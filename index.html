@@ -2432,6 +2432,10 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="nav-item" onclick="goTo('bilan-promotion')" data-page="bilan-promotion">
         <span class="nav-icon">💹</span><span>Bilan de Promotion</span>
       </div>
+          <div class="nav-item" onclick="goTo('validations')" data-page="validations">
+        <span class="nav-icon">✅</span><span>Validations</span>
+        <span class="nav-badge" id="badge-validations-pilotage" style="display:none;">0</span>
+      </div>
         </div>
       </div>
 
@@ -2511,9 +2515,6 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
       </div>
           <div class="nav-item" onclick="goTo('avancement')" data-page="avancement">
         <span class="nav-icon">📈</span><span>Suivi Chantiers</span>
-      </div>
-          <div class="nav-item" onclick="goTo('validations')" data-page="validations">
-        <span class="nav-icon">✅</span><span>Validations</span>
       </div>
         </div>
       </div>
@@ -5305,16 +5306,22 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
       <div class="page" id="page-validations">
         <div class="page-header">
           <div>
-            <div class="step-badge">Contrôle interne</div>
-            <div class="page-title">✅ Validations hiérarchiques</div>
-            <div class="page-subtitle">Engagements et actes soumis au visa de la Direction</div>
+            <div class="step-badge">● Pilotage</div>
+            <div class="page-title">✅ Validations</div>
+            <div class="page-subtitle">Tout ce qui attend une décision — chantier, trésorerie et budget, au même endroit</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <label style="font-size:11px;color:var(--dim);">🏢 Secteur d'activité</label>
+            <select class="filter-select" id="val-filtre-division" onchange="renderPageValidations()">
+              <option value="">Toutes divisions</option>
+            </select>
           </div>
         </div>
         <div class="kpi-grid" id="kpi-validations" style="margin-bottom:18px;"></div>
-        <div class="steps-nav" style="margin-bottom:18px;">
+        <div class="steps-nav" style="margin-bottom:10px;">
           <div class="etape">
-            <div class="etape-hd"><span class="etape-num">1</span>Circuit de validation</div>
-            <div class="etape-btns">
+            <div class="etape-hd"><span class="etape-num">1</span>Chantier & achats — circuit de validation</div>
+            <div class="etape-btns" id="val-filter-tabs">
               <button class="tab-btn active" onclick="valSetFilter('en_attente')"><i>⏳</i>En attente</button>
               <button class="tab-btn" onclick="valSetFilter('histo')"><i>📜</i>Historique</button>
             </div>
@@ -5325,6 +5332,26 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <thead><tr><th>Type</th><th>Objet</th><th style="text-align:right;">Montant</th><th>Demandeur</th><th>Date</th><th>Statut</th><th></th></tr></thead>
           <tbody id="tbody-validations"></tbody>
         </table></div></div>
+
+        <div class="steps-nav" style="margin:18px 0 10px;">
+          <div class="etape">
+            <div class="etape-hd"><span class="etape-num">2</span>Trésorerie & budget</div>
+            <div class="etape-btns">
+              <button class="tab-btn active" onclick="switchTab('validations','caisse')">💰 Mouvements de caisse <span class="nav-badge" id="badge-tab-valid-caisse" style="display:none;position:static;margin-left:4px;">0</span></button>
+              <button class="tab-btn" onclick="switchTab('validations','fed')">📝 Engagements de dépense <span class="nav-badge" id="badge-tab-valid-fed" style="display:none;position:static;margin-left:4px;">0</span></button>
+              <button class="tab-btn" onclick="switchTab('validations','transferts')">🔀 Transferts budgétaires <span class="nav-badge" id="badge-tab-valid-transferts" style="display:none;position:static;margin-left:4px;">0</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="tab-pane active" id="tab-validations-caisse">
+          <div id="validations-caisse-box"></div>
+        </div>
+        <div class="tab-pane" id="tab-validations-fed">
+          <div id="validations-fed-box"></div>
+        </div>
+        <div class="tab-pane" id="tab-validations-transferts">
+          <div id="validations-transferts-box"></div>
+        </div>
       </div>
 
       <!-- ══ RÉCEPTION & LIVRAISON ══════════════════════════════════ -->
@@ -11571,7 +11598,16 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <button class="tab-btn active" onclick="switchTab('caisse','ventilation')">🧾 Ventilation comptable des mouvements de caisse</button>
             <button class="tab-btn" onclick="switchTab('caisse','decaissements')">💵 Décaissements à faire</button>
             <button class="tab-btn" onclick="switchTab('caisse','tiers')">💰 Comptabilité tiers</button>
+            <button class="tab-btn" onclick="switchTab('caisse','mesdemandes')">📋 Mes demandes de validation <span class="nav-badge" id="badge-tab-mesdemandes" style="display:none;position:static;margin-left:4px;">0</span></button>
             <button class="tab-btn" id="caisse-tab-btn-audit" onclick="switchTab('caisse','audit')" style="display:none;" title="Réservé aux administrateurs">🔍 Audit</button>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-caisse-mesdemandes">
+          <div class="card">
+            <div class="card-title" style="margin-bottom:2px;">📋 Mes demandes de validation</div>
+            <div style="font-size:11px;color:var(--dim);margin-bottom:10px;">Tous vos mouvements soumis à validation — en attente, validés ou rejetés — pour suivre où en est chaque demande sans avoir à redemander.</div>
+            <div id="caisse-mesdemandes-box"></div>
           </div>
         </div>
 
@@ -14759,6 +14795,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <button class="tab-btn" onclick="switchTab('budget','fed')">📝 Engagements de dépense</button>
           <button class="tab-btn" onclick="switchTab('budget','transferts')">🔀 Transferts</button>
           <button class="tab-btn" onclick="switchTab('budget','exploitation')">📈 Compte d'exploitation prévisionnel</button>
+          <button class="tab-btn" onclick="switchTab('budget','da')">🖨️ Demandes d'Achat <span class="nav-badge" id="badge-tab-budget-da" style="display:none;position:static;margin-left:4px;">0</span></button>
+          <button class="tab-btn" onclick="switchTab('budget','mesdemandes')">📋 Mes demandes <span class="nav-badge" id="badge-tab-budget-mesdemandes" style="display:none;position:static;margin-left:4px;">0</span></button>
         </div>
 
         <!-- ── Onglet Budget prévisionnel ── -->
@@ -14822,6 +14860,23 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="card">
             <div id="cexp-box" style="overflow-x:auto;"></div>
           </div>
+        </div>
+
+        <!-- ── Onglet Demandes d'Achat (DA) — FED validées, prêtes à imprimer ── -->
+        <div class="tab-pane" id="tab-budget-da">
+          <div class="card" style="margin-bottom:14px;">
+            <div style="font-size:12px;color:var(--blanc-dim);">Fiches d'engagement de dépense validées, devenues Demandes d'Achat — imprimables et suivies jusqu'à leur décaissement en caisse.</div>
+          </div>
+          <div id="budget-da-box"></div>
+        </div>
+
+        <!-- ── Onglet Mes demandes — FED et transferts soumis par l'utilisateur courant ── -->
+        <div class="tab-pane" id="tab-budget-mesdemandes">
+          <div class="card" style="margin-bottom:14px;">
+            <div class="card-title" style="margin-bottom:2px;">📋 Mes demandes</div>
+            <div style="font-size:11px;color:var(--dim);">Tous vos engagements de dépense et transferts budgétaires soumis — en attente, validés ou rejetés — pour suivre où en est chaque demande sans avoir à redemander.</div>
+          </div>
+          <div id="budget-mesdemandes-box"></div>
         </div>
       </div>
 
@@ -25727,6 +25782,78 @@ async function _pullTable(table) {
   return { rows: all, incremental: false };
 }
 
+/* Traite les lignes déjà récupérées pour UNE table (fusion remote-wins,
+   tombstones, avancement du curseur) — extrait de la boucle historique pour
+   être appelable aussi bien depuis le nouveau chemin groupé (RPC, un seul
+   aller-retour pour les ~150 tables) que depuis l'ancien chemin séquentiel
+   (repli automatique si la fonction RPC est indisponible). Retourne le
+   nombre de lignes effectivement appliquées. */
+async function _appliquerLignesPullTable(table, store, rows) {
+  var appliquees = 0;
+  if (!rows || !rows.length) return 0;
+  var _tsMax = _pullCurseurs()[table] || '';
+  if (!DATA[store]) DATA[store] = [];
+  var byId = {};
+  DATA[store].forEach(function(x){ if (x && x.id !== undefined) byId[String(x.id)] = x; });
+  for (var j = 0; j < rows.length; j++) {
+    var r = _supaUnwrap(table, rows[j]);
+    if (!r || r.id === undefined) continue;
+    if (typeof tombHas === 'function' && tombHas(store, r.id)) { try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, r.id); } catch(e){} continue; }
+    var ex = byId[String(r.id)];
+    if (_remoteWins(r, ex)) {
+      byId[String(r.id)] = r;
+      try { await dbPut(store, r); } catch(e) {}
+      appliquees++;
+    }
+  }
+  for (var jt = 0; jt < rows.length; jt++) {
+    var _u = rows[jt] && rows[jt].updated_at;
+    if (_u && (!_tsMax || _u > _tsMax)) _tsMax = _u;
+  }
+  if (_tsMax) _pullCurseurSet(table, _tsMax);
+  DATA[store] = Object.keys(byId).map(function(k){ return byId[k]; });
+  return appliquees;
+}
+
+/* [Correctif charge Supabase — 02/09] La synchro incrémentale, bien que
+   correcte table par table, faisait ~150 ALLERS-RETOURS HTTP SÉPARÉS par
+   cycle — un par table du SUPA_STORE_MAP — même quand rien n'avait changé.
+   Avec plusieurs postes ouverts, ce volume de requêtes (indépendant du
+   volume réel de données) suffit à lui seul à saturer un compute réduit.
+   Cette fonction regroupe tout en UN SEUL appel RPC côté base
+   (pull_incremental), qui interroge les ~150 tables côté serveur et
+   renvoie tout d'un coup. Repli automatique et silencieux sur l'ancienne
+   méthode séquentielle si la fonction RPC n'existe pas encore côté
+   Supabase (compatible avant/après migration) ou si l'appel échoue pour
+   toute autre raison — jamais de blocage total de la synchro sur ce point. */
+async function _pullBatchViaRPC() {
+  var curseurs = {};
+  var tablesConcernees = [];
+  for (var i = 0; i < SUPA_STORE_MAP.length; i++) {
+    var table = SUPA_STORE_MAP[i][0], store = SUPA_STORE_MAP[i][1];
+    if (store === 'suppressions_sync') continue;
+    var complet = PULL_TOUJOURS_COMPLET.indexOf(table) !== -1 || PULL_INCR_INAPTES[table];
+    curseurs[table] = complet ? '' : (_pullCurseurs()[table] || '');
+    tablesConcernees.push([table, store]);
+  }
+  var body = JSON.stringify({ cursors: curseurs });
+  var url = SB.url.replace(/\/+$/,'') + '/rest/v1/rpc/pull_incremental';
+  var resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + SB.key, 'Content-Type': 'application/json' },
+    body: body
+  });
+  if (!resp.ok) throw new Error('RPC pull_incremental indisponible (' + resp.status + ')');
+  var data = await resp.json();
+  var total = 0;
+  for (var k = 0; k < tablesConcernees.length; k++) {
+    var t = tablesConcernees[k][0], s = tablesConcernees[k][1];
+    var rows = data && data[t];
+    if (rows && rows.length) total += await _appliquerLignesPullTable(t, s, rows);
+  }
+  return total;
+}
+
 async function pullFromCloudSilent() {
   if (!navigator.onLine) return;
   getSBConfig();
@@ -25756,51 +25883,28 @@ async function pullFromCloudSilent() {
       }
     } catch(e) { /* suppressions inaccessibles → le filet de fin de cycle reste actif */ }
 
+    /* ── PHASE 1 — Tentative du chemin groupé (1 seul aller-retour RPC pour
+       les ~150 tables) — bien plus léger pour le serveur qu'une boucle de
+       150 requêtes séparées. Si la fonction pull_incremental n'existe pas
+       encore côté Supabase (avant migration) ou échoue pour toute autre
+       raison, repli SILENCIEUX et complet sur l'ancienne méthode
+       séquentielle juste en dessous — aucune perte de service. ── */
+    var _rpcReussi = false;
+    try {
+      var _totalRPC = await _pullBatchViaRPC();
+      total += _totalRPC;
+      _rpcReussi = true;
+    } catch(eRpc) { _rpcReussi = false; }
+
+    if (!_rpcReussi) {
     for (var i = 0; i < SUPA_STORE_MAP.length; i++) {
       var table = SUPA_STORE_MAP[i][0], store = SUPA_STORE_MAP[i][1];
       if (store === 'suppressions_sync') continue; /* déjà traité en phase 0 */
       try {
         var _res = await _pullTable(table);
         var rows = _res.rows;
-        var _tsMax = _pullCurseurs()[table] || '';
-        if (!rows || !rows.length) {
-          /* [FIX] On n'avance PLUS le curseur sur l'horloge locale.
-             L'ancien code posait le curseur à new Date() du POSTE : dès que
-             cette horloge devançait celle du serveur — décalage de quelques
-             minutes, fuseau mal réglé, simple latence — toutes les lignes
-             créées par un autre poste dans cet intervalle passaient
-             définitivement sous le curseur et n'étaient JAMAIS tirées. Symptôme
-             exact : « un collaborateur a enregistré, je ne vois rien même après
-             synchronisation », sans aucun message d'erreur.
-             Le curseur n'avance désormais que sur un updated_at réellement
-             reçu du serveur (voir plus bas) : c'est la seule horloge commune.
-             Ne pas avancer coûte une requête vide au cycle suivant — sans
-             comparaison avec la perte silencieuse de données. */
-          continue;
-        }
-        if (!DATA[store]) DATA[store] = [];
-        var byId = {};
-        DATA[store].forEach(function(x){ if (x && x.id !== undefined) byId[String(x.id)] = x; });
-        for (var j = 0; j < rows.length; j++) {
-          var r = _supaUnwrap(table, rows[j]);
-          if (!r || r.id === undefined) continue;
-          if (typeof tombHas === 'function' && tombHas(store, r.id)) { try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, r.id); } catch(e){} continue; }
-          var ex = byId[String(r.id)];
-          if (_remoteWins(r, ex)) {
-            byId[String(r.id)] = r;
-            try { await dbPut(store, r); } catch(e) {}   // _pulling=true → pas marqué dirty
-            total++;
-          }
-        }
-        /* Curseur = horodatage serveur le plus récent réellement reçu. On ne
-           prend pas l'heure locale : une horloge de poste décalée ferait
-           sauter des enregistrements au cycle suivant. */
-        for (var jt = 0; jt < rows.length; jt++) {
-          var _u = rows[jt] && rows[jt].updated_at;
-          if (_u && (!_tsMax || _u > _tsMax)) _tsMax = _u;
-        }
-        if (_tsMax) _pullCurseurSet(table, _tsMax);
-        DATA[store] = Object.keys(byId).map(function(k){ return byId[k]; });
+        var _appliquees = await _appliquerLignesPullTable(table, store, rows);
+        total += _appliquees;
         /* NB : pour 'custom_roles', on NE reconstruit PAS CUSTOM_ROLES ici en
            copiant les lignes brutes — cela réinjecterait les surcharges de
            rôles système (is_override, id "xxx_override") comme de faux rôles
@@ -25808,6 +25912,7 @@ async function pullFromCloudSilent() {
            bas dès que total > 0, s'en charge correctement en repliant chaque
            surcharge sur le rôle système d'origine. */
       } catch(tableErr) { /* une table en erreur ne bloque pas les autres */ }
+    }
     }
   } finally {
     _pulling = false;
@@ -27277,6 +27382,7 @@ function goTo(page) {
   if (page === 'lbcft') { lbcRender(); }
   if (page === 'parc-auto') { paEnter(); }
   if (page === 'budget') { if (typeof budgetInitFiltres === 'function') budgetInitFiltres(); if (typeof budgetRenderPrevisionnel === 'function') budgetRenderPrevisionnel(); }
+  if (page === 'validations' && typeof renderPageValidations === 'function') renderPageValidations();
 }
 
 function switchTab(context, tab) {
@@ -27291,7 +27397,9 @@ function switchTab(context, tab) {
     if (tab==='decaissements' && typeof caisseRenderDecaissementsAFaire==='function') caisseRenderDecaissementsAFaire();
     if (tab==='tiers' && typeof caisseRenderBalanceAgee==='function') caisseRenderBalanceAgee();
     if (tab==='audit' && typeof renderCaisseAudit==='function') renderCaisseAudit();
+    if (tab==='mesdemandes' && typeof caisseRenderMesDemandes==='function') caisseRenderMesDemandes();
   }
+  if (context==='validations' && typeof renderPageValidations==='function') renderPageValidations();
   if (context==='lbcft') {
     if (tab==='alertes' && typeof lbcRenderAlertes==='function') lbcRenderAlertes();
     if (tab==='kyc' && typeof lbcRenderKyc==='function') lbcRenderKyc();
@@ -27430,6 +27538,8 @@ function switchTab(context, tab) {
     if (tab === 'fed' && typeof budgetRenderFed === 'function') budgetRenderFed();
     if (tab === 'transferts' && typeof budgetRenderTransferts === 'function') budgetRenderTransferts();
     if (tab === 'exploitation' && typeof renderCompteExploitationPrevisionnel === 'function') renderCompteExploitationPrevisionnel();
+    if (tab === 'da' && typeof budgetRenderDA === 'function') budgetRenderDA();
+    if (tab === 'mesdemandes' && typeof budgetRenderMesDemandes === 'function') budgetRenderMesDemandes();
   }
 
   /* Mettre à jour les boutons .tab-btn du même contexte */
@@ -28905,6 +29015,7 @@ function getDashPeriodeFilter() {
 function refreshDashboard() {
   document.getElementById('dash-date').textContent =
     new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  try { if (typeof _majBadgeValidationsPilotage === 'function') _majBadgeValidationsPilotage(); } catch(e){}
 
   var _pmin = getDashPeriodeFilter();
   var _cesAll = DATA.cessions_foncieres || [];
@@ -34028,7 +34139,15 @@ function rebuildPlanComptable() {
   var supprimes = p.plan_comptable_supprimes || [];
   var modifs    = p.plan_comptable_modifs || {};
   var ajouts    = p.plan_comptable_custom || [];
+  /* [FIX] Garde-fou étendu à baseSource elle-même — jusqu'ici seuls les
+     comptes personnalisés (ajouts) étaient filtrés contre les entrées
+     null/undefined ; si la base (chargée depuis le cloud/params) contenait
+     ne serait-ce qu'un trou, tout .find(c => c.code === ...) en aval de
+     l'application plantait sur "Cannot read properties of undefined
+     (reading 'code')" — confirmé en production sur l'onglet Ventilation
+     de caisse (03/09). */
   APP.planComptable = baseSource
+    .filter(function(c){ return c && c.code; })
     .filter(function(c){ return supprimes.indexOf(c.code) === -1; })
     .map(function(c){ return modifs[c.code] ? Object.assign({}, c, modifs[c.code]) : c; })
     .concat((ajouts || []).filter(function(c){ return c && c.code; })); /* garde-fou : rejette null/undefined/entrées sans code — évite un plan comptable corrompu de faire planter l'arborescence */
@@ -42543,8 +42662,16 @@ function userScopeDivision() {
 function userPlafond() {
   if (!APP.currentUser) return Infinity;
   var r = getAllRoles()[APP.currentUser.role];
-  var v = r && parseFloat(r.plafond_validation);
-  return (v && v > 0) ? v : Infinity;
+  /* [FIX] "0 && v > 0" vaut faux en JS — un plafond fixé à 0 (tolérance
+     zéro : tout doit être validé) était donc traité comme "illimité"
+     (Infinity), l'exact inverse de l'intention. Un rôle sans plafond
+     configuré (plafond_validation absent/vide/NaN) reste illimité comme
+     avant ; un plafond explicitement à 0 est désormais un vrai zéro. */
+  if (!r) return Infinity;
+  var brut = r.plafond_validation;
+  if (brut === undefined || brut === null || brut === '') return Infinity;
+  var v = parseFloat(brut);
+  return (!isNaN(v) && v >= 0) ? v : Infinity;
 }
 
 function userPeutSupprimer() {
@@ -43287,7 +43414,10 @@ function openRoleModal(roleId) {
     var sc = document.getElementById('role-scope-division');
     if (sc) sc.value = (r && r.scope_division) || 'toutes';
     var pl = document.getElementById('role-plafond');
-    if (pl) pl.value = (r && r.plafond_validation) || '';
+    /* [FIX] Même bug que userPlafond() : "0 || ''" efface un plafond
+       explicitement fixé à 0 en réouvrant le formulaire — l'admin le
+       croyait alors non enregistré. */
+    if (pl) pl.value = (r && r.plafond_validation !== undefined && r.plafond_validation !== null) ? r.plafond_validation : '';
     if (typeof buildModulesGrid === 'function' && r) buildModulesGrid(r.permissions, r.droits);
     if (typeof _rolesMajDroits === 'function') _rolesMajDroits();
   }, 30);
@@ -43416,7 +43546,13 @@ async function saveRoleFromModal() {
   var _peutSup = _cbSup ? !!_cbSup.checked : true;
   var _droits  = (typeof _collecterDroits === 'function') ? _collecterDroits() : {};
   var _scope   = ((document.getElementById('role-scope-division') || {}).value) || 'toutes';
-  var _plafond = parseFloat((document.getElementById('role-plafond') || {}).value) || 0;
+  /* [FIX] "parseFloat('') || 0" transformait un champ laissé VIDE (intention :
+     pas de plafond, illimité) en plafond explicite à 0 (tolérance zéro,
+     tout doit être validé) — l'inverse total de l'intention. On distingue
+     désormais "vide" (null → illimité, cf. userPlafond) de "0" tapé
+     explicitement (zéro réel). */
+  var _plafondBrut = (document.getElementById('role-plafond') || {}).value;
+  var _plafond = (_plafondBrut === '' || _plafondBrut === undefined) ? null : (parseFloat(_plafondBrut) || 0);
   if (!hasRole('admin')) { toast('⛔ Réservé aux administrateurs.', 'error'); return; }
   var nom   = (document.getElementById('role-nom')||{}).value.trim();
   var icon  = (document.getElementById('role-icon')||{}).value.trim();
@@ -94214,6 +94350,127 @@ async function daSupprimer(id) {
   toast('Supprimée.', 'info');
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   ONGLET « Demandes d'Achat » — fiches validées (donc devenues DA),
+   listées pour impression et suivi jusqu'au décaissement. Symétrique de
+   « Décaissements à faire » côté Caisse.
+   ══════════════════════════════════════════════════════════════════════ */
+function budgetRenderDA() {
+  var box = document.getElementById('budget-da-box'); if (!box) return;
+  var liste = (DATA.fiches_engagement_depense||[]).filter(function(d){ return d.statut === 'validee' || d.statut === 'decaissee'; })
+    .sort(function(a,b){ return (b.valide_le||'').localeCompare(a.valide_le||''); });
+  var badge = document.getElementById('badge-tab-budget-da');
+  var nbAImprimer = liste.filter(function(d){ return d.statut === 'validee'; }).length;
+  if (badge) { badge.textContent = nbAImprimer; badge.style.display = nbAImprimer ? 'inline-block' : 'none'; }
+  if (!liste.length) { box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune Demande d\'Achat pour l\'instant — une fiche apparaît ici dès qu\'elle est validée.</div>'; return; }
+
+  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N° DA</th><th>Objet</th><th>Ligne</th><th style="text-align:right;">Montant</th><th>Validée par</th><th>Statut</th><th></th></tr></thead><tbody>';
+  liste.forEach(function(d) {
+    html += '<tr>'
+      + '<td><b>' + escHtml(d.numero_da||'') + '</b><div style="font-size:10px;color:var(--blanc-dim);">ex-' + escHtml(d.numero_fed||'') + '</div></td>'
+      + '<td>' + escHtml(d.objet||'') + '</td><td>' + escHtml(d.compte||'') + '</td>'
+      + '<td style="text-align:right;font-weight:700;">' + fmtF(d.montant) + ' F</td>'
+      + '<td style="font-size:11px;">' + escHtml(d.valide_par||'') + '<br><span style="color:var(--blanc-dim);">' + (d.valide_le||'').slice(0,10) + '</span></td>'
+      + '<td>' + (d.statut === 'decaissee'
+          ? '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Payée le ' + dateShort(d.decaisse_le) + '</span>'
+          : '<span class="badge" style="background:rgba(184,115,51,0.15);color:var(--or);">🕓 À décaisser</span>')
+      + '</td>'
+      + '<td><button class="btn btn-secondary btn-sm btn-icon" title="Imprimer la DA" onclick="imprimerDA(\'' + d.id + '\')">🖨️</button></td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+  box.innerHTML = html;
+}
+
+function imprimerDA(id) {
+  var d = (DATA.fiches_engagement_depense||[]).find(function(x){ return x.id===id; }); if (!d) return;
+  if (d.statut !== 'validee' && d.statut !== 'decaissee') { toast('🔒 Seule une Demande d\'Achat validée peut être imprimée.', 'error'); return; }
+  var p = DATA.params || {};
+  var divLabel = d.division_id ? _nomDivision(d.division_id) : '';
+  var lignesHtml = (d.lignes||[]).map(function(l){
+    return '<tr><td style="padding:6px 0;">' + escHtml(l.designation) + '</td>'
+      + '<td style="text-align:right;padding:6px 0;">' + (l.qte||0) + '</td>'
+      + '<td style="text-align:right;padding:6px 0;">' + fmtF(l.pu) + ' F</td>'
+      + '<td style="text-align:right;padding:6px 0;font-weight:700;">' + fmtF((l.qte||0)*(l.pu||0)) + ' F</td></tr>';
+  }).join('');
+  var visaHtml = '<div style="margin-top:14px;padding:8px 12px;background:#F0FDF4;border:1px solid #16A34A;border-radius:6px;font-size:12px;">'
+    + '<b>✅ Visa de la hiérarchie</b> — validée par ' + escHtml(d.valide_par||'—') + ' le ' + (d.valide_le ? (d.valide_le||'').replace('T',' ').slice(0,16) : '—')
+    + '</div>';
+  var html = '<div style="font-family:Georgia,serif;max-width:680px;margin:0 auto;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #B87333;padding-bottom:16px;margin-bottom:20px;">'
+    + '<div style="display:flex;align-items:center;gap:12px;">'
+    + (getLogoForPrint() ? '<img src="'+getLogoForPrint()+'" style="height:48px;object-fit:contain;"/>' : '')
+    + '<div><h2 style="color:#B87333;font-size:18px;margin:0;">'+escHtml(p.societe||'ImmoSuite ERP')+'</h2></div></div>'
+    + '<div style="text-align:right;"><h3 style="color:#B87333;margin:0;">DEMANDE D\'ACHAT</h3><p style="font-size:13px;margin:2px 0 0;">'+escHtml(d.numero_da||'')+'</p></div>'
+    + '</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">'
+    + '<tr><td style="padding:4px 0;width:35%;color:#666;">Objet</td><td style="padding:4px 0;font-weight:700;">' + escHtml(d.objet||'') + '</td></tr>'
+    + '<tr><td style="padding:4px 0;color:#666;">Ligne budgétaire</td><td style="padding:4px 0;">' + escHtml(d.compte||'') + '</td></tr>'
+    + (divLabel ? '<tr><td style="padding:4px 0;color:#666;">Division</td><td style="padding:4px 0;">' + escHtml(divLabel) + '</td></tr>' : '')
+    + '<tr><td style="padding:4px 0;color:#666;">Bénéficiaire / Fournisseur</td><td style="padding:4px 0;">' + escHtml(d.beneficiaire||'') + '</td></tr>'
+    + '</table>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="border-bottom:2px solid #333;"><th style="text-align:left;padding:6px 0;">Désignation</th><th style="text-align:right;">Qté</th><th style="text-align:right;">P.U.</th><th style="text-align:right;">Total</th></tr></thead>'
+    + '<tbody>' + lignesHtml + '</tbody>'
+    + '<tfoot><tr style="border-top:2px solid #333;font-weight:800;"><td colspan="3" style="padding:8px 0;text-align:right;">TOTAL</td><td style="text-align:right;padding:8px 0;font-size:16px;">' + fmtF(d.montant) + ' F</td></tr></tfoot></table>'
+    + visaHtml
+    + '<div style="display:flex;justify-content:space-between;margin-top:60px;font-size:12px;">'
+    + '<div>Demandeur<br><br><br>___________________<br>' + escHtml(d.soumis_par||'') + '</div>'
+    + '<div>Fournisseur / Bénéficiaire<br><br><br>___________________</div>'
+    + '</div></div>';
+  openPrintPreview(html, 'DA — ' + (d.numero_da||''));
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ONGLET « Mes demandes » — engagements de dépense ET transferts
+   budgétaires soumis par l'utilisateur courant, tous statuts confondus.
+   Symétrique de « Mes demandes de validation » côté Caisse.
+   ══════════════════════════════════════════════════════════════════════ */
+function budgetRenderMesDemandes() {
+  var box = document.getElementById('budget-mesdemandes-box'); if (!box) return;
+  var monNom = (APP.currentUser && APP.currentUser.nom) || '';
+  var fed = (DATA.fiches_engagement_depense||[]).filter(function(d){ return d.soumis_par === monNom; })
+    .map(function(d){ return { type:'FED', ref: fedLabelDocument(d), objet: d.objet, montant: d.montant, statut: d.statut, motif_rejet: d.motif_rejet, valide_par: d.valide_par, valide_le: d.valide_le, tri: d.soumis_le||d.created_at }; });
+  var transferts = (DATA.transferts_budgetaires||[]).filter(function(t){ return t.soumis_par === monNom; })
+    .map(function(t){ return { type:'Transfert', ref: (t.compte_source||'')+' → '+(t.compte_dest||''), objet: t.motif, montant: t.montant, statut: t.statut, motif_rejet: t.motif_rejet, valide_par: t.valide_par, valide_le: t.valide_le, tri: t.soumis_le||t.created_at }; });
+  var liste = fed.concat(transferts).sort(function(a,b){ return (b.tri||'').localeCompare(a.tri||''); });
+
+  var enAttente = liste.filter(function(x){ return x.statut === 'soumise' || x.statut === 'soumis'; }).length;
+  var badge = document.getElementById('badge-tab-budget-mesdemandes');
+  if (badge) { badge.textContent = enAttente; badge.style.display = enAttente ? 'inline-block' : 'none'; }
+  if (!liste.length) { box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune demande soumise pour l\'instant.</div>'; return; }
+
+  var STATUT_BADGE = {
+    brouillon:   '<span class="badge" style="background:rgba(255,255,255,0.08);color:var(--blanc-dim);">📝 Brouillon</span>',
+    soumise:     '<span class="badge" style="background:rgba(184,115,51,0.15);color:var(--or);">⏳ En attente</span>',
+    soumis:      '<span class="badge" style="background:rgba(184,115,51,0.15);color:var(--or);">⏳ En attente</span>',
+    validee:     '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Validé</span>',
+    valide:      '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Validé</span>',
+    decaissee:   '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Payée</span>',
+    rejetee:     '<span class="badge" style="background:rgba(220,53,69,0.15);color:var(--rouge);">✖ Rejeté</span>',
+    rejete:      '<span class="badge" style="background:rgba(220,53,69,0.15);color:var(--rouge);">✖ Rejeté</span>'
+  };
+
+  var html = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Type</th><th>N°</th><th>Objet / Motif</th><th style="text-align:right;">Montant</th><th>Statut</th><th>Décision</th></tr></thead><tbody>';
+  liste.forEach(function(x) {
+    var decisionHtml = '—';
+    if (x.statut === 'validee' || x.statut === 'valide' || x.statut === 'decaissee') {
+      decisionHtml = escHtml(x.valide_par||'') + '<br><span style="font-size:10px;color:var(--blanc-dim);">' + (x.valide_le||'').slice(0,16).replace('T',' ') + '</span>';
+    } else if (x.statut === 'rejetee' || x.statut === 'rejete') {
+      decisionHtml = escHtml(x.valide_par||'') + (x.motif_rejet ? '<br><span style="font-size:10px;color:var(--rouge);">' + escHtml(x.motif_rejet) + '</span>' : '');
+    }
+    html += '<tr>'
+      + '<td><span class="badge" style="background:rgba(255,255,255,0.08);">' + x.type + '</span></td>'
+      + '<td>' + escHtml(x.ref||'') + '</td>'
+      + '<td>' + escHtml(x.objet||'') + '</td>'
+      + '<td style="text-align:right;font-weight:700;">' + fmtF(x.montant) + ' F</td>'
+      + '<td>' + (STATUT_BADGE[x.statut] || x.statut) + '</td>'
+      + '<td style="font-size:11px;">' + decisionHtml + '</td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  box.innerHTML = html;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    RENDU DES 3 LISTES — Budget prévisionnel, Fiches d'Engagement/DA, Transferts
    ═══════════════════════════════════════════════════════════════════════ */
@@ -96110,7 +96367,7 @@ async function submitBC(id){
   if(v){ b.statut='en_attente_validation'; await dbPut('bons_commande',b); if(typeof syncToSupabase==='function')syncToSupabase('pi_bons_commande',b); renderAchats(); etudesLiveRefresh('bons_commande'); etudesLiveRefresh('validations'); toast('📤 Soumis à validation.','success'); }
 }
 var valFilter='en_attente';
-function valSetFilter(fl){ valFilter=fl; document.querySelectorAll('#page-validations .tab-btn').forEach(function(b){ b.classList.toggle('active', (b.getAttribute('onclick')||'').indexOf("'"+fl+"'")!==-1); }); renderValidations(); }
+function valSetFilter(fl){ valFilter=fl; document.querySelectorAll('#val-filter-tabs .tab-btn').forEach(function(b){ b.classList.toggle('active', (b.getAttribute('onclick')||'').indexOf("'"+fl+"'")!==-1); }); renderValidations(); }
 function valReject(id){ var m=prompt('Motif du rejet ?',''); if(m===null)return; valDecide(id,'rejete',m||''); }
 function renderValidations(){
   var all=(DATA.validations||[]);
@@ -113493,6 +113750,7 @@ async function caisseEnter() {
      fil des tentatives de reconnexion réseau. */
   try { caisseRenderBalanceAgee(); } catch(e) { console.warn('[Caisse] Balance tiers non affichée :', e); }
   try { caisseRenderDecaissementsAFaire(); } catch(e) { console.warn('[Caisse] Décaissements à faire non affichés :', e); }
+  try { if (typeof caisseRenderMesDemandes === 'function') caisseRenderMesDemandes(); } catch(e) { console.warn('[Caisse] Mes demandes non affichées :', e); }
   /* [Retiré v14.60] caisseRenderBudgets() — voir note dans le HTML de la page Caisse */
 
   var btnNew = document.getElementById('btn-caisse-nouvelle');
@@ -113988,27 +114246,18 @@ async function caisseSaveBon() {
     mvt.modifie_par = (APP.currentUser && APP.currentUser.nom) || '—';
     mvt.modifie_le = new Date().toISOString();
 
-    /* Une modification qui fait franchir (ou repasser sous) le plafond de
-       l'auteur de la modification réévalue le besoin de validation — sur la
-       base du plafond de la personne qui modifie, pas de celle qui a créé le
-       bon à l'origine. Un bon déjà validé le reste (on ne redemande pas une
-       approbation déjà obtenue si le nouveau montant reste dans les clous du
-       validateur d'origine) ; s'il redevient au-delà du plafond du modificateur
-       et n'avait jamais été validé, il repasse en attente. */
+    /* [ÉVOLUTION] Toute modification d'un bon pas encore validé repasse (ou
+       reste) en attente de validation, quel que soit le plafond de la
+       personne qui modifie — plus d'exception pour un plafond illimité. */
     if ((type === 'sortie' || type === 'entree') && !mvt.valide) {
       var _plafondMod = (typeof userPlafond === 'function') ? userPlafond() : Infinity;
       var _etaitDejaEnAttente = !!mvt.requiert_validation;
-      if (isFinite(_plafondMod)) {
-        mvt.requiert_validation = true; mvt.valide = false; mvt.rejete = false;
-        mvt.plafond_demandeur = _plafondMod;
-        mvt.demande_par = (APP.currentUser && APP.currentUser.nom) || '—';
-        mvt.demande_role = (APP.currentUser && APP.currentUser.role) || '';
-        mvt.demande_le = new Date().toISOString();
-        var _nouvelleDemande = !_etaitDejaEnAttente;
-      } else {
-        mvt.requiert_validation = false;
-        mvt.rejete = false; /* un bon corrigé par un auteur au plafond illimité n'est plus "rejeté" : l'icône ✖ ne doit pas rester collée */
-      }
+      mvt.requiert_validation = true; mvt.valide = false; mvt.rejete = false;
+      mvt.plafond_demandeur = _plafondMod;
+      mvt.demande_par = (APP.currentUser && APP.currentUser.nom) || '—';
+      mvt.demande_role = (APP.currentUser && APP.currentUser.role) || '';
+      mvt.demande_le = new Date().toISOString();
+      var _nouvelleDemande = !_etaitDejaEnAttente;
     }
 
     if (etaitVentile && compteV) {
@@ -114096,26 +114345,25 @@ async function caisseSaveBon() {
   };
   /* ── HABILITATION DE VALIDATION DES MOUVEMENTS DE CAISSE ───────────────
      [ÉVOLUTION] Sur demande explicite du DG : tout mouvement (entrée ET
-     sortie), quel que soit le montant, doit être validé avant de compter
-     dans le solde — plus de seuil (l'ancien système ne concernait que les
-     sorties dépassant le plafond de l'auteur). Le plafond du rôle continue
-     de déterminer QUI peut valider (délégation : un remplaçant désigné,
-     ex. Manager, avec un plafond élevé mais fini, peut valider en
-     l'absence du DG — cf. Rôles & Accès). Seul un auteur au plafond
-     illimité (le DG lui-même, ou tout rôle sans plafond défini) déclenche
-     encore aucune validation : lui demander de s'auto-valider n'aurait
-     aucune valeur de contrôle. */
+     sortie), quel que soit le montant ET quel que soit le plafond de
+     l'auteur, doit être validé avant de compter dans le solde — y compris
+     les propres écritures du DG. Plus aucune exception : l'ancienne
+     dispense pour un auteur au plafond illimité est supprimée. Le plafond
+     du rôle du VALIDATEUR (pas de l'auteur) continue de déterminer qui
+     peut approuver quoi (délégation : un remplaçant désigné, ex. Manager,
+     peut valider en l'absence du DG — cf. Rôles & Accès) ; un auteur au
+     plafond illimité peut toujours s'auto-approuver depuis l'écran de
+     validation (aucun autre validateur "au-dessus" n'existe pour lui),
+     mais cette étape reste désormais obligatoire pour lui aussi. */
   if (type === 'sortie' || type === 'entree') {
     var _plafondAuteur = (typeof userPlafond === 'function') ? userPlafond() : Infinity;
-    if (isFinite(_plafondAuteur)) {
-      nouveau.requiert_validation = true;
-      nouveau.valide = false;
-      nouveau.rejete = false;
-      nouveau.plafond_demandeur = _plafondAuteur;
-      nouveau.demande_par = (APP.currentUser && APP.currentUser.nom) || '—';
-      nouveau.demande_role = (APP.currentUser && APP.currentUser.role) || '';
-      nouveau.demande_le = new Date().toISOString();
-    }
+    nouveau.requiert_validation = true;
+    nouveau.valide = false;
+    nouveau.rejete = false;
+    nouveau.plafond_demandeur = _plafondAuteur;
+    nouveau.demande_par = (APP.currentUser && APP.currentUser.nom) || '—';
+    nouveau.demande_role = (APP.currentUser && APP.currentUser.role) || '';
+    nouveau.demande_le = new Date().toISOString();
   }
   DATA.caisse_mouvements.push(nouveau);
   await dbPut('caisse_mouvements', nouveau);
@@ -114415,6 +114663,18 @@ async function caisseImportCSVConfirmer() {
       import_batch_id: importBatchId,
       created_by: user + ' (import CSV)', created_at: new Date().toISOString()
     };
+    /* [FIX] Ce chemin de création (import CSV) ne posait jamais
+       requiert_validation — un mouvement importé filait directement dans
+       le solde sans jamais passer par la validation, contrairement à la
+       saisie manuelle (caisseSaveBon). Alignement complet : même règle
+       partout, sans exception de plafond. */
+    mvt.requiert_validation = true;
+    mvt.valide = false;
+    mvt.rejete = false;
+    mvt.plafond_demandeur = (typeof userPlafond === 'function') ? userPlafond() : Infinity;
+    mvt.demande_par = user;
+    mvt.demande_role = (APP.currentUser && APP.currentUser.role) || '';
+    mvt.demande_le = new Date().toISOString();
     DATA.caisse_mouvements.push(mvt);
     await dbPut('caisse_mouvements', mvt);
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', mvt);
@@ -114936,8 +115196,8 @@ function caisseRenderBrouillardSession(sessionId) {
       + (caisseDocCount(m.id) ? ' <button class="btn btn-primary btn-sm" title="Pièces justificatives" onclick="caisseViewDocs(\'' + m.id + '\')">📎 ' + caisseDocCount(m.id) + '</button>' : '')
       + (caisseRoleAdminLike() ? ' <button class="btn btn-danger btn-sm btn-icon" title="Supprimer le mouvement" onclick="caisseSupprimerMouvement(\'' + m.id + '\')">🗑️</button>' : '')
       + (m.statut === 'ventile' ? '<span title="Ventilé" style="margin-left:4px;color:var(--vert);">✓</span>' : '<span title="En attente de ventilation" style="margin-left:4px;color:var(--dim);">⏳</span>')
-      + (m.type==='sortie' && m.requiert_validation && !m.valide && !m.rejete ? '<span title="En attente de validation (plafond dépassé)" style="margin-left:4px;color:var(--or);">🔐</span>' : '')
-      + (m.type==='sortie' && m.rejete ? '<span title="Décaissement rejeté" style="margin-left:4px;color:var(--rouge);">✖</span>' : '')
+      + (m.requiert_validation && !m.valide && !m.rejete ? '<span title="En attente de validation" style="margin-left:4px;color:var(--or);">🔐</span>' : '')
+      + (m.rejete ? '<span title="Mouvement rejeté" style="margin-left:4px;color:var(--rouge);">✖</span>' : '')
       + (_caissePending(m.id) ? '<span title="Non synchronisé au cloud — écriture locale seulement" style="margin-left:4px;color:var(--rouge,#dc2626);font-weight:700;">☁✗</span>' : '')
       + (m.modifie_le ? '<span title="Modifié le ' + (m.modifie_le||'').slice(0,16).replace('T',' ') + ' par ' + escHtml(m.modifie_par||'') + '" style="margin-left:4px;color:var(--or,#B87333);">✎</span>' : '')
       + '</td>'
@@ -114961,9 +115221,27 @@ function caisseRenderBrouillardSession(sessionId) {
 function caisseImprimerBon(mvtId) {
   var m = (DATA.caisse_mouvements || []).find(function(x){ return x.id === mvtId; });
   if (!m) return;
+  /* [Blocage impression sans visa] Un mouvement soumis à validation ne peut
+     être imprimé qu'une fois VALIDÉ par la hiérarchie — jamais avant, jamais
+     s'il a été rejeté. Le bon imprimé porte alors le visa (qui, quand) en
+     plus des signatures habituelles, comme preuve que la validation a bien
+     eu lieu avant tout décaissement/encaissement physique. */
+  if (m.requiert_validation === true && m.rejete === true) {
+    toast('⛔ Impression impossible — ce mouvement a été rejeté par la hiérarchie' + (m.motif_rejet ? ' (' + m.motif_rejet + ')' : '') + '.', 'error');
+    return;
+  }
+  if (m.requiert_validation === true && m.valide !== true) {
+    toast('🔒 Impression impossible — ce mouvement attend encore le visa de la hiérarchie (Pilotage → Validations).', 'error');
+    return;
+  }
   var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
   var p = DATA.params || {};
   var titre = m.type === 'entree' ? 'Bon d\'entrée de caisse' : 'Bon de sortie de caisse';
+  var visaHtml = m.requiert_validation === true && m.valide === true
+    ? '<div style="margin-top:14px;padding:8px 12px;background:#F0FDF4;border:1px solid #16A34A;border-radius:6px;font-size:12px;">'
+      + '<b>✅ Visa de la hiérarchie</b> — validé par ' + escHtml(m.valide_par||'—') + ' le ' + (m.valide_le ? (m.valide_le||'').replace('T',' ').slice(0,16) : '—')
+      + '</div>'
+    : '';
   var html = '<div style="font-family:Georgia,serif;max-width:640px;margin:0 auto;">'
     + '<div style="text-align:center;margin-bottom:18px;">'
     + '<div style="font-size:16px;font-weight:800;">' + escHtml(p.societe || 'ImmoSuite ERP') + '</div>'
@@ -114978,6 +115256,7 @@ function caisseImprimerBon(mvtId) {
     + '<tr><td style="padding:6px 0;color:#666;">' + (m.type === 'entree' ? 'Déposant' : 'Bénéficiaire') + '</td><td style="padding:6px 0;">' + escHtml(m.beneficiaire||'—') + '</td></tr>'
     + '<tr><td style="padding:6px 0;color:#666;">Montant</td><td style="padding:10px 0;font-size:20px;font-weight:800;">' + fmtF(m.montant) + ' FCFA</td></tr>'
     + '</table>'
+    + visaHtml
     + '<div style="display:flex;justify-content:space-between;margin-top:60px;font-size:12px;">'
     + '<div>Caissière<br><br><br>___________________<br>' + escHtml(m.created_by||'') + '</div>'
     + '<div>' + (m.type === 'entree' ? 'Déposant / Versé par' : 'Bénéficiaire / Reçu par') + '<br><br><br>___________________</div>'
@@ -115175,7 +115454,15 @@ async function caisseCloturer() {
 /* ── Envoi de l'état de caisse (messagerie interne + email hiérarchie) ─── */
 async function caisseGetOrCreateConversation(c) {
   var userId = (APP.currentUser && APP.currentUser.id) || 'system';
-  var membres = [userId].concat(c.destinataires_internes || []).concat(c.caissiere_ids || []);
+  /* [FIX] Les validateurs habilités (droit de vue Caisse) sont inclus dès la
+     construction de la liste de membres — pas seulement ajoutés après coup.
+     Sans ça, une caisse neuve sans destinataires_internes/caissiere_ids
+     configurés manuellement échouait à créer sa conversation du tout
+     (membres.length < 2), et la notification de demande de validation
+     partait dans le vide silencieusement : personne notifié, rien jamais
+     validé. */
+  var validateurs = (typeof _utilisateursValidateursCaisse === 'function') ? _utilisateursValidateursCaisse() : [];
+  var membres = [userId].concat(c.destinataires_internes || []).concat(c.caissiere_ids || []).concat(validateurs);
   membres = membres.filter(function(v,i,a){ return v && a.indexOf(v) === i; }); /* dédoublonnage */
 
   var conv = c.conversation_id ? (DATA.conversations || []).find(function(x){ return x.id === c.conversation_id; }) : null;
@@ -115584,7 +115871,7 @@ function caisseAppliquerPrincipal(principalInputId, compteSelectId, infoId) {
   if (!inp || !sel) return;
   var raw = inp.value.trim();
   var code = (raw.match(/^(\S+)/) || [null, ''])[1];
-  var cpt = code ? (APP.planComptable || []).find(function(c){ return c.code === code; }) : null;
+  var cpt = code ? (APP.planComptable || []).find(function(c){ return c && c.code === code; }) : null;
 
   if (!cpt) {
     sel.innerHTML = '';
@@ -115635,7 +115922,7 @@ function caisseRenderVentilation() {
 
   var enAttente = (DATA.caisse_mouvements || []).filter(function(m) {
     if (m.statut === 'ventile') return false;
-    if (m.type === 'sortie' && m.requiert_validation && !m.valide) return false; /* pas encore approuvé */
+    if (m.requiert_validation && !m.valide) return false; /* pas encore approuvé — vaut pour entrée ET sortie */
     if (caissesIdsFiltre && caissesIdsFiltre.indexOf(m.caisse_id) < 0) return false;
     var mDate = (m.date || '').slice(0, 10);
     if (CAISSE_VENT.dateDebut && mDate < CAISSE_VENT.dateDebut) return false;
@@ -115940,7 +116227,7 @@ function caisseControleIntegrite() {
   else ok.push('✅ Aucun doublon détecté.');
 
   /* 9. Décaissements en attente depuis trop longtemps */
-  var enAttente = mvts.filter(function(m){ return m.type==='sortie' && m.requiert_validation && !m.valide && !m.rejete; });
+  var enAttente = mvts.filter(function(m){ return m.requiert_validation && !m.valide && !m.rejete; });
   var vieux = enAttente.filter(function(m){ return (Date.now() - new Date(m.demande_le || m.created_at || Date.now()).getTime()) > 7*24*3600*1000; });
   if (vieux.length) pb.push('⚠️ ' + vieux.length + ' décaissement(s) en attente de validation depuis plus de 7 jours (bloquent leur ventilation).');
 
@@ -115949,7 +116236,7 @@ function caisseControleIntegrite() {
   ok.push('ℹ️ ' + nbAuto + ' mouvement(s) ventilé(s) automatiquement par règle · ' + mvts.filter(function(m){ return m.statut==='ventile' && !m.ventile_auto; }).length + ' manuellement.');
 
   /* 11. Mouvements non ventilés sur sessions clôturées (en attente de traitement) */
-  var aTraiter = mvts.filter(function(m){ var s = idxSess[m.session_id]; return m.statut!=='ventile' && s && s.statut==='cloturee' && !(m.type==='sortie' && m.requiert_validation && !m.valide); });
+  var aTraiter = mvts.filter(function(m){ var s = idxSess[m.session_id]; return m.statut!=='ventile' && s && s.statut==='cloturee' && !(m.requiert_validation && !m.valide); });
   if (aTraiter.length) ok.push('ℹ️ ' + aTraiter.length + ' mouvement(s) prêt(s) à ventiler (session clôturée, validation OK).');
 
   /* 12. Sessions ouvertes en double sur une même caisse (course entre postes
@@ -116170,12 +116457,12 @@ async function caisseRestaurerSnapshot(cle) {
 }
 
 async function genererEcritureCaisseMouvement(mvt, compteContrepartie, viaAuto) {
-  /* Un décaissement encore en attente de validation (montant au-delà du
-     plafond de son auteur) ne peut pas être ventilé/comptabilisé : tant
-     qu'aucun responsable habilité ne l'a approuvé, l'argent n'est pas réputé
-     sorti et l'écriture ne doit pas exister. */
-  if (mvt.type === 'sortie' && mvt.requiert_validation && !mvt.valide) {
-    try { toast('🔒 Ce décaissement (' + fmtF(mvt.montant) + ' FCFA) est en attente de validation par un responsable habilité — ventilation impossible avant approbation.', 'error'); } catch(e){}
+  /* Un mouvement encore en attente de validation ne peut pas être
+     ventilé/comptabilisé : tant qu'aucun responsable habilité ne l'a
+     approuvé, l'argent n'est pas réputé entré ou sorti et l'écriture ne
+     doit pas exister — vaut pour entrée ET sortie. */
+  if (mvt.requiert_validation && !mvt.valide) {
+    try { toast('🔒 Ce mouvement (' + fmtF(mvt.montant) + ' FCFA) est en attente de validation par un responsable habilité — ventilation impossible avant approbation.', 'error'); } catch(e){}
     return null;
   }
   var caisse = (DATA.caisses || []).find(function(c){ return c.id === mvt.caisse_id; });
@@ -116270,11 +116557,97 @@ async function caisseVentilerLigne(mvtId) {
    validation (voir caisseSoldeSession).
 ════════════════════════════════════════════════════════════════════════ */
 function caisseDecaissementsEnAttente() {
-  var idsVisibles = caissesVisibles().map(function(c){ return c.id; });
+  /* [FIX] Valider est une fonction transverse, pas cloisonnée par division —
+     un DG (ou tout rôle habilité à valider, via son plafond) doit voir les
+     mouvements de TOUTES les caisses, quelle que soit leur division, pas
+     seulement celles de sa propre division de rattachement. Le cloisonnement
+     par division de caissesVisibles() reste correct pour les opérations
+     courantes de caisse (une caissière n'ouvre/ne saisit que ses caisses),
+     mais il masquait à tort des mouvements légitimement en attente à un
+     validateur d'une autre division — cas réel signalé : sortie enregistrée
+     dans la caisse Digitech, introuvable en validation. Le filtrage réel
+     reste appliqué au moment d'approuver (plafond de rôle vs montant, cf.
+     caisseRenderValidations) — ici on ne fait que LISTER ce qui existe. */
   return (DATA.caisse_mouvements || []).filter(function(m){
-    return (m.type === 'sortie' || m.type === 'entree') && m.requiert_validation === true && !m.valide && !m.rejete
-      && idsVisibles.indexOf(m.caisse_id) >= 0;
+    return (m.type === 'sortie' || m.type === 'entree') && m.requiert_validation === true && !m.valide && !m.rejete;
   }).sort(function(a,b){ return (a.demande_le||a.date||'').localeCompare(b.demande_le||b.date||''); });
+}
+
+/* [Suivi caissière] Tous les mouvements soumis à validation par
+   l'utilisateur courant, quel que soit leur statut (en attente / validé /
+   rejeté) — contrairement à caisseDecaissementsEnAttente() qui ne montre
+   que le "en attente". Match par nom (demande_par) : aucun id d'auteur
+   n'est porté par le mouvement, cohérent avec demande_par/valide_par/
+   rejete_par déjà utilisés partout ailleurs dans ce module. */
+function caisseMesDemandes() {
+  var monNom = (APP.currentUser && APP.currentUser.nom) || '';
+  if (!monNom) return [];
+  return (DATA.caisse_mouvements || []).filter(function(m){
+    return m.requiert_validation === true && m.demande_par === monNom;
+  }).sort(function(a,b){ return (b.demande_le||b.date||'').localeCompare(a.demande_le||a.date||''); });
+}
+async function caisseDecaisserMouvement(mvtId) {
+  var m = (DATA.caisse_mouvements || []).find(function(x){ return x.id === mvtId; });
+  if (!m) return;
+  if (!(m.requiert_validation !== true || m.valide === true)) { toast('🔒 Ce mouvement doit d\'abord être validé par la hiérarchie.', 'error'); return; }
+  if (m.decaisse === true) { toast('Déjà marqué comme décaissé.', 'info'); return; }
+  if (!confirm((m.type==='entree'?'Confirmer l\'encaissement':'Confirmer le décaissement') + ' de ' + fmtF(m.montant) + ' FCFA (' + (m.motif||'') + ') — l\'argent a-t-il été physiquement remis ?')) return;
+  m.decaisse = true;
+  m.decaisse_par = (APP.currentUser && APP.currentUser.nom) || '—';
+  m.decaisse_le = new Date().toISOString();
+  await dbPut('caisse_mouvements', m);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', m);
+  toast('✅ ' + (m.type==='entree'?'Encaissement':'Décaissement') + ' confirmé.', 'success');
+  if (typeof caisseRenderMesDemandes === 'function') caisseRenderMesDemandes();
+}
+
+function caisseRenderMesDemandes() {
+  var box = document.getElementById('caisse-mesdemandes-box'); if (!box) return;
+  var liste = caisseMesDemandes();
+  var enAttente = liste.filter(function(m){ return !m.valide && !m.rejete; }).length;
+  var badge = document.getElementById('badge-tab-mesdemandes');
+  if (badge) { badge.textContent = enAttente; badge.style.display = enAttente ? 'inline-block' : 'none'; }
+  if (!liste.length) { box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune demande de validation soumise pour l\'instant.</div>'; return; }
+
+  var html = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Date</th><th>Type</th><th>Caisse</th><th>Motif</th><th style="text-align:right;">Montant</th><th>Statut</th><th>Décision</th><th>Actions</th></tr></thead><tbody>';
+  liste.forEach(function(m) {
+    var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
+    var estSortie = m.type === 'sortie';
+    var statutHtml, decisionHtml = '—';
+    if (m.valide === true) {
+      statutHtml = '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Validé</span>';
+      decisionHtml = escHtml(m.valide_par||'') + '<br><span style="font-size:10px;color:var(--blanc-dim);">' + (m.valide_le||'').replace('T',' ').slice(0,16) + '</span>';
+    } else if (m.rejete === true) {
+      statutHtml = '<span class="badge" style="background:rgba(220,53,69,0.15);color:var(--rouge);">✖ Rejeté</span>';
+      decisionHtml = escHtml(m.rejete_par||'') + (m.motif_rejet ? '<br><span style="font-size:10px;color:var(--rouge);">' + escHtml(m.motif_rejet) + '</span>' : '');
+    } else {
+      statutHtml = '<span class="badge" style="background:rgba(184,115,51,0.15);color:var(--or);">⏳ En attente</span>';
+    }
+    /* [Boutons Décaisser/Imprimer] — visibles UNIQUEMENT si validé, comme le
+       blocage déjà en place sur caisseImprimerBon() (défense en profondeur :
+       même si le bouton n'était pas caché, la fonction refuserait quand
+       même). "Décaisser" fixe une confirmation distincte de la validation
+       elle-même — l'argent physiquement remis, pas juste approuvé. */
+    var actionsHtml = '—';
+    if (m.valide === true) {
+      actionsHtml = (m.decaisse === true
+        ? '<span style="font-size:10px;color:var(--vert);">✅ ' + (m.type==='entree'?'Encaissé':'Décaissé') + ' le ' + (m.decaisse_le||'').slice(0,10) + '<br>par ' + escHtml(m.decaisse_par||'') + '</span>'
+        : '<button class="btn btn-primary btn-sm" onclick="caisseDecaisserMouvement(\'' + m.id + '\')">💰 ' + (m.type==='entree'?'Encaisser':'Décaisser') + '</button>')
+        + ' <button class="btn btn-secondary btn-sm btn-icon" title="Imprimer le bon" onclick="caisseImprimerBon(\'' + m.id + '\')">🖨️</button>';
+    }
+    html += '<tr>'
+      + '<td>' + (m.date||'').slice(0,10) + '</td>'
+      + '<td><span class="badge" style="background:' + (estSortie?'rgba(220,53,69,0.15);color:var(--rouge)':'rgba(16,163,74,0.15);color:var(--vert)') + ';">' + (estSortie?'↓ Sortie':'↑ Entrée') + '</span></td>'
+      + '<td>' + escHtml(c ? c.nom : '') + '</td>'
+      + '<td>' + escHtml(m.motif||'') + '</td>'
+      + '<td style="text-align:right;font-weight:700;">' + fmtF(m.montant) + ' F</td>'
+      + '<td>' + statutHtml + '</td>'
+      + '<td style="font-size:11px;">' + decisionHtml + '</td>'
+      + '<td style="white-space:nowrap;">' + actionsHtml + '</td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  box.innerHTML = html;
 }
 
 function caisseRenderValidations() {
@@ -116320,6 +116693,132 @@ function caisseRenderValidations() {
 
   html += '</tbody></table></div></div>';
   box.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PAGE PILOTAGE → VALIDATIONS — hub centralisant toutes les files
+   d'attente de validation existantes (caisse, engagements de dépense,
+   transferts budgétaires) sur un seul écran à onglets, pour que le DG
+   n'ait pas à chercher module par module. Réutilise entièrement les
+   données et les actions déjà en place (caisseValiderDecaissement,
+   daValider/daRejeter, transfertValider/transfertRejeter) — aucune
+   logique de validation dupliquée, seulement une seconde surface
+   d'affichage regroupée. */
+function renderPageValidations() {
+  var sel = document.getElementById('val-filtre-division');
+  if (sel && !sel.dataset.rempli) {
+    sel.innerHTML = '<option value="">Toutes divisions</option>' + (DATA.divisions||[]).map(function(d){ return '<option value="'+d.id+'">'+escHtml(d.nom)+'</option>'; }).join('');
+    sel.dataset.rempli = '1';
+  }
+  _pilotageRenderValidCaisse();
+  _pilotageRenderValidFED();
+  _pilotageRenderValidTransferts();
+}
+
+function _pilotageRenderValidCaisse() {
+  var box = document.getElementById('validations-caisse-box'); if (!box) return;
+  var divFiltre = (document.getElementById('val-filtre-division')||{}).value || '';
+  var liste = (typeof caisseDecaissementsEnAttente === 'function') ? caisseDecaissementsEnAttente() : [];
+  if (divFiltre) {
+    liste = liste.filter(function(m){
+      var c = (DATA.caisses||[]).find(function(x){ return x.id === m.caisse_id; });
+      return c && c.division_id === divFiltre;
+    });
+  }
+  var badge = document.getElementById('badge-tab-valid-caisse');
+  if (badge) { badge.textContent = liste.length; badge.style.display = liste.length ? 'inline-block' : 'none'; }
+  if (!liste.length) { box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:24px;">✅ Aucun mouvement de caisse en attente' + (divFiltre ? ' pour ce secteur' : '') + '.</div>'; return; }
+
+  var monPlafond = (typeof userPlafond === 'function') ? userPlafond() : Infinity;
+  var jePeuxValider = (typeof userPeut === 'function') ? userPeut('Caisse', 'v') : true;
+  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Type</th><th>Date</th><th>Caisse</th><th>Motif</th><th>Bénéficiaire</th><th style="text-align:right;">Montant</th><th>Demandé par</th><th></th></tr></thead><tbody>';
+  liste.forEach(function(m) {
+    var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
+    var montant = parseFloat(m.montant) || 0;
+    var habiliteMontant = jePeuxValider && (!isFinite(monPlafond) || montant <= monPlafond);
+    var estSortie = m.type === 'sortie';
+    html += '<tr>'
+      + '<td><span class="badge" style="background:' + (estSortie?'rgba(220,53,69,0.15);color:var(--rouge)':'rgba(16,163,74,0.15);color:var(--vert)') + ';">' + (estSortie?'↓ Sortie':'↑ Entrée') + '</span></td>'
+      + '<td>' + (m.date||'').slice(0,10) + '</td>'
+      + '<td>' + escHtml(c ? c.nom : '') + '</td>'
+      + '<td>' + escHtml(m.motif||'') + '</td>'
+      + '<td>' + escHtml(m.beneficiaire||'') + '</td>'
+      + '<td style="text-align:right;color:' + (estSortie?'var(--rouge)':'var(--vert)') + ';font-weight:700;">' + fmtF(montant) + '</td>'
+      + '<td style="font-size:11px;">' + escHtml(m.demande_par||'—') + '</td>'
+      + '<td style="white-space:nowrap;">'
+      + (habiliteMontant
+          ? '<button class="btn btn-primary btn-sm" onclick="caisseValiderDecaissement(\'' + m.id + '\').then(renderPageValidations)">✅ Valider</button> '
+            + '<button class="btn btn-danger btn-sm" onclick="caisseRejeterDecaissement(\'' + m.id + '\').then(renderPageValidations)">✖ Rejeter</button>'
+          : '<span class="badge badge-neutre" title="Plafond insuffisant">🔒</span>')
+      + '</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+  box.innerHTML = html;
+}
+
+function _pilotageRenderValidFED() {
+  var box = document.getElementById('validations-fed-box'); if (!box) return;
+  var divFiltre = (document.getElementById('val-filtre-division')||{}).value || '';
+  var fiches = (DATA.fiches_engagement_depense||[]).filter(function(d){ return d.statut === 'soumise'; })
+    .sort(function(a,b){ return (a.created_at||'').localeCompare(b.created_at||''); });
+  if (divFiltre) fiches = fiches.filter(function(d){ return d.division_id === divFiltre; });
+  var badge = document.getElementById('badge-tab-valid-fed');
+  if (badge) { badge.textContent = fiches.length; badge.style.display = fiches.length ? 'inline-block' : 'none'; }
+  if (!fiches.length) { box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:24px;">✅ Aucune fiche d\'engagement en attente' + (divFiltre ? ' pour ce secteur' : '') + '.</div>'; return; }
+
+  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N°</th><th>Objet</th><th>Ligne</th><th>Division</th><th style="text-align:right;">Montant</th><th></th></tr></thead><tbody>';
+  fiches.forEach(function(d) {
+    var divLabel = d.division_id ? escHtml(_nomDivision(d.division_id)) : '—';
+    html += '<tr>'
+      + '<td><b>' + escHtml(fedLabelDocument(d)) + '</b></td>'
+      + '<td>' + escHtml(d.objet||'') + '</td><td>' + escHtml(d.compte) + '</td><td>' + divLabel + '</td>'
+      + '<td style="text-align:right;">' + fmtF(d.montant) + ' F</td>'
+      + '<td style="white-space:nowrap;">'
+      + '<button class="btn btn-primary btn-sm" onclick="daValider(\'' + d.id + '\').then(renderPageValidations)">✅ Valider</button> '
+      + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)daRejeter(\'' + d.id + '\',m).then(renderPageValidations);})()">❌ Rejeter</button>'
+      + '</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+  box.innerHTML = html;
+}
+
+function _pilotageRenderValidTransferts() {
+  var box = document.getElementById('validations-transferts-box'); if (!box) return;
+  var divFiltre = (document.getElementById('val-filtre-division')||{}).value || '';
+  var transferts = (DATA.transferts_budgetaires||[]).filter(function(t){ return t.statut === 'soumis'; })
+    .sort(function(a,b){ return (a.created_at||'').localeCompare(b.created_at||''); });
+  if (divFiltre) transferts = transferts.filter(function(t){ return t.division_id === divFiltre; });
+  var badge = document.getElementById('badge-tab-valid-transferts');
+  if (badge) { badge.textContent = transferts.length; badge.style.display = transferts.length ? 'inline-block' : 'none'; }
+  if (!transferts.length) { box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:24px;">✅ Aucun transfert budgétaire en attente' + (divFiltre ? ' pour ce secteur' : '') + '.</div>'; return; }
+
+  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>De</th><th>Vers</th><th>Division</th><th style="text-align:right;">Montant</th><th>Motif</th><th></th></tr></thead><tbody>';
+  transferts.forEach(function(t) {
+    var divLabel = t.division_id ? escHtml(_nomDivision(t.division_id)) : '—';
+    html += '<tr>'
+      + '<td><b>' + escHtml(t.compte_source) + '</b></td><td><b>' + escHtml(t.compte_dest) + '</b></td><td>' + divLabel + '</td>'
+      + '<td style="text-align:right;">' + fmtF(t.montant) + ' F</td><td style="font-size:12px;">' + escHtml(t.motif||'') + '</td>'
+      + '<td style="white-space:nowrap;">'
+      + '<button class="btn btn-primary btn-sm" onclick="transfertValider(\'' + t.id + '\').then(renderPageValidations)">✅ Valider</button> '
+      + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)transfertRejeter(\'' + t.id + '\',m).then(renderPageValidations);})()">❌ Rejeter</button>'
+      + '</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+  box.innerHTML = html;
+}
+
+/* Badge global du nav-item Pilotage → Validations — total des 3 files,
+   mis à jour partout où les autres badges de navigation le sont déjà
+   (refreshDashboard, post-pull, post-action). */
+function _majBadgeValidationsPilotage() {
+  var badge = document.getElementById('badge-validations-pilotage');
+  if (!badge) return;
+  var n = (DATA.validations||[]).filter(function(v){ return v.statut === 'en_attente'; }).length
+    + ((typeof caisseDecaissementsEnAttente === 'function') ? caisseDecaissementsEnAttente().length : 0)
+    + (DATA.fiches_engagement_depense||[]).filter(function(d){ return d.statut === 'soumise'; }).length
+    + (DATA.transferts_budgetaires||[]).filter(function(t){ return t.statut === 'soumis'; }).length;
+  badge.textContent = n;
+  badge.style.display = n ? 'inline-block' : 'none';
 }
 
 async function caisseValiderDecaissement(mvtId) {
@@ -116408,6 +116907,25 @@ async function caisseNotifierValidation(mvt, evenement) {
   } catch(e) { /* notification best-effort — jamais bloquant */ }
 }
 
+/* Tout utilisateur actif dont le rôle a un droit de vue sur le module Caisse
+   (module non désactivé, ET chaîne de droits absente — non restreint — ou
+   contenant 'v') est considéré habilité à valider. Volontairement large :
+   mieux vaut notifier quelqu'un qui ne pourra finalement pas approuver
+   (plafond insuffisant, visible dans l'écran de validation) que rater le
+   seul responsable réellement habilité parce que le filtre était trop
+   strict. */
+function _utilisateursValidateursCaisse() {
+  var roles = (typeof getAllRoles === 'function') ? getAllRoles() : {};
+  return (DATA.users || []).filter(function(u){
+    if (!u || u.actif === false) return false;
+    var r = roles[u.role]; if (!r) return false;
+    if (r.permissions && r.permissions.Caisse === false) return false;
+    var d = r.droits && r.droits.Caisse;
+    if (d === undefined || d === null) return true;
+    return String(d).indexOf('v') !== -1;
+  }).map(function(u){ return u.id; });
+}
+
 /* ── Configuration des règles de ventilation automatique (mot-clé → compte) ──
    Stockées dans DATA.params.caisse_ventilation_map = { "carburant":"6051", ... }.
    Accessible via le bouton "⚙️ Configurer les règles" de la section Ventilation. */
@@ -116494,7 +117012,7 @@ async function caisseVentilationAuto() {
 
   var enAttente = (DATA.caisse_mouvements || []).filter(function(m) {
     if (m.statut === 'ventile') return false;
-    if (m.type === 'sortie' && m.requiert_validation && !m.valide) return false; /* pas encore approuvé */
+    if (m.requiert_validation && !m.valide) return false; /* pas encore approuvé — vaut pour entrée ET sortie */
     if (caissesIdsFiltre && caissesIdsFiltre.indexOf(m.caisse_id) < 0) return false;
     var s = (DATA.caisse_sessions || []).find(function(x){ return x.id === m.session_id; });
     return s && s.statut === 'cloturee';
