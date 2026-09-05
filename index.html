@@ -27868,6 +27868,7 @@ function switchTab(context, tab) {
     if (tab==='sfc' && typeof sfcRenderListe==='function') { sfcRenderListe(); sfcRenderCriblages(); }
     if (tab==='conformx' && typeof cxRender==='function') cxRender();
     if (tab==='artci' && typeof artciRender==='function') { artciRenderContact(); artciRender(); }
+    if (tab==='dispositif' && typeof lbcRenderConformite==='function') lbcRenderConformite();
   }
   if (context==='diaspo') {
     if (tab==='dossiers' && typeof dspRenderDossiers==='function') dspRenderDossiers();
@@ -52364,6 +52365,70 @@ function lbcRender(){
   sfcRenderListe(); sfcRenderCriblages();
   cxRender();
   artciRenderContact(); artciRender();
+  lbcRenderConformite();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TABLEAU DE BORD CONFORMITÉ — interconnecte tous les modules LBC/FT
+   (Vigilance/KYC, Alertes, Déclarations, SFC, CAPPI, ConformX, ARTCI,
+   Dispositif) en une vue unique. Chaque indicateur pointe vers son
+   onglet d'origine : la conformité ne se pilote pas module par module
+   isolément, un retard ou un gel dans l'un doit sauter aux yeux depuis
+   l'écran d'accueil du module. Emplacement #lbc-conformite existait
+   dans l'écran mais n'était jamais peuplé avant cette fonction. */
+function lbcRenderConformite(){
+  var box=document.getElementById('lbc-conformite'); if(!box) return;
+  var P=_lbcParams();
+
+  var sansFiche=(DATA.clients||[]).filter(function(c){return !_kycDe(c.id);}).length;
+  var risqueEleve=(DATA.clients||[]).filter(function(c){var f=_kycDe(c.id);return _lbcScore(f,c.id).niveau==='eleve';}).length;
+  var alertesOuvertes=lbcAnalyser().filter(function(a){return a.statut==='nouvelle'||a.statut==='examen';}).length;
+  var dsBrouillon=(_lbcD()||[]).filter(function(d){return d.statut==='brouillon';}).length;
+
+  var geles=(DATA.clients||[]).filter(function(c){return c.gele;}).length
+    +(DATA.fournisseurs||[]).filter(function(f){return f.gele;}).length;
+  var sfcATraiter=_sfcCriblages().reduce(function(n,r){return n+r.resultats.filter(function(x){return x.decision==='a_traiter';}).length;},0);
+  var sfcListeAbsente=!_sfcListe().length;
+
+  var cappiOuverts=(_cappiE()||[]).filter(function(e){return e.statut!=='clos';}).length;
+  var cxRetard=(_cxE()||[]).filter(function(e){return e.statut!=='clos'&&e.echeance&&e.echeance<today();}).length;
+  var artciEnCours=(DATA.lbc_artci||[]).filter(function(e){return e.statut!=='delivre';}).length;
+
+  var correspondantManquant=!(P.correspondant&&P.suppleant);
+
+  var items=[
+    { label:'Dispositif interne', ok:!correspondantManquant,
+      detail:correspondantManquant?'Correspondant/suppléant CENTIF non désignés':'Correspondant désigné',
+      tab:'dispositif' },
+    { label:'Vigilance clientèle', ok:sansFiche===0 && risqueEleve===0,
+      detail:(sansFiche?sansFiche+' client(s) sans fiche KYC':'')+(sansFiche&&risqueEleve?' · ':'')+(risqueEleve?risqueEleve+' à risque élevé':'')||'Toutes les fiches sont à jour',
+      tab:'kyc' },
+    { label:'Opérations à examiner', ok:alertesOuvertes===0,
+      detail:alertesOuvertes?alertesOuvertes+' constat(s) en attente d\'examen':'Aucun constat en attente', tab:'alertes' },
+    { label:'Déclarations de soupçon', ok:dsBrouillon===0,
+      detail:dsBrouillon?dsBrouillon+' brouillon(s) non transmis':'Aucun brouillon en attente', tab:'declarations' },
+    { label:'Sanctions (SFC)', ok:sfcATraiter===0 && !sfcListeAbsente,
+      detail:sfcListeAbsente?'⚠️ Aucune liste de sanctions chargée':(sfcATraiter?sfcATraiter+' correspondance(s) à traiter':'')+(geles?' · '+geles+' tiers gelé(s)':'')||'À jour',
+      tab:'sfc' },
+    { label:'Suivi CAPPI', ok:cappiOuverts===0,
+      detail:cappiOuverts?cappiOuverts+' échange(s) en cours':'Aucun échange en cours', tab:'cappi' },
+    { label:'Suivi ConformX', ok:cxRetard===0,
+      detail:cxRetard?cxRetard+' échéance(s) dépassée(s)':'Aucune échéance en retard', tab:'conformx' },
+    { label:'ARTCI (données perso.)', ok:artciEnCours===0,
+      detail:artciEnCours?artciEnCours+' démarche(s) en cours':'Aucune démarche en instance', tab:'artci' },
+  ];
+  var nbAlertes=items.filter(function(i){return !i.ok;}).length;
+
+  box.innerHTML='<div class="card" style="border-left:3px solid '+(nbAlertes?'var(--rouge)':'var(--vert)')+';">'
+    +'<div style="font-weight:800;font-size:15px;margin-bottom:2px;">'+(nbAlertes?'⚠️ ':'✅ ')+'Conformité LBC/FT — vue d\'ensemble</div>'
+    +'<div style="font-size:11.5px;color:var(--blanc-dim);margin-bottom:10px;">'+(nbAlertes?nbAlertes+' point(s) appellent une action, tous modules confondus.':'Tous les modules sont à jour.')+'</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;">'
+    +items.map(function(i){
+      return '<div onclick="switchTab(\'lbcft\',\''+i.tab+'\')" style="cursor:pointer;border:1px solid '+(i.ok?'var(--bord)':'var(--rouge)')+';border-radius:8px;padding:8px 10px;background:'+(i.ok?'transparent':'rgba(220,53,69,0.06)')+';">'
+        +'<div style="font-size:11.5px;font-weight:700;">'+(i.ok?'✅':'🔴')+' '+i.label+'</div>'
+        +'<div style="font-size:10.5px;color:var(--blanc-dim);margin-top:2px;">'+escHtml(i.detail)+'</div></div>';
+    }).join('')
+    +'</div></div>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════
