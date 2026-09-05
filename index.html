@@ -14672,6 +14672,112 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             </div>
             <div id="sfc-criblages-list" style="margin-top:12px;"></div>
           </div>
+
+          <div class="card" style="margin-top:14px;" id="sfc-centif-panel">
+            <div class="page-header" style="margin:0;">
+              <div class="form-section-title" style="margin:0;">📝 Formulaire de retour d'informations — CENTIF-CI</div>
+              <span style="font-size:10.5px;color:var(--blanc-dim);">Champs identiques à centif.ci/declarations/formsSFC.php</span>
+            </div>
+            <div class="alert alert-info" style="font-size:11px;margin-top:8px;">
+              Ce formulaire prépare vos réponses hors ligne. La soumission officielle reste manuelle sur le site de la CENTIF
+              (aucune API publique) — cliquez « Imprimer / recopier » puis reportez les réponses sur
+              <a href="https://www.centif.ci/declarations/formsSFC.php" target="_blank" style="color:var(--or);">centif.ci</a>.
+            </div>
+            <input type="hidden" id="cf-id"><input type="hidden" id="cf-criblage-id">
+
+            <div class="form-section-title" style="margin-top:16px;">Identification du répondant</div>
+            <div class="form-grid">
+              <div class="form-group"><label>Nom *</label><input type="text" class="form-control" id="cf-nom"></div>
+              <div class="form-group"><label>Prénoms *</label><input type="text" class="form-control" id="cf-prenoms"></div>
+              <div class="form-group"><label>Adresse email *</label><input type="text" class="form-control" id="cf-email"></div>
+              <div class="form-group"><label>Contact *</label><input type="text" class="form-control" id="cf-contact"></div>
+            </div>
+
+            <div class="form-section-title" style="margin-top:16px;">Informations générales sur l'alerte</div>
+            <div class="form-group"><label>Objet (Alerte reçue) *</label>
+              <select class="form-control" id="cf-objet">
+                <option value="Alertes SFC 1988">Alertes SFC 1988</option>
+                <option value="Alertes SFC 1267" selected>Alertes SFC 1267</option>
+                <option value="Alertes SFC 1373">Alertes SFC 1373</option>
+                <option value="Alertes SFC 1718">Alertes SFC 1718</option>
+              </select>
+            </div>
+            <div class="form-grid">
+              <div class="form-group"><label>Date de mise à jour de la SFC *</label><input type="date" class="form-control" id="cf-date-maj"></div>
+              <div class="form-group"><label>Comment avez-vous reçu l'alerte SFC ? *</label>
+                <select class="form-control" id="cf-reception">
+                  <option value="Mail">Mail</option>
+                  <option value="Whatsapp">Whatsapp</option>
+                  <option value="Visite de la Page Centif" selected>Visite de la Page Centif</option>
+                  <option value="Visite de la page des Nations Unies">Visite de la page des Nations Unies</option>
+                  <option value="Autre">Autre</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-section-title" style="margin-top:16px;">Identification de la structure</div>
+            <div class="form-grid">
+              <div class="form-group"><label>Typologie de la structure *</label>
+                <select class="form-control" id="cf-typologie">
+                  <option value="Institutions Financieres (IF)">Institutions Financieres (IF)</option>
+                  <option value="Entreprises ou Professions non Financières (EPNFD)" selected>Entreprises ou Professions non Financières (EPNFD)</option>
+                  <option value="Autres Consultants">Autres Consultants</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Type d'activité *</label><input type="text" class="form-control" id="cf-activite" value="Promotion immobilière"></div>
+            </div>
+            <div class="form-group"><label>Dénomination sociale *</label><input type="text" class="form-control" id="cf-denomination"></div>
+
+            <div class="form-section-title" style="margin-top:16px;">Croisement des registres et des listes</div>
+            <div class="form-grid">
+              <div class="form-group"><label>Croisement des listes SFC / partenaires effectué ? *</label>
+                <select class="form-control" id="cf-croisement-fait"><option value="Oui">Oui</option><option value="Non">Non</option></select>
+              </div>
+              <div class="form-group"><label>Au moins un partenaire identifié sur la liste ? *</label>
+                <select class="form-control" id="cf-croisement-identifie"><option value="Non">Non</option><option value="Oui">Oui</option></select>
+              </div>
+            </div>
+
+            <div class="form-section-title" style="margin-top:16px;">Mesures</div>
+            <div class="form-grid">
+              <div class="form-group"><label>Nombre de personnes/entités identifiées *</label><input type="number" class="form-control" id="cf-nb-identifies" min="0" value="0"></div>
+              <div class="form-group"><label>Fonds/ressources/relation d'affaires impliquant une personne désignée ? *</label>
+                <select class="form-control" id="cf-fonds-impliques"><option value="Non">Non</option><option value="Oui">Oui</option></select>
+              </div>
+            </div>
+
+            <div class="form-section-title" style="margin-top:16px;">Mesures et diligences sans délai</div>
+            <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;">
+              <label><input type="checkbox" class="cf-mesure" value="Geler immédiatement les avoirs concernés, empêchant tout mouvement, transfert ou utilisation."> Geler immédiatement les avoirs concernés, empêchant tout mouvement, transfert ou utilisation.</label>
+              <label><input type="checkbox" class="cf-mesure" value="Interdire la mise à disposition de fonds ou de ressources économiques aux personnes ou entités listées, directement ou indirectement."> Interdire la mise à disposition de fonds ou de ressources économiques aux personnes ou entités listées, directement ou indirectement.</label>
+              <label><input type="checkbox" class="cf-mesure" value="Informer sans délai l'autorité nationale compétente (la CENTIF) des mesures prises." checked> Informer sans délai l'autorité nationale compétente (la CENTIF) des mesures prises.</label>
+              <label><input type="checkbox" class="cf-mesure" value="Fournir à la CENTIF des informations détaillées sur les fonds ou ressources économiques gelés, y compris leur nature, leur montant et les liens avec les personnes ou entités désignées."> Fournir à la CENTIF des informations détaillées sur les fonds ou ressources économiques gelés, y compris leur nature, leur montant et les liens avec les personnes ou entités désignées.</label>
+              <label><input type="checkbox" class="cf-mesure" value="Aucune mesure ci-dessus n'a été mise en place." id="cf-mesure-aucune"> Aucune mesure ci-dessus n'a été mise en place.</label>
+              <label><input type="checkbox" class="cf-mesure" value="Autres" id="cf-mesure-autre"> Autres</label>
+            </div>
+            <div class="form-group" style="margin-top:8px;"><label>Précisez autres mesures prises</label><input type="text" class="form-control" id="cf-mesure-autre-txt"></div>
+
+            <div class="form-section-title" style="margin-top:16px;">Diligences de suivi</div>
+            <div class="form-group"><label>Dispositif de vérification/comparaison continue avant/pendant/après la relation d'affaires ? *</label>
+              <select class="form-control" id="cf-suivi-dispositif"><option value="Oui" selected>Oui</option><option value="Non">Non</option></select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;margin-top:6px;">
+              <label><input type="checkbox" class="cf-suivi" value="Actualisation systématique de la liste des personnes et entités visées par les SFC, avec diffusion immédiate aux personnes responsables du contrôle des nouveaux clients." checked> Actualisation systématique de la liste, diffusion immédiate aux responsables du contrôle des nouveaux clients.</label>
+              <label><input type="checkbox" class="cf-suivi" value="Contrôles réguliers et rigoureux sur la base clientèle existante et les transactions en cours, pour identifier toute correspondance avec la liste SFC." checked> Contrôles réguliers sur la base clientèle existante et les transactions en cours.</label>
+              <label><input type="checkbox" class="cf-suivi" value="Formation continue du personnel concerné à l'identification, au traitement et à la déclaration des situations liées aux SFC."> Formation continue du personnel concerné à l'identification, au traitement et à la déclaration des situations liées aux SFC.</label>
+              <label><input type="checkbox" class="cf-suivi" value="Aucune mesure ci-dessus n'a été mise en place" id="cf-suivi-aucune"> Aucune mesure ci-dessus n'a été mise en place</label>
+              <label><input type="checkbox" class="cf-suivi" value="Autres" id="cf-suivi-autre"> Autres</label>
+            </div>
+            <div class="form-group" style="margin-top:8px;"><label>Précisez autres mesures de suivi</label><input type="text" class="form-control" id="cf-suivi-autre-txt"></div>
+
+            <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="sfcCentifSauvegarder()">💾 Enregistrer</button>
+              <button class="btn btn-secondary" onclick="sfcCentifImprimer()">🖨️ Imprimer / recopier sur centif.ci</button>
+            </div>
+
+            <div class="form-section-title" style="margin-top:18px;">Historique des soumissions préparées</div>
+            <div class="table-wrap" id="cf-historique" style="margin-top:8px;"></div>
+          </div>
         </div>
 
         <div class="tab-pane" id="tab-lbcft-kyc">
@@ -14682,6 +14788,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <option value="actifs">En relation d'affaires</option>
               <option value="sans">Sans fiche de vigilance</option>
               <option value="eleve">Risque élevé</option>
+              <option value="sfc">🔒 Correspondance / gel SFC</option>
             </select>
           </div>
           <div class="table-wrap" style="margin-top:12px;"><div id="lbc-kyc-table"></div></div>
@@ -14951,6 +15058,10 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               par la CENTIF (liste 1267 / communiqué de presse) avant de lancer le criblage.
             </div>
             <div class="form-group"><label>Source / résolution</label><input type="text" class="form-control" id="sfc-import-source" placeholder="Ex. Résolution 1267 CSNU — Liste EIIL (Daech) et Al-Qaida"></div>
+            <div class="form-group">
+              <label>Fichier .txt (une entrée par ligne, même format)</label>
+              <input type="file" class="form-control" id="sfc-import-fichier" accept=".txt" onchange="sfcChargerFichier(this)">
+            </div>
             <div class="form-group"><label>Entrées</label><textarea class="form-control" id="sfc-import-texte" rows="10" placeholder="Nom Prénom | alias1;alias2 | QDi.123 | personne"></textarea></div>
           </div>
           <div class="modal-footer">
@@ -18287,6 +18398,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
       <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-kyc')">✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="kyc-id">
+      <div id="kyc-sfc-alerte" style="margin-bottom:12px;"></div>
       <div class="form-grid">
         <div class="form-group"><label>Client *</label><select class="form-control" id="kyc-client" onchange="kycMajRisque()"></select></div>
         <div class="form-group"><label>Qualité</label><select class="form-control" id="kyc-personne" onchange="kycMajRisque()">
@@ -22668,7 +22780,12 @@ var DATA = {
    INDEXEDDB
 ────────────────────────────────────────────────────── */
 var DB_NAME = 'ImmoSuiteDB';
-var DB_VERSION = 149; /* v149: ajout stores 'lbc_conformx' (bug v148 non corrigé — même symptôme :
+var DB_VERSION = 150; /* v150: ajout store 'sfc_centif' (nouveau — formulaire CENTIF) et correction
+                          d'un bug préexistant : 'sfc_liste' et 'sfc_criblages' (module Criblage SFC)
+                          n'avaient JAMAIS été déclarés ici ni dans SUPA_STORE_MAP depuis la création
+                          du module — écriture IndexedDB perdue hors ligne, jamais tirés du cloud, ni
+                          visibles au diagnostic. Migration additive uniquement, aucune perte.
+                          v149: ajout stores 'lbc_conformx' (bug v148 non corrigé — même symptôme :
                           écriture perdue hors ligne) et 'lbc_artci' (nouveau module déclaration
                           ARTCI/CERTINUM). v148: stores 'lbc_cappi', 'kyc_fiches', 'lbc_declarations',
                           'lbc_alertes' — ces stores du module Conformité LBC/FT écrivaient déjà dans
@@ -22691,7 +22808,7 @@ var ALL_STORES = [
   'factures_client',
   'financements_programme',
   'conflits_sync',
-  'lbc_cappi','kyc_fiches','lbc_declarations','lbc_alertes','lbc_conformx','lbc_artci',
+  'lbc_cappi','kyc_fiches','lbc_declarations','lbc_alertes','lbc_conformx','lbc_artci','sfc_centif','sfc_liste','sfc_criblages',
   'immobilisations',
   'permis','plans_arch','rapports_chantier',
   'campagnes','actions_marketing','segments_marketing',
@@ -24655,6 +24772,9 @@ var SUPA_STORE_MAP = [
   ['pi_lbc_cappi',        'lbc_cappi'],
   ['pi_lbc_conformx',     'lbc_conformx'],
   ['pi_lbc_artci',        'lbc_artci'],
+  ['pi_sfc_liste',        'sfc_liste'],
+  ['pi_sfc_criblages',    'sfc_criblages'],
+  ['pi_sfc_centif',       'sfc_centif'],
   ['pi_fiches_engagement_depense',         'fiches_engagement_depense'],
   ['pi_transferts_budgetaires', 'transferts_budgetaires'],
   ['pi_caisse_budgets',         'caisse_budgets'],
@@ -36594,6 +36714,7 @@ function imprimerDeclarationTVA() {
     + '.res{margin-top:12px;border:2px solid #B87333;padding:10px;}'
     + '.no-print{text-align:center;margin-bottom:12px;} .no-print button{padding:8px 18px;background:#B87333;color:#fff;border:none;border-radius:5px;cursor:pointer;}'
     + '@media print{.no-print{display:none;}}</style></head><body>'
+    + sanixQrHtml('Déclaration TVA', mois)
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer</button></div>'
     + '<div style="text-align:center;font-weight:700;">RÉPUBLIQUE DE CÔTE D\'IVOIRE — DIRECTION GÉNÉRALE DES IMPÔTS</div>'
     + '<h1>DÉCLARATION DE TAXE SUR LA VALEUR AJOUTÉE</h1>'
@@ -51739,6 +51860,14 @@ function kycOpen(cid){
   v('kyc-origine',f?f.origine_fonds:'justifiee'); v('kyc-origine-detail',f?f.origine_detail:'');
   v('kyc-objet',f?f.objet_relation:''); v('kyc-notes',f?f.notes:'');
   var pr=document.getElementById('kyc-pays-risque'); if(pr) pr.checked=!!(f&&f.pays_risque);
+  var alerteEl=document.getElementById('kyc-sfc-alerte');
+  if(alerteEl){
+    var sfc=cid?sfcStatutClient(cid):null;
+    alerteEl.innerHTML=(sfc&&(sfc.niveau==='gele'||sfc.niveau==='a_traiter'))
+      ? '<div class="alert alert-danger" style="margin:0;">'+sfc.label+(sfc.motif?(' — '+escHtml(sfc.motif)):'')
+        +' <button class="btn btn-secondary btn-sm" style="margin-left:8px;" onclick="closeModal(\'modal-kyc\');switchTab(\'lbcft\',\'sfc\')">Voir le criblage SFC</button></div>'
+      : '';
+  }
   kycMajRisque();
   openModal('modal-kyc');
 }
@@ -51793,24 +51922,44 @@ async function kycSave(){
   closeModal('modal-kyc'); lbcRender();
   toast('Fiche de vigilance enregistrée — risque '+LBC_NIVEAUX[ev.niveau].l.toLowerCase()+'.','success');
 }
+/* [Interaction Vigilance ↔ SFC] Statut de criblage d'un client, calculé à la
+   volée depuis le dernier criblage et son état de gel — pour que la vigilance
+   clientèle ne soit jamais consultée sans visibilité sur un éventuel match SFC. */
+function sfcStatutClient(cid){
+  var c=(DATA.clients||[]).find(function(x){return x.id===cid;});
+  if(c && c.gele) return { niveau:'gele', label:'🔒 Gelé (SFC)', motif:c.gele_motif||'' };
+  var runs=(typeof _sfcCriblages==='function'?_sfcCriblages():[]).slice().sort(function(a,b){return (b.created_at||'').localeCompare(a.created_at||'');});
+  for(var i=0;i<runs.length;i++){
+    var r=runs[i].resultats.find(function(x){return x.tiers_type==='client'&&x.tiers_id===cid;});
+    if(r) return r.decision==='a_traiter'
+      ? { niveau:'a_traiter', label:'⚠️ Correspondance à traiter', motif:r.sanction_nom }
+      : { niveau:'ecarte', label:'Écarté le '+dateShort(runs[i].date), motif:r.motif||'' };
+  }
+  return { niveau:'non_crible', label:'— Non criblé', motif:'' };
+}
 function lbcRenderKyc(){
   var el=document.getElementById('lbc-kyc-table'); if(!el) return;
   var filtre=(document.getElementById('lbc-kyc-filtre')||{}).value||'';
   var lignes=(DATA.clients||[]).map(function(c){
     var f=_kycDe(c.id), ev=_lbcScore(f,c.id);
-    return { c:c, f:f, ev:ev, cumul:_lbcCumul(c.id) };
+    return { c:c, f:f, ev:ev, cumul:_lbcCumul(c.id), sfc:sfcStatutClient(c.id) };
   }).filter(function(x){
     if(filtre==='sans') return !x.f;
     if(filtre==='eleve') return x.ev.niveau==='eleve';
     if(filtre==='actifs') return x.cumul>0;
+    if(filtre==='sfc') return x.sfc.niveau==='gele'||x.sfc.niveau==='a_traiter';
     return true;
-  }).sort(function(a,b){ return b.ev.score-a.ev.score; });
+  }).sort(function(a,b){
+    var poidsSfc={gele:2,a_traiter:1}; var pa=poidsSfc[a.sfc.niveau]||0, pb=poidsSfc[b.sfc.niveau]||0;
+    return pb-pa || (b.ev.score-a.ev.score);
+  });
   if(!lignes.length){ el.innerHTML='<div style="text-align:center;color:var(--dim);padding:20px;">Aucun client.</div>'; return; }
-  el.innerHTML='<table><thead><tr><th>Client</th><th>Fiche</th><th>Pièce</th><th>Bénéf. effectif</th><th>PPE</th><th>Origine des fonds</th><th>Cumul</th><th>Risque</th><th></th></tr></thead><tbody>'
+  var sfcClasse={gele:'badge-rouge',a_traiter:'badge-or',ecarte:'badge-gris',non_crible:'badge-gris'};
+  el.innerHTML='<table><thead><tr><th>Client</th><th>Fiche</th><th>Pièce</th><th>Bénéf. effectif</th><th>PPE</th><th>Origine des fonds</th><th>Cumul</th><th>Risque</th><th>SFC</th><th></th></tr></thead><tbody>'
     +lignes.slice(0,300).map(function(x){
       var n=LBC_NIVEAUX[x.ev.niveau];
       var f=x.f;
-      return '<tr'+(x.ev.niveau==='eleve'?' style="background:rgba(220,53,69,.07);"':'')+'>'
+      return '<tr'+(x.ev.niveau==='eleve'||x.sfc.niveau==='gele'?' style="background:rgba(220,53,69,.07);"':'')+'>'
         +'<td><strong>'+escHtml(((x.c.nom||'')+' '+(x.c.prenoms||'')).trim())+'</strong></td>'
         +'<td>'+(f?('<span class="badge badge-vert">'+escHtml(f.ref)+'</span>'):'<span class="badge badge-rouge">Absente</span>')+'</td>'
         +'<td style="font-size:11px;">'+(f&&f.piece_num?(escHtml(f.piece_type+' '+f.piece_num)):'—')+'</td>'
@@ -51819,6 +51968,7 @@ function lbcRenderKyc(){
         +'<td style="font-size:11px;">'+(f?({justifiee:'Justifiée',partielle:'⚠️ Partielle',non_justifiee:'❌ Non justifiée'}[f.origine_fonds]||'—'):'—')+'</td>'
         +'<td style="text-align:right;">'+fmtF(x.cumul)+'</td>'
         +'<td><span class="badge '+n.c+'">'+n.l+' ('+x.ev.score+')</span></td>'
+        +'<td><span class="badge '+(sfcClasse[x.sfc.niveau]||'badge-gris')+'" style="font-size:10px;cursor:pointer;" title="'+escHtml(x.sfc.motif)+'" onclick="switchTab(\'lbcft\',\'sfc\')">'+x.sfc.label+'</span></td>'
         +'<td><button class="btn btn-secondary btn-sm btn-icon" onclick="kycOpen(\''+x.c.id+'\')" title="Fiche de vigilance">📋</button></td></tr>';
     }).join('')+'</tbody></table>';
 }
@@ -51936,6 +52086,33 @@ function lbcRenderDeclarations(){
         +'<td><button class="btn btn-secondary btn-sm btn-icon" onclick="lbcImprimerDS(\''+d.id+'\')" title="Imprimer">🖨️</button></td></tr>';
     }).join('')+'</tbody></table>';
 }
+/* ═══════════════════════════════════════════════════════════════════
+   QR CODE DE SÉCURITÉ LOGICIEL — apposé sur les documents réglementaires
+   (CENTIF, ARTCI, fiscal). Encode un identifiant simple : logiciel,
+   type de document, référence, date d'émission — pas d'URL externe ni
+   de hash, conformément au périmètre retenu. Réutilise la bibliothèque
+   qrcode-generator déjà embarquée (module Paiement en ligne) : aucune
+   dépendance ajoutée, fonctionne hors ligne / file://. */
+function sanixQrPayload(typeDoc, reference){
+  return 'SANIX AFRICA — ImmoSuite ERP | '+typeDoc+' | Réf: '+(reference||'—')+' | '+new Date().toLocaleDateString('fr-FR');
+}
+function sanixQrDataUrl(typeDoc, reference){
+  try{
+    var q=qrcode(0,'M');
+    q.addData(sanixQrPayload(typeDoc, reference));
+    q.make();
+    return q.createDataURL(3,4);
+  }catch(e){ return ''; }
+}
+/* HTML prêt à insérer dans un document imprimé (coin, taille fixe). */
+function sanixQrHtml(typeDoc, reference){
+  var url=sanixQrDataUrl(typeDoc, reference);
+  if(!url) return '';
+  return '<div style="position:absolute;top:30px;right:36px;text-align:center;">'
+    +'<img src="'+url+'" alt="QR sécurité" style="width:64px;height:64px;">'
+    +'<div style="font-size:8px;color:#777;margin-top:2px;">Document ImmoSuite ERP</div></div>';
+}
+
 function lbcImprimerDS(id){
   if(!lbcPeutVoirDeclarations()){ toast('⛔ Accès refusé.','error'); return; }
   var d=_lbcD().find(function(x){return x.id===id;}); if(!d) return;
@@ -51952,6 +52129,7 @@ function lbcImprimerDS(id){
     +'.bloc{border:1px solid #bbb;padding:12px;margin:12px 0;}'
     +'.conf{background:#7f1d1d;color:#fff;padding:8px 12px;font-weight:bold;text-align:center;letter-spacing:1px;}'
     +'.pied{margin-top:26px;font-size:11px;color:#555;line-height:1.7;}</style></head><body>'
+    +sanixQrHtml('Déclaration de soupçon', d.ref)
     +'<div class="conf">CONFIDENTIEL — DÉCLARATION DE SOUPÇON</div>'
     +'<h2>Déclaration de soupçon à la CENTIF-CI</h2>'
     +'<div style="color:#555;">Ordonnance n°2023-875 du 23 novembre 2023 relative à la LBC/FT/FP</div>'
@@ -52376,6 +52554,7 @@ function artciImprimerFiche(){
     +'.sub{color:#555;font-size:11.5px;margin-bottom:18px;}'
     +'table{width:100%;border-collapse:collapse;margin:8px 0;}td{padding:4px 8px;vertical-align:top;border:1px solid #ccc;}td.k{width:30%;background:#f5f5f5;}'
     +'.pied{margin-top:30px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Fiche traitement ARTCI', P.recepisse||soc)
     +'<h1>'+escHtml(soc||'Société de promotion immobilière')+'</h1>'
     +'<div class="sub">'+escHtml(adr)+(rccm?(' · RCCM '+escHtml(rccm)):'')+'</div>'
     +'<h1 style="margin-top:18px;">Fiche de traitement de données à caractère personnel</h1>'
@@ -52480,12 +52659,28 @@ function sfcOpenImport(){
   if(s) s.value=(DATA.params&&DATA.params.lbcft&&DATA.params.lbcft.sfc_liste_source)||'Résolution 1267 CSNU — Liste EIIL (Daech) et Al-Qaida';
   openModal('modal-sfc-import');
 }
+function sfcChargerFichier(input){
+  var f=input.files&&input.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(e){
+    var t=document.getElementById('sfc-import-texte');
+    if(t) t.value=String(e.target.result||'');
+    toast('Fichier chargé ('+f.name+') — cliquez « Importer ».','success');
+  };
+  r.onerror=function(){ toast('Lecture du fichier impossible.','error'); };
+  r.readAsText(f,'utf-8');
+}
 async function sfcImporterListe(){
   var texte=(document.getElementById('sfc-import-texte')||{}).value||'';
   var source=((document.getElementById('sfc-import-source')||{}).value||'').trim();
   var lignes=texte.split('\n').map(function(l){return l.trim();}).filter(Boolean);
   if(!lignes.length){ toast('Collez au moins une entrée à importer.','error'); return; }
   var liste=_sfcListe(); var ajoutes=0;
+  var btn=document.querySelector('#modal-sfc-import .btn-primary');
+  if(btn){ btn.disabled=true; btn.textContent='Import en cours…'; }
+  /* [Volume] Une liste officielle (RSNU 1267) peut compter plusieurs centaines
+     d'entrées : dbPut + syncToSupabase à chaque itération sans jamais rendre
+     la main gèlerait l'UI. Cession de la boucle toutes les 25 entrées. */
   for(var i=0;i<lignes.length;i++){
     var p=lignes[i].split('|').map(function(x){return x.trim();});
     var nom=p[0]; if(!nom) continue;
@@ -52499,6 +52694,7 @@ async function sfcImporterListe(){
     try{ await dbPut('sfc_liste',entree); }catch(e){}
     if(typeof syncToSupabase==='function') syncToSupabase('pi_sfc_liste',entree);
     ajoutes++;
+    if(i%25===0){ await new Promise(function(res){ setTimeout(res,0); }); if(btn) btn.textContent='Import en cours… ('+(i+1)+'/'+lignes.length+')'; }
   }
   DATA.params=DATA.params||{}; DATA.params.id=DATA.params.id||'main';
   DATA.params.lbcft=DATA.params.lbcft||{};
@@ -52506,6 +52702,7 @@ async function sfcImporterListe(){
   DATA.params._modifie=new Date().toISOString();
   try{ await dbPut('params',DATA.params); }catch(e){}
   if(typeof syncToSupabase==='function') syncToSupabase('pi_params',DATA.params);
+  if(btn){ btn.disabled=false; btn.textContent='Importer'; }
   closeModal('modal-sfc-import');
   sfcRenderListe();
   toast(ajoutes+' entrée(s) ajoutée(s) — '+(lignes.length-ajoutes)+' déjà en base ou ignorée(s).','success');
@@ -52516,6 +52713,130 @@ async function sfcSupprimerEntree(id){
   try{ await dbDelete('sfc_liste',id); }catch(e){}
   if(typeof syncToSupabase==='function') syncToSupabase('pi_sfc_liste',{id:id,_supprime:true});
   sfcRenderListe();
+}
+function _cfSoumissions(){ return DATA.sfc_centif||(DATA.sfc_centif=[]); }
+/* Préremplit le formulaire officiel CENTIF à partir d'un criblage effectué. */
+function sfcCentifOuvrir(runId){
+  var run=_sfcCriblages().find(function(x){return x.id===runId;});
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom_societe||DATA.params.nom))||'';
+  var u=APP.currentUser||{};
+  var v=function(id,val){ var e=document.getElementById(id); if(e) e.value=val||''; };
+  v('cf-id',''); v('cf-criblage-id',run?run.id:'');
+  var nomComplet=(u.nom||'').trim().split(/\s+/);
+  v('cf-nom', nomComplet.slice(0,1).join(' ')); v('cf-prenoms', nomComplet.slice(1).join(' '));
+  v('cf-email', u.email||''); v('cf-contact', u.telephone||u.tel||'');
+  v('cf-date-maj', run?run.date:today());
+  v('cf-denomination', soc);
+  if(run){
+    var fructueux = run.resultats.length>0;
+    v('cf-croisement-fait','Oui');
+    v('cf-croisement-identifie', fructueux?'Oui':'Non');
+    v('cf-nb-identifies', run.resultats.length);
+    var geles = run.resultats.filter(function(r){return r.decision==='confirme';}).length;
+    v('cf-fonds-impliques', geles>0?'Oui':'Non');
+  }
+  var aucune=document.getElementById('cf-mesure-aucune'); if(aucune) aucune.checked=!(run&&run.resultats.some(function(r){return r.decision==='confirme';}));
+  document.querySelectorAll('.cf-mesure').forEach(function(c){ if(c.id!=='cf-mesure-aucune') c.checked=!!(run&&run.resultats.some(function(r){return r.decision==='confirme';})) && c.id!=='cf-mesure-autre'; });
+  sfcCentifRenderHistorique();
+  var panel=document.getElementById('sfc-centif-panel'); if(panel) panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function _cfCocheesValeurs(cls){
+  return Array.prototype.slice.call(document.querySelectorAll('.'+cls+':checked')).map(function(c){return c.value;});
+}
+async function sfcCentifSauvegarder(){
+  var g=function(id){ var e=document.getElementById(id); return e?e.value:''; };
+  if(!g('cf-nom').trim()||!g('cf-prenoms').trim()||!g('cf-email').trim()||!g('cf-contact').trim()){
+    toast('Nom, prénoms, email et contact du répondant sont obligatoires.','error'); return;
+  }
+  if(!g('cf-denomination').trim()){ toast('Dénomination sociale obligatoire.','error'); return; }
+  var mesures=_cfCocheesValeurs('cf-mesure'); var suivi=_cfCocheesValeurs('cf-suivi');
+  if(!mesures.length){ toast('Sélectionnez au moins une mesure prise (ou « Aucune mesure »).','error'); return; }
+  if(!suivi.length){ toast('Sélectionnez au moins une mesure de suivi (ou « Aucune mesure »).','error'); return; }
+  var id=g('cf-id')||uid();
+  var rec={
+    id:id, criblage_id:g('cf-criblage-id'),
+    repondant_nom:g('cf-nom').trim(), repondant_prenoms:g('cf-prenoms').trim(),
+    repondant_email:g('cf-email').trim(), repondant_contact:g('cf-contact').trim(),
+    objet:g('cf-objet'), date_maj:g('cf-date-maj'), reception:g('cf-reception'),
+    typologie:g('cf-typologie'), activite:g('cf-activite'), denomination:g('cf-denomination').trim(),
+    croisement_fait:g('cf-croisement-fait'), croisement_identifie:g('cf-croisement-identifie'),
+    nb_identifies:parseInt(g('cf-nb-identifies'),10)||0, fonds_impliques:g('cf-fonds-impliques'),
+    mesures:mesures, mesures_autre:g('cf-mesure-autre-txt').trim(),
+    suivi_dispositif:g('cf-suivi-dispositif'), suivi_mesures:suivi, suivi_autre:g('cf-suivi-autre-txt').trim(),
+    prepare_par:(APP.currentUser&&APP.currentUser.nom)||'', prepare_le:new Date().toISOString()
+  };
+  await _locSave('sfc_centif',rec,'pi_sfc_centif');
+  document.getElementById('cf-id').value=id;
+  sfcCentifRenderHistorique();
+  toast('✅ Réponses enregistrées — utilisez « Imprimer / recopier » pour les reporter sur centif.ci.','success');
+}
+function sfcCentifImprimer(){
+  var g=function(id){ var e=document.getElementById(id); return e?e.value:''; };
+  var mesures=_cfCocheesValeurs('cf-mesure'), suivi=_cfCocheesValeurs('cf-suivi');
+  var w=window.open('','_blank');
+  if(!w){ toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  var li=function(arr){ return '<ul>'+arr.map(function(x){return '<li>'+escHtml(x)+'</li>';}).join('')+'</ul>'; };
+  w.document.write('<html><head><title>Réponses — Formulaire CENTIF SFC</title>'
+    +'<style>body{font-family:Georgia,serif;padding:36px;color:#111;font-size:13px;line-height:1.5;}'
+    +'h1{font-size:17px;margin:0 0 4px;}h2{font-size:13.5px;margin:18px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px;}'
+    +'table{width:100%;border-collapse:collapse;}td{padding:4px 6px;border-bottom:1px solid #ddd;vertical-align:top;}td.k{width:38%;color:#555;}'
+    +'ul{margin:4px 0;padding-left:20px;}.pied{margin-top:24px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Formulaire CENTIF SFC', g('cf-id')||g('cf-objet'))
+    +'<h1>Réponses préparées — Formulaire de retour CENTIF-CI (SFC)</h1>'
+    +'<div style="color:#555;font-size:11.5px;">À recopier sur <u>centif.ci/declarations/formsSFC.php</u> — ce document n\'est pas une soumission officielle.</div>'
+    +'<h2>Identification du répondant</h2><table>'
+    +'<tr><td class="k">Nom</td><td>'+escHtml(g('cf-nom'))+'</td></tr>'
+    +'<tr><td class="k">Prénoms</td><td>'+escHtml(g('cf-prenoms'))+'</td></tr>'
+    +'<tr><td class="k">Adresse email</td><td>'+escHtml(g('cf-email'))+'</td></tr>'
+    +'<tr><td class="k">Contact</td><td>'+escHtml(g('cf-contact'))+'</td></tr></table>'
+    +'<h2>Informations générales sur l\'alerte</h2><table>'
+    +'<tr><td class="k">Objet (Alerte reçue)</td><td>'+escHtml(g('cf-objet'))+'</td></tr>'
+    +'<tr><td class="k">Date de mise à jour de la SFC</td><td>'+dateShort(g('cf-date-maj'))+'</td></tr>'
+    +'<tr><td class="k">Comment reçue</td><td>'+escHtml(g('cf-reception'))+'</td></tr></table>'
+    +'<h2>Identification de la structure</h2><table>'
+    +'<tr><td class="k">Typologie de la structure</td><td>'+escHtml(g('cf-typologie'))+'</td></tr>'
+    +'<tr><td class="k">Type d\'activité</td><td>'+escHtml(g('cf-activite'))+'</td></tr>'
+    +'<tr><td class="k">Dénomination sociale</td><td>'+escHtml(g('cf-denomination'))+'</td></tr></table>'
+    +'<h2>Croisement des registres et des listes</h2><table>'
+    +'<tr><td class="k">Croisement effectué</td><td>'+escHtml(g('cf-croisement-fait'))+'</td></tr>'
+    +'<tr><td class="k">Partenaire identifié sur la liste</td><td>'+escHtml(g('cf-croisement-identifie'))+'</td></tr></table>'
+    +'<h2>Mesures</h2><table>'
+    +'<tr><td class="k">Nombre identifié</td><td>'+escHtml(g('cf-nb-identifies'))+'</td></tr>'
+    +'<tr><td class="k">Fonds/ressources impliqués</td><td>'+escHtml(g('cf-fonds-impliques'))+'</td></tr></table>'
+    +'<h2>Mesures et diligences sans délai</h2>'+li(mesures)
+    +(g('cf-mesure-autre-txt')?('<div><i>Autres :</i> '+escHtml(g('cf-mesure-autre-txt'))+'</div>'):'')
+    +'<h2>Diligences de suivi</h2><table><tr><td class="k">Dispositif continu</td><td>'+escHtml(g('cf-suivi-dispositif'))+'</td></tr></table>'
+    +li(suivi)
+    +(g('cf-suivi-autre-txt')?('<div><i>Autres :</i> '+escHtml(g('cf-suivi-autre-txt'))+'</div>'):'')
+    +'<div class="pied">Généré depuis ImmoSuite ERP le '+new Date().toLocaleDateString('fr-FR')+'.</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
+}
+function sfcCentifRenderHistorique(){
+  var el=document.getElementById('cf-historique'); if(!el) return;
+  var list=_cfSoumissions().slice().sort(function(a,b){ return (b.prepare_le||'').localeCompare(a.prepare_le||''); });
+  if(!list.length){ el.innerHTML='<div style="padding:12px;text-align:center;color:var(--blanc-dim);font-size:11.5px;">Aucune réponse préparée pour l\'instant.</div>'; return; }
+  el.innerHTML='<table><thead><tr><th>Préparé le</th><th>Objet</th><th>Correspondance ?</th><th>Par</th><th></th></tr></thead><tbody>'
+    +list.map(function(r){
+      return '<tr><td>'+dateShort(r.prepare_le)+'</td><td style="font-size:11px;">'+escHtml(r.objet||'')+'</td>'
+        +'<td>'+(r.croisement_identifie==='Oui'?'⚠️ Oui':'✅ Non')+'</td>'
+        +'<td style="font-size:11px;">'+escHtml(r.prepare_par||'')+'</td>'
+        +'<td><button class="btn btn-secondary btn-sm btn-icon" title="Rouvrir" onclick="sfcCentifRecharger(\''+r.id+'\')">✏️</button></td></tr>';
+    }).join('')+'</tbody></table>';
+}
+function sfcCentifRecharger(id){
+  var r=_cfSoumissions().find(function(x){return x.id===id;}); if(!r) return;
+  var v=function(eid,val){ var e=document.getElementById(eid); if(e) e.value=val||''; };
+  v('cf-id',r.id); v('cf-criblage-id',r.criblage_id);
+  v('cf-nom',r.repondant_nom); v('cf-prenoms',r.repondant_prenoms); v('cf-email',r.repondant_email); v('cf-contact',r.repondant_contact);
+  v('cf-objet',r.objet); v('cf-date-maj',r.date_maj); v('cf-reception',r.reception);
+  v('cf-typologie',r.typologie); v('cf-activite',r.activite); v('cf-denomination',r.denomination);
+  v('cf-croisement-fait',r.croisement_fait); v('cf-croisement-identifie',r.croisement_identifie);
+  v('cf-nb-identifies',r.nb_identifies); v('cf-fonds-impliques',r.fonds_impliques);
+  v('cf-mesure-autre-txt',r.mesures_autre); v('cf-suivi-dispositif',r.suivi_dispositif); v('cf-suivi-autre-txt',r.suivi_autre);
+  document.querySelectorAll('.cf-mesure').forEach(function(c){ c.checked=(r.mesures||[]).indexOf(c.value)!==-1; });
+  document.querySelectorAll('.cf-suivi').forEach(function(c){ c.checked=(r.suivi_mesures||[]).indexOf(c.value)!==-1; });
+  var panel=document.getElementById('sfc-centif-panel'); if(panel) panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function sfcRenderListe(){
   var etat=document.getElementById('sfc-liste-etat');
@@ -52621,7 +52942,7 @@ function sfcRenderCriblages(){
       +(run.resultats.length?(' · <span style="color:var(--rouge);">'+run.resultats.length+' correspondance(s)</span>'):' · <span style="color:var(--vert);">aucune correspondance</span>')
       +(run.transmis_centif?(' · <span class="badge badge-vert">Retour transmis le '+dateShort(run.transmis_le)+'</span>'):'')
       +'</div>'
-      +'<button class="btn btn-secondary btn-sm" onclick="sfcImprimerRetour(\''+run.id+'\')">🖨️ Formulaire de retour CENTIF</button>'
+      +'<button class="btn btn-secondary btn-sm" onclick="sfcCentifOuvrir(\''+run.id+'\')">📝 Formulaire de retour CENTIF</button>'
       +'</div>'
       +(run.resultats.length?('<table style="margin-top:8px;"><thead><tr><th>Tiers</th><th>Qualité</th><th>Correspond à</th><th>Score</th><th>Décision</th><th></th></tr></thead><tbody>'
         +run.resultats.map(function(r){
@@ -52631,7 +52952,9 @@ function sfcRenderCriblages(){
             +'<td style="font-size:11px;">'+escHtml(r.sanction_nom)+(r.sanction_ref?(' — '+escHtml(r.sanction_ref)):'')+'</td>'
             +'<td>'+r.score+'%</td>'
             +'<td><span class="badge '+d.c+'">'+d.l+'</span>'+(r.motif?('<div style="font-size:10px;color:var(--blanc-dim);">'+escHtml(r.motif)+'</div>'):'')+'</td>'
-            +'<td style="white-space:nowrap;">'+(r.decision==='a_traiter'
+            +'<td style="white-space:nowrap;">'
+            +(r.tiers_type==='client'?('<button class="btn btn-secondary btn-sm btn-icon" onclick="kycOpen(\''+r.tiers_id+'\')" title="Fiche de vigilance">📋</button> '):'')
+            +(r.decision==='a_traiter'
               ?('<button class="btn btn-danger btn-sm" onclick="sfcTraiterCorrespondance(\''+run.id+'\',\''+r.id+'\',\'confirme\')">🔒 Confirmer</button> '
                +'<button class="btn btn-secondary btn-sm" onclick="sfcTraiterCorrespondance(\''+run.id+'\',\''+r.id+'\',\'faux_positif\')">✖ Écarter</button>')
               :'—')+'</td></tr>';
@@ -114249,6 +114572,7 @@ function imprimerFactureFNE(facId) {
     + '.legal{font-size:10px;color:#6B6B9A;margin-top:16px;}'
     + '.no-print{text-align:center;margin-bottom:16px;} .no-print button{padding:9px 20px;background:#B87333;color:#fff;border:none;border-radius:6px;cursor:pointer;margin:0 4px;}'
     + '@media print{.no-print{display:none;}body{padding:0;}}</style></head><body>'
+    + sanixQrHtml('Facture', f.numero)
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / PDF</button>'
     + (enErreur ? '<button onclick="window.opener && window.opener.fneRecertifier(\'' + f.id + '\')">🔁 Retenter la certification DGI</button>' : '')
     + '</div>'
