@@ -2458,18 +2458,6 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="nav-item" onclick="goTo('acces-foncier')" data-page="acces-foncier" title="Accès portail des acquéreurs de cessions foncières">
         <span class="nav-icon">🔑</span><span>Accès Acquéreurs Fonciers</span>
       </div>
-          <div class="nav-item" onclick="goTo('portail-proprietaire-foncier')" data-page="portail-proprietaire-foncier" title="Espace propriétaire — suivi de l'avancement de sa/ses parcelle(s)">
-        <span class="nav-icon">🗺️</span><span>Espace Propriétaire Foncier</span>
-      </div>
-          <div class="nav-item" onclick="goTo('portail-acquereur-foncier')" data-page="portail-acquereur-foncier" title="Espace acquéreur — échéancier, versements et déclaration de paiement">
-        <span class="nav-icon">💳</span><span>Espace Acquéreur Foncier</span>
-      </div>
-          <div class="nav-item" onclick="goTo('portail-financier')" data-page="portail-financier" title="Espace partenaire financier — engagement, versements et documents">
-        <span class="nav-icon">🏦</span><span>Espace Partenaire Financier</span>
-      </div>
-          <div class="nav-item" onclick="goTo('portail-partenaire-lot')" data-page="portail-partenaire-lot" title="Accès portail des partenaires lotissement">
-        <span class="nav-icon">🤝</span><span>Accès Partenaires Lotissement</span>
-      </div>
           <div class="nav-item" onclick="goTo('sig')" data-page="sig">
         <span class="nav-icon">🛰️</span><span>Cartographie &amp; SIG</span>
       </div>
@@ -5351,6 +5339,36 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         </div>
         <div class="tab-pane" id="tab-validations-transferts">
           <div id="validations-transferts-box"></div>
+        </div>
+
+        <div class="steps-nav" style="margin:18px 0 10px;">
+          <div class="etape">
+            <div class="etape-hd"><span class="etape-num">3</span>Historique — décisions rendues (validations &amp; rejets)</div>
+            <div class="etape-btns">
+              <button class="tab-btn active" onclick="switchTab('validations','histo-caisse')">💰 Mouvements de caisse</button>
+              <button class="tab-btn" onclick="switchTab('validations','histo-da')">📝 Demandes d'Achat (DA)</button>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:12px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div><label style="font-size:11px;color:var(--dim);display:block;">Statut</label>
+            <select class="filter-select" id="histo-filtre-statut" onchange="renderHistoriqueValidations()">
+              <option value="">Tous (validés + rejetés)</option>
+              <option value="valide">Validés uniquement</option>
+              <option value="rejete">Rejetés uniquement</option>
+            </select>
+          </div>
+          <div><label style="font-size:11px;color:var(--dim);display:block;">Du</label>
+            <input type="date" class="filter-select" id="histo-filtre-debut" onchange="renderHistoriqueValidations()"></div>
+          <div><label style="font-size:11px;color:var(--dim);display:block;">Au</label>
+            <input type="date" class="filter-select" id="histo-filtre-fin" onchange="renderHistoriqueValidations()"></div>
+          <button class="btn btn-secondary btn-sm" onclick="exporterHistoriqueValidations()">📊 Exporter Excel</button>
+        </div>
+        <div class="tab-pane active" id="tab-validations-histo-caisse">
+          <div id="histo-validations-caisse-box"></div>
+        </div>
+        <div class="tab-pane" id="tab-validations-histo-da">
+          <div id="histo-validations-da-box"></div>
         </div>
       </div>
 
@@ -14592,6 +14610,15 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <div class="etape-hd"><span class="etape-num">3</span>Gouvernance</div>
             <div class="etape-btns">
               <button class="tab-btn" onclick="switchTab('lbcft','dispositif')"><i>⚙️</i>Dispositif interne</button>
+              <button class="tab-btn" onclick="switchTab('lbcft','cappi')"><i>🏛️</i>Suivi CAPPI</button>
+              <button class="tab-btn" onclick="switchTab('lbcft','conformx')"><i>📊</i>Suivi ConformX</button>
+              <button class="tab-btn" onclick="switchTab('lbcft','artci')"><i>🔐</i>ARTCI (données perso.)</button>
+            </div>
+          </div>
+          <div class="etape">
+            <div class="etape-hd"><span class="etape-num">🎯</span>Sanctions</div>
+            <div class="etape-btns">
+              <button class="tab-btn" onclick="switchTab('lbcft','sfc')"><i>🛑</i>Criblage SFC (listes CSNU)</button>
             </div>
           </div>
         </div>
@@ -14600,6 +14627,51 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <div class="tab-pane active" id="tab-lbcft-alertes">
           <div class="alert alert-info">Ces constats n'établissent pas un soupçon : ils appellent un examen. Toute décision — examen approfondi, écartement motivé, déclaration — doit être tracée : le contrôle vérifie la justification, pas seulement le résultat.</div>
           <div class="table-wrap" style="margin-top:12px;"><div id="lbc-alertes-table"></div></div>
+        </div>
+
+        <div class="tab-pane" id="tab-lbcft-sfc">
+          <div class="alert alert-danger" style="font-size:12px;">
+            <b>🛑 Obligation de gel sans délai.</b> Toute personne ou entité identifiée dans la liste doit être gelée immédiatement —
+            interdiction de mettre des fonds, biens, ressources économiques ou services financiers à sa disposition, directement ou
+            indirectement. Le résultat de la recherche — fructueux ou infructueux — doit être communiqué sans délai à la CENTIF-CI
+            via le formulaire de retour d'informations (ci-dessous), qui vaut accusé de réception.
+          </div>
+
+          <div id="sfc-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0;"></div>
+
+          <div class="card">
+            <div class="page-header" style="margin:0;">
+              <div class="form-section-title" style="margin:0;">📇 Liste des personnes/entités sanctionnées (RSNU — Rés. 1267 et subséquentes)</div>
+              <button class="btn btn-secondary btn-sm" onclick="sfcOpenImport()">📥 Importer / mettre à jour la liste</button>
+            </div>
+            <div style="font-size:11.5px;color:var(--blanc-dim);margin:8px 0;" id="sfc-liste-etat"></div>
+            <div class="filters-bar" style="flex-wrap:wrap;">
+              <input type="text" class="form-control" id="sfc-liste-filtre" placeholder="Rechercher un nom…" oninput="sfcRenderListe()" style="max-width:260px;">
+            </div>
+            <div class="table-wrap" style="margin-top:10px;max-height:280px;overflow:auto;"><div id="sfc-liste-table"></div></div>
+          </div>
+
+          <div class="card" style="margin-top:14px;">
+            <div class="page-header" style="margin:0;">
+              <div class="form-section-title" style="margin:0;">🔍 Criblage des tiers (clients &amp; fournisseurs)</div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <label style="font-size:11px;color:var(--blanc-dim);">Seuil de similarité</label>
+                <select class="form-control" id="sfc-seuil" style="width:100px;">
+                  <option value="0.7">70%</option>
+                  <option value="0.75">75%</option>
+                  <option value="0.8" selected>80%</option>
+                  <option value="0.9">90%</option>
+                  <option value="1">100% (exact)</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="sfcLancerCriblage()">▶️ Lancer le criblage</button>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--blanc-dim);margin-top:8px;">
+              Compare le nom de chaque client et fournisseur de la base à la liste ci-dessus (y compris les alias), avec tolérance
+              aux fautes de frappe et variantes orthographiques (translittération, ordre des noms…).
+            </div>
+            <div id="sfc-criblages-list" style="margin-top:12px;"></div>
+          </div>
         </div>
 
         <div class="tab-pane" id="tab-lbcft-kyc">
@@ -14641,6 +14713,249 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               Des <b>seuils sectoriels propres à l'immobilier</b> ont été fixés par la décision n°003/28-03-2024/CM/UMOA :
               vérifiez la valeur applicable à votre activité auprès de votre autorité de supervision avant de vous fier à ce paramétrage.
             </div>
+          </div>
+
+          <div class="card" style="margin-top:14px;">
+            <div class="form-section-title">📑 Documents de conformité</div>
+            <div style="font-size:12px;color:var(--blanc-dim);margin:6px 0 12px;">
+              Ces documents sont générés à partir des paramètres ci-dessus. Régénérez-les après toute modification
+              (changement de correspondant, de suppléant ou de seuils) et conservez une version signée dans le dossier de conformité.
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-secondary" onclick="lbcImprimerPolitique()">📄 Imprimer la politique LBC/FT/FP</button>
+              <button class="btn btn-secondary" onclick="lbcImprimerDesignation()">✉️ Lettre de désignation (CENTIF + CAPPI)</button>
+            </div>
+            <div id="lbc-docs-etat" style="margin-top:12px;font-size:11.5px;color:var(--blanc-dim);"></div>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-lbcft-cappi">
+          <div class="alert alert-info" style="font-size:12px;">
+            🏛️ La CAPPI (Commission d'Agrément des Promoteurs et Programmes Immobiliers) est l'autorité de supervision
+            sectorielle LBC/FT des agents et promoteurs immobiliers en Côte d'Ivoire. Ce registre trace toutes vos
+            correspondances avec elle — notifications, demandes, réponses, contrôles — indépendamment des déclarations
+            de soupçon adressées à la CENTIF-CI, qui restent confidentielles et séparées.
+          </div>
+
+          <div class="card" style="margin-top:12px;">
+            <div class="form-section-title">📇 Coordonnées CAPPI</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Interlocuteur / service</label><input type="text" class="form-control" id="cappi-contact" placeholder="Ex. Secrétariat de la CAPPI"></div>
+              <div class="form-group"><label>Adresse</label><input type="text" class="form-control" id="cappi-adresse"></div>
+              <div class="form-group"><label>Téléphone</label><input type="text" class="form-control" id="cappi-tel"></div>
+              <div class="form-group"><label>Email</label><input type="text" class="form-control" id="cappi-email"></div>
+              <div class="form-group"><label>N° d'agrément promoteur (si délivré)</label><input type="text" class="form-control" id="cappi-agrement"></div>
+              <div class="form-group"><label>Date de délivrance de l'agrément</label><input type="date" class="form-control" id="cappi-agrement-date"></div>
+            </div>
+            <button class="btn btn-primary" style="margin-top:12px;" onclick="cappiSaveContact()">💾 Enregistrer</button>
+          </div>
+
+          <div class="card" style="margin-top:14px;">
+            <div class="page-header" style="margin:0;">
+              <div class="form-section-title" style="margin:0;">📋 Registre des échanges</div>
+              <button class="btn btn-primary btn-sm" onclick="cappiOpen()">+ Nouvel échange</button>
+            </div>
+            <div id="cappi-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0;"></div>
+            <div class="table-wrap"><div id="cappi-table"></div></div>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-lbcft-conformx">
+          <div class="alert alert-info" style="font-size:12px;">
+            📊 <b>ConformX</b> est la plateforme numérique des autorités de contrôle (Secrétariat Technique LBC/FT/FP) dédiée
+            au suivi (i) des contrôles sur pièces et sur place, (ii) de la mise en œuvre des mesures correctives et (iii) du
+            processus de mise en conformité des assujettis. Ce registre trace ici, en interne, chaque contrôle notifié et
+            l'avancement de ses mesures correctives — indépendamment de la saisie sur la plateforme elle-même.
+          </div>
+
+          <div class="card" style="margin-top:12px;">
+            <div class="page-header" style="margin:0;">
+              <div class="form-section-title" style="margin:0;">📋 Registre des contrôles</div>
+              <button class="btn btn-primary btn-sm" onclick="cxOpen()">+ Nouveau contrôle</button>
+            </div>
+            <div id="cx-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0;"></div>
+            <div class="table-wrap"><div id="cx-table"></div></div>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-lbcft-artci">
+          <div class="alert alert-info" style="font-size:12px;">
+            🔐 <b>ARTCI</b> (Autorité de Régulation des Télécommunications/TIC de Côte d'Ivoire) est l'autorité de protection
+            des données à caractère personnel. Tout traitement de données KYC (pièce d'identité, PPE, origine des fonds,
+            bénéficiaire effectif) doit faire l'objet d'une déclaration/autorisation via la plateforme CERTINUM
+            (certinumapdp.ci). Le responsable de traitement est le promoteur (client), pas l'éditeur du logiciel — ce
+            registre trace ici l'avancement de sa démarche.
+          </div>
+
+          <div class="card" style="margin-top:12px;">
+            <div class="form-section-title">📇 Responsable de traitement</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Interlocuteur / DPO désigné</label><input type="text" class="form-control" id="artci-contact"></div>
+              <div class="form-group"><label>Adresse</label><input type="text" class="form-control" id="artci-adresse"></div>
+              <div class="form-group"><label>Téléphone</label><input type="text" class="form-control" id="artci-tel"></div>
+              <div class="form-group"><label>Email</label><input type="text" class="form-control" id="artci-email"></div>
+              <div class="form-group"><label>N° de récépissé/autorisation CERTINUM</label><input type="text" class="form-control" id="artci-recepisse"></div>
+              <div class="form-group"><label>Date de délivrance</label><input type="date" class="form-control" id="artci-recepisse-date"></div>
+            </div>
+            <button class="btn btn-primary" style="margin-top:12px;" onclick="artciSaveContact()">💾 Enregistrer</button>
+          </div>
+
+          <div class="card" style="margin-top:14px;">
+            <div class="page-header" style="margin:0;">
+              <div class="form-section-title" style="margin:0;">📋 Registre des démarches CERTINUM</div>
+              <button class="btn btn-primary btn-sm" onclick="artciOpen()">+ Nouvelle démarche</button>
+            </div>
+            <div id="artci-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0;"></div>
+            <div class="table-wrap"><div id="artci-table"></div></div>
+          </div>
+
+          <div class="card" style="margin-top:14px;">
+            <div class="form-section-title">📑 Dossier de déclaration</div>
+            <div style="font-size:12px;color:var(--blanc-dim);margin:6px 0 12px;">
+              Génère la fiche de traitement des données personnelles (finalités, catégories de données, destinataires,
+              durée de conservation) à joindre au dossier CERTINUM.
+            </div>
+            <button class="btn btn-secondary" onclick="artciImprimerFiche()">📄 Imprimer la fiche de traitement</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="modal-conformx">
+        <div class="modal">
+          <div class="modal-header"><h3>📊 Contrôle — ConformX</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-conformx')">✕</button></div>
+          <div class="modal-body">
+            <input type="hidden" id="cx-id">
+            <div class="form-grid">
+              <div class="form-group"><label>Date de notification</label><input type="date" class="form-control" id="cx-date"></div>
+              <div class="form-group"><label>Type de contrôle</label>
+                <select class="form-control" id="cx-type">
+                  <option value="sur_pieces">Contrôle sur pièces</option>
+                  <option value="sur_place">Contrôle sur place</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="form-group"><label>Autorité de contrôle</label><input type="text" class="form-control" id="cx-autorite" placeholder="Ex. CENTIF-CI, CAPPI…"></div>
+              <div class="form-group"><label>N° dossier / réf. ConformX</label><input type="text" class="form-control" id="cx-ref"></div>
+            </div>
+            <div class="form-group"><label>Objet / constats du contrôle</label><textarea class="form-control" id="cx-objet" rows="3"></textarea></div>
+            <div class="form-group"><label>Mesures correctives demandées</label><textarea class="form-control" id="cx-mesures" rows="3"></textarea></div>
+            <div class="form-grid">
+              <div class="form-group"><label>Échéance de mise en œuvre</label><input type="date" class="form-control" id="cx-echeance"></div>
+              <div class="form-group"><label>Statut</label>
+                <select class="form-control" id="cx-statut">
+                  <option value="notifie">Notifié</option>
+                  <option value="en_cours">Mesures en cours</option>
+                  <option value="mis_en_oeuvre">Mesures mises en œuvre</option>
+                  <option value="clos">Clos / conforme</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group"><label>Notes</label><textarea class="form-control" id="cx-notes" rows="2"></textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-conformx')">Annuler</button>
+            <button class="btn btn-primary" onclick="cxSave()">💾 Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="modal-artci">
+        <div class="modal">
+          <div class="modal-header"><h3>🔐 Démarche ARTCI/CERTINUM</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-artci')">✕</button></div>
+          <div class="modal-body">
+            <input type="hidden" id="artci-e-id">
+            <div class="form-grid">
+              <div class="form-group"><label>Date</label><input type="date" class="form-control" id="artci-e-date"></div>
+              <div class="form-group"><label>Type</label>
+                <select class="form-control" id="artci-e-type">
+                  <option value="declaration">Déclaration initiale</option>
+                  <option value="autorisation">Demande d'autorisation</option>
+                  <option value="modification">Modification de traitement</option>
+                  <option value="renouvellement">Renouvellement</option>
+                  <option value="controle">Contrôle ARTCI</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group"><label>N° dossier CERTINUM</label><input type="text" class="form-control" id="artci-e-ref"></div>
+            <div class="form-group"><label>Objet</label><textarea class="form-control" id="artci-e-objet" rows="2"></textarea></div>
+            <div class="form-grid">
+              <div class="form-group"><label>Statut</label>
+                <select class="form-control" id="artci-e-statut">
+                  <option value="a_deposer">À déposer</option>
+                  <option value="depose">Déposé</option>
+                  <option value="en_instruction">En instruction</option>
+                  <option value="delivre">Récépissé/autorisation délivré(e)</option>
+                  <option value="rejete">Rejeté</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Échéance</label><input type="date" class="form-control" id="artci-e-echeance"></div>
+            </div>
+            <div class="form-group"><label>Notes</label><textarea class="form-control" id="artci-e-notes" rows="2"></textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-artci')">Annuler</button>
+            <button class="btn btn-primary" onclick="artciSave()">💾 Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="modal-cappi">
+        <div class="modal">
+          <div class="modal-header"><h3>🏛️ Échange avec la CAPPI</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-cappi')">✕</button></div>
+          <div class="modal-body">
+            <input type="hidden" id="cappi-e-id">
+            <div class="form-grid">
+              <div class="form-group"><label>Date</label><input type="date" class="form-control" id="cappi-e-date"></div>
+              <div class="form-group"><label>Type</label>
+                <select class="form-control" id="cappi-e-type">
+                  <option value="designation">Notification de désignation (correspondant/suppléant)</option>
+                  <option value="politique">Transmission de la politique LBC/FT</option>
+                  <option value="demande_info">Demande d'information de la CAPPI</option>
+                  <option value="reponse">Réponse à une demande de la CAPPI</option>
+                  <option value="controle">Contrôle / visite sur place</option>
+                  <option value="agrement">Dossier d'agrément promoteur</option>
+                  <option value="autre">Autre</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group"><label>Objet</label><input type="text" class="form-control" id="cappi-e-objet" placeholder="Ex. Notification du correspondant CENTIF"></div>
+            <div class="form-grid">
+              <div class="form-group"><label>Statut</label>
+                <select class="form-control" id="cappi-e-statut">
+                  <option value="a_transmettre">À transmettre</option>
+                  <option value="transmis">Transmis</option>
+                  <option value="accuse">Accusé de réception reçu</option>
+                  <option value="en_cours">En cours d'examen par la CAPPI</option>
+                  <option value="clos">Clos / classé</option>
+                </select>
+              </div>
+              <div class="form-group"><label>N° référence / accusé</label><input type="text" class="form-control" id="cappi-e-ref"></div>
+            </div>
+            <div class="form-group"><label>Notes</label><textarea class="form-control" id="cappi-e-notes" rows="3"></textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-cappi')">Annuler</button>
+            <button class="btn btn-primary" onclick="cappiSave()">💾 Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="modal-sfc-import">
+        <div class="modal">
+          <div class="modal-header"><h3>📥 Importer la liste de sanctions (SFC)</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-sfc-import')">✕</button></div>
+          <div class="modal-body">
+            <div class="alert alert-info" style="font-size:11.5px;">
+              Une ligne par entrée, séparateur « | » : <code>Nom complet | Alias1;Alias2 | Référence (ex. QDi.123) | Type (personne ou entite)</code>.
+              Alias, référence et type sont optionnels (type par défaut : personne). Reportez ici les noms de la mise à jour transmise
+              par la CENTIF (liste 1267 / communiqué de presse) avant de lancer le criblage.
+            </div>
+            <div class="form-group"><label>Source / résolution</label><input type="text" class="form-control" id="sfc-import-source" placeholder="Ex. Résolution 1267 CSNU — Liste EIIL (Daech) et Al-Qaida"></div>
+            <div class="form-group"><label>Entrées</label><textarea class="form-control" id="sfc-import-texte" rows="10" placeholder="Nom Prénom | alias1;alias2 | QDi.123 | personne"></textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-sfc-import')">Annuler</button>
+            <button class="btn btn-primary" onclick="sfcImporterListe()">Importer</button>
           </div>
         </div>
       </div>
@@ -21247,6 +21562,18 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <!-- Grille photos avec édition inline -->
         <div id="rch-photos-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;"></div>
 
+        <!-- [AJOUT — revue photo/vidéo] Vidéos du rapport, même gabarit que le module lotissement (plr*) -->
+        <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="rchOuvrirVideo()">🔗 Vidéo (YouTube/Vimeo/lien)</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="rchOuvrirVideoFichier()">📤 Vidéo (fichier, max 25 Mo)</button>
+          <input type="file" id="rch-input-video" accept="video/mp4,video/webm,video/ogg,video/quicktime" style="display:none;" onchange="rchAjouterVideoFichier(this)">
+        </div>
+        <div id="rch-video-form" style="display:none;margin-top:10px;padding:12px;border:1px dashed #B87333;border-radius:10px;">
+          <input type="text" id="rch-video-url" class="form-control" placeholder="https://www.youtube.com/watch?v=… · https://vimeo.com/… · https://…/video.mp4">
+          <button type="button" class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="rchAjouterVideo()">✅ Ajouter la vidéo</button>
+        </div>
+        <div id="rch-videos-list" style="margin-top:10px;"></div>
+
         <!-- Prise de vue caméra -->
         <div id="rch-camera-zone" style="display:none;margin-top:14px;">
           <div style="position:relative;background:#000;border-radius:var(--r2);overflow:hidden;max-height:280px;">
@@ -22341,7 +22668,15 @@ var DATA = {
    INDEXEDDB
 ────────────────────────────────────────────────────── */
 var DB_NAME = 'ImmoSuiteDB';
-var DB_VERSION = 147; /* v147: stores 'fiches_engagement_depense', 'transferts_budgetaires' — circuit budgétaire complet avec validation DG */
+var DB_VERSION = 149; /* v149: ajout stores 'lbc_conformx' (bug v148 non corrigé — même symptôme :
+                          écriture perdue hors ligne) et 'lbc_artci' (nouveau module déclaration
+                          ARTCI/CERTINUM). v148: stores 'lbc_cappi', 'kyc_fiches', 'lbc_declarations',
+                          'lbc_alertes' — ces stores du module Conformité LBC/FT écrivaient déjà dans
+                          DATA et se synchronisaient bien vers le cloud (syncToSupabase), mais n'étaient
+                          jamais déclarés ici : dbPut échouait silencieusement en local (voir garde-fou
+                          « [dbPut] Store absent — écriture perdue »). Hors connexion, les fiches de
+                          vigilance, alertes et déclarations de soupçon saisies ne survivaient donc
+                          pas à un rechargement de page. Migration additive uniquement, aucune perte. */
 var db = null;
 
 /* Liste COMPLÈTE et définitive de tous les stores */
@@ -22356,6 +22691,7 @@ var ALL_STORES = [
   'factures_client',
   'financements_programme',
   'conflits_sync',
+  'lbc_cappi','kyc_fiches','lbc_declarations','lbc_alertes','lbc_conformx','lbc_artci',
   'immobilisations',
   'permis','plans_arch','rapports_chantier',
   'campagnes','actions_marketing','segments_marketing',
@@ -24316,6 +24652,9 @@ function _filtrerFantomes(table, store, ids) {
 
 /* Correspondance table Supabase ↔ store local (IndexedDB / DATA) */
 var SUPA_STORE_MAP = [
+  ['pi_lbc_cappi',        'lbc_cappi'],
+  ['pi_lbc_conformx',     'lbc_conformx'],
+  ['pi_lbc_artci',        'lbc_artci'],
   ['pi_fiches_engagement_depense',         'fiches_engagement_depense'],
   ['pi_transferts_budgetaires', 'transferts_budgetaires'],
   ['pi_caisse_budgets',         'caisse_budgets'],
@@ -27405,6 +27744,10 @@ function switchTab(context, tab) {
     if (tab==='kyc' && typeof lbcRenderKyc==='function') lbcRenderKyc();
     if (tab==='declarations' && typeof lbcRenderDeclarations==='function') lbcRenderDeclarations();
     if (tab==='dispositif' && typeof lbcRenderParams==='function') lbcRenderParams();
+    if (tab==='cappi' && typeof cappiRender==='function') { cappiRenderContact(); cappiRender(); }
+    if (tab==='sfc' && typeof sfcRenderListe==='function') { sfcRenderListe(); sfcRenderCriblages(); }
+    if (tab==='conformx' && typeof cxRender==='function') cxRender();
+    if (tab==='artci' && typeof artciRender==='function') { artciRenderContact(); artciRender(); }
   }
   if (context==='diaspo') {
     if (tab==='dossiers' && typeof dspRenderDossiers==='function') dspRenderDossiers();
@@ -27540,6 +27883,9 @@ function switchTab(context, tab) {
     if (tab === 'exploitation' && typeof renderCompteExploitationPrevisionnel === 'function') renderCompteExploitationPrevisionnel();
     if (tab === 'da' && typeof budgetRenderDA === 'function') budgetRenderDA();
     if (tab === 'mesdemandes' && typeof budgetRenderMesDemandes === 'function') budgetRenderMesDemandes();
+  }
+  if (context === 'validations') {
+    if ((tab === 'histo-caisse' || tab === 'histo-da') && typeof renderHistoriqueValidations === 'function') renderHistoriqueValidations();
   }
 
   /* Mettre à jour les boutons .tab-btn du même contexte */
@@ -30387,6 +30733,10 @@ function exportClients() {
    PAIEMENTS / VERSEMENTS
 ────────────────────────────────────────────────────── */
 function openPaiementModal(clientId) {
+  if (clientId && typeof sfcTiersEstGele==='function' && sfcTiersEstGele('client', clientId)) {
+    toast('⛔ Ce client fait l\'objet d\'une mesure de gel SFC — aucun encaissement possible. Voir Conformité LBC/FT > Sanctions.', 'error');
+    return;
+  }
   APP._editVersementId = null;
   var _t=document.querySelector('#modal-paiement .modal-header h3'); if(_t) _t.textContent='Enregistrer un versement';
   var _b=document.getElementById('btn-save-paiement'); if(_b) _b.textContent='Enregistrer + Reçu';
@@ -31422,6 +31772,10 @@ async function savePaiement() {
   var montant = parseFloat(document.getElementById('v-montant').value);
   var date = document.getElementById('v-date').value;
   if (!cid || !montant || !date) { toast('Client, montant et date sont obligatoires.', 'error'); return; }
+  if (typeof sfcTiersEstGele==='function' && sfcTiersEstGele('client', cid)) {
+    toast('⛔ Ce client est gelé (SFC) — l\'enregistrement d\'un versement est interdit tant que la mesure de gel est active.', 'error');
+    return;
+  }
 
   // ── MODE ÉDITION : mise à jour + ré-impact des commissions + ré-écriture comptable ──
   if (APP._editVersementId) {
@@ -42459,6 +42813,13 @@ var SYSTEM_ROLES = {
      inverse, jamais par effacement : c'est la condition d'une caisse auditable. */
   caissiere:  { id:'caissiere',  label:'Caissière',      icon:'💰', level:1, system:true,
     peut_supprimer: false,
+    /* [FIX segregation of duties] Sans "droits" défini, userPeut() traite le
+       module comme non restreint et autorise TOUTE action — y compris 'v'
+       (Valider). La caissière saisit ses bons de caisse mais ne doit jamais
+       pouvoir valider son propre mouvement : la validation revient à un
+       responsable habilité (plafond de rôle), sinon aucun contrôle réel
+       n'existe sur les sorties de fonds. */
+    droits: { Caisse: 'cm' },
     permissions: Object.fromEntries(ALL_MODULES.map(function(m){
       return [m, ['Caisse','Messagerie','Comptabilite'].includes(m)]; })) },
 };
@@ -51466,7 +51827,14 @@ function lbcRenderAlertes(){
   var list=lbcAnalyser().filter(function(a){ return a.statut==='nouvelle'||a.statut==='examen'; })
     .sort(function(a,b){ return (a.gravite==='haute'?0:1)-(b.gravite==='haute'?0:1); });
   var b=document.getElementById('badge-lbcft');
-  if(b){ b.textContent=list.length; b.style.display=list.length?'inline-block':'none'; }
+  if(b){
+    var _sfcAT=(typeof _sfcCriblages==='function'?_sfcCriblages():[]).reduce(function(n,r){
+      return n+r.resultats.filter(function(x){return x.decision==='a_traiter';}).length; },0);
+    var _cxRetard=(typeof _cxE==='function'?_cxE():[]).filter(function(e){
+      return e.statut!=='clos' && e.echeance && e.echeance<today(); }).length;
+    var _tot=list.length+_sfcAT+_cxRetard;
+    b.textContent=_tot; b.style.display=_tot?'inline-block':'none';
+  }
   if(!list.length){ el.innerHTML='<div class="alert alert-success">✅ Aucune opération appelant un examen à ce jour.</div>'; return; }
   var ico={vigilance:'🔍',especes:'💵',risque:'⚠️',kyc:'📋',remboursement:'↩️'};
   el.innerHTML='<table><thead><tr><th></th><th>Client</th><th>Montant</th><th>Constat</th><th>Statut</th><th>Actions</th></tr></thead><tbody>'
@@ -51620,6 +51988,150 @@ function lbcImprimerDS(id){
     +'</body></html>');
   w.document.close(); w.print();
 }
+/* ─── Politique LBC/FT/FP — document de gouvernance ────────────────
+   Formalise par écrit le dispositif interne exigé par l'ordonnance
+   n°2023-875 (art. relatifs à l'organisation et au contrôle interne).
+   Générée à partir des paramètres enregistrés : toute modification du
+   correspondant, du suppléant ou des seuils doit être suivie d'une
+   régénération et d'une nouvelle signature. */
+function lbcImprimerPolitique(){
+  var P=_lbcParams();
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom_societe))||'';
+  var adr=(DATA.params&&DATA.params.adresse)||'';
+  var rccm=(DATA.params&&DATA.params.rccm)||'';
+  var w=window.open('','_blank');
+  if(!w){ toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  w.document.write('<html><head><title>Politique LBC/FT/FP — '+escHtml(soc)+'</title>'
+    +'<style>body{font-family:Georgia,serif;padding:40px;color:#111;font-size:13px;line-height:1.55;}'
+    +'h1{font-size:19px;margin:0 0 4px;}h2{font-size:14px;margin:20px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px;}'
+    +'.sub{color:#555;font-size:11.5px;margin-bottom:18px;}'
+    +'table{width:100%;border-collapse:collapse;margin:8px 0;}td{padding:4px 0;vertical-align:top;}td.k{width:32%;color:#555;}'
+    +'.pied{margin-top:30px;font-size:11px;color:#555;}ul{margin:6px 0 6px 18px;}li{margin-bottom:4px;}</style></head><body>'
+    +'<h1>'+escHtml(soc||'Société de promotion immobilière')+'</h1>'
+    +'<div class="sub">'+escHtml(adr)+(rccm?(' · RCCM '+escHtml(rccm)):'')+'</div>'
+    +'<h1 style="margin-top:18px;">Politique de lutte contre le blanchiment de capitaux, le financement du terrorisme et de la prolifération (LBC/FT/FP)</h1>'
+    +'<div class="sub">Établie en application de l\'Ordonnance n°2023-875 du 23 novembre 2023 — Autorité de déclaration : CENTIF-CI</div>'
+
+    +'<h2>1. Objet et champ d\'application</h2>'
+    +'<p>La présente politique définit le dispositif interne de prévention du blanchiment de capitaux, du financement du '
+    +'terrorisme et de la prolifération mis en œuvre par '+escHtml(soc||'la société')+', professionnel de l\'immobilier '
+    +'assujetti au titre des Entreprises et Professions Non Financières Désignées (EPNFD). Elle s\'applique à l\'ensemble '
+    +'du personnel intervenant dans la relation d\'affaires avec la clientèle.</p>'
+
+    +'<h2>2. Gouvernance et dispositif interne</h2>'
+    +'<table><tbody>'
+    +'<tr><td class="k">Correspondant CENTIF</td><td>'+escHtml(P.correspondant||'⚠️ non désigné')+(P.correspondant_tel?(' — Tél. '+escHtml(P.correspondant_tel)):'')+'</td></tr>'
+    +'<tr><td class="k">Suppléant</td><td>'+escHtml(P.suppleant||'⚠️ non désigné')+'</td></tr>'
+    +'<tr><td class="k">Durée de conservation des pièces</td><td>'+P.conservation_ans+' ans à compter de la fin de la relation d\'affaires</td></tr>'
+    +'</tbody></table>'
+    +'<p>Le correspondant CENTIF est le point de contact unique pour la réception des alertes internes, l\'analyse des '
+    +'opérations atypiques, la rédaction des déclarations de soupçon et leur transmission à la CENTIF-CI. Son identité '
+    +'et celle de son suppléant sont communiquées à la CENTIF-CI et à la Commission d\'Agrément des Promoteurs et '
+    +'Programmes Immobiliers (CAPPI), autorité de supervision sectorielle LBC/FT des agents et promoteurs immobiliers.</p>'
+
+    +'<h2>3. Approche par les risques et seuils de vigilance</h2>'
+    +'<table><tbody>'
+    +'<tr><td class="k">Seuil de vigilance (opérations cumulées)</td><td>'+fmtF(P.seuil)+' FCFA</td></tr>'
+    +'<tr><td class="k">Seuil d\'alerte règlements en espèces</td><td>'+fmtF(P.seuil_especes)+' FCFA</td></tr>'
+    +'</tbody></table>'
+    +'<p>Ces seuils déclenchent automatiquement, dans le système d\'information, l\'exigence d\'une fiche de vigilance '
+    +'et, le cas échéant, un examen renforcé. Ils sont revus périodiquement et à chaque évolution réglementaire, '
+    +'notamment au regard des seuils sectoriels immobiliers fixés par la décision n°003/28-03-2024/CM/UMOA.</p>'
+
+    +'<h2>4. Vigilance à l\'égard de la clientèle</h2>'
+    +'<ul><li>Identification du client et vérification de son identité avant l\'entrée en relation d\'affaires ;</li>'
+    +'<li>Identification du bénéficiaire effectif pour les personnes morales et les opérations pour compte de tiers ;</li>'
+    +'<li>Détermination du statut de personne politiquement exposée (PPE), le cas échéant de son proche ou associé ;</li>'
+    +'<li>Recueil et vérification, autant que possible, de l\'origine des fonds ;</li>'
+    +'<li>Vigilance constante sur la durée de la relation d\'affaires, avec mise à jour des informations.</li></ul>'
+
+    +'<h2>5. Détection, examen et déclaration</h2>'
+    +'<p>Toute opération atypique détectée par le système ou signalée par un collaborateur fait l\'objet d\'un examen '
+    +'documenté par le correspondant CENTIF. Cet examen — approfondissement, écartement motivé ou déclaration — est '
+    +'systématiquement tracé. La déclaration de soupçon, écrite et motivée, est adressée exclusivement à la CENTIF-CI. '
+    +'Il est interdit d\'en informer le client ou tout tiers.</p>'
+
+    +'<h2>6. Conservation et confidentialité</h2>'
+    +'<p>Les pièces d\'identification, les fiches de vigilance et les pièces justificatives des opérations sont '
+    +'conservées pendant '+P.conservation_ans+' ans. Le registre des déclarations de soupçon n\'est accessible qu\'au '
+    +'correspondant CENTIF, à son suppléant et à la direction.</p>'
+
+    +'<h2>7. Formation et actualisation</h2>'
+    +'<p>Le personnel en contact avec la clientèle reçoit une sensibilisation aux obligations LBC/FT/FP. La présente '
+    +'politique est revue au moins une fois par an et à chaque évolution réglementaire.</p>'
+
+    +'<div class="pied">Document généré depuis ImmoSuite ERP le '+new Date().toLocaleDateString('fr-FR')+'. '
+    +'À valider et signer par le dirigeant avant classement au dossier de conformité.'
+    +'<br><br>Fait à Abidjan, le _____________________<br><br>Signature du dirigeant</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
+  DATA.params=DATA.params||{}; DATA.params.lbcft=DATA.params.lbcft||{};
+  DATA.params.lbcft.politique_generee_le=new Date().toISOString();
+  try{ dbPut('params',DATA.params); }catch(e){}
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_params',DATA.params);
+  lbcRenderParams();
+}
+
+/* ─── Lettre de désignation du correspondant CENTIF et de son suppléant ──
+   Pièce exigée pour la notification à la CENTIF-CI et à l'autorité de
+   supervision sectorielle (copie). Bloquée tant que les deux noms ne
+   sont pas renseignés dans le dispositif, pour éviter une notification
+   incomplète. */
+function lbcImprimerDesignation(){
+  var P=_lbcParams();
+  if(!P.correspondant || !P.suppleant){
+    toast('⚠️ Renseignez le correspondant ET le suppléant avant de générer la lettre de désignation.','error');
+    switchTab('lbcft','dispositif');
+    return;
+  }
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom_societe))||'';
+  var adr=(DATA.params&&DATA.params.adresse)||'';
+  var rccm=(DATA.params&&DATA.params.rccm)||'';
+  var w=window.open('','_blank');
+  if(!w){ toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  w.document.write('<html><head><title>Lettre de désignation — '+escHtml(soc)+'</title>'
+    +'<style>body{font-family:Georgia,serif;padding:40px;color:#111;font-size:13px;line-height:1.6;}'
+    +'.entete{margin-bottom:24px;}.dest{margin:24px 0;}.obj{font-weight:bold;margin:18px 0;}'
+    +'.pied{margin-top:40px;font-size:11px;color:#555;}</style></head><body>'
+    +'<div class="entete"><strong>'+escHtml(soc||'Société de promotion immobilière')+'</strong><br>'
+    +escHtml(adr)+(rccm?('<br>RCCM '+escHtml(rccm)):'')+'</div>'
+    +'<div style="text-align:right;">Abidjan, le '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    +'<div class="dest">À l\'attention de :<br>Monsieur/Madame le Président de la CENTIF-CI<br>'
+    +'Copie : Commission d\'Agrément des Promoteurs et Programmes Immobiliers (CAPPI) — autorité de supervision sectorielle LBC/FT des agents et promoteurs immobiliers</div>'
+    +'<div class="obj">Objet : Désignation du correspondant CENTIF et de son suppléant</div>'
+    +'<p>Monsieur le Président,</p>'
+    +'<p>Conformément aux obligations de dispositif interne prévues par l\'Ordonnance n°2023-875 du 23 novembre 2023 '
+    +'relative à la lutte contre le blanchiment de capitaux, le financement du terrorisme et de la prolifération, '
+    +'nous avons l\'honneur de vous notifier la désignation suivante au sein de '+escHtml(soc||'notre société')+' :</p>'
+    +'<table style="width:100%;border-collapse:collapse;margin:16px 0;">'
+    +'<tr><td style="padding:6px 10px;border:1px solid #999;width:40%;background:#f5f5f5;">Correspondant CENTIF</td>'
+    +'<td style="padding:6px 10px;border:1px solid #999;">'+escHtml(P.correspondant)+(P.correspondant_tel?(' — Tél. '+escHtml(P.correspondant_tel)):'')+'</td></tr>'
+    +'<tr><td style="padding:6px 10px;border:1px solid #999;background:#f5f5f5;">Suppléant</td>'
+    +'<td style="padding:6px 10px;border:1px solid #999;">'+escHtml(P.suppleant)+'</td></tr>'
+    +'</table>'
+    +'<p>Le correspondant ainsi désigné, ou à défaut son suppléant, est l\'interlocuteur unique de la CENTIF-CI et de '
+    +'la CAPPI pour toute question relative au dispositif LBC/FT/FP de notre structure, ainsi que le '
+    +'signataire des déclarations de soupçon transmises en application de l\'article relatif à la déclaration.</p>'
+    +'<p>Nous vous prions d\'agréer, Monsieur le Président, l\'expression de notre haute considération.</p>'
+    +'<div class="pied">Fait à Abidjan, le '+new Date().toLocaleDateString('fr-FR')
+    +'<br><br>Signature et cachet du dirigeant'
+    +'<br><br><i>Document généré depuis ImmoSuite ERP — à imprimer sur papier en-tête, signer et transmettre en original à la CENTIF-CI, copie à la CAPPI.</i></div>'
+    +'</body></html>');
+  w.document.close(); w.print();
+  DATA.params=DATA.params||{}; DATA.params.lbcft=DATA.params.lbcft||{};
+  DATA.params.lbcft.designation_generee_le=new Date().toISOString();
+  try{ dbPut('params',DATA.params); }catch(e){}
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_params',DATA.params);
+  /* Trace automatiquement l'événement dans le registre CAPPI, pour éviter
+     une double saisie et garantir qu'aucune notification imprimée ne
+     reste hors suivi. */
+  _locSave('lbc_cappi',{ id:uid(), date:today(), type:'designation',
+    objet:'Notification du correspondant ('+P.correspondant+') et du suppléant ('+P.suppleant+')',
+    statut:'a_transmettre', reference:'', notes:'Généré automatiquement depuis la lettre de désignation imprimée.' },
+    'pi_lbc_cappi');
+  lbcRender();
+}
+
 async function lbcSaveParams(){
   var g=function(i){var e=document.getElementById(i); return e?e.value:'';};
   DATA.params=DATA.params||{}; DATA.params.id=DATA.params.id||'main';
@@ -51641,7 +52153,7 @@ function lbcRenderParams(){
   var el=document.getElementById('lbc-conformite');
   if(!el) return;
   var manques=[];
-  if(!P.correspondant) manques.push('Aucun correspondant CENTIF désigné — son identité doit être communiquée à la CENTIF et à l\'autorité de supervision.');
+  if(!P.correspondant) manques.push('Aucun correspondant CENTIF désigné — son identité doit être communiquée à la CENTIF et à la CAPPI (autorité de supervision sectorielle).');
   if(!P.suppleant) manques.push('Aucun suppléant désigné.');
   var sansKyc=(DATA.clients||[]).filter(function(c){ return _lbcCumul(c.id)>0 && !_kycDe(c.id); }).length;
   if(sansKyc) manques.push(sansKyc+' client(s) en relation d\'affaires sans fiche de vigilance.');
@@ -51657,9 +52169,609 @@ function lbcRenderParams(){
       ['Conservation',P.conservation_ans+' ans']]
       .map(function(k){ return '<div class="kpi-card"><div class="kpi-label">'+k[0]+'</div><div class="kpi-value or" style="font-size:16px;">'+k[1]+'</div></div>'; }).join('')
     +'</div>';
+  var docs=document.getElementById('lbc-docs-etat');
+  if(docs){
+    var pp=(DATA.params&&DATA.params.lbcft)||{};
+    var fmtD=function(iso){ return iso ? new Date(iso).toLocaleDateString('fr-FR')+' à '+new Date(iso).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : null; };
+    var pol=fmtD(pp.politique_generee_le), des=fmtD(pp.designation_generee_le);
+    docs.innerHTML =
+      '📄 Politique LBC/FT/FP : '+(pol?('dernière impression le <b>'+pol+'</b>'):'<span style="color:var(--rouge);">jamais générée</span>')
+      +'<br>✉️ Lettre de désignation : '+(des?('dernière impression le <b>'+des+'</b>'):'<span style="color:var(--rouge);">jamais générée</span>')
+      +(!(P.correspondant&&P.suppleant)?'<br><span style="color:var(--rouge);">Renseignez le correspondant et le suppléant ci-dessus avant de générer la lettre de désignation.</span>':'');
+  }
 }
 function lbcRender(){
   lbcRenderKyc(); lbcRenderAlertes(); lbcRenderDeclarations(); lbcRenderParams();
+  cappiRenderContact(); cappiRender();
+  sfcRenderListe(); sfcRenderCriblages();
+  cxRender();
+  artciRenderContact(); artciRender();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SUIVI CONFORMX — plateforme numérique des autorités de contrôle
+   (Secrétariat Technique LBC/FT/FP) pour le suivi des contrôles sur
+   pièces/sur place, des mesures correctives et de la mise en conformité.
+   Registre interne, distinct de la saisie faite directement sur la
+   plateforme, pour garder trace des échéances et de leur respect.
+═══════════════════════════════════════════════════════════════════ */
+function _cxE(){ return DATA.lbc_conformx||(DATA.lbc_conformx=[]); }
+var CX_TYPES={ sur_pieces:'Contrôle sur pièces', sur_place:'Contrôle sur place' };
+var CX_STATUTS={ notifie:{l:'Notifié',c:'badge-rouge'}, en_cours:{l:'Mesures en cours',c:'badge-or'},
+  mis_en_oeuvre:{l:'Mesures mises en œuvre',c:'badge-bleu'}, clos:{l:'Clos / conforme',c:'badge-vert'} };
+
+function cxOpen(id){
+  var e=id?_cxE().find(function(x){return x.id===id;}):null;
+  var v=function(i,val){var el=document.getElementById(i); if(el) el.value=val||'';};
+  v('cx-id',e?e.id:''); v('cx-date',e?e.date:today());
+  v('cx-type',e?e.type:'sur_pieces'); v('cx-autorite',e?e.autorite:'');
+  v('cx-ref',e?e.reference:''); v('cx-objet',e?e.objet:''); v('cx-mesures',e?e.mesures:'');
+  v('cx-echeance',e?e.echeance:''); v('cx-statut',e?e.statut:'notifie'); v('cx-notes',e?e.notes:'');
+  openModal('modal-conformx');
+}
+async function cxSave(){
+  var g=function(i){var el=document.getElementById(i); return el?el.value:'';};
+  if(!(g('cx-autorite')||'').trim()){ toast('L\'autorité de contrôle est obligatoire.','error'); return; }
+  var list=_cxE(), id=g('cx-id');
+  var e=id?list.find(function(x){return x.id===id;}):null;
+  if(!e) e={ id:uid() };
+  e.date=g('cx-date')||today(); e.type=g('cx-type'); e.autorite=g('cx-autorite').trim();
+  e.reference=g('cx-ref'); e.objet=g('cx-objet'); e.mesures=g('cx-mesures');
+  e.echeance=g('cx-echeance'); e.statut=g('cx-statut'); e.notes=g('cx-notes');
+  await _locSave('lbc_conformx',e,'pi_lbc_conformx');
+  closeModal('modal-conformx'); cxRender();
+  toast('Contrôle enregistré au registre ConformX.','success');
+}
+async function cxSupprimer(id){
+  if(!confirm('Supprimer ce contrôle du registre ?')) return;
+  DATA.lbc_conformx=_cxE().filter(function(x){return x.id!==id;});
+  try{ await dbDelete('lbc_conformx',id); }catch(e){}
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_lbc_conformx',{id:id,_supprime:true});
+  cxRender();
+  toast('Contrôle supprimé.','success');
+}
+async function cxMajStatut(id, champ, valeur){
+  var e=_cxE().find(function(x){return x.id===id;}); if(!e) return;
+  e[champ]=valeur;
+  await _locSave('lbc_conformx',e,'pi_lbc_conformx');
+  cxRender();
+}
+function cxRender(){
+  var kpis=document.getElementById('cx-kpis');
+  var list=_cxE().slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var aujourdhui=today();
+  var enRetard=list.filter(function(e){ return e.statut!=='clos' && e.echeance && e.echeance<aujourdhui; }).length;
+  var enCours=list.filter(function(e){ return e.statut==='notifie'||e.statut==='en_cours'; }).length;
+  if(kpis){
+    kpis.innerHTML=[['Contrôles enregistrés',list.length],['Mesures en cours',enCours],
+      ['Échéances dépassées',enRetard],['Clos / conformes',list.filter(function(e){return e.statut==='clos';}).length]]
+      .map(function(k){ return '<div class="kpi-card"><div class="kpi-label">'+k[0]+'</div><div class="kpi-value or" style="font-size:15px;">'+k[1]+'</div></div>'; }).join('');
+  }
+  var el=document.getElementById('cx-table'); if(!el) return;
+  if(!list.length){ el.innerHTML='<div style="padding:20px;text-align:center;color:var(--blanc-dim);">Aucun contrôle enregistré. Utilisez « + Nouveau contrôle » pour tracer une notification (sur pièces ou sur place) et ses mesures correctives.</div>'; return; }
+  el.innerHTML='<table><thead><tr><th>Date</th><th>Type</th><th>Autorité</th><th>Objet</th><th>Échéance</th><th>Statut</th><th>Actions</th></tr></thead><tbody>'
+    +list.map(function(e){
+      var s=CX_STATUTS[e.statut]||CX_STATUTS.notifie;
+      var retard=e.statut!=='clos' && e.echeance && e.echeance<aujourdhui;
+      return '<tr'+(retard?' style="background:rgba(220,53,69,.07);"':'')+'>'
+        +'<td>'+dateShort(e.date)+'</td>'
+        +'<td style="font-size:11px;">'+escHtml(CX_TYPES[e.type]||e.type)+'</td>'
+        +'<td style="font-size:11px;">'+escHtml(e.autorite)+(e.reference?('<div style="font-size:10px;color:var(--blanc-dim);">Réf. '+escHtml(e.reference)+'</div>'):'')+'</td>'
+        +'<td style="font-size:11px;max-width:320px;">'+escHtml(e.objet||'—')+(e.mesures?('<div style="font-size:10px;color:var(--blanc-dim);">Mesures : '+escHtml(e.mesures)+'</div>'):'')+'</td>'
+        +'<td style="font-size:11px;'+(retard?'color:var(--rouge);font-weight:bold;':'')+'">'+(e.echeance?dateShort(e.echeance):'—')+(retard?' ⚠️':'')+'</td>'
+        +'<td><select class="form-control" style="font-size:11px;padding:2px;" onchange="cxMajStatut(\''+e.id+'\',\'statut\',this.value)">'
+        +['notifie','en_cours','mis_en_oeuvre','clos'].map(function(st){
+          return '<option value="'+st+'"'+(e.statut===st?' selected':'')+'>'+CX_STATUTS[st].l+'</option>'; }).join('')
+        +'</select></td>'
+        +'<td><button class="btn btn-secondary btn-sm btn-icon" onclick="cxOpen(\''+e.id+'\')" title="Modifier">✏️</button>'
+        +'<button class="btn btn-secondary btn-sm btn-icon" onclick="cxSupprimer(\''+e.id+'\')" title="Supprimer">🗑️</button></td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ARTCI/CERTINUM — déclaration/autorisation de traitement de données
+   à caractère personnel (KYC : pièce d'identité, PPE, origine des
+   fonds, bénéficiaire effectif). Responsable de traitement = le
+   promoteur (client), pas l'éditeur du logiciel. Registre calqué sur
+   celui de la CAPPI. ═══════════════════════════════════════════════ */
+function _artciE(){ return DATA.lbc_artci||(DATA.lbc_artci=[]); }
+var ARTCI_TYPES={ declaration:'Déclaration initiale', autorisation:'Demande d\'autorisation',
+  modification:'Modification de traitement', renouvellement:'Renouvellement', controle:'Contrôle ARTCI' };
+var ARTCI_STATUTS={ a_deposer:{l:'À déposer',c:'badge-gris'}, depose:{l:'Déposé',c:'badge-bleu'},
+  en_instruction:{l:'En instruction',c:'badge-or'}, delivre:{l:'Délivré(e)',c:'badge-vert'}, rejete:{l:'Rejeté',c:'badge-rouge'} };
+
+function _artciParams(){ DATA.params=DATA.params||{}; return DATA.params.artci||(DATA.params.artci={}); }
+async function artciSaveContact(){
+  var g=function(i){var e=document.getElementById(i); return e?e.value:'';};
+  DATA.params=DATA.params||{}; DATA.params.id=DATA.params.id||'main';
+  DATA.params.artci={ contact:g('artci-contact'), adresse:g('artci-adresse'), tel:g('artci-tel'),
+    email:g('artci-email'), recepisse:g('artci-recepisse'), recepisse_date:g('artci-recepisse-date') };
+  DATA.params._modifie=new Date().toISOString();
+  try{ await dbPut('params',DATA.params); }catch(e){}
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_params',DATA.params);
+  toast('Coordonnées ARTCI enregistrées.','success');
+}
+function artciRenderContact(){
+  var P=_artciParams(), v=function(i,val){var e=document.getElementById(i); if(e) e.value=val||'';};
+  v('artci-contact',P.contact); v('artci-adresse',P.adresse); v('artci-tel',P.tel);
+  v('artci-email',P.email); v('artci-recepisse',P.recepisse); v('artci-recepisse-date',P.recepisse_date);
+}
+function artciOpen(id){
+  var e=id?_artciE().find(function(x){return x.id===id;}):null;
+  var v=function(i,val){var el=document.getElementById(i); if(el) el.value=val||'';};
+  v('artci-e-id',e?e.id:''); v('artci-e-date',e?e.date:today());
+  v('artci-e-type',e?e.type:'declaration'); v('artci-e-ref',e?e.reference:'');
+  v('artci-e-objet',e?e.objet:''); v('artci-e-statut',e?e.statut:'a_deposer');
+  v('artci-e-echeance',e?e.echeance:''); v('artci-e-notes',e?e.notes:'');
+  openModal('modal-artci');
+}
+async function artciSave(){
+  var g=function(i){var el=document.getElementById(i); return el?el.value:'';};
+  if(!(g('artci-e-objet')||'').trim()){ toast('L\'objet de la démarche est obligatoire.','error'); return; }
+  var list=_artciE(), id=g('artci-e-id');
+  var e=id?list.find(function(x){return x.id===id;}):null;
+  if(!e) e={ id:uid() };
+  e.date=g('artci-e-date')||today(); e.type=g('artci-e-type'); e.reference=g('artci-e-ref');
+  e.objet=g('artci-e-objet').trim(); e.statut=g('artci-e-statut'); e.echeance=g('artci-e-echeance'); e.notes=g('artci-e-notes');
+  await _locSave('lbc_artci',e,'pi_lbc_artci');
+  closeModal('modal-artci'); artciRender();
+  toast('Démarche ARTCI enregistrée.','success');
+}
+async function artciSupprimer(id){
+  if(!confirm('Supprimer cette démarche du registre ?')) return;
+  DATA.lbc_artci=_artciE().filter(function(x){return x.id!==id;});
+  try{ await dbDelete('lbc_artci',id); }catch(e){}
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_lbc_artci',{id:id,_supprime:true});
+  artciRender();
+  toast('Démarche supprimée.','success');
+}
+function artciRender(){
+  var kpis=document.getElementById('artci-kpis');
+  var list=_artciE().slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  if(kpis){
+    kpis.innerHTML=[['Démarches enregistrées',list.length],
+      ['En instruction',list.filter(function(e){return e.statut==='en_instruction'||e.statut==='depose';}).length],
+      ['Délivrées',list.filter(function(e){return e.statut==='delivre';}).length],
+      ['Rejetées',list.filter(function(e){return e.statut==='rejete';}).length]]
+      .map(function(k){ return '<div class="kpi-card"><div class="kpi-label">'+k[0]+'</div><div class="kpi-value or" style="font-size:15px;">'+k[1]+'</div></div>'; }).join('');
+  }
+  var el=document.getElementById('artci-table'); if(!el) return;
+  if(!list.length){ el.innerHTML='<div style="padding:20px;text-align:center;color:var(--blanc-dim);">Aucune démarche enregistrée. Utilisez « + Nouvelle démarche » pour tracer un dépôt CERTINUM.</div>'; return; }
+  el.innerHTML='<table><thead><tr><th>Date</th><th>Type</th><th>Réf. CERTINUM</th><th>Objet</th><th>Échéance</th><th>Statut</th><th>Actions</th></tr></thead><tbody>'
+    +list.map(function(e){
+      var s=ARTCI_STATUTS[e.statut]||ARTCI_STATUTS.a_deposer;
+      return '<tr><td>'+dateShort(e.date)+'</td>'
+        +'<td style="font-size:11px;">'+escHtml(ARTCI_TYPES[e.type]||e.type)+'</td>'
+        +'<td style="font-size:11px;">'+escHtml(e.reference||'—')+'</td>'
+        +'<td style="font-size:11px;max-width:320px;">'+escHtml(e.objet||'—')+'</td>'
+        +'<td style="font-size:11px;">'+(e.echeance?dateShort(e.echeance):'—')+'</td>'
+        +'<td><select class="form-control" style="font-size:11px;padding:2px;" onchange="artciMajStatut(\''+e.id+'\',this.value)">'
+        +['a_deposer','depose','en_instruction','delivre','rejete'].map(function(st){
+          return '<option value="'+st+'"'+(e.statut===st?' selected':'')+'>'+ARTCI_STATUTS[st].l+'</option>'; }).join('')
+        +'</select></td>'
+        +'<td><button class="btn btn-secondary btn-sm btn-icon" onclick="artciOpen(\''+e.id+'\')" title="Modifier">✏️</button>'
+        +'<button class="btn btn-secondary btn-sm btn-icon" onclick="artciSupprimer(\''+e.id+'\')" title="Supprimer">🗑️</button></td></tr>';
+    }).join('')+'</tbody></table>';
+}
+async function artciMajStatut(id, valeur){
+  var e=_artciE().find(function(x){return x.id===id;}); if(!e) return;
+  e.statut=valeur;
+  await _locSave('lbc_artci',e,'pi_lbc_artci');
+  artciRender();
+}
+
+/* Fiche de traitement des données personnelles, pièce type à joindre au
+   dossier CERTINUM. Périmètre figé au module KYC/LBC-FT de l'ERP —
+   ne couvre pas d'éventuels autres traitements du promoteur hors ERP. */
+function artciImprimerFiche(){
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom_societe))||'';
+  var adr=(DATA.params&&DATA.params.adresse)||'';
+  var rccm=(DATA.params&&DATA.params.rccm)||'';
+  var P=_artciParams();
+  var w=window.open('','_blank');
+  if(!w){ toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  w.document.write('<html><head><title>Fiche de traitement — '+escHtml(soc)+'</title>'
+    +'<style>body{font-family:Georgia,serif;padding:40px;color:#111;font-size:13px;line-height:1.55;}'
+    +'h1{font-size:18px;margin:0 0 4px;}h2{font-size:14px;margin:20px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px;}'
+    +'.sub{color:#555;font-size:11.5px;margin-bottom:18px;}'
+    +'table{width:100%;border-collapse:collapse;margin:8px 0;}td{padding:4px 8px;vertical-align:top;border:1px solid #ccc;}td.k{width:30%;background:#f5f5f5;}'
+    +'.pied{margin-top:30px;font-size:11px;color:#555;}</style></head><body>'
+    +'<h1>'+escHtml(soc||'Société de promotion immobilière')+'</h1>'
+    +'<div class="sub">'+escHtml(adr)+(rccm?(' · RCCM '+escHtml(rccm)):'')+'</div>'
+    +'<h1 style="margin-top:18px;">Fiche de traitement de données à caractère personnel</h1>'
+    +'<div class="sub">Pièce jointe au dossier de déclaration/autorisation ARTCI — plateforme CERTINUM (certinumapdp.ci)</div>'
+    +'<h2>1. Responsable de traitement</h2>'
+    +'<table><tbody>'
+    +'<tr><td class="k">Dénomination</td><td>'+escHtml(soc||'—')+'</td></tr>'
+    +'<tr><td class="k">Adresse</td><td>'+escHtml(adr||'—')+'</td></tr>'
+    +'<tr><td class="k">RCCM</td><td>'+escHtml(rccm||'—')+'</td></tr>'
+    +'<tr><td class="k">Interlocuteur / DPO</td><td>'+escHtml(P.contact||'⚠️ non désigné')+(P.tel?(' — Tél. '+escHtml(P.tel)):'')+(P.email?(' — '+escHtml(P.email)):'')+'</td></tr>'
+    +'</tbody></table>'
+    +'<h2>2. Finalité du traitement</h2>'
+    +'<p>Vigilance et identification de la clientèle (KYC) dans le cadre de la lutte contre le blanchiment de capitaux, '
+    +'le financement du terrorisme et de la prolifération (LBC/FT/FP), préalablement à toute relation d\'affaires ou '
+    +'opération immobilière occasionnelle dépassant le seuil réglementaire.</p>'
+    +'<h2>3. Catégories de données collectées</h2>'
+    +'<table><tbody>'
+    +'<tr><td class="k">Identité</td><td>Nom, prénoms, date et lieu de naissance, nationalité, adresse</td></tr>'
+    +'<tr><td class="k">Pièce d\'identité</td><td>Type, numéro, date d\'expiration, copie numérisée</td></tr>'
+    +'<tr><td class="k">Situation</td><td>Profession, statut de personne politiquement exposée (PPE), origine des fonds</td></tr>'
+    +'<tr><td class="k">Personne morale</td><td>RCCM, NCC, identité du bénéficiaire effectif</td></tr>'
+    +'</tbody></table>'
+    +'<h2>4. Base légale</h2>'
+    +'<p>Obligation légale — Ordonnance n°2023-875 du 23 novembre 2023 relative à la LBC/FT/FP, complétée par les '
+    +'dispositions applicables en matière de protection des données à caractère personnel.</p>'
+    +'<h2>5. Destinataires</h2>'
+    +'<p>Personnel habilité de '+escHtml(soc||'la société')+' ; CENTIF-CI (déclarations de soupçon) ; CAPPI (supervision '
+    +'sectorielle) ; ARTCI (sur demande). Aucun transfert hors de Côte d\'Ivoire.</p>'
+    +'<h2>6. Durée de conservation</h2>'
+    +'<p>'+((DATA.params&&DATA.params.lbcft&&DATA.params.lbcft.conservation_ans)||10)+' ans à compter de la fin de la '
+    +'relation d\'affaires, conformément au dispositif LBC/FT/FP.</p>'
+    +'<h2>7. Mesures de sécurité</h2>'
+    +'<p>Accès restreint par authentification et rôles utilisateurs, chiffrement des mots de passe, journal des accès '
+    +'sensibles, hébergement sécurisé (Supabase/PostgreSQL avec Row Level Security).</p>'
+    +'<div class="pied">Document généré depuis ImmoSuite ERP le '+new Date().toLocaleDateString('fr-FR')+'. '
+    +'À compléter, valider et joindre au dossier de déclaration déposé sur CERTINUM (certinumapdp.ci).'
+    +'<br><br>Fait à Abidjan, le _____________________<br><br>Signature du responsable de traitement</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SANCTIONS FINANCIÈRES CIBLÉES (SFC) — Résolution 1267 du CSNU et
+   résolutions subséquentes, relayées par la CENTIF-CI. Module de
+   criblage : la liste des personnes/entités sanctionnées est saisie/
+   importée localement (l'app fonctionne hors ligne, sans accès direct
+   au fichier officiel du CSNU) puis comparée par similarité de nom aux
+   clients et fournisseurs de la base. Toute correspondance confirmée
+   déclenche une mesure de gel immédiate sur le tiers concerné, qui
+   bloque l'enregistrement de tout nouveau versement le concernant
+   (voir sfcTiersEstGele, appelé depuis openPaiementModal/savePaiement).
+   Chaque criblage génère un formulaire imprimable de retour d'informations
+   à la CENTIF-CI, fructueux ou infructueux, conformément à l'obligation
+   de communication sans délai. ═══════════════════════════════════════ */
+function _sfcListe(){ return DATA.sfc_liste||(DATA.sfc_liste=[]); }
+function _sfcCriblages(){ return DATA.sfc_criblages||(DATA.sfc_criblages=[]); }
+var SFC_DECISIONS={ a_traiter:{l:'⚠️ À traiter',c:'badge-rouge'}, faux_positif:{l:'Faux positif',c:'badge-gris'},
+  confirme:{l:'🔒 Confirmé — gelé',c:'badge-rouge'} };
+
+/* Normalisation : majuscules, sans accents ni ponctuation — pour comparer
+   des noms saisis avec des variantes orthographiques/translittérations. */
+function sfcNormalise(s){
+  return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+function sfcLevenshtein(a,b){
+  var m=a.length, n=b.length;
+  if(!m) return n; if(!n) return m;
+  var d=[]; for(var i=0;i<=m;i++){ d[i]=[i]; }
+  for(var j=0;j<=n;j++){ d[0][j]=j; }
+  for(i=1;i<=m;i++){
+    for(j=1;j<=n;j++){
+      var cout=a.charAt(i-1)===b.charAt(j-1)?0:1;
+      d[i][j]=Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+cout);
+    }
+  }
+  return d[m][n];
+}
+function sfcSimilarite(a,b){
+  a=sfcNormalise(a); b=sfcNormalise(b);
+  if(!a||!b) return 0;
+  if(a===b) return 1;
+  if(a.length>3 && b.length>3 && (a.indexOf(b)!==-1 || b.indexOf(a)!==-1)) return 0.92;
+  var dist=sfcLevenshtein(a,b), maxLen=Math.max(a.length,b.length);
+  return maxLen? Math.max(0,1-(dist/maxLen)) : 0;
+}
+function _sfcTiersScreenables(){
+  var out=[];
+  (DATA.clients||[]).forEach(function(c){ var nom=((c.nom||'')+' '+(c.prenoms||'')).trim(); if(nom) out.push({type:'client',id:c.id,nom:nom}); });
+  (DATA.fournisseurs||[]).forEach(function(f){ var nom=f.nom||f.raison_sociale||''; if(nom) out.push({type:'fournisseur',id:f.id,nom:nom}); });
+  return out;
+}
+function sfcTiersEstGele(type,id){
+  var arr=type==='client'?DATA.clients:DATA.fournisseurs;
+  var t=(arr||[]).find(function(x){return x.id===id;});
+  return !!(t&&t.gele);
+}
+
+function sfcOpenImport(){
+  var t=document.getElementById('sfc-import-texte'); if(t) t.value='';
+  var s=document.getElementById('sfc-import-source');
+  if(s) s.value=(DATA.params&&DATA.params.lbcft&&DATA.params.lbcft.sfc_liste_source)||'Résolution 1267 CSNU — Liste EIIL (Daech) et Al-Qaida';
+  openModal('modal-sfc-import');
+}
+async function sfcImporterListe(){
+  var texte=(document.getElementById('sfc-import-texte')||{}).value||'';
+  var source=((document.getElementById('sfc-import-source')||{}).value||'').trim();
+  var lignes=texte.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+  if(!lignes.length){ toast('Collez au moins une entrée à importer.','error'); return; }
+  var liste=_sfcListe(); var ajoutes=0;
+  for(var i=0;i<lignes.length;i++){
+    var p=lignes[i].split('|').map(function(x){return x.trim();});
+    var nom=p[0]; if(!nom) continue;
+    var reference=p[2]||'';
+    if(reference && liste.some(function(s){return s.reference && s.reference===reference;})) continue;
+    if(!reference && liste.some(function(s){return sfcNormalise(s.nom)===sfcNormalise(nom);})) continue;
+    var entree={ id:uid(), nom:nom, alias:p[1]||'', reference:reference,
+      type:((p[3]||'personne').toLowerCase()==='entite'?'entite':'personne'),
+      source:source, date_ajout:today() };
+    liste.push(entree);
+    try{ await dbPut('sfc_liste',entree); }catch(e){}
+    if(typeof syncToSupabase==='function') syncToSupabase('pi_sfc_liste',entree);
+    ajoutes++;
+  }
+  DATA.params=DATA.params||{}; DATA.params.id=DATA.params.id||'main';
+  DATA.params.lbcft=DATA.params.lbcft||{};
+  DATA.params.lbcft.sfc_liste_maj=today(); DATA.params.lbcft.sfc_liste_source=source;
+  DATA.params._modifie=new Date().toISOString();
+  try{ await dbPut('params',DATA.params); }catch(e){}
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_params',DATA.params);
+  closeModal('modal-sfc-import');
+  sfcRenderListe();
+  toast(ajoutes+' entrée(s) ajoutée(s) — '+(lignes.length-ajoutes)+' déjà en base ou ignorée(s).','success');
+}
+async function sfcSupprimerEntree(id){
+  if(!confirm('Retirer cette entrée de la liste locale ? (n\'affecte pas la liste officielle du CSNU)')) return;
+  DATA.sfc_liste=_sfcListe().filter(function(x){return x.id!==id;});
+  try{ await dbDelete('sfc_liste',id); }catch(e){}
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_sfc_liste',{id:id,_supprime:true});
+  sfcRenderListe();
+}
+function sfcRenderListe(){
+  var etat=document.getElementById('sfc-liste-etat');
+  var liste=_sfcListe(); var P=_lbcParams();
+  if(etat) etat.innerHTML = liste.length
+    ? ('<b>'+liste.length+'</b> entrée(s) en base'
+       +(P.sfc_liste_maj?(' · dernière mise à jour le '+dateShort(P.sfc_liste_maj)):'')
+       +(P.sfc_liste_source?(' · '+escHtml(P.sfc_liste_source)):''))
+    : '⚠️ Aucune liste chargée — importez la liste transmise par la CENTIF avant de lancer un criblage.';
+  var kpis=document.getElementById('sfc-kpis');
+  if(kpis){
+    var gelesClients=(DATA.clients||[]).filter(function(c){return c.gele;}).length;
+    var gelesFourn=(DATA.fournisseurs||[]).filter(function(f){return f.gele;}).length;
+    var aTraiter=_sfcCriblages().reduce(function(n,r){ return n+r.resultats.filter(function(x){return x.decision==='a_traiter';}).length; },0);
+    kpis.innerHTML=[['Entrées liste',liste.length],['Criblages effectués',_sfcCriblages().length],
+      ['Correspondances à traiter',aTraiter],['Tiers gelés',gelesClients+gelesFourn]]
+      .map(function(k){ return '<div class="kpi-card"><div class="kpi-label">'+k[0]+'</div><div class="kpi-value or" style="font-size:15px;">'+k[1]+'</div></div>'; }).join('');
+  }
+  var el=document.getElementById('sfc-liste-table'); if(!el) return;
+  var q=((document.getElementById('sfc-liste-filtre')||{}).value||'').toLowerCase();
+  var rows=liste.filter(function(s){ return !q || (s.nom+' '+(s.alias||'')).toLowerCase().indexOf(q)!==-1; })
+    .slice().sort(function(a,b){ return (a.nom||'').localeCompare(b.nom||''); });
+  if(!rows.length){ el.innerHTML='<div style="padding:16px;text-align:center;color:var(--blanc-dim);">Aucune entrée.</div>'; return; }
+  el.innerHTML='<table><thead><tr><th>Nom</th><th>Alias</th><th>Type</th><th>Référence</th><th>Ajouté le</th><th></th></tr></thead><tbody>'
+    +rows.map(function(s){
+      return '<tr><td><strong>'+escHtml(s.nom)+'</strong></td>'
+        +'<td style="font-size:11px;">'+escHtml(s.alias||'—')+'</td>'
+        +'<td>'+(s.type==='entite'?'🏢 Entité':'👤 Personne')+'</td>'
+        +'<td style="font-size:11px;">'+escHtml(s.reference||'—')+'</td>'
+        +'<td>'+dateShort(s.date_ajout)+'</td>'
+        +'<td><button class="btn btn-secondary btn-sm btn-icon" onclick="sfcSupprimerEntree(\''+s.id+'\')" title="Retirer">🗑️</button></td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
+async function sfcLancerCriblage(){
+  var liste=_sfcListe();
+  if(!liste.length){ toast('Aucune liste de sanctions chargée — importez-la d\'abord.','error'); return; }
+  var seuil=parseFloat((document.getElementById('sfc-seuil')||{}).value)||0.8;
+  var tiers=_sfcTiersScreenables();
+  var resultats=[];
+  tiers.forEach(function(t){
+    var best=null;
+    liste.forEach(function(s){
+      var noms=[s.nom].concat((s.alias||'').split(/[,;]/).map(function(x){return x.trim();}).filter(Boolean));
+      noms.forEach(function(n){
+        var sc=sfcSimilarite(t.nom,n);
+        if(!best||sc>best.score) best={score:sc, sanction:s, nom_match:n};
+      });
+    });
+    if(best && best.score>=seuil){
+      resultats.push({ id:uid(), tiers_type:t.type, tiers_id:t.id, tiers_nom:t.nom,
+        sanction_id:best.sanction.id, sanction_nom:best.sanction.nom, sanction_ref:best.sanction.reference,
+        score:Math.round(best.score*100), decision:'a_traiter', motif:'', traite_le:'', traite_par:'' });
+    }
+  });
+  var run={ id:uid(), date:today(), seuil:seuil, nb_tiers:tiers.length, nb_liste:liste.length,
+    resultats:resultats, transmis_centif:false, transmis_le:'', created_at:new Date().toISOString() };
+  _sfcCriblages().push(run);
+  try{ await dbPut('sfc_criblages',run); }catch(e){}
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_sfc_criblages',run);
+  sfcRenderCriblages(); sfcRenderListe();
+  if(typeof lbcRenderAlertes==='function') lbcRenderAlertes();
+  toast(resultats.length? ('⚠️ '+resultats.length+' correspondance(s) à examiner sur '+tiers.length+' tiers criblés.')
+    : ('✅ Criblage infructueux — aucune correspondance sur '+tiers.length+' tiers criblés.'), resultats.length?'error':'success');
+}
+async function sfcTraiterCorrespondance(criblageId, resId, decision){
+  var run=_sfcCriblages().find(function(x){return x.id===criblageId;}); if(!run) return;
+  var r=run.resultats.find(function(x){return x.id===resId;}); if(!r) return;
+  if(decision==='faux_positif'){
+    var motif=prompt('Motif de l\'écartement (obligatoire — homonymie, vérification documentaire…) :','');
+    if(!motif||!motif.trim()){ toast('Un motif est obligatoire pour écarter une correspondance.','error'); return; }
+    r.decision='faux_positif'; r.motif=motif.trim();
+  } else if(decision==='confirme'){
+    if(!confirm('Confirmer la correspondance et GELER ce tiers ?\nCette mesure est immédiate : plus aucun versement ne pourra être enregistré à son nom tant que le gel est actif.')) return;
+    r.decision='confirme';
+    var store=r.tiers_type==='client'?'clients':'fournisseurs';
+    var table=r.tiers_type==='client'?'pi_clients':'pi_fournisseurs';
+    var tiers=(DATA[store]||[]).find(function(x){return x.id===r.tiers_id;});
+    if(tiers){
+      tiers.gele=true; tiers.gele_le=new Date().toISOString();
+      tiers.gele_motif='Correspondance SFC — '+r.sanction_nom+(r.sanction_ref?(' ('+r.sanction_ref+')'):'');
+      tiers.gele_criblage_id=criblageId;
+      try{ await dbPut(store,tiers); }catch(e){}
+      if(typeof syncToSupabase==='function') syncToSupabase(table,tiers);
+    }
+  } else return;
+  r.traite_le=new Date().toISOString(); r.traite_par=(APP.currentUser&&APP.currentUser.nom)||'';
+  try{ await dbPut('sfc_criblages',run); }catch(e){}
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_sfc_criblages',run);
+  sfcRenderCriblages(); sfcRenderListe();
+  if(typeof lbcRenderAlertes==='function') lbcRenderAlertes();
+  toast(decision==='confirme'?'🔒 Tiers gelé. Imprimez et transmettez le retour d\'informations à la CENTIF.':'Correspondance écartée.','success');
+}
+function sfcRenderCriblages(){
+  var el=document.getElementById('sfc-criblages-list'); if(!el) return;
+  var list=_sfcCriblages().slice().sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); });
+  if(!list.length){ el.innerHTML='<div style="text-align:center;color:var(--blanc-dim);padding:20px;">Aucun criblage effectué.</div>'; return; }
+  el.innerHTML=list.map(function(run){
+    var aTraiter=run.resultats.filter(function(r){return r.decision==='a_traiter';}).length;
+    return '<div class="card" style="margin-bottom:10px;'+(aTraiter?'border-color:var(--rouge);':'')+'">'
+      +'<div class="page-header" style="margin:0;flex-wrap:wrap;gap:8px;">'
+      +'<div style="font-size:12.5px;"><b>Criblage du '+dateShort(run.date)+'</b> — '+run.nb_tiers+' tiers vérifiés contre '+run.nb_liste+' entrée(s)'
+      +(run.resultats.length?(' · <span style="color:var(--rouge);">'+run.resultats.length+' correspondance(s)</span>'):' · <span style="color:var(--vert);">aucune correspondance</span>')
+      +(run.transmis_centif?(' · <span class="badge badge-vert">Retour transmis le '+dateShort(run.transmis_le)+'</span>'):'')
+      +'</div>'
+      +'<button class="btn btn-secondary btn-sm" onclick="sfcImprimerRetour(\''+run.id+'\')">🖨️ Formulaire de retour CENTIF</button>'
+      +'</div>'
+      +(run.resultats.length?('<table style="margin-top:8px;"><thead><tr><th>Tiers</th><th>Qualité</th><th>Correspond à</th><th>Score</th><th>Décision</th><th></th></tr></thead><tbody>'
+        +run.resultats.map(function(r){
+          var d=SFC_DECISIONS[r.decision]||SFC_DECISIONS.a_traiter;
+          return '<tr><td><strong>'+escHtml(r.tiers_nom)+'</strong></td>'
+            +'<td style="font-size:11px;">'+(r.tiers_type==='client'?'Client':'Fournisseur')+'</td>'
+            +'<td style="font-size:11px;">'+escHtml(r.sanction_nom)+(r.sanction_ref?(' — '+escHtml(r.sanction_ref)):'')+'</td>'
+            +'<td>'+r.score+'%</td>'
+            +'<td><span class="badge '+d.c+'">'+d.l+'</span>'+(r.motif?('<div style="font-size:10px;color:var(--blanc-dim);">'+escHtml(r.motif)+'</div>'):'')+'</td>'
+            +'<td style="white-space:nowrap;">'+(r.decision==='a_traiter'
+              ?('<button class="btn btn-danger btn-sm" onclick="sfcTraiterCorrespondance(\''+run.id+'\',\''+r.id+'\',\'confirme\')">🔒 Confirmer</button> '
+               +'<button class="btn btn-secondary btn-sm" onclick="sfcTraiterCorrespondance(\''+run.id+'\',\''+r.id+'\',\'faux_positif\')">✖ Écarter</button>')
+              :'—')+'</td></tr>';
+        }).join('')+'</tbody></table>')
+        :'<div style="font-size:11px;color:var(--blanc-dim);margin-top:6px;">Recherche infructueuse — aucune correspondance relevée à la date du criblage.</div>')
+      +'</div>';
+  }).join('');
+}
+function sfcImprimerRetour(runId){
+  var run=_sfcCriblages().find(function(x){return x.id===runId;}); if(!run) return;
+  var P=_lbcParams();
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom_societe||DATA.params.nom))||'';
+  var fructueux=run.resultats.some(function(r){return r.decision!=='faux_positif';});
+  var w=window.open('','_blank');
+  if(!w){ toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  var lignes=run.resultats.map(function(r){
+    return '<tr><td>'+escHtml(r.tiers_nom)+'</td><td>'+(r.tiers_type==='client'?'Client':'Fournisseur')+'</td>'
+      +'<td>'+escHtml(r.sanction_nom)+(r.sanction_ref?(' — '+escHtml(r.sanction_ref)):'')+'</td>'
+      +'<td>'+r.score+'%</td>'
+      +'<td>'+escHtml({a_traiter:'En cours d\'examen',faux_positif:'Faux positif — '+(r.motif||''),confirme:'Confirmé — mesure de gel appliquée'}[r.decision]||'')+'</td></tr>';
+  }).join('');
+  w.document.write('<html><head><title>Retour d\'informations CENTIF — SFC</title>'
+    +'<style>body{font-family:Georgia,serif;padding:38px;color:#111;font-size:13px;}'
+    +'h2{margin:0 0 2px;}table{width:100%;border-collapse:collapse;margin:14px 0;}'
+    +'th,td{padding:5px 6px;border-bottom:1px solid #ccc;text-align:left;font-size:12px;vertical-align:top;}'
+    +'td.k{width:34%;color:#555;}.bloc{border:1px solid #bbb;padding:12px;margin:12px 0;}'
+    +'.res{padding:8px 12px;font-weight:bold;text-align:center;color:#fff;}'
+    +'.pied{margin-top:26px;font-size:11px;color:#555;line-height:1.7;}</style></head><body>'
+    +'<h2>Formulaire de retour d\'informations — CENTIF-CI</h2>'
+    +'<div style="color:#555;">Sanctions Financières Ciblées (SFC) — Résolution 1267 du CSNU et résolutions subséquentes</div>'
+    +'<table><tbody>'
+    +'<tr><td class="k">Professionnel</td><td>'+escHtml(soc)+' — société de promotion immobilière (EPNFD)</td></tr>'
+    +'<tr><td class="k">Date de la recherche</td><td>'+dateShort(run.date)+'</td></tr>'
+    +'<tr><td class="k">Liste consultée</td><td>'+escHtml((DATA.params&&DATA.params.lbcft&&DATA.params.lbcft.sfc_liste_source)||'Liste RSNU 1267')
+      +(P.sfc_liste_maj?(' — mise à jour du '+dateShort(P.sfc_liste_maj)):'')+'</td></tr>'
+    +'<tr><td class="k">Nombre de tiers criblés</td><td>'+run.nb_tiers+'</td></tr>'
+    +'<tr><td class="k">Correspondant CENTIF</td><td>'+escHtml(P.correspondant||'à désigner')+(P.correspondant_tel?(' — '+escHtml(P.correspondant_tel)):'')+'</td></tr>'
+    +'</tbody></table>'
+    +'<div class="res" style="background:'+(fructueux?'#7f1d1d':'#14532d')+';">'
+    +(fructueux?'RÉSULTAT : RECHERCHE FRUCTUEUSE':'RÉSULTAT : RECHERCHE INFRUCTUEUSE')+'</div>'
+    +(run.resultats.length? ('<div class="bloc"><b>Correspondances relevées</b><table><thead><tr><th>Tiers</th><th>Qualité</th><th>Entrée correspondante</th><th>Score</th><th>Traitement</th></tr></thead><tbody>'+lignes+'</tbody></table></div>')
+      : '<div class="bloc">Aucune correspondance relevée entre la base de tiers et la liste consultée à la date de la recherche.</div>')
+    +'<div class="pied">Établi en application de l\'obligation de communication sans délai à la CENTIF-CI des résultats de recherche, '
+    +'fructueux ou infructueux. Toute mesure de gel mentionnée ci-dessus porte sur les fonds et ressources économiques détenus, '
+    +'directement ou indirectement, par la personne ou l\'entité visée, et interdit leur mise à disposition sous quelque forme que ce soit.'
+    +'<br><br>Fait à Abidjan, le '+new Date().toLocaleDateString('fr-FR')+'<br><br>Signature du correspondant CENTIF</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
+  run.transmis_centif=true; run.transmis_le=today();
+  dbPut('sfc_criblages',run).catch(function(){});
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_sfc_criblages',run);
+  sfcRenderCriblages();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SUIVI CAPPI — Commission d'Agrément des Promoteurs et Programmes
+   Immobiliers, autorité de supervision sectorielle LBC/FT des agents
+   et promoteurs immobiliers.
+   À la différence du registre des déclarations de soupçon (confidentiel,
+   adressé exclusivement à la CENTIF-CI), ce registre trace la relation
+   administrative ordinaire avec l'autorité de supervision : notifications,
+   demandes, contrôles. Il n'est soumis à aucune règle de confidentialité
+   particulière et peut être consulté par toute personne habilitée.
+═══════════════════════════════════════════════════════════════════ */
+function _cappiE(){ return DATA.lbc_cappi||(DATA.lbc_cappi=[]); }
+var CAPPI_TYPES={ designation:'Notification de désignation', politique:'Transmission politique LBC/FT',
+  demande_info:'Demande d\'information (CAPPI)', reponse:'Réponse à la CAPPI',
+  controle:'Contrôle / visite sur place', agrement:'Dossier d\'agrément promoteur', autre:'Autre' };
+var CAPPI_STATUTS={ a_transmettre:{l:'À transmettre',c:'badge-rouge'}, transmis:{l:'Transmis',c:'badge-or'},
+  accuse:{l:'Accusé reçu',c:'badge-bleu'}, en_cours:{l:'En cours d\'examen',c:'badge-or'}, clos:{l:'Clos',c:'badge-vert'} };
+
+async function cappiSaveContact(){
+  var g=function(i){var e=document.getElementById(i); return e?e.value:'';};
+  DATA.params=DATA.params||{}; DATA.params.id=DATA.params.id||'main';
+  DATA.params.lbcft=DATA.params.lbcft||{};
+  DATA.params.lbcft.cappi_contact=g('cappi-contact'); DATA.params.lbcft.cappi_adresse=g('cappi-adresse');
+  DATA.params.lbcft.cappi_tel=g('cappi-tel'); DATA.params.lbcft.cappi_email=g('cappi-email');
+  DATA.params.lbcft.cappi_agrement=g('cappi-agrement'); DATA.params.lbcft.cappi_agrement_date=g('cappi-agrement-date');
+  DATA.params._modifie=new Date().toISOString();
+  try{ await dbPut('params',DATA.params); }catch(e){}
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_params',DATA.params);
+  toast('Coordonnées CAPPI enregistrées.','success');
+}
+function cappiRenderContact(){
+  var p=(DATA.params&&DATA.params.lbcft)||{}, v=function(i,val){var e=document.getElementById(i); if(e) e.value=val||'';};
+  v('cappi-contact',p.cappi_contact); v('cappi-adresse',p.cappi_adresse); v('cappi-tel',p.cappi_tel);
+  v('cappi-email',p.cappi_email); v('cappi-agrement',p.cappi_agrement); v('cappi-agrement-date',p.cappi_agrement_date);
+}
+
+function cappiOpen(id){
+  var e=id?_cappiE().find(function(x){return x.id===id;}):null;
+  var v=function(i,val){var el=document.getElementById(i); if(el) el.value=val||'';};
+  v('cappi-e-id',e?e.id:''); v('cappi-e-date',e?e.date:today());
+  v('cappi-e-type',e?e.type:'designation'); v('cappi-e-objet',e?e.objet:'');
+  v('cappi-e-statut',e?e.statut:'a_transmettre'); v('cappi-e-ref',e?e.reference:'');
+  v('cappi-e-notes',e?e.notes:'');
+  openModal('modal-cappi');
+}
+async function cappiSave(){
+  var g=function(i){var el=document.getElementById(i); return el?el.value:'';};
+  if(!g('cappi-e-objet')){ toast('L\'objet de l\'échange est obligatoire.','error'); return; }
+  var list=_cappiE(), id=g('cappi-e-id');
+  var e=id?list.find(function(x){return x.id===id;}):null;
+  if(!e) e={ id:uid() };
+  e.date=g('cappi-e-date')||today(); e.type=g('cappi-e-type'); e.objet=g('cappi-e-objet');
+  e.statut=g('cappi-e-statut'); e.reference=g('cappi-e-ref'); e.notes=g('cappi-e-notes');
+  await _locSave('lbc_cappi',e,'pi_lbc_cappi');
+  closeModal('modal-cappi'); cappiRender();
+  toast('Échange enregistré au registre CAPPI.','success');
+}
+async function cappiSupprimer(id){
+  if(!confirm('Supprimer cet échange du registre ?')) return;
+  DATA.lbc_cappi=_cappiE().filter(function(x){return x.id!==id;});
+  try{ await dbDelete('lbc_cappi',id); }catch(e){}
+  if(typeof syncToSupabase==='function') syncToSupabase('pi_lbc_cappi',{id:id,_supprime:true});
+  cappiRender();
+  toast('Échange supprimé.','success');
+}
+function cappiRender(){
+  var kpis=document.getElementById('cappi-kpis');
+  var list=_cappiE().slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  if(kpis){
+    var enAttente=list.filter(function(e){ return e.statut==='a_transmettre'||e.statut==='en_cours'; }).length;
+    kpis.innerHTML=[['Échanges enregistrés',list.length],['En attente / en cours',enAttente],
+      ['Agrément promoteur',(DATA.params&&DATA.params.lbcft&&DATA.params.lbcft.cappi_agrement)?'✅ '+escHtml(DATA.params.lbcft.cappi_agrement):'⚠️ non renseigné']]
+      .map(function(k){ return '<div class="kpi-card"><div class="kpi-label">'+k[0]+'</div><div class="kpi-value or" style="font-size:15px;">'+k[1]+'</div></div>'; }).join('');
+  }
+  var el=document.getElementById('cappi-table'); if(!el) return;
+  if(!list.length){ el.innerHTML='<div style="padding:20px;text-align:center;color:var(--blanc-dim);">Aucun échange enregistré. Utilisez « + Nouvel échange » pour tracer vos notifications à la CAPPI.</div>'; return; }
+  el.innerHTML='<table><thead><tr><th>Date</th><th>Type</th><th>Objet</th><th>Référence</th><th>Statut</th><th>Actions</th></tr></thead><tbody>'
+    +list.map(function(e){
+      var s=CAPPI_STATUTS[e.statut]||CAPPI_STATUTS.a_transmettre;
+      return '<tr><td>'+dateShort(e.date)+'</td>'
+        +'<td style="font-size:11px;">'+escHtml(CAPPI_TYPES[e.type]||e.type)+'</td>'
+        +'<td>'+escHtml(e.objet)+(e.notes?('<div style="font-size:11px;color:var(--blanc-dim);">'+escHtml(e.notes)+'</div>'):'')+'</td>'
+        +'<td style="font-size:11px;">'+escHtml(e.reference||'—')+'</td>'
+        +'<td><span class="badge '+s.c+'">'+s.l+'</span></td>'
+        +'<td><button class="btn btn-secondary btn-sm btn-icon" onclick="cappiOpen(\''+e.id+'\')" title="Modifier">✏️</button>'
+        +'<button class="btn btn-secondary btn-sm btn-icon" onclick="cappiSupprimer(\''+e.id+'\')" title="Supprimer">🗑️</button></td></tr>';
+    }).join('')+'</tbody></table>';
 }
 
 function _otA(){ return DATA.artisans||(DATA.artisans=[]); }
@@ -69356,7 +70468,58 @@ function chargerPortailSouscripteur() {
   }
 }
 
-/* ─── Échéancier ─────────────────────────────────────── */
+/* ─── Suivi de chantier (photos & vidéos) — portail souscripteur ───
+   [AJOUT — revue photo/vidéo] Les rapports de chantier existaient déjà en
+   base (DATA.rapports_chantier), soigneusement marqués "visible souscripteurs"
+   par le staff, mais rien ne les affichait jamais côté acheteur — la seule
+   trace visible était une barre de pourcentage globale. Repris du motif
+   éprouvé de portplRenderAvancement (portail lotissement). */
+function renderPortalChantierTimeline() {
+  if (!SESSION_SOUSCRIPTEUR) return;
+  var c = SESSION_SOUSCRIPTEUR;
+  var el = document.getElementById('portal-chantier-timeline');
+  if (!el) return;
+  var convIds = (DATA.conventions||[]).filter(function(x){ return x.programme_id === c.programme_id; }).map(function(x){ return x.id; });
+  var rapports = (DATA.rapports_chantier||[]).filter(function(r){
+    return convIds.indexOf(r.convention_id) !== -1 && r.visibilite !== 'interne';
+  }).sort(function(a,b){ return (b.date_debut||'').localeCompare(a.date_debut||''); });
+
+  if (!rapports.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--blanc-dim);">Aucune mise à jour de chantier publiée pour le moment.<br><small>Les photos et vidéos apparaîtront ici au fil de l\'avancement.</small></div>';
+    return;
+  }
+  var catLabel = { amenagement:'Aménagement', vrd:'VRD', construction:'Construction', finition:'Finitions', reception:'Réception' };
+  el.innerHTML = rapports.map(function(r) {
+    var photos = (r.photos||[]).filter(function(p){ return p.visible; });
+    var videos = (r.videos||[]).filter(function(v){ return v.visible; });
+    var photoHtml = photos.length
+      ? '<div style="margin-top:10px;"><div style="font-size:12px;font-weight:700;margin-bottom:6px;">📸 '+photos.length+' photo(s)</div>'
+        + '<div class="portal-photos-grid">' + photos.map(function(p){
+            return '<div class="portal-photo-item"><img src="'+p.data+'" alt="'+escHtml(p.legende||'')+'" loading="lazy"><div class="portal-photo-label">'+escHtml(p.legende||'')+'</div></div>';
+          }).join('') + '</div></div>' : '';
+    var videoHtml = videos.length
+      ? '<div style="margin-top:10px;"><div style="font-size:12px;font-weight:700;margin-bottom:6px;">🎬 '+videos.length+' vidéo(s)</div>' + videos.map(function(v){
+          if (v.provider==='youtube') return '<div style="margin-bottom:10px;"><iframe width="100%" height="280" style="border:none;border-radius:8px;max-width:560px;display:block;" src="https://www.youtube.com/embed/'+v.video_id+'" allowfullscreen></iframe></div>';
+          if (v.provider==='vimeo') return '<div style="margin-bottom:10px;"><iframe width="100%" height="280" style="border:none;border-radius:8px;max-width:560px;display:block;" src="https://player.vimeo.com/video/'+v.video_id+'" allowfullscreen></iframe></div>';
+          if (v.provider==='upload') return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:400px;" src="'+v.data+'"></video></div>';
+          return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:400px;" src="'+v.url+'"></video></div>';
+        }).join('') + '</div>' : '';
+    if (!photoHtml && !videoHtml) return '';
+    return '<div class="portal-tl-item">'
+      + '<div class="portal-tl-dot" style="background:linear-gradient(135deg,var(--or),var(--or-dark));">'+(RCH_PHASE_ICONS[r.categorie||r.cat]||'🏗️')+'</div>'
+      + '<div class="portal-tl-card">'
+      + '<div class="portal-tl-header">'
+      + '<div class="portal-tl-titre">'+(catLabel[r.categorie||r.cat]||'Mise à jour')+'</div>'
+      + '<div class="portal-tl-date">'+dateShort(r.date_debut)+' — <strong>'+(r.avancement||0)+'%</strong></div>'
+      + '</div>'
+      + '<div class="portal-tl-body">'
+      + (r.travaux_realises ? '<div style="font-size:12px;color:var(--blanc-dim);white-space:pre-line;">'+escHtml(r.travaux_realises)+'</div>' : '')
+      + photoHtml + videoHtml
+      + '</div></div></div>';
+  }).join('');
+}
+
+
 function renderEcheancierSouscripteur() {
   if (!SESSION_SOUSCRIPTEUR) return;
   var c = SESSION_SOUSCRIPTEUR;
@@ -84201,6 +85364,7 @@ async function deletePlan(id) {
 /* ── État local modal rapport ── */
 var RCH_STATE = {
   photos: [],       /* photos du rapport en cours { id, data, type, nom, taille, categorie, legende, visible, date } */
+  videos: [],       /* [AJOUT] vidéos du rapport — même structure que plr* (lotissement), pour parité avec les autres portails */
   cameraStream: null
 };
 
@@ -84237,6 +85401,52 @@ function rchUpdateBadgePhotos() {
   var b = document.getElementById('rch-badge-photos');
   if (b) { b.textContent = RCH_STATE.photos.length; b.style.display = RCH_STATE.photos.length ? '' : 'none'; }
 }
+
+/* ─────────────────────────────────────────────
+   [AJOUT] VIDÉOS DU RAPPORT DE CHANTIER — parité avec plr* (lotissement)
+   et pm* (médias portail), qui géraient déjà lien + upload. Le rapport de
+   chantier souscripteur (le portail le plus visible côté acheteur) était
+   le seul des trois à rejeter toute vidéo malgré un libellé de bouton
+   ailleurs dans l'app annonçant "Photos & Vidéos".
+──────────────────────────────────────────────── */
+var RCH_VIDEO_MAX_MO = 25; /* aligné sur plr* (lotissement) — au-delà, lien YouTube/Vimeo recommandé */
+function rchOuvrirVideo(){ var f=document.getElementById('rch-video-form'); if(f){ f.style.display = f.style.display==='none' ? 'block' : 'none'; var u=document.getElementById('rch-video-url'); if(u) u.focus(); } }
+function rchOuvrirVideoFichier(){ var i=document.getElementById('rch-input-video'); if(i){ i.value=''; i.click(); } }
+function rchAjouterVideo(){
+  var url = (document.getElementById('rch-video-url')||{}).value || '';
+  var v = (typeof pmParseVideoUrl === 'function') ? pmParseVideoUrl(url) : null;
+  if (!v) { toast('❌ Lien non reconnu. Formats acceptés : YouTube, Vimeo, ou fichier .mp4/.webm en https.', 'error'); return; }
+  RCH_STATE.videos.push({ id:'v_'+Date.now()+'_'+Math.random().toString(36).substr(2,4), provider:v.provider, video_id:v.video_id, url:v.url, legende:'', visible:true });
+  document.getElementById('rch-video-url').value = '';
+  document.getElementById('rch-video-form').style.display = 'none';
+  rchRenderVideosList();
+  toast('✅ Vidéo ajoutée au rapport.', 'success');
+}
+async function rchAjouterVideoFichier(input){
+  var f = (input.files||[])[0];
+  if (!f) return;
+  if (f.type.indexOf('video/')!==0) { toast('❌ Fichier non reconnu comme vidéo.','error'); input.value=''; return; }
+  if (f.size > RCH_VIDEO_MAX_MO*1024*1024) { toast('❌ Vidéo trop lourde (max '+RCH_VIDEO_MAX_MO+' Mo). Utilisez plutôt un lien YouTube/Vimeo.','error'); input.value=''; return; }
+  toast('⏳ Téléversement de la vidéo…','info');
+  var dataUrl;
+  try {
+    dataUrl = await new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.onerror=function(){rej(new Error('read failed'));}; r.readAsDataURL(f); });
+  } catch(e){ toast('❌ Échec de lecture du fichier vidéo.','error'); input.value=''; return; }
+  RCH_STATE.videos.push({ id:'v_'+Date.now()+'_'+Math.random().toString(36).substr(2,4), provider:'upload', video_id:'', url:'', data:dataUrl, mime:f.type||'video/mp4', legende:f.name, visible:true });
+  input.value = '';
+  rchRenderVideosList();
+  toast('✅ Vidéo ajoutée au rapport.', 'success');
+}
+function rchRenderVideosList(){
+  var el = document.getElementById('rch-videos-list'); if (!el) return;
+  if (!RCH_STATE.videos.length) { el.innerHTML = ''; return; }
+  el.innerHTML = RCH_STATE.videos.map(function(v,i){
+    var label = v.provider==='youtube' ? '▶️ YouTube' : v.provider==='vimeo' ? '▶️ Vimeo' : v.provider==='upload' ? '📤 '+(v.legende||'Fichier') : '🔗 Lien direct';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--card2);border-radius:8px;margin-bottom:4px;font-size:12px;">'
+      + '<span>'+label+'</span><button type="button" onclick="rchSupprimerVideo(\''+v.id+'\')" class="btn btn-danger btn-sm btn-icon">🗑</button></div>';
+  }).join('');
+}
+function rchSupprimerVideo(id){ RCH_STATE.videos = RCH_STATE.videos.filter(function(x){ return x.id!==id; }); rchRenderVideosList(); }
 
 /* ─────────────────────────────────────────────
    UPLOAD PHOTOS
@@ -84536,11 +85746,13 @@ function rchGenererApercu() {
       statut: document.getElementById('rch-statut').value,
       visibilite: (document.getElementById('rch-visibilite')||{value:'souscripteurs'}).value,
       photos: JSON.parse(JSON.stringify(RCH_STATE.photos)),
+      videos: JSON.parse(JSON.stringify(RCH_STATE.videos)),
       created_at: APP.editingId ? undefined : today()
     };
     var idx = DATA.rapports_chantier.findIndex(function(x){ return x.id===APP.editingId; });
     if (idx>=0) DATA.rapports_chantier[idx]=r; else DATA.rapports_chantier.push(r);
     await dbPut('rapports_chantier', r);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_rapports_chantier', r);
     /* Mettre à jour avancement convention */
     var conv = DATA.conventions.find(function(c){ return c.id===convId; });
     if (conv && av>=(conv.avancement||0)) { conv.avancement=av; await dbPut('conventions',conv); }
@@ -84550,7 +85762,8 @@ function rchGenererApercu() {
     if (typeof renderRapports === 'function') renderRapports();
     if (typeof renderConventions === 'function') renderConventions();
     var nbPhotos = r.photos.length;
-    toast('✅ Rapport enregistré'+(nbPhotos?' avec '+nbPhotos+' photo(s).':'.'), 'success');
+    var nbVideos = r.videos.length;
+    toast('✅ Rapport enregistré'+((nbPhotos||nbVideos)?' avec '+(nbPhotos?nbPhotos+' photo(s)':'')+(nbPhotos&&nbVideos?' et ':'')+(nbVideos?nbVideos+' vidéo(s)':'')+'.':'.'), 'success');
   };
 })();
 
@@ -84562,6 +85775,7 @@ function rchGenererApercu() {
   openRapportChantier = function(convId) {
     APP.editingId = null;
     RCH_STATE.photos = [];
+    RCH_STATE.videos = [];
     rchFermerCamera();
 
     /* Peupler conventions */
@@ -84591,6 +85805,7 @@ function rchGenererApercu() {
 
     rchUpdateBadgePhotos();
     rchRenderPhotosGrid();
+    rchRenderVideosList();
     rchSwitchTab('rapport');
     document.getElementById('rch-modal-title').textContent = '📋 Rapport hebdomadaire de chantier';
     openModal('modal-rapport-chantier');
@@ -84629,8 +85844,10 @@ function rchGenererApercu() {
       el('rch-visibilite',r.visibilite||'souscripteurs');
       /* Charger photos */
       RCH_STATE.photos = r.photos ? JSON.parse(JSON.stringify(r.photos)) : [];
+      RCH_STATE.videos = r.videos ? JSON.parse(JSON.stringify(r.videos)) : [];
       rchUpdateBadgePhotos();
       rchRenderPhotosGrid();
+      rchRenderVideosList();
       document.getElementById('rch-modal-title').textContent = 'Modifier rapport';
       if (typeof updateRapportGauge==='function') updateRapportGauge();
     }, 120);
@@ -84723,6 +85940,25 @@ function portalRenderTravaux() {
           + '</div></div>';
       }
 
+      /* [AJOUT — revue photo/vidéo] Les vidéos existaient déjà en base
+         (RCH_STATE.videos, capturées côté staff) mais n'étaient jamais
+         affichées ici — seules les photos l'étaient. Même gabarit que
+         portplRenderAvancement (portail lotissement), qui gérait déjà
+         les 3 provenances (YouTube, Vimeo, upload direct). */
+      var videos = (r.videos||[]).filter(function(v){ return v.visible; });
+      var videoHtml = '';
+      if (videos.length) {
+        videoHtml = '<div style="margin-top:10px;">'
+          +'<div style="font-size:12px;font-weight:700;margin-bottom:6px;">🎬 '+videos.length+' vidéo(s)</div>'
+          + videos.map(function(v){
+              if (v.provider==='youtube') return '<div style="margin-bottom:10px;"><iframe width="100%" height="280" style="border:none;border-radius:8px;max-width:560px;display:block;" src="https://www.youtube.com/embed/'+v.video_id+'" allowfullscreen></iframe></div>';
+              if (v.provider==='vimeo') return '<div style="margin-bottom:10px;"><iframe width="100%" height="280" style="border:none;border-radius:8px;max-width:560px;display:block;" src="https://player.vimeo.com/video/'+v.video_id+'" allowfullscreen></iframe></div>';
+              if (v.provider==='upload') return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:400px;" src="'+v.data+'"></video></div>';
+              return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:400px;" src="'+v.url+'"></video></div>';
+            }).join('')
+          + '</div>';
+      }
+
       var dotColor = r.statut==='transmis'?'linear-gradient(135deg,var(--vert),#16A34A)'
         : r.statut==='valide'?'linear-gradient(135deg,var(--or),var(--or-dark))'
         : 'linear-gradient(135deg,var(--bleu),#2563EB)';
@@ -84750,6 +85986,7 @@ function portalRenderTravaux() {
         +(r.travaux_prevus?'<div style="margin-bottom:8px;"><div style="font-size:12px;font-weight:700;color:#1C1C2E;margin-bottom:4px;">🔜 Prochaine semaine</div><div style="font-size:12px;color:var(--dim);">'+r.travaux_prevus+'</div></div>':'')
         +(r.meteo&&r.meteo!=='favorable'?'<div style="font-size:11px;color:var(--dim);">🌤️ Météo : '+r.meteo+'</div>':'')
         + photoHtml
+        + videoHtml
         +'</div></div></div>';
     }).join('');
   }
@@ -94318,6 +95555,7 @@ async function daSoumettre(id) {
 }
 async function daValider(id) {
   var d = (DATA.fiches_engagement_depense||[]).find(function(x){ return x.id===id; }); if (!d) return;
+  if (!exigerDroit('Budget', 'v', 'la validation de cette fiche d\'engagement de dépense')) return;
   if (d.statut !== 'soumise') { toast('Seule une fiche soumise peut être validée.', 'error'); return; }
   if (!exigerPlafond(d.montant, 'La validation de cette fiche d\'engagement de dépense')) return;
   var dispo = budgetDisponible(d.compte, d.division_id, d.exercice, d.id);
@@ -94336,6 +95574,7 @@ async function daValider(id) {
 }
 async function daRejeter(id, motif) {
   var d = (DATA.fiches_engagement_depense||[]).find(function(x){ return x.id===id; }); if (!d) return;
+  if (!exigerDroit('Budget', 'v', 'le rejet de cette fiche d\'engagement de dépense')) return;
   if (d.statut !== 'soumise') { toast('Seule une fiche soumise peut être rejetée.', 'error'); return; }
   d.statut = 'rejetee'; d.motif_rejet = motif||''; d.valide_par = (APP.currentUser&&APP.currentUser.nom)||'—'; d.valide_le = new Date().toISOString(); d._modifie = new Date().toISOString();
   await dbPut('fiches_engagement_depense', d); if (typeof syncToSupabase==='function') syncToSupabase('pi_fiches_engagement_depense', d);
@@ -94471,9 +95710,118 @@ function budgetRenderMesDemandes() {
   box.innerHTML = html;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   RENDU DES 3 LISTES — Budget prévisionnel, Fiches d'Engagement/DA, Transferts
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   HISTORIQUE COMBINÉ DES DÉCISIONS — mouvements de caisse ET DA (FED)
+   validés ou rejetés, tous demandeurs confondus. Répond au besoin client :
+   traçabilité complète de qui a validé/rejeté quoi et quand.
+   Section 3 de Pilotage → Validations, avec export Excel.
+   ══════════════════════════════════════════════════════════════════════ */
+function _histoValidationsFiltrees() {
+  var statutFiltre = (document.getElementById('histo-filtre-statut') || {}).value || '';
+  var debut = (document.getElementById('histo-filtre-debut') || {}).value || '';
+  var fin = (document.getElementById('histo-filtre-fin') || {}).value || '';
+
+  var caisse = (DATA.caisse_mouvements || []).filter(function(m) {
+    if (!(m.valide === true || m.rejete === true)) return false;
+    var statut = m.valide ? 'valide' : 'rejete';
+    if (statutFiltre && statut !== statutFiltre) return false;
+    var d = (m.valide ? m.valide_le : m.rejete_le) || m.date || '';
+    if (debut && d.slice(0,10) < debut) return false;
+    if (fin && d.slice(0,10) > fin) return false;
+    return true;
+  }).sort(function(a,b){ return ((b.valide_le||b.rejete_le||'')).localeCompare(a.valide_le||b.rejete_le||''); });
+
+  var da = (DATA.fiches_engagement_depense || []).filter(function(f) {
+    if (!(f.statut === 'validee' || f.statut === 'decaissee' || f.statut === 'rejetee')) return false;
+    var statut = (f.statut === 'rejetee') ? 'rejete' : 'valide';
+    if (statutFiltre && statut !== statutFiltre) return false;
+    var d = f.valide_le || f.rejete_le || '';
+    if (debut && d.slice(0,10) < debut) return false;
+    if (fin && d.slice(0,10) > fin) return false;
+    return true;
+  }).sort(function(a,b){ return ((b.valide_le||b.rejete_le||'')).localeCompare(a.valide_le||b.rejete_le||''); });
+
+  return { caisse: caisse, da: da };
+}
+
+function renderHistoriqueValidations() {
+  var boxC = document.getElementById('histo-validations-caisse-box');
+  var boxD = document.getElementById('histo-validations-da-box');
+  if (!boxC && !boxD) return;
+  var f = _histoValidationsFiltrees();
+
+  if (boxC) {
+    if (!f.caisse.length) {
+      boxC.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune décision de caisse sur cette période/filtre.</div>';
+    } else {
+      var h = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N° bon</th><th>Type</th><th>Caisse</th><th>Motif</th><th style="text-align:right;">Montant</th><th>Demandeur</th><th>Décision</th><th>Par / le</th></tr></thead><tbody>';
+      f.caisse.forEach(function(m) {
+        var c = (DATA.caisses||[]).find(function(x){ return x.id===m.caisse_id; });
+        var estValide = m.valide === true;
+        h += '<tr>'
+          + '<td style="font-family:monospace;">' + escHtml(m.numero||'') + '</td>'
+          + '<td><span class="badge" style="background:' + (m.type==='sortie'?'rgba(220,53,69,0.15);color:var(--rouge)':'rgba(16,163,74,0.15);color:var(--vert)') + ';">' + (m.type==='sortie'?'↓ Sortie':'↑ Entrée') + '</span></td>'
+          + '<td>' + escHtml(c?c.nom:'') + '</td>'
+          + '<td>' + escHtml(m.motif||'') + '</td>'
+          + '<td style="text-align:right;font-weight:700;">' + fmtF(m.montant) + ' F</td>'
+          + '<td>' + escHtml(m.demande_par||'') + '</td>'
+          + '<td>' + (estValide ? '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Validé</span>' : '<span class="badge" style="background:rgba(220,53,69,0.15);color:var(--rouge);">✖ Rejeté</span>') + (!estValide && m.motif_rejet ? '<div style="font-size:10px;color:var(--rouge);">' + escHtml(m.motif_rejet) + '</div>' : '') + '</td>'
+          + '<td style="font-size:11px;">' + escHtml(estValide ? (m.valide_par||'') : (m.rejete_par||'')) + '<br><span style="color:var(--blanc-dim);">' + (estValide ? (m.valide_le||'').slice(0,16).replace('T',' ') : (m.rejete_le||'').slice(0,16).replace('T',' ')) + '</span></td>'
+          + '</tr>';
+      });
+      h += '</tbody></table></div></div>';
+      boxC.innerHTML = h;
+    }
+  }
+
+  if (boxD) {
+    if (!f.da.length) {
+      boxD.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune décision de DA sur cette période/filtre.</div>';
+    } else {
+      var h2 = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N° DA / FED</th><th>Objet</th><th style="text-align:right;">Montant</th><th>Demandeur</th><th>Décision</th><th>Par / le</th></tr></thead><tbody>';
+      f.da.forEach(function(d) {
+        var estRejete = d.statut === 'rejetee';
+        h2 += '<tr>'
+          + '<td style="font-family:monospace;">' + escHtml(fedLabelDocument(d)) + '</td>'
+          + '<td>' + escHtml(d.objet||'') + '</td>'
+          + '<td style="text-align:right;font-weight:700;">' + fmtF(d.montant) + ' F</td>'
+          + '<td>' + escHtml(d.soumis_par||'') + '</td>'
+          + '<td>' + (!estRejete ? '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Validé' + (d.statut==='decaissee'?' (payé)':'') + '</span>' : '<span class="badge" style="background:rgba(220,53,69,0.15);color:var(--rouge);">✖ Rejeté</span>') + (estRejete && d.motif_rejet ? '<div style="font-size:10px;color:var(--rouge);">' + escHtml(d.motif_rejet) + '</div>' : '') + '</td>'
+          + '<td style="font-size:11px;">' + escHtml(d.valide_par||'') + '<br><span style="color:var(--blanc-dim);">' + ((d.valide_le||d.rejete_le)||'').slice(0,16).replace('T',' ') + '</span></td>'
+          + '</tr>';
+      });
+      h2 += '</tbody></table></div></div>';
+      boxD.innerHTML = h2;
+    }
+  }
+}
+
+function exporterHistoriqueValidations() {
+  var f = _histoValidationsFiltrees();
+  if (!f.caisse.length && !f.da.length) { toast('Rien à exporter pour ce filtre.', 'error'); return; }
+  var lignes = [];
+  lignes.push(['Type','N°','Objet / Motif','Montant FCFA','Demandeur','Statut','Décidé par','Décidé le','Motif de rejet']);
+  f.caisse.forEach(function(m) {
+    var estValide = m.valide === true;
+    lignes.push(['Caisse — ' + (m.type==='sortie'?'Sortie':'Entrée'), m.numero||'', m.motif||'', m.montant||0, m.demande_par||'',
+      estValide?'Validé':'Rejeté', estValide?(m.valide_par||''):(m.rejete_par||''),
+      (estValide?(m.valide_le||''):(m.rejete_le||'')).slice(0,16).replace('T',' '), m.motif_rejet||'']);
+  });
+  f.da.forEach(function(d) {
+    var estRejete = d.statut === 'rejetee';
+    lignes.push(['DA / FED', fedLabelDocument(d), d.objet||'', d.montant||0, d.soumis_par||'',
+      estRejete?'Rejeté':'Validé', d.valide_par||'', ((d.valide_le||d.rejete_le)||'').slice(0,16).replace('T',' '), d.motif_rejet||'']);
+  });
+  var csv = lignes.map(function(l){ return l.map(function(c){ return '"' + String(c).replace(/"/g,'""') + '"'; }).join(';'); }).join('\r\n');
+  var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Historique_Validations_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  toast('Export généré (' + lignes.length-1 + ' ligne(s)).', 'success');
+}
+
+
 var _BUDGET_STATUT_STYLE = {
   brouillon: { c:'var(--blanc-dim)', l:'Brouillon' },
   soumis:    { c:'var(--or,#B87333)', l:'Soumis' },
@@ -95940,6 +97288,7 @@ async function transfertSoumettre(id) {
 }
 async function transfertValider(id) {
   var t = (DATA.transferts_budgetaires||[]).find(function(x){ return x.id===id; }); if (!t) return;
+  if (!exigerDroit('Budget', 'v', 'la validation de ce transfert budgétaire')) return;
   if (t.statut !== 'soumis') { toast('Seul un transfert soumis peut être validé.', 'error'); return; }
   if (!exigerPlafond(t.montant, 'La validation de ce transfert budgétaire')) return;
   /* La ligne SOURCE doit avoir assez de disponible à donner — calculé AVANT
@@ -95956,6 +97305,7 @@ async function transfertValider(id) {
 }
 async function transfertRejeter(id, motif) {
   var t = (DATA.transferts_budgetaires||[]).find(function(x){ return x.id===id; }); if (!t) return;
+  if (!exigerDroit('Budget', 'v', 'le rejet de ce transfert budgétaire')) return;
   if (t.statut !== 'soumis') { toast('Seul un transfert soumis peut être rejeté.', 'error'); return; }
   t.statut = 'rejete'; t.motif_rejet = motif||''; t.valide_par = (APP.currentUser&&APP.currentUser.nom)||'—'; t.valide_le = new Date().toISOString(); t._modifie = new Date().toISOString();
   await dbPut('transferts_budgetaires', t); if (typeof syncToSupabase==='function') syncToSupabase('pi_transferts_budgetaires', t);
@@ -116713,6 +118063,7 @@ function renderPageValidations() {
   _pilotageRenderValidCaisse();
   _pilotageRenderValidFED();
   _pilotageRenderValidTransferts();
+  if (typeof renderHistoriqueValidations === 'function') renderHistoriqueValidations();
 }
 
 function _pilotageRenderValidCaisse() {
