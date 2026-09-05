@@ -22780,7 +22780,17 @@ var DATA = {
    INDEXEDDB
 ────────────────────────────────────────────────────── */
 var DB_NAME = 'ImmoSuiteDB';
-var DB_VERSION = 150; /* v150: ajout store 'sfc_centif' (nouveau — formulaire CENTIF) et correction
+var DB_VERSION = 151; /* v151: DEUX bugs corrigés, même famille que les précédents.
+                          (1) allKeys (loadAllData, relecture au démarrage) n'incluait pas
+                          'sfc_liste','sfc_criblages','sfc_centif','lbc_cappi','lbc_conformx',
+                          'lbc_artci' — écrits en base mais jamais rechargés à l'ouverture :
+                          symptôme rapporté « la liste RSNU importée disparaît à chaque
+                          ouverture ». (2) Audit complet ALL_STORES ↔ allKeys : 'audit_log',
+                          'cout_gestion_exercices', 'declarations_versement_financier' étaient
+                          dbPut/relus mais leur object store IndexedDB n'avait JAMAIS été créé
+                          (absents d'ALL_STORES) — dbPut échouait silencieusement depuis
+                          l'origine de ces 3 fonctionnalités. Migration additive, aucune perte.
+                          v150: ajout store 'sfc_centif' (nouveau — formulaire CENTIF) et correction
                           d'un bug préexistant : 'sfc_liste' et 'sfc_criblages' (module Criblage SFC)
                           n'avaient JAMAIS été déclarés ici ni dans SUPA_STORE_MAP depuis la création
                           du module — écriture IndexedDB perdue hors ligne, jamais tirés du cloud, ni
@@ -22809,6 +22819,7 @@ var ALL_STORES = [
   'financements_programme',
   'conflits_sync',
   'lbc_cappi','kyc_fiches','lbc_declarations','lbc_alertes','lbc_conformx','lbc_artci','sfc_centif','sfc_liste','sfc_criblages',
+  'audit_log','cout_gestion_exercices','declarations_versement_financier',
   'immobilisations',
   'permis','plans_arch','rapports_chantier',
   'campagnes','actions_marketing','segments_marketing',
@@ -23305,6 +23316,13 @@ async function loadAllData() {
   'caisse_budgets',
   /* v147 — Circuit budgétaire : DA + transferts */
   'fiches_engagement_depense', 'transferts_budgetaires',
+  /* [FIX] Même défaut que ci-dessus, découvert sur un signalement distinct :
+     « la liste RSNU importée disparaît à chaque ouverture ». Ces 6 stores du
+     module Conformité LBC/FT sont bien déclarés dans ALL_STORES et écrits
+     par dbPut/syncToSupabase, mais absents d'allKeys — jamais relus au
+     démarrage, DATA[store] repartait vide à chaque rechargement alors que
+     les données étaient toujours en base. */
+  'sfc_liste','sfc_criblages','sfc_centif','lbc_cappi','lbc_conformx','lbc_artci',
   /* [FIX audit synchro] Ces 4 stores étaient écrits (dbPut, certains même
      synchronisés vers Supabase) mais JAMAIS relus au démarrage — DATA[store]
      repartait vide à chaque rechargement de page jusqu'au premier pull (ou
