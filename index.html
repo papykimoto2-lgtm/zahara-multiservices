@@ -11697,6 +11697,21 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </div>
           <div class="kpi-grid" id="caisse-audit-kpi" style="margin-bottom:14px;"></div>
           <div id="caisse-audit-box"></div>
+
+          <div class="card" style="margin-top:20px;margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+              <div>
+                <div class="card-title" style="margin-bottom:2px;">🗓️ Revue mensuelle</div>
+                <div style="font-size:11px;color:var(--dim);">Résumé, mouvements non ventilés, doublons probables, écarts de clôture — pour un mois donné, toutes caisses visibles ou une caisse précise</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <input type="month" class="form-control" id="crm-mois" style="width:auto;" onchange="caisseRevueMensuelleUI()">
+                <select class="filter-select" id="crm-caisse-id" onchange="caisseRevueMensuelleUI()"></select>
+                <button class="btn btn-secondary btn-sm" onclick="imprimerRevueMensuelleCaisse()">🖨️ Imprimer</button>
+              </div>
+            </div>
+          </div>
+          <div id="caisse-revue-mensuelle-box"></div>
         </div>
       </div>
 
@@ -27876,7 +27891,7 @@ function switchTab(context, tab) {
     if (tab==='ventilation' && typeof caisseRenderVentilation==='function') caisseRenderVentilation();
     if (tab==='decaissements' && typeof caisseRenderDecaissementsAFaire==='function') caisseRenderDecaissementsAFaire();
     if (tab==='tiers' && typeof caisseRenderBalanceAgee==='function') caisseRenderBalanceAgee();
-    if (tab==='audit' && typeof renderCaisseAudit==='function') renderCaisseAudit();
+    if (tab==='audit' && typeof renderCaisseAudit==='function') { renderCaisseAudit(); if (typeof caisseRevueMensuelleUI==='function') caisseRevueMensuelleUI(); }
     if (tab==='mesdemandes' && typeof caisseRenderMesDemandes==='function') caisseRenderMesDemandes();
   }
   if (context==='validations' && typeof renderPageValidations==='function') renderPageValidations();
@@ -115574,6 +115589,148 @@ function renderCaisseAudit() {
   document.getElementById('caisse-audit-box').innerHTML = html;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   REVUE MENSUELLE DE CAISSE — vue de contrôle pour un mois donné :
+   résumé, mouvements non ventilés, doublons probables (même montant/
+   type, dates ≤ 2 jours — utile après une reprise d'historique où une
+   partie a été importée en CSV et une autre ressaisie manuellement),
+   écarts de clôture des sessions du mois. Respecte le même
+   cloisonnement caissière/admin que le tableau de bord Caisse. */
+function _crmMoisCourant(){
+  var el=document.getElementById('crm-mois');
+  if (el && el.value) return el.value;
+  var d=new Date(); var v=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  if (el) el.value=v;
+  return v;
+}
+function _crmCalculer(moisKey, caisseId){
+  var visibles = caissesVisibles();
+  var caisses = caisseId ? visibles.filter(function(c){return c.id===caisseId;}) : visibles;
+  var ids = caisses.map(function(c){return c.id;});
+  var mvts = (DATA.caisse_mouvements||[]).filter(function(m){
+    return ids.indexOf(m.caisse_id)>=0 && (m.date||'').slice(0,7)===moisKey;
+  });
+  var entrees = mvts.filter(function(m){return m.type==='entree';});
+  var sorties = mvts.filter(function(m){return m.type==='sortie';});
+  var totE = entrees.reduce(function(s,m){return s+(parseFloat(m.montant)||0);},0);
+  var totD = sorties.reduce(function(s,m){return s+(parseFloat(m.montant)||0);},0);
+  var nonVentiles = sorties.filter(function(m){return !m.compte_ventile;});
+  var enAttente = mvts.filter(function(m){return m.statut_validation==='en_attente';});
+
+  // Doublons probables : deux mouvements de MÊME caisse, même type, montant
+  // identique, dates ≤ 2 jours d'écart — signal fort quand l'un vient d'un
+  // import CSV et l'autre d'une ressaisie manuelle du même encaissement.
+  var doublons=[]; var vus={};
+  mvts.forEach(function(a){
+    if (vus[a.id]) return;
+    mvts.forEach(function(b){
+      if (a.id===b.id || vus[b.id] || a.type!==b.type || a.caisse_id!==b.caisse_id) return;
+      var ma=parseFloat(a.montant)||0, mb=parseFloat(b.montant)||0;
+      if (ma!==mb || ma===0) return;
+      var ja=new Date(a.date), jb=new Date(b.date);
+      if (Math.abs(ja-jb) > 2*86400000) return;
+      doublons.push([a,b]); vus[a.id]=1; vus[b.id]=1;
+    });
+  });
+
+  var sessionsMois = (DATA.caisse_sessions||[]).filter(function(s){
+    return ids.indexOf(s.caisse_id)>=0 && s.statut==='cloturee' && (s.date||'').slice(0,7)===moisKey;
+  });
+  var ecarts = sessionsMois.map(function(s){
+    var e=(parseFloat(s.fond_cloture_reel)||0)-(parseFloat(s.fond_cloture_theorique)||0);
+    return { session:s, ecart:e };
+  }).filter(function(x){ return Math.round(x.ecart)!==0; });
+
+  return { moisKey:moisKey, caisses:caisses, nb:mvts.length, entrees:entrees, sorties:sorties,
+           totE:totE, totD:totD, nonVentiles:nonVentiles, enAttente:enAttente, doublons:doublons, ecarts:ecarts };
+}
+function caisseRevueMensuelleUI(){
+  var host=document.getElementById('caisse-revue-mensuelle-box'); if(!host) return;
+  var sel=document.getElementById('crm-caisse-id');
+  if (sel && !sel.dataset.rempli){
+    sel.innerHTML = '<option value="">Toutes les caisses visibles</option>'
+      + caissesVisibles().map(function(c){ return '<option value="'+c.id+'">'+escHtml(c.nom)+'</option>'; }).join('');
+    sel.dataset.rempli='1';
+  }
+  var moisKey=_crmMoisCourant();
+  var caisseId=sel?sel.value:'';
+  var r=_crmCalculer(moisKey, caisseId);
+  window._crmDernierRapport=r;
+
+  if (!r.caisses.length){ host.innerHTML='<div class="alert alert-info">Aucune caisse visible pour ce périmètre.</div>'; return; }
+
+  var libMois=new Date(moisKey+'-01').toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var kpi=[
+    {label:'Mouvements', val:r.nb, icon:'📒', cls:'kpi-bleu'},
+    {label:'Entrées', val:fmtF(r.totE)+' F', icon:'📥', cls:'kpi-vert'},
+    {label:'Sorties', val:fmtF(r.totD)+' F', icon:'📤', cls:'kpi-rouge'},
+    {label:'Flux net', val:(r.totE-r.totD>=0?'+':'')+fmtF(r.totE-r.totD)+' F', icon:'⚖️', cls:(r.totE-r.totD>=0?'kpi-vert':'kpi-rouge')},
+    {label:'Non ventilées', val:r.nonVentiles.length, icon:'🧾', cls:r.nonVentiles.length?'kpi-red':'kpi-green'},
+    {label:'À valider', val:r.enAttente.length, icon:'🔐', cls:r.enAttente.length?'kpi-red':'kpi-green'},
+    {label:'Doublons probables', val:r.doublons.length, icon:'⚠️', cls:r.doublons.length?'kpi-red':'kpi-green'},
+    {label:'Écarts de clôture', val:r.ecarts.length, icon:'🔴', cls:r.ecarts.length?'kpi-red':'kpi-green'}
+  ];
+  var html='<div style="font-size:12px;color:var(--dim);margin-bottom:10px;">'+escHtml(libMois)+' · '+r.caisses.length+' caisse(s) dans le périmètre</div>'
+    +'<div class="kpi-grid" style="margin-bottom:14px;">'+kpi.map(_kpiCard).join('')+'</div>';
+
+  if (r.doublons.length){
+    html+='<div class="card" style="margin-bottom:14px;"><div class="card-title">⚠️ Doublons probables (même caisse, même type, montant identique, dates ≤ 2 jours)</div>'
+      +'<div style="font-size:11px;color:var(--dim);margin-bottom:8px;">À vérifier avant suppression — deux paiements distincts peuvent coïncider.</div>'
+      +'<table class="data-table" style="width:100%;font-size:12px;"><thead><tr><th>Date</th><th>Montant</th><th>Libellé A</th><th>Date B</th><th>Libellé B</th></tr></thead><tbody>'
+      +r.doublons.map(function(p){ return '<tr><td>'+dateShort(p[0].date)+'</td><td style="text-align:right;font-weight:700;">'+fmtF(p[0].montant)+' F</td>'
+        +'<td>'+escHtml(p[0].beneficiaire||p[0].libelle||'')+(p[0]._import_source?' <span style="color:var(--dim);">(import)</span>':'')+'</td>'
+        +'<td>'+dateShort(p[1].date)+'</td>'
+        +'<td>'+escHtml(p[1].beneficiaire||p[1].libelle||'')+(p[1]._import_source?' <span style="color:var(--dim);">(import)</span>':'')+'</td></tr>'; }).join('')
+      +'</tbody></table></div>';
+  }
+  if (r.nonVentiles.length){
+    html+='<div class="card" style="margin-bottom:14px;"><div class="card-title">🧾 Sorties non ventilées ('+r.nonVentiles.length+')</div>'
+      +'<table class="data-table" style="width:100%;font-size:12px;"><thead><tr><th>Date</th><th>Montant</th><th>Libellé</th></tr></thead><tbody>'
+      +r.nonVentiles.map(function(m){ return '<tr><td>'+dateShort(m.date)+'</td><td style="text-align:right;font-weight:700;">'+fmtF(m.montant)+' F</td><td>'+escHtml(m.libelle||m.beneficiaire||'')+'</td></tr>'; }).join('')
+      +'</tbody></table></div>';
+  }
+  if (r.ecarts.length){
+    html+='<div class="card" style="margin-bottom:14px;"><div class="card-title">⚖️ Écarts de clôture du mois</div>'
+      +'<table class="data-table" style="width:100%;font-size:12px;"><thead><tr><th>Date</th><th>Théorique</th><th>Réel compté</th><th>Écart</th></tr></thead><tbody>'
+      +r.ecarts.map(function(x){ return '<tr><td>'+dateShort(x.session.date)+'</td><td style="text-align:right;">'+fmtF(x.session.fond_cloture_theorique)+' F</td><td style="text-align:right;">'+fmtF(x.session.fond_cloture_reel)+' F</td><td style="text-align:right;font-weight:700;color:var(--rouge);">'+(x.ecart>=0?'+':'')+fmtF(x.ecart)+' F</td></tr>'; }).join('')
+      +'</tbody></table></div>';
+  }
+  if (!r.doublons.length && !r.nonVentiles.length && !r.ecarts.length && !r.enAttente.length){
+    html+='<div class="alert alert-info" style="text-align:center;padding:20px;">✅ Aucune anomalie détectée sur '+escHtml(libMois)+'.</div>';
+  }
+  host.innerHTML=html;
+}
+function imprimerRevueMensuelleCaisse(){
+  var r=window._crmDernierRapport; if(!r){ toast('Sélectionnez d\'abord un mois.','error'); return; }
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var libMois=new Date(r.moisKey+'-01').toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var w=window.open('','_blank');
+  if(!w){ toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  var tbl=function(titre, cols, lignes){ return lignes.length ? ('<h2>'+titre+' ('+lignes.length+')</h2>'
+    +'<table><thead><tr>'+cols.map(function(c){return '<th>'+c+'</th>';}).join('')+'</tr></thead><tbody>'+lignes+'</tbody></table>') : ''; };
+  var doublonsRows = r.doublons.map(function(p){ return '<tr><td>'+dateShort(p[0].date)+'</td><td>'+fmtF(p[0].montant)+' F</td>'
+    +'<td>'+escHtml(p[0].beneficiaire||p[0].libelle||'')+'</td><td>'+dateShort(p[1].date)+'</td><td>'+escHtml(p[1].beneficiaire||p[1].libelle||'')+'</td></tr>'; }).join('');
+  var nvRows = r.nonVentiles.map(function(m){ return '<tr><td>'+dateShort(m.date)+'</td><td>'+fmtF(m.montant)+' F</td><td>'+escHtml(m.libelle||m.beneficiaire||'')+'</td></tr>'; }).join('');
+  var ecRows = r.ecarts.map(function(x){ return '<tr><td>'+dateShort(x.session.date)+'</td><td>'+fmtF(x.session.fond_cloture_theorique)+' F</td><td>'+fmtF(x.session.fond_cloture_reel)+' F</td><td>'+(x.ecart>=0?'+':'')+fmtF(x.ecart)+' F</td></tr>'; }).join('');
+  w.document.write('<html><head><title>Revue mensuelle caisse — '+escHtml(libMois)+'</title>'
+    +'<style>body{font-family:Georgia,serif;padding:36px;color:#111;font-size:12.5px;line-height:1.5;}'
+    +'h1{font-size:17px;margin:0 0 4px;}h2{font-size:13.5px;margin:20px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px;}'
+    +'table{width:100%;border-collapse:collapse;margin:6px 0;}th,td{padding:5px 6px;border:1px solid #ccc;text-align:left;font-size:11.5px;}'
+    +'th{background:#f2f2f2;}.pied{margin-top:24px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Revue mensuelle caisse', r.moisKey)
+    +'<h1>Revue mensuelle de caisse — '+escHtml(libMois)+'</h1>'
+    +'<div style="color:#555;font-size:11.5px;">'+escHtml(soc)+' — '+r.caisses.map(function(c){return escHtml(c.nom);}).join(', ')+' — généré le '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    +'<div style="margin-top:10px;font-size:12px;">'+r.nb+' mouvement(s) · Entrées '+fmtF(r.totE)+' F · Sorties '+fmtF(r.totD)+' F · Flux net '+(r.totE-r.totD>=0?'+':'')+fmtF(r.totE-r.totD)+' F</div>'
+    +tbl('Doublons probables', ['Date','Montant','Libellé A','Date B','Libellé B'], doublonsRows)
+    +tbl('Sorties non ventilées', ['Date','Montant','Libellé'], nvRows)
+    +tbl('Écarts de clôture', ['Date','Théorique','Réel','Écart'], ecRows)
+    +(!r.doublons.length && !r.nonVentiles.length && !r.ecarts.length ? '<p>Aucune anomalie détectée sur la période.</p>' : '')
+    +'<div class="pied">Détection automatique — un doublon signalé n\'est pas nécessairement réel, vérification manuelle requise avant toute suppression.<br><br>'
+    +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>Contrôlé par : ___________________________</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
+}
+
 function imprimerRapportAuditCaisse() {
   if (!hasRole('admin')) { toast('Réservé aux administrateurs.', 'error'); return; }
   var caisseId = document.getElementById('caisse-audit-caisse-id').value;
@@ -119269,7 +119426,8 @@ function caisseRenderDashboard(){
       + '<div style="font-weight:800;font-size:16px;">📊 Tableau de bord — Caisse <span style="font-size:12px;color:var(--blanc-dim);font-weight:600;">· '+b.label+'</span></div>'
       + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+divisionSelectHtml+navHtml+'<div style="display:flex;gap:6px;">'+pill('jour','Jour')+pill('mois','Mois')+pill('annee','Année')+'</div></div>'
     + '</div>'
-    + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:12px;">'+totalCaisses+' caisse(s) créée(s)'+(CAISSE_DASH.division?' dans cette division':' au total')+' · '+ouvertes+' ouverte(s) actuellement</div>'
+    + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:4px;">'+totalCaisses+' caisse(s) créée(s)'+(CAISSE_DASH.division?' dans cette division':' au total')+' · '+ouvertes+' ouverte(s) actuellement</div>'
+    + (caisseRoleAdminLike() ? '' : '<div style="font-size:11px;color:var(--or,#B87333);margin-bottom:12px;background:rgba(184,115,51,0.08);padding:5px 9px;border-radius:6px;display:inline-block;">🔒 Vue limitée à '+idsFiltre.length+' caisse(s) qui vous '+(idsFiltre.length>1?'sont assignées':'est assignée')+' — un profil Admin/Manager/Comptable voit toutes les caisses de toutes les divisions.</div>')
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">'
       + _cdKpi('Solde temps réel', fmtF(soldeTempsReel), 'FCFA', 'var(--or,#B87333)', ouvertes+' / '+totalCaisses+' caisse(s) ouverte(s)')
       + _cdKpi('Encaissements', fmtF(totE), 'FCFA', 'var(--vert)', entrees.length+' bon(s)')
