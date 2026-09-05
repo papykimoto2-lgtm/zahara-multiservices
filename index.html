@@ -11236,9 +11236,12 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <button class="btn btn-primary btn-sm" onclick="comptabiliserToutesCommissions()">📒 Tout comptabiliser</button>
                 <button class="btn btn-secondary btn-sm" onclick="exportCommissionsCSV()">⬇ Export CSV</button>
                 <button class="btn btn-danger btn-sm" onclick="regenererToutesCommissions()">🔄 Régénérer tout</button>
+                <button class="btn btn-secondary btn-sm" onclick="verifierCommissionsVersementsUI()" title="Détecte les commissions orphelines (versement supprimé) et en double (souvent causées par un versement saisi deux fois)">🔍 Vérifier doublons/orphelines</button>
               </div>
             </div>
           </div>
+
+          <div id="compta-comm-verif" style="display:none;"></div>
 
           <!-- Filtres -->
           <div class="filters-bar" style="margin-bottom:12px;">
@@ -31330,18 +31333,26 @@ async function annulerCommission(id) {
 async function verifierCommissionsVersements(reparer) {
   var rapport = { total_versements: DATA.versements.length, sans_intervenant: 0,
                   manquantes_commercial: [], manquantes_apporteur: [],
-                  doublons: [], orphelines: [], creees: 0 };
+                  doublons: [], orphelines: [], creees: 0, doublons_supprimees: 0, orphelines_supprimees: 0 };
 
-  // Doublons : >1 commission active de même type pour un versement
+  // Doublons : >1 commission active de même type pour un versement — on garde
+  // la plus ancienne (created_at), les suivantes sont les doublons à traiter.
   var parVers = {};
   (DATA.commissions||[]).forEach(function(c){
     if (c.statut === 'annulee') return;
     var k = c.versement_id + '|' + c.type_beneficiaire;
-    parVers[k] = (parVers[k]||0) + 1;
-    if (parVers[k] === 2) rapport.doublons.push(k);
+    (parVers[k] = parVers[k]||[]).push(c);
+  });
+  Object.keys(parVers).forEach(function(k){
+    if (parVers[k].length > 1) {
+      var tri = parVers[k].slice().sort(function(a,b){ return (a.created_at||'').localeCompare(b.created_at||''); });
+      rapport.doublons = rapport.doublons.concat(tri.slice(1).map(function(c){ return c.id; }));
+    }
   });
 
-  // Orphelines : commission dont le versement n'existe plus
+  // Orphelines : commission dont le versement n'existe plus (ex : versement
+  // dupliqué supprimé via "Détecter les doublons" — deleteVersement ne
+  // nettoyait jusqu'ici jamais les commissions qui en découlaient).
   (DATA.commissions||[]).forEach(function(c){
     if (c.statut === 'annulee') return;
     if (!DATA.versements.some(function(v){ return v.id === c.versement_id; }))
@@ -31362,7 +31373,9 @@ async function verifierCommissionsVersements(reparer) {
     if (attendApporteur  && present.indexOf('apporteur')  === -1) rapport.manquantes_apporteur.push(v.id);
   });
 
-  // Réparation : génère uniquement le manquant (idempotent)
+  // Réparation : génère le manquant, ET supprime réellement doublons/orphelines
+  // (le rapport seul ne corrigeait jamais les données jusqu'ici — c'est ce qui
+  // laissait les données comptables faussées après suppression d'un doublon).
   if (reparer) {
     var aTraiter = {};
     rapport.manquantes_commercial.concat(rapport.manquantes_apporteur).forEach(function(id){ aTraiter[id]=1; });
@@ -31371,6 +31384,16 @@ async function verifierCommissionsVersements(reparer) {
       var v = DATA.versements.find(function(x){ return x.id === ids[i]; });
       if (v) { var avant = (DATA.commissions||[]).length; await genererCommissionsVersement(v); rapport.creees += (DATA.commissions||[]).length - avant; }
     }
+    var aSupprimer = rapport.doublons.concat(rapport.orphelines);
+    for (var j=0; j<aSupprimer.length; j++) {
+      var com=(DATA.commissions||[]).find(function(x){return x.id===aSupprimer[j];});
+      if (!com) continue;
+      if (com.statut==='payee') continue; // jamais de suppression automatique d'une commission déjà payée
+      await logAudit('commissions', com.id, 'delete', com, null);
+      DATA.commissions = DATA.commissions.filter(function(x){ return x.id!==com.id; });
+      try{ await deleteRecord('commissions', com.id); }catch(e){}
+      if (rapport.doublons.indexOf(com.id)!==-1) rapport.doublons_supprimees++; else rapport.orphelines_supprimees++;
+    }
     renderCommissions();
     if (typeof buildKPIsApporteurs === 'function') buildKPIsApporteurs();
   }
@@ -31378,9 +31401,80 @@ async function verifierCommissionsVersements(reparer) {
   console.log('=== VÉRIFICATION COMMISSIONS ===', rapport);
   var nbManq = rapport.manquantes_commercial.length + rapport.manquantes_apporteur.length;
   toast('Vérif : ' + nbManq + ' manquante(s), ' + rapport.doublons.length + ' doublon(s), '
-        + rapport.orphelines.length + ' orpheline(s)' + (reparer ? ' — ' + rapport.creees + ' créée(s)' : ''),
+        + rapport.orphelines.length + ' orpheline(s)' + (reparer ? ' — ' + rapport.creees + ' créée(s), ' + rapport.doublons_supprimees + ' doublon(s) supprimé(s), ' + rapport.orphelines_supprimees + ' orpheline(s) supprimée(s)' : ''),
         nbManq || rapport.doublons.length || rapport.orphelines.length ? 'error' : 'success');
   return rapport;
+}
+
+/* Interface : affiche le rapport avec le détail (client, montant, date) au
+   lieu du seul toast — indispensable pour vérifier avant suppression sur un
+   historique repris (import + ressaisie manuelle, cas Menko Holding). */
+async function verifierCommissionsVersementsUI(reparer){
+  var host=document.getElementById('compta-comm-verif'); if(!host) return;
+  var r = await verifierCommissionsVersements(!!reparer);
+  var nomClient=function(vid){ var v=(DATA.versements||[]).find(function(x){return x.id===vid;}); if(!v) return '(versement supprimé)';
+    var c=(DATA.clients||[]).find(function(x){return x.id===v.client_id;}); return c?((c.nom||'')+' '+(c.prenoms||'')).trim():'—'; };
+  var ligneComm=function(id){ var c=(DATA.commissions||[]).find(function(x){return x.id===id;}); if(!c) return null;
+    return '<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-top:1px solid var(--bord2,#E2E8F0);">'
+      +'<span>'+escHtml(nomClient(c.versement_id))+' · '+escHtml(c.type_beneficiaire)+' · '+fmtF(c.montant)+' F · '+(c.date_versement||'')+'</span>'
+      +(c.statut==='payee'?'<span style="color:var(--or);">payée — non touchée</span>':'<span style="color:var(--rouge);">à traiter</span>')+'</div>';
+  };
+  var doublonsLignes = r.doublons.map(ligneComm).filter(Boolean);
+  var orphelinesLignes = r.orphelines.map(ligneComm).filter(Boolean);
+  var confirmation = reparer ? ('<div style="margin-top:6px;font-size:11.5px;color:var(--vert);">✅ '+r.creees+' commission(s) créée(s), '
+    +r.doublons_supprimees+' doublon(s) supprimé(s), '+r.orphelines_supprimees+' orpheline(s) supprimée(s).</div>') : '';
+  var nbManq=r.manquantes_commercial.length+r.manquantes_apporteur.length;
+  window._vcvDernierRapport = r;
+  if (!nbManq && !r.doublons.length && !r.orphelines.length){
+    host.style.display=''; host.innerHTML='<div class="card" style="border-left:4px solid var(--vert);padding:12px 14px;">✅ Aucune anomalie commission/versement détectée.</div>'; return;
+  }
+  host.style.display='';
+  host.innerHTML='<div class="card" style="border-left:4px solid var(--rouge);padding:12px 14px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+    +'<strong>⚠️ Anomalies commissions/versements</strong>'
+    +'<button class="btn btn-secondary btn-sm" onclick="imprimerRapportCommissionsVerif()">🖨️ Imprimer le rapport</button>'
+    +'</div>'
+    +'<div style="font-size:12px;margin-top:4px;">'+nbManq+' manquante(s), '+r.doublons.length+' doublon(s), '+r.orphelines.length+' orpheline(s)</div>'
+    +confirmation
+    +(doublonsLignes.length?('<div style="margin-top:8px;"><b style="font-size:12px;">Doublons (même versement, même type)</b>'+doublonsLignes.join('')+'</div>'):'')
+    +(orphelinesLignes.length?('<div style="margin-top:8px;"><b style="font-size:12px;">Orphelines (versement déjà supprimé)</b>'+orphelinesLignes.join('')+'</div>'):'')
+    +(nbManq?('<div style="margin-top:8px;font-size:11px;color:var(--blanc-dim);">'+nbManq+' versement(s) éligible(s) sans commission générée.</div>'):'')
+    +'<div style="margin-top:10px;"><button class="btn btn-danger btn-sm" onclick="verifierCommissionsVersementsUI(true)">🧹 Générer les manquantes et supprimer doublons/orphelines (hors commissions payées)</button></div>'
+    +'</div>';
+}
+
+function imprimerRapportCommissionsVerif(){
+  var r = window._vcvDernierRapport; if(!r){ toast('Lancez d\'abord la vérification.','error'); return; }
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var nomClient=function(vid){ var v=(DATA.versements||[]).find(function(x){return x.id===vid;}); if(!v) return '(versement supprimé)';
+    var c=(DATA.clients||[]).find(function(x){return x.id===v.client_id;}); return c?((c.nom||'')+' '+(c.prenoms||'')).trim():'—'; };
+  var w=window.open('','_blank');
+  if(!w){ toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  var ligne=function(id){ var c=(DATA.commissions||[]).find(function(x){return x.id===id;});
+    if(!c) return '<tr><td colspan="5"><i>(commission déjà supprimée)</i></td></tr>';
+    return '<tr><td>'+escHtml(nomClient(c.versement_id))+'</td><td>'+escHtml(c.type_beneficiaire)+'</td>'
+      +'<td>'+fmtF(c.montant)+' F</td><td>'+escHtml(c.date_versement||'')+'</td><td>'+escHtml(c.statut)+'</td></tr>';
+  };
+  var tbl=function(titre, ids){ return ids.length ? ('<h2>'+titre+' ('+ids.length+')</h2>'
+    +'<table><thead><tr><th>Client</th><th>Type</th><th>Montant</th><th>Date versement</th><th>Statut</th></tr></thead><tbody>'
+    +ids.map(ligne).join('')+'</tbody></table>') : ''; };
+  var nbManq=r.manquantes_commercial.length+r.manquantes_apporteur.length;
+  w.document.write('<html><head><title>Rapport commissions/versements</title>'
+    +'<style>body{font-family:Georgia,serif;padding:36px;color:#111;font-size:12.5px;line-height:1.5;}'
+    +'h1{font-size:17px;margin:0 0 4px;}h2{font-size:13.5px;margin:20px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px;}'
+    +'table{width:100%;border-collapse:collapse;margin:6px 0;}th,td{padding:5px 6px;border:1px solid #ccc;text-align:left;font-size:11.5px;}'
+    +'th{background:#f2f2f2;}.pied{margin-top:24px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Rapport commissions/versements', new Date().toISOString().slice(0,10))
+    +'<h1>Rapport de contrôle — Commissions / Versements</h1>'
+    +'<div style="color:#555;font-size:11.5px;">'+escHtml(soc)+' — généré le '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    +'<div style="margin-top:10px;font-size:12px;">'+r.total_versements+' versement(s) analysé(s) · '+nbManq+' manquante(s) · '+r.doublons.length+' doublon(s) · '+r.orphelines.length+' orpheline(s)</div>'
+    +tbl('Doublons (même versement, même type de bénéficiaire)', r.doublons)
+    +tbl('Orphelines (versement source déjà supprimé)', r.orphelines)
+    +(!r.doublons.length && !r.orphelines.length && !nbManq ? '<p>Aucune anomalie détectée à la date du contrôle.</p>' : '')
+    +'<div class="pied">Les commissions déjà payées ne sont jamais supprimées automatiquement, même en cas de doublon ou d\'orpheline : une régularisation manuelle est requise.<br><br>'
+    +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>Contrôlé par : ___________________________</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
 }
 
 /** Régénérer les commissions pour tous les versements existants */
@@ -31848,8 +31942,10 @@ function detecterVersementsDoublons() {
   if (!groupes.length && !croisements.length) {
     host.style.display = '';
     host.innerHTML = '<div class="card" style="border-left:4px solid var(--vert);padding:12px 14px;margin-bottom:14px;">✅ Aucun doublon probable détecté — ni entre versements, ni entre versements et mouvements de caisse (même montant, dates ≤ 2 jours, nom correspondant).</div>';
+    window._dvdDernierRapport = { groupes:[], croisements:[] };
     return;
   }
+  window._dvdDernierRapport = { groupes:groupes, croisements:croisements };
   var origine = function(v){ return v._import_source ? ('📥 importé (' + v._import_source.replace('csv_','') + ')') : ('✍️ saisi le ' + (v.created_at||'').slice(0,10)); };
   var blocs = '';
   if (groupes.length) {
@@ -31886,9 +31982,54 @@ function detecterVersementsDoublons() {
   }
   host.style.display = '';
   host.innerHTML = '<div class="card" style="border-left:4px solid var(--rouge);padding:12px 14px;margin-bottom:14px;">'
-    + '<strong>⚠️ Doublons probables détectés</strong> — vérifiez avant toute suppression : cela peut aussi être deux paiements distincts et coïncidents.'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+    + '<strong>⚠️ Doublons probables détectés</strong>'
+    + '<button class="btn btn-secondary btn-sm" onclick="imprimerRapportDoublonsVersements()">🖨️ Imprimer le rapport</button>'
+    + '</div>'
+    + '<div style="font-size:12px;margin-top:4px;">Vérifiez avant toute suppression : cela peut aussi être deux paiements distincts et coïncidents.</div>'
     + blocs
     + '</div>';
+}
+
+/* Rapport imprimable — mêmes données que le panneau à l'écran, pour classement
+   dans le dossier d'audit (ex. reprise d'historique Menko Holding, import
+   caisse + ressaisie manuelle). */
+function imprimerRapportDoublonsVersements(){
+  var rap = window._dvdDernierRapport || { groupes:[], croisements:[] };
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var w=window.open('','_blank');
+  if(!w){ toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  var origine=function(v){ return v._import_source ? ('Importé ('+v._import_source.replace('csv_','')+')') : ('Saisi le '+(v.created_at||'').slice(0,10)); };
+  var nomClient=function(cid){ var c=(DATA.clients||[]).find(function(x){return x.id===cid;}); return c?((c.nom||'')+' '+(c.prenoms||'')).trim():'—'; };
+  var secGroupes = rap.groupes.length ? ('<h2>Doublons entre versements ('+rap.groupes.length+')</h2>'
+    +'<table><thead><tr><th>Client</th><th>Montant</th><th>Référence</th><th>Date</th><th>Origine</th></tr></thead><tbody>'
+    +rap.groupes.map(function(g){
+      return g.map(function(v,i){
+        return '<tr>'+(i===0?('<td rowspan="'+g.length+'">'+escHtml(nomClient(v.client_id))+'</td><td rowspan="'+g.length+'">'+fmtF(v.montant)+' F</td>'):'')
+          +'<td>'+escHtml(v.ref||v.id)+'</td><td>'+escHtml(v.date||'')+'</td><td>'+escHtml(origine(v))+'</td></tr>';
+      }).join('');
+    }).join('')+'</tbody></table>') : '';
+  var secCroisements = rap.croisements.length ? ('<h2>Correspondances versement ↔ mouvement de caisse ('+rap.croisements.length+')</h2>'
+    +'<table><thead><tr><th>Client</th><th>Montant</th><th>Versement</th><th>Mouvement(s) de caisse correspondant(s)</th></tr></thead><tbody>'
+    +rap.croisements.map(function(x){
+      return '<tr><td>'+escHtml(((x.cl.nom||'')+' '+(x.cl.prenoms||'')).trim())+'</td><td>'+fmtF(x.v.montant)+' F</td>'
+        +'<td>'+escHtml(x.v.ref||x.v.id)+' · '+escHtml(x.v.date||'')+' · '+escHtml(origine(x.v))+'</td>'
+        +'<td>'+x.mvts.map(function(m){ return 'Bon n°'+escHtml(m.numero||m.id)+' · '+escHtml((m.date||'').slice(0,10))+' · « '+escHtml(m.beneficiaire||'')+' »'+(m._import_source?' · importé':''); }).join('<br>')+'</td></tr>';
+    }).join('')+'</tbody></table>') : '';
+  w.document.write('<html><head><title>Rapport de doublons — Versements</title>'
+    +'<style>body{font-family:Georgia,serif;padding:36px;color:#111;font-size:12.5px;line-height:1.5;}'
+    +'h1{font-size:17px;margin:0 0 4px;}h2{font-size:13.5px;margin:20px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px;}'
+    +'table{width:100%;border-collapse:collapse;margin:6px 0;}th,td{padding:5px 6px;border:1px solid #ccc;text-align:left;font-size:11.5px;vertical-align:top;}'
+    +'th{background:#f2f2f2;}.pied{margin-top:24px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Rapport doublons versements', new Date().toISOString().slice(0,10))
+    +'<h1>Rapport de contrôle — Doublons versements / caisse</h1>'
+    +'<div style="color:#555;font-size:11.5px;">'+escHtml(soc)+' — généré le '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    +(secGroupes||secCroisements ? (secGroupes+secCroisements) : '<p>Aucun doublon probable détecté à la date du contrôle.</p>')
+    +'<div class="pied">Détection automatique par rapprochement montant identique et écart de date ≤ 2 jours (et correspondance de nom pour les rapprochements caisse). '
+    +'Un résultat signalé n\'est pas nécessairement un doublon réel — deux paiements distincts peuvent coïncider — vérification manuelle requise avant toute suppression.<br><br>'
+    +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>Contrôlé par : ___________________________</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
 }
 
 async function backfillEcrituresVersements() {
@@ -32086,6 +32227,11 @@ function renderVersements() {
 function filterPaiements() { renderVersements(); }
 
 async function deleteVersement(id) {
+  /* Vérification explicite en plus du filet de deleteRecord (défense en
+     profondeur, même pattern que les validations Budget/Caisse) : message
+     clair immédiatement, avant même la confirmation, plutôt que de laisser
+     échouer silencieusement après un "OK" de l'utilisateur. */
+  if (!exigerDroit('Paiements', 's', 'la suppression de ce versement')) return;
   if (!confirm('Supprimer ce versement ?')) return;
   var v = DATA.versements.find(function(x){ return x.id === id; });
   var clientId = v ? v.client_id : null;
@@ -32093,12 +32239,47 @@ async function deleteVersement(id) {
   DATA.versements = DATA.versements.filter(function(v) { return v.id !== id; });
   await deleteRecord('versements', id);
   await supprimerEcritureVersement(id);
+  /* [FIX] Un versement supprimé (doublon, erreur de saisie) laissait ses
+     commissions générées automatiquement (genererCommissionsVersement) en
+     orphelines — invisibles ici, mais toujours comptées dans le total des
+     commissions à payer. Nettoyage immédiat, sauf commission déjà payée
+     (auquel cas elle doit être traitée manuellement, pas effacée en silence). */
+  var commsLiees = (DATA.commissions||[]).filter(function(c){ return c.versement_id === id; });
+  var commsPayees = commsLiees.filter(function(c){ return c.statut === 'payee'; });
+  for (var i=0; i<commsLiees.length; i++) {
+    var c = commsLiees[i]; if (c.statut === 'payee') continue;
+    await logAudit('commissions', c.id, 'delete', c, null);
+    try{ await deleteRecord('commissions', c.id); }catch(e){}
+  }
+  DATA.commissions = (DATA.commissions||[]).filter(function(c){ return c.versement_id !== id || c.statut === 'payee'; });
+  /* [FIX cascade] Deux liens supplémentaires laissés orphelins jusqu'ici :
+     1) l'écriture de frais de passerelle (mobile money) générée par
+        payOnlineReconcilier() — id déterministe 'ecr_frais_<transaction_id>' ;
+     2) le paiement en ligne source (paiements_online) qui reste marqué
+        "réconcilié" avec un versement_id pointant vers un enregistrement
+        supprimé — il faut le rouvrir pour qu'un nouveau rapprochement
+        redevienne possible, sinon le paiement reste bloqué à vie. */
+  var poLie = (DATA.paiements_online||[]).find(function(p){ return p.versement_id === id; });
+  if (poLie) {
+    var ecrFraisId = 'ecr_frais_' + poLie.transaction_id;
+    if ((DATA.ecritures||[]).some(function(e){ return e.id === ecrFraisId; })) {
+      try{ await deleteRecord('ecritures', ecrFraisId, { skipIntegrity: true }); }catch(e){}
+    }
+    poLie.reconcilie = false; poLie.versement_id = null; poLie.frais = 0; poLie._modifie = new Date().toISOString();
+    try{ await dbPut('paiements_online', poLie); }catch(e){}
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_paiements_online', poLie);
+  }
+  if (typeof renderCommissions === 'function') renderCommissions();
   if (typeof buildBalance === 'function') buildBalance();
   if (typeof buildGrandLivre === 'function') buildGrandLivre();
   if (clientId && typeof majStatutLotClient === 'function') await majStatutLotClient(clientId);
   renderVersements();
+  if (typeof payOnlineRender === 'function') payOnlineRender();
   refreshDashboard();
-  toast('Versement et écriture comptable supprimés.', 'info');
+  toast('Versement et écriture comptable supprimés.'
+    + (commsLiees.length>commsPayees.length ? ' '+(commsLiees.length-commsPayees.length)+' commission(s) liée(s) supprimée(s).' : '')
+    + (commsPayees.length ? ' ⚠️ '+commsPayees.length+' commission(s) déjà payée(s) conservée(s) — à régulariser manuellement.' : '')
+    + (poLie ? ' Paiement en ligne '+(poLie.transaction_id||'')+' remis en attente de rapprochement.' : ''), 'info');
 }
 
 function loadEcheancier() {
