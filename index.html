@@ -16893,6 +16893,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <input type="number" class="form-control" id="c-surface" placeholder="0" oninput="clientCompareSurface()">
             <div id="c-surface-ecart" style="font-size:11px;margin-top:4px;display:none;"></div>
             <div id="c-surface-regul-action" style="margin-top:6px;"></div>
+            <div id="c-tma-action" style="margin-top:6px;"></div>
           </div>
           <div class="form-group">
             <label>Prix de vente total (FCFA)</label>
@@ -17185,6 +17186,78 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-regul-surface')">Annuler</button>
       <button class="btn btn-primary" onclick="confirmerRegularisationSurface()">📐 Enregistrer et générer l'avenant</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal TMA — liste des demandes de modification d'un souscripteur -->
+<div class="modal-overlay" id="modal-tma-liste">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-header"><h3>📝 Demandes de modification (TMA) — <span id="tma-liste-client"></span></h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-tma-liste')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="tma-liste-client-id">
+      <div class="alert alert-info" style="font-size:11.5px;">
+        Travaux modificatifs acquéreur — toute demande du souscripteur de modifier son logement en cours de
+        construction (cloisons, finitions, équipements...). La faisabilité dépend du stade d'avancement : au-delà du
+        gros œuvre, une modification structurelle est rarement possible sans reprise coûteuse.
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" style="margin:10px 0;" onclick="ouvrirTmaFormulaire()">➕ Nouvelle demande</button>
+      <div id="tma-liste-box"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-tma-liste')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal TMA — formulaire d'une demande -->
+<div class="modal-overlay" id="modal-tma-form">
+  <div class="modal">
+    <div class="modal-header"><h3>📝 Demande de modification</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-tma-form')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="tma-id">
+      <div id="tma-faisabilite-alerte" style="margin-bottom:10px;"></div>
+      <div class="form-group"><label>Description de la modification demandée *</label><textarea class="form-control" id="tma-description" rows="3" placeholder="Ex. Déplacement de la cloison salon/cuisine, ajout d'une baie vitrée en façade nord."></textarea></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Date de la demande</label><input type="date" class="form-control" id="tma-date"></div>
+        <div class="form-group"><label>Stade du chantier à la demande</label>
+          <select class="form-control" id="tma-stade">
+            <option value="gros_oeuvre">🧱 Gros œuvre</option>
+            <option value="second_oeuvre">🔧 Second œuvre</option>
+            <option value="cle_en_main">🔑 Clé en main / finitions</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Faisabilité technique</label>
+          <select class="form-control" id="tma-faisabilite" onchange="tmaMajAlerteFaisabilite()">
+            <option value="a_evaluer">À évaluer</option>
+            <option value="faisable">Faisable</option>
+            <option value="faisable_reserve">Faisable sous réserve (surcoût/délai important)</option>
+            <option value="non_faisable">Non faisable</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Statut</label>
+          <select class="form-control" id="tma-statut">
+            <option value="demande">Demande reçue</option>
+            <option value="devis">Devis en cours</option>
+            <option value="valide">Validée par le souscripteur</option>
+            <option value="en_cours">Travaux en cours</option>
+            <option value="realise">Réalisée</option>
+            <option value="refuse">Refusée</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Coût estimé (FCFA)</label><input type="number" class="form-control" id="tma-cout-estime"></div>
+        <div class="form-group"><label>Impact délai (jours)</label><input type="number" class="form-control" id="tma-impact-delai" value="0"></div>
+      </div>
+      <div class="form-group"><label><input type="checkbox" id="tma-facturer"> Facturer ce surcoût au souscripteur (ajoute au montant total du contrat + avenant)</label></div>
+      <div class="form-group"><label>Notes / observations</label><textarea class="form-control" id="tma-notes" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-tma-form');ouvrirTmaListe(document.getElementById('tma-liste-client-id').value)">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmerTma()">💾 Enregistrer</button>
     </div>
   </div>
 </div>
@@ -30455,11 +30528,18 @@ function openClientModal(id) {
     // Documents téléversés
     setTimeout(function(){ refreshDocumentsForEntity('client', id); }, 80);
     renderClientHistorique(id);
+    var tmaAction = document.getElementById('c-tma-action');
+    if (tmaAction) {
+      var nbTma = (c.demandes_modification||[]).filter(function(d){ return d.statut!=='realise' && d.statut!=='refuse'; }).length;
+      tmaAction.innerHTML = '<button type="button" class="btn btn-secondary btn-sm" onclick="ouvrirTmaListe(\''+id+'\')">📝 Demandes de modification (TMA)'
+        + (nbTma ? ' <span class="badge badge-or" style="margin-left:4px;">'+nbTma+'</span>' : '') + '</button>';
+    }
   } else {
     document.getElementById('modal-client-title').textContent = 'Nouveau Souscripteur';
     document.getElementById('c-date-debut').value = today();
     document.getElementById('c-date-souscription').value = today();
     document.getElementById('client-historique-block').innerHTML = '';
+    var tmaActionNew = document.getElementById('c-tma-action'); if (tmaActionNew) tmaActionNew.innerHTML = '';
   }
   if (typeof updateLotsByProgramme === 'function') updateLotsByProgramme();
   openModal('modal-client');
@@ -45792,6 +45872,183 @@ function imprimerRegularisationSurface(regul, c){
     +'</tbody></table>'
     +'<div class="pied">Le présent avenant complète et modifie le contrat de souscription initial à hauteur du montant ci-dessus, '
     +'sans emporter aucune autre modification des conditions convenues.<br><br>'
+    +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>'
+    +'Pour '+escHtml(soc)+' : ___________________________<br><br>Le souscripteur (bon pour accord) : ___________________________</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TRAVAUX MODIFICATIFS ACQUÉREUR (TMA) — demande d'un souscripteur de
+   modifier son logement en cours de construction. Absent jusqu'ici :
+   seule trace possible était une note libre ou un échange par message,
+   sans faisabilité tracée selon le stade, sans impact financier lié au
+   contrat. Même principe que la régularisation de surface : le montant
+   total du contrat est la seule source de vérité de ce qui est dû, un
+   avenant signable est généré, les futurs versements/commissions
+   suivent automatiquement (aucun traitement rétroactif nécessaire). */
+function ouvrirTmaListe(clientId){
+  var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; });
+  if (!c) return;
+  document.getElementById('tma-liste-client-id').value = clientId;
+  document.getElementById('tma-liste-client').textContent = ((c.nom||'')+' '+(c.prenoms||'')).trim();
+  tmaRenderListe();
+  openModal('modal-tma-liste');
+}
+function tmaRenderListe(){
+  var clientId = document.getElementById('tma-liste-client-id').value;
+  var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; });
+  var box = document.getElementById('tma-liste-box'); if (!box || !c) return;
+  var demandes = (c.demandes_modification||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  if (!demandes.length){ box.innerHTML = '<div style="color:var(--blanc-dim);font-size:12px;padding:14px;text-align:center;">Aucune demande enregistrée.</div>'; return; }
+  var statutLabel = { demande:'Demande reçue', devis:'Devis en cours', valide:'Validée', en_cours:'En cours', realise:'Réalisée', refuse:'Refusée' };
+  var statutBadge = { demande:'badge-gris', devis:'badge-or', valide:'badge-bleu', en_cours:'badge-or', realise:'badge-vert', refuse:'badge-rouge' };
+  var faisabiliteLabel = { a_evaluer:'À évaluer', faisable:'✅ Faisable', faisable_reserve:'⚠️ Sous réserve', non_faisable:'❌ Non faisable' };
+  box.innerHTML = '<div class="table-wrap"><table style="width:100%;font-size:12px;">'
+    + '<thead><tr><th>Date</th><th>Description</th><th>Stade</th><th>Faisabilité</th><th>Coût</th><th>Statut</th><th></th></tr></thead><tbody>'
+    + demandes.map(function(d){
+      return '<tr><td>'+dateShort(d.date)+'</td>'
+        + '<td style="max-width:220px;">'+escHtml((d.description||'').slice(0,60))+'</td>'
+        + '<td style="font-size:11px;">'+({gros_oeuvre:'🧱 Gros œuvre',second_oeuvre:'🔧 Second œuvre',cle_en_main:'🔑 Clé en main'}[d.stade]||d.stade)+'</td>'
+        + '<td style="font-size:11px;">'+(faisabiliteLabel[d.faisabilite]||d.faisabilite)+'</td>'
+        + '<td style="text-align:right;">'+(d.facture ? fmtF(d.cout_estime)+' F' : (d.cout_estime?fmtF(d.cout_estime)+' F (non facturé)':'—'))+'</td>'
+        + '<td><span class="badge '+(statutBadge[d.statut]||'badge-gris')+'">'+(statutLabel[d.statut]||d.statut)+'</span></td>'
+        + '<td style="white-space:nowrap;">'
+        + '<button class="btn btn-secondary btn-sm btn-icon" title="Modifier" onclick="ouvrirTmaFormulaire(\''+d.id+'\')">✏️</button> '
+        + (d.statut!=='realise' && !d.facture ? '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer" onclick="supprimerTma(\''+d.id+'\')">🗑</button>' : '')
+        + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+function ouvrirTmaFormulaire(tmaId){
+  var clientId = document.getElementById('tma-liste-client-id').value;
+  var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; });
+  if (!c) return;
+  if (!exigerDroit('Souscripteurs', 'v', 'la gestion des demandes de modification')) return;
+  var d = tmaId ? (c.demandes_modification||[]).find(function(x){ return x.id===tmaId; }) : null;
+  document.getElementById('tma-id').value = d ? d.id : '';
+  document.getElementById('tma-description').value = d ? d.description : '';
+  document.getElementById('tma-date').value = d ? d.date : today();
+  var lot = (DATA.lots||[]).find(function(l){ return l.id===c.lot_id; });
+  document.getElementById('tma-stade').value = d ? d.stade : ((lot && lot.mode_livraison) || 'gros_oeuvre');
+  document.getElementById('tma-faisabilite').value = d ? d.faisabilite : 'a_evaluer';
+  document.getElementById('tma-statut').value = d ? d.statut : 'demande';
+  document.getElementById('tma-cout-estime').value = d ? d.cout_estime : '';
+  document.getElementById('tma-impact-delai').value = d ? (d.impact_delai||0) : 0;
+  document.getElementById('tma-facturer').checked = d ? !!d.facture : false;
+  document.getElementById('tma-facturer').disabled = !!(d && d.facture); // déjà facturé : ne plus pouvoir décocher (éviterait de fausser le montant sans repasser par une régularisation explicite)
+  document.getElementById('tma-notes').value = d ? (d.notes||'') : '';
+  tmaMajAlerteFaisabilite();
+  closeModal('modal-tma-liste');
+  openModal('modal-tma-form');
+}
+function tmaMajAlerteFaisabilite(){
+  var stade = document.getElementById('tma-stade').value;
+  var el = document.getElementById('tma-faisabilite-alerte');
+  var msgs = {
+    gros_oeuvre: { c:'alert-info', t:'🧱 Gros œuvre : les modifications structurelles (cloisons porteuses, ouvertures, réseaux enterrés) restent généralement possibles à ce stade.' },
+    second_oeuvre: { c:'alert-warn', t:'🔧 Second œuvre : une modification touchant la structure (cloisons porteuses, gros réseaux) implique une reprise coûteuse — limiter aux cloisons non porteuses, électricité, plomberie non encore posée.' },
+    cle_en_main: { c:'alert-danger', t:'🔑 Clé en main / finitions : seules les modifications esthétiques mineures (peinture, revêtements non posés, équipements) sont réalistes sans reprise majeure des travaux déjà achevés.' }
+  };
+  var m = msgs[stade] || msgs.gros_oeuvre;
+  el.className = 'alert ' + m.c;
+  el.innerHTML = m.t;
+}
+async function confirmerTma(){
+  var clientId = document.getElementById('tma-liste-client-id').value;
+  var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; });
+  if (!c) { toast('Souscripteur introuvable.','error'); return; }
+  if (!exigerDroit('Souscripteurs', 'v', 'la gestion des demandes de modification')) return;
+  var description = document.getElementById('tma-description').value.trim();
+  if (!description) { toast('La description de la demande est obligatoire.','error'); return; }
+  var tmaId = document.getElementById('tma-id').value;
+  var coutEstime = parseFloat(document.getElementById('tma-cout-estime').value) || 0;
+  var facturer = document.getElementById('tma-facturer').checked;
+
+  c.demandes_modification = c.demandes_modification || [];
+  var d = tmaId ? c.demandes_modification.find(function(x){ return x.id===tmaId; }) : null;
+  var dejaFacture = !!(d && d.facture);
+  if (!d) { d = { id: uid() }; c.demandes_modification.push(d); }
+
+  d.description = description;
+  d.date = document.getElementById('tma-date').value || today();
+  d.stade = document.getElementById('tma-stade').value;
+  d.faisabilite = document.getElementById('tma-faisabilite').value;
+  d.statut = document.getElementById('tma-statut').value;
+  d.cout_estime = coutEstime;
+  d.impact_delai = parseFloat(document.getElementById('tma-impact-delai').value) || 0;
+  d.notes = document.getElementById('tma-notes').value.trim();
+  d.valide_par = (APP.currentUser&&APP.currentUser.nom)||'—';
+  d._modifie_le = new Date().toISOString();
+
+  /* Facturation : n'ajoute au montant total qu'UNE SEULE FOIS (idempotent) —
+     éviter qu'un simple changement de statut sur une demande déjà facturée
+     ne réaugmente le montant total à chaque enregistrement. */
+  if (facturer && !dejaFacture && coutEstime > 0) {
+    c.montant_total = (parseFloat(c.montant_total)||0) + coutEstime;
+    d.facture = true;
+    d.montant_facture = coutEstime;
+    await logAudit('clients', clientId, 'tma_facturation', null, { tma_id:d.id, montant:coutEstime, description:description });
+    imprimerAvenantTma(d, c);
+  } else if (!facturer) {
+    d.facture = false;
+  }
+
+  c._modifie = new Date().toISOString();
+  await dbPut('clients', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+
+  closeModal('modal-tma-form');
+  var mtEl = document.getElementById('c-montant-total'); if (mtEl && APP.editingId===clientId) mtEl.value = c.montant_total;
+  var tmaAction = document.getElementById('c-tma-action');
+  if (tmaAction && APP.editingId===clientId) {
+    var nbTma = c.demandes_modification.filter(function(x){ return x.statut!=='realise' && x.statut!=='refuse'; }).length;
+    tmaAction.innerHTML = '<button type="button" class="btn btn-secondary btn-sm" onclick="ouvrirTmaListe(\''+clientId+'\')">📝 Demandes de modification (TMA)'
+      + (nbTma ? ' <span class="badge badge-or" style="margin-left:4px;">'+nbTma+'</span>' : '') + '</button>';
+  }
+  toast('✅ Demande enregistrée.'+(facturer && !dejaFacture && coutEstime>0 ? ' Montant total mis à jour (+'+fcfa(coutEstime)+'), avenant généré.' : ''), 'success');
+  ouvrirTmaListe(clientId);
+}
+async function supprimerTma(tmaId){
+  var clientId = document.getElementById('tma-liste-client-id').value;
+  var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; });
+  if (!c) return;
+  if (!exigerDroit('Souscripteurs', 'v', 'la suppression de cette demande')) return;
+  var d = (c.demandes_modification||[]).find(function(x){ return x.id===tmaId; });
+  if (d && d.facture) { toast('Impossible : cette demande a déjà été facturée au contrat.','error'); return; }
+  if (!confirm('Supprimer cette demande de modification ?')) return;
+  c.demandes_modification = (c.demandes_modification||[]).filter(function(x){ return x.id!==tmaId; });
+  c._modifie = new Date().toISOString();
+  await dbPut('clients', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+  tmaRenderListe();
+  toast('Demande supprimée.','info');
+}
+function imprimerAvenantTma(d, c){
+  var soc = (DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var w = window.open('','_blank');
+  if (!w) { toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  var stadeLabel = {gros_oeuvre:'Gros œuvre',second_oeuvre:'Second œuvre',cle_en_main:'Clé en main / finitions'}[d.stade]||d.stade;
+  w.document.write('<html><head><title>Avenant — Travaux modificatifs</title>'
+    +'<style>body{font-family:Georgia,serif;padding:38px;color:#111;font-size:13px;line-height:1.55;}'
+    +'h1{font-size:17px;margin:0 0 4px;}table{width:100%;border-collapse:collapse;margin:10px 0;}'
+    +'td{padding:5px 8px;border:1px solid #ccc;}td.k{width:40%;background:#f5f5f5;}'
+    +'.pied{margin-top:26px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Avenant TMA', c.dossier||c.id)
+    +'<h1>'+escHtml(soc)+'</h1>'
+    +'<h1 style="margin-top:14px;">Avenant — Travaux modificatifs acquéreur</h1>'
+    +'<div style="color:#555;font-size:11.5px;">Réf. souscripteur : '+escHtml(c.dossier||c.id)+' — '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    +'<h2>Souscripteur</h2><table><tbody>'
+    +'<tr><td class="k">Nom</td><td>'+escHtml(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</td></tr>'
+    +'</tbody></table>'
+    +'<h2>Nature de la modification</h2><p>'+escHtml(d.description)+'</p>'
+    +'<table><tbody>'
+    +'<tr><td class="k">Stade du chantier</td><td>'+escHtml(stadeLabel)+'</td></tr>'
+    +'<tr><td class="k">Impact sur le délai de livraison</td><td>'+(d.impact_delai>0 ? '+'+d.impact_delai+' jour(s)' : 'Aucun')+'</td></tr>'
+    +'<tr><td class="k"><b>Coût complémentaire facturé</b></td><td><b>'+fcfa(d.montant_facture||d.cout_estime)+'</b></td></tr>'
+    +'<tr><td class="k">Nouveau montant total du contrat</td><td>'+fcfa(c.montant_total)+'</td></tr>'
+    +'</tbody></table>'
+    +'<div class="pied">Le présent avenant complète et modifie le contrat de souscription initial à hauteur du montant ci-dessus. '
+    +'La réalisation reste conditionnée à la faisabilité technique confirmée par le maître d\'œuvre.<br><br>'
     +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>'
     +'Pour '+escHtml(soc)+' : ___________________________<br><br>Le souscripteur (bon pour accord) : ___________________________</div>'
     +'</body></html>');
