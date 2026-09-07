@@ -4129,6 +4129,11 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
 
           <!-- Liste des biens amortissables -->
           <div id="amort-pane-biens">
+            <div class="alert alert-info" style="margin-bottom:10px;font-size:11.5px;">
+              ℹ️ Foncier et biens immobiliers acquis par le promoteur uniquement. Véhicules, matériel et mobilier :
+              onglet 🏢 <b>Immobilisations Société</b> — mais le sélecteur du Tableau d'amortissement (onglet suivant)
+              liste bien les deux registres.
+            </div>
             <div class="filters-bar">
               <input type="text" class="search-input" id="search-amort" placeholder="🔍 Référence, désignation du bien..." oninput="buildAmortBiens()">
               <select class="filter-select" id="filter-amort-methode" onchange="buildAmortBiens()">
@@ -4186,6 +4191,11 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
 
           <!-- Dotations annuelles -->
           <div id="amort-pane-dotations" style="display:none;">
+            <div class="alert alert-info" style="margin-bottom:10px;font-size:11.5px;">
+              ℹ️ Comptabilise le foncier <b>et</b> les véhicules/matériel (Immobilisations Société) en une seule action —
+              identifiant d'écriture identique quel que soit le bouton utilisé (ici ou dans l'onglet Immobilisations
+              Société), aucun risque de double comptabilisation.
+            </div>
             <div class="filters-bar">
               <select class="filter-select" id="filter-amort-annee" onchange="buildDotations()"></select>
               <button class="btn btn-primary btn-sm" onclick="comptabiliserDotations()">⚡ Comptabiliser dotations 681</button>
@@ -4676,7 +4686,10 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <div style="margin-top:10px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <label style="margin:0;">Soldes par compte *</label>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="boAjouterLigne()">➕ Ajouter une ligne</button>
+                <div style="display:flex;gap:8px;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="boOuvrirImport()">📋 Coller/Importer</button>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="boAjouterLigne()">➕ Ajouter une ligne</button>
+                </div>
               </div>
               <div id="bo-lignes-wrap"></div>
             </div>
@@ -4686,6 +4699,12 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <button class="btn btn-primary" onclick="saveBilanOuverture()">💾 Enregistrer le bilan d'ouverture</button>
               <button class="btn btn-danger" id="bo-btn-suppr" style="display:none;" onclick="supprimerBilanOuverture()">🗑 Supprimer le bilan d'ouverture existant</button>
             </div>
+          </div>
+
+          <div class="card">
+            <div class="form-section-title">📋 Bilans d'ouverture enregistrés</div>
+            <div style="font-size:11.5px;color:var(--blanc-dim);margin:4px 0 10px;">Toutes divisions et tous exercices confondus — cliquez ✏️ pour recharger une ligne dans le formulaire ci-dessus.</div>
+            <div id="bo-recap-box"></div>
           </div>
         </div>
 
@@ -7413,6 +7432,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <div class="form-group"><label>Parc auto — Carburant (charge)</label><input class="form-control" id="cd-parc-carburant" list="dl-plan-comptable" placeholder="6051"></div>
               <div class="form-group"><label>Parc auto — Entretien/réparations (charge)</label><input class="form-control" id="cd-parc-entretien" list="dl-plan-comptable" placeholder="6156"></div>
               <div class="form-group"><label>Parc auto — Immobilisation véhicules</label><input class="form-control" id="cd-parc-immobilisation" list="dl-plan-comptable" placeholder="2451"></div>
+              <div class="form-group"><label>Résiliation — Dette de remboursement au souscripteur</label><input class="form-control" id="cd-resiliation-dette" list="dl-plan-comptable" placeholder="4197"></div>
+              <div class="form-group"><label>Résiliation — Retenue conservée (produit)</label><input class="form-control" id="cd-resiliation-produit" list="dl-plan-comptable" placeholder="758"></div>
 
               <div class="form-group"><label>Taux Impôt sur les Sociétés (%)</label><input type="number" step="0.1" class="form-control" id="cd-taux-is" placeholder="25"></div>
               <div class="form-group"></div>
@@ -11256,6 +11277,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <option value="a_payer">À payer</option>
               <option value="payee">Payée</option>
               <option value="annulee">Annulée</option>
+              <option value="a_recuperer">À récupérer (résiliation)</option>
             </select>
             <input type="month" class="filter-select" id="comm-filter-periode" onchange="renderCommissions()">
           </div>
@@ -11692,6 +11714,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <div style="display:flex;gap:8px;">
                 <select class="filter-select" id="caisse-audit-caisse-id" onchange="renderCaisseAudit()"></select>
                 <button class="btn btn-secondary btn-sm" onclick="imprimerRapportAuditCaisse()">🖨️ Rapport d'audit</button>
+                <button class="btn btn-secondary btn-sm" onclick="partagerRapportAuditCaisse()">📤 Partager</button>
               </div>
             </div>
           </div>
@@ -11708,6 +11731,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <input type="month" class="form-control" id="crm-mois" style="width:auto;" onchange="caisseRevueMensuelleUI()">
                 <select class="filter-select" id="crm-caisse-id" onchange="caisseRevueMensuelleUI()"></select>
                 <button class="btn btn-secondary btn-sm" onclick="imprimerRevueMensuelleCaisse()">🖨️ Imprimer</button>
+                <button class="btn btn-secondary btn-sm" onclick="partagerRevueMensuelleCaisse()">📤 Partager</button>
               </div>
             </div>
           </div>
@@ -16861,6 +16885,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <label>Surface souscrite (m²) <span style="font-weight:400;color:var(--blanc-dim);">— pré-remplie depuis le(s) lot(s), modifiable</span></label>
             <input type="number" class="form-control" id="c-surface" placeholder="0" oninput="clientCompareSurface()">
             <div id="c-surface-ecart" style="font-size:11px;margin-top:4px;display:none;"></div>
+            <div id="c-surface-regul-action" style="margin-top:6px;"></div>
           </div>
           <div class="form-group">
             <label>Prix de vente total (FCFA)</label>
@@ -17004,6 +17029,179 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-paiement')">Annuler</button>
       <button class="btn btn-primary" id="btn-save-paiement" onclick="savePaiement()">Enregistrer + Reçu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Résiliation de souscription -->
+<div class="modal-overlay" id="modal-resiliation">
+  <div class="modal">
+    <div class="modal-header"><h3>📄 Résiliation de souscription</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-resiliation')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="rs-client-id">
+      <div id="rs-alerte-gele" style="display:none;"></div>
+      <div class="alert alert-info" style="font-size:11.5px;">
+        Clause contractuelle applicable : désistement du souscripteur → remboursement de <b>60%</b> des versements
+        (effectif à la fin du délai de réalisation) ; désistement imputable au promoteur → remboursement <b>total (100%)</b>.
+      </div>
+      <div class="card" style="margin:10px 0;padding:10px 12px;">
+        <div id="rs-recap" style="font-size:12.5px;line-height:1.7;"></div>
+      </div>
+      <div class="form-group">
+        <label>Motif de la résiliation</label>
+        <select class="form-control" id="rs-motif" onchange="resilierRecalculer()">
+          <option value="desistement_client">Désistement du souscripteur (60%)</option>
+          <option value="faute_promoteur">Défaut/retard imputable au promoteur (100%)</option>
+        </select>
+        <div id="rs-suggestion-auto" style="font-size:11px;color:var(--or,#B87333);margin-top:4px;"></div>
+      </div>
+      <div class="form-group"><label>Justification / motif détaillé (obligatoire)</label><textarea class="form-control" id="rs-justification" rows="3" placeholder="Ex. Retard de livraison de 14 mois sur programme dont l'échéance contractuelle était le..."></textarea></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Montant total versé (hors frais de dossier)</label><input type="text" class="form-control" id="rs-montant-verse" disabled></div>
+        <div class="form-group"><label>Taux de remboursement</label><input type="text" class="form-control" id="rs-taux" disabled></div>
+        <div class="form-group"><label>Montant à rembourser</label><input type="text" class="form-control" id="rs-montant-rembourse" disabled style="font-weight:700;color:var(--vert);"></div>
+        <div class="form-group"><label>Montant retenu (conservé)</label><input type="text" class="form-control" id="rs-montant-retenu" disabled style="font-weight:700;color:var(--or,#B87333);"></div>
+      </div>
+      <div id="rs-commissions-info" class="alert" style="font-size:11.5px;"></div>
+      <div class="form-group"><label><input type="checkbox" id="rs-confirme"> Je confirme avoir vérifié le motif et le calcul ci-dessus — cette opération est tracée et génère une écriture comptable.</label></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-resiliation')">Annuler</button>
+      <button class="btn btn-danger" onclick="resilierConfirmer()">📄 Résilier et générer le décompte</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Remboursement effectif d'une résiliation -->
+<div class="modal-overlay" id="modal-resiliation-remb">
+  <div class="modal">
+    <div class="modal-header"><h3>💰 Remboursement de la résiliation</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-resiliation-remb')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="rr-client-id">
+      <div id="rr-recap" class="alert alert-info" style="font-size:12.5px;"></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Date du remboursement</label><input type="date" class="form-control" id="rr-date"></div>
+        <div class="form-group"><label>Mode de paiement</label>
+          <select class="form-control" id="rr-mode">
+            <option value="virement">Virement bancaire</option>
+            <option value="especes">Espèces (caisse)</option>
+            <option value="mobile_money">Mobile Money</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Référence (n° virement, bon de caisse…)</label><input type="text" class="form-control" id="rr-reference"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-resiliation-remb')">Annuler</button>
+      <button class="btn btn-primary" onclick="resilierConfirmerRemboursement()">💰 Confirmer le remboursement</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Résiliation de cession foncière -->
+<div class="modal-overlay" id="modal-cesresil">
+  <div class="modal">
+    <div class="modal-header"><h3>📄 Résiliation de cession foncière</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-cesresil')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="cr-cession-id">
+      <div class="alert alert-info" style="font-size:11.5px;">
+        Même clause contractuelle : désistement de l'acquéreur → remboursement de <b>60%</b> des sommes encaissées ;
+        désistement imputable au promoteur → remboursement <b>total (100%)</b>. Le prix de cession est intégralement
+        annulé comptablement (la vente n'aura pas lieu) ; seule la somme réellement encaissée est concernée par le taux.
+      </div>
+      <div class="card" style="margin:10px 0;padding:10px 12px;"><div id="cr-recap" style="font-size:12.5px;line-height:1.7;"></div></div>
+      <div class="form-group">
+        <label>Motif de la résiliation</label>
+        <select class="form-control" id="cr-motif" onchange="cesResilierRecalculer()">
+          <option value="desistement_client">Désistement de l'acquéreur (60%)</option>
+          <option value="faute_promoteur">Défaut/retard imputable au promoteur (100%)</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Justification / motif détaillé (obligatoire)</label><textarea class="form-control" id="cr-justification" rows="3"></textarea></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Prix de cession (annulé intégralement)</label><input type="text" class="form-control" id="cr-prix" disabled></div>
+        <div class="form-group"><label>Montant réellement encaissé</label><input type="text" class="form-control" id="cr-encaisse" disabled></div>
+        <div class="form-group"><label>Taux de remboursement</label><input type="text" class="form-control" id="cr-taux" disabled></div>
+        <div class="form-group"><label>Montant à rembourser</label><input type="text" class="form-control" id="cr-rembourse" disabled style="font-weight:700;color:var(--vert);"></div>
+      </div>
+      <div id="cr-commissions-info" class="alert" style="font-size:11.5px;"></div>
+      <div class="form-group"><label><input type="checkbox" id="cr-confirme"> Je confirme avoir vérifié le motif et le calcul ci-dessus — cette opération est tracée et génère une écriture comptable.</label></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-cesresil')">Annuler</button>
+      <button class="btn btn-danger" onclick="cesResilierConfirmer()">📄 Résilier et générer le décompte</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Remboursement effectif — cession foncière -->
+<div class="modal-overlay" id="modal-cesresil-remb">
+  <div class="modal">
+    <div class="modal-header"><h3>💰 Remboursement de la résiliation</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-cesresil-remb')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="crr-cession-id">
+      <div id="crr-recap" class="alert alert-info" style="font-size:12.5px;"></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Date du remboursement</label><input type="date" class="form-control" id="crr-date"></div>
+        <div class="form-group"><label>Mode de paiement</label>
+          <select class="form-control" id="crr-mode"><option value="virement">Virement bancaire</option><option value="especes">Espèces (caisse)</option><option value="mobile_money">Mobile Money</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label>Référence</label><input type="text" class="form-control" id="crr-reference"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-cesresil-remb')">Annuler</button>
+      <button class="btn btn-primary" onclick="cesResilierConfirmerRemboursement()">💰 Confirmer le remboursement</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Régularisation de surface -->
+<div class="modal-overlay" id="modal-regul-surface">
+  <div class="modal">
+    <div class="modal-header"><h3>📐 Facturer l'écart de surface</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-regul-surface')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="rs2-client-id">
+      <div class="alert alert-info" style="font-size:11.5px;">
+        La surface réelle du terrain (relevé, bornage) dépasse la surface déclarée à la souscription. Le surplus est
+        facturé au souscripteur, au prix au m² du lot — génère un avenant signable et met à jour le montant total du contrat.
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Surface déclarée (m²)</label><input type="number" class="form-control" id="rs2-surface-declaree" disabled></div>
+        <div class="form-group"><label>Surface réelle (m²)</label><input type="number" class="form-control" id="rs2-surface-reelle" disabled></div>
+        <div class="form-group"><label>Écart facturable (m²)</label><input type="number" class="form-control" id="rs2-ecart" disabled></div>
+        <div class="form-group"><label>Prix au m² (FCFA)</label><input type="number" class="form-control" id="rs2-prix-m2" oninput="rs2Recalculer()"></div>
+      </div>
+      <div class="form-group"><label>Montant complémentaire dû</label><input type="text" class="form-control" id="rs2-montant" disabled style="font-weight:700;color:var(--or,#B87333);"></div>
+      <div class="form-group"><label>Motif / justification (obligatoire)</label><textarea class="form-control" id="rs2-motif" rows="2" placeholder="Ex. Relevé topographique du géomètre-expert du 12/09/2026 — bornage définitif."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-regul-surface')">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmerRegularisationSurface()">📐 Enregistrer et générer l'avenant</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Import Bilan d'ouverture -->
+<div class="modal-overlay" id="modal-bo-import">
+  <div class="modal">
+    <div class="modal-header"><h3>📋 Importer le bilan d'ouverture</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-bo-import')">✕</button></div>
+    <div class="modal-body">
+      <div class="alert alert-info" style="font-size:11.5px;">
+        Une ligne par compte, format <code>compte|sens|montant</code> — sens = <b>D</b> (débiteur) ou <b>C</b> (créditeur).
+        Collez directement depuis un tableau préparé (Excel, ou le tableau que je vous ai fourni).<br>
+        Exemple : <code>571|D|12688</code>
+      </div>
+      <div class="form-group"><label>Coller les lignes ici</label><textarea class="form-control" id="bo-import-texte" rows="12" placeholder="571|D|12688
+521|D|500000
+101|C|8022150
+12|D|64302814
+401|C|56793352"></textarea></div>
+      <div id="bo-import-apercu" style="font-size:11.5px;color:var(--blanc-dim);margin-top:8px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-bo-import')">Annuler</button>
+      <button class="btn btn-primary" onclick="boConfirmerImport()">✅ Charger dans le formulaire</button>
     </div>
   </div>
 </div>
@@ -23265,89 +23463,17 @@ async function saveData(store) {
 }
 
 async function loadAllData() {
-  var allKeys = [
-    'clients','versements','programmes','lots','terrains','ecritures','relances',
-    'employes','divisions','bulletins','declarations','parcelles','mutations','dossiersJuridiques',
-    'constructeurs','conventions','situations','avenants','conceptions','leads',
-    'pointages','itineraires','etapes_itineraire','cr_visites','biens_amort','ordres_mission',
-    'releves_bank','rapprochements','permis','plans_arch','rapports_chantier',
-    'campagnes','actions_marketing','segments_marketing',
-  'documents','signatures',
-  'historique_actions','workflow_configs',
-  'evenements_calendrier','messages','conversations',
-  'apporteurs','commissions',
-  'nomenclatures','prix_unitaire','devis_fournisseurs',
-  /* v108 */
-  'reunions_direction','actions_reunion',
-  /* MàJ RH 2026-06-07 : stores désormais synchronisés */
-  'custom_roles','logs_connexion',
-  /* v110 */
-  'portail_medias',
-  /* v111 */
-  'portail_messages',
-  /* v112 — Documents juridiques */
-  'docs_juridiques',
-  /* v113 — Accueil & Visites */
-  'visites_rdv','visites_log','visites_blacklist',
-  /* v113-116 — Modules déboursé, foncier, cessions (chargement au démarrage) */
-  'eds_ouvrages','eds_etudes','eds_ressources',
-  'af_operations','af_agents','af_relances',
-  'af_financiers','af_versements_financiers',
-  'cessions_foncieres',
-  'lot_unites',
-  /* v140 — Déclarations de versement portail acquéreur foncier */
-  'declarations_versement_foncier',
-  'coproprietes','lots_copro','budgets_copro','appels_charges_copro','ag_copro','fonds_travaux_copro',
-  'demarcheurs','etats_lieux_bail','restitutions_caution',
-  'relances_locatives',
-  /* v135 — Mobilité interne RH */
-  'mobilites_rh',
-  /* v136 — Module Caisse */
-  'caisses','caisse_sessions','caisse_mouvements',
-  /* v139 — Couches SIG */
-  'sig_couches',
-  /* v141 — Tombstones partagés (anti-réinjection multi-postes) */
-  'suppressions_sync',
-  /* v142 — Propriétaires mandants (gestion locative pour compte de tiers) */
-  'proprietaires_bailleurs',
-  /* [FIX] Ces stores étaient déclarés dans ALL_STORES (donc créés dans
-     IndexedDB et correctement écrits par dbPut) mais absents de allKeys :
-     ils n'étaient JAMAIS relus au démarrage. Les enregistrements
-     existaient bien en base, DATA[store] repartait vide à chaque
-     rechargement — d'où l'impression que « rien ne persiste ». Signalé
-     sur les partenaires de lotissement, le défaut touchait en réalité
-     53 stores, dont des modules entiers (baux, quittances,
-     factures, fournisseurs, immobilisations, morcellement, aménagement,
-     diaspora, copropriété…). */
-  'quinzainiers','factures_client','financements_programme','immobilisations','modeles_logement','plans_morcellement',
-  'parcelles_morcellement','agrement_promoteur','agrement_programme','conv_agrement','previsionnels','amenageurs',
-  'partenaires_lot','dossiers_lot','rapports_lot','conventions_amenagement','situations_amenagement','avenants_amenagement',
-  'stock_mouvements','chantier_couts','depots','fournisseurs','tiers_comptables','bons_commande',
-  'receptions','factures_fournisseur','validations','receptions_travaux','livraisons','receptions_dossiers',
-  'conges_rh','candidats_rh','postes_ouverts','formations_rh','paiements_online','baux',
-  'quittances','loc_relances','diaspo_dossiers','diaspo_preuves','diaspo_jalons','diaspo_parts',
-  'diaspo_ancrages','signalements','artisans','ordres_travaux','kyc_fiches','lbc_declarations',
-  'lbc_alertes','candidatures_loc','biens_locatifs','af_manifestations','masse_dxf_presets','factures_fournisseur_attente',
-  /* v145 — Parc Auto (logistique) */
-  'vehicules','vehicule_carburant','vehicule_entretiens','vehicule_affectations','vehicule_courses',
-  /* v146 — Suivi budgétaire caisse */
-  'caisse_budgets',
-  /* v147 — Circuit budgétaire : DA + transferts */
-  'fiches_engagement_depense', 'transferts_budgetaires',
-  /* [FIX] Même défaut que ci-dessus, découvert sur un signalement distinct :
-     « la liste RSNU importée disparaît à chaque ouverture ». Ces 6 stores du
-     module Conformité LBC/FT sont bien déclarés dans ALL_STORES et écrits
-     par dbPut/syncToSupabase, mais absents d'allKeys — jamais relus au
-     démarrage, DATA[store] repartait vide à chaque rechargement alors que
-     les données étaient toujours en base. */
-  'sfc_liste','sfc_criblages','sfc_centif','lbc_cappi','lbc_conformx','lbc_artci',
-  /* [FIX audit synchro] Ces 4 stores étaient écrits (dbPut, certains même
-     synchronisés vers Supabase) mais JAMAIS relus au démarrage — DATA[store]
-     repartait vide à chaque rechargement de page jusqu'au premier pull (ou
-     restait vide indéfiniment pour conflits_sync, purement local). Symptôme
-     exact signalé : « valeurs différentes selon le poste/le moment ». */
-  'audit_log', 'cout_gestion_exercices', 'declarations_versement_financier', 'conflits_sync'
-  ];
+  /* [FIX STRUCTUREL] Cette liste était auparavant recopiée à la main,
+     séparément d'ALL_STORES — la source du bug qui a frappé 3 fois cette
+     année (jusqu'à 53 stores d'un coup un jour : "quinzainiers",
+     "factures_client", "fournisseurs"... déclarés et écrits, mais jamais
+     relus au démarrage). Il n'existe AUCUNE raison légitime pour qu'un
+     store présent dans ALL_STORES (donc créé dans IndexedDB, donc
+     potentiellement écrit par dbPut) ne soit pas relu ici : les deux
+     listes ne peuvent donc plus diverger, par construction. Seuls
+     'params' et 'users' sont exclus — chargés séparément juste après
+     (singleton / structure différente de {id,...}[]). */
+  var allKeys = ALL_STORES.filter(function(s){ return s!=='params' && s!=='users'; });
   /* Chargement en PARALLÈLE plutôt que séquentiel : chaque dbGetAll() ouvre
      sa propre transaction IndexedDB 'readonly' indépendante (voir dbGetAll
      ci-dessus), donc rien n'empêche de les lancer toutes en même temps.
@@ -23385,6 +23511,38 @@ async function loadAllData() {
       DATA.users = [];  /* showLogin() détectera users.length===0 et affichera le formulaire de création */
     }
   } catch(e) {}
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTO-DIAGNOSTIC — cohérence ALL_STORES ↔ SUPA_STORE_MAP au démarrage.
+   Le rechargement au boot (allKeys) est désormais dérivé directement
+   d'ALL_STORES (voir loadAllData) : cette classe de bug ne peut plus se
+   produire de ce côté. Reste UN endroit où stores et table cloud peuvent
+   encore diverger silencieusement : SUPA_STORE_MAP, rempli à la main
+   store par store. Un store présent dans ALL_STORES mais absent de
+   SUPA_STORE_MAP se comporte normalement en local, mais n'est JAMAIS
+   synchronisé vers le cloud ni tiré sur un autre poste — sans aucune
+   erreur visible (exactement le défaut trouvé 2 fois cette session sur
+   des modules Conformité/SFC entiers). Alerte silencieuse en console +
+   bandeau discret pour un profil Admin uniquement — jamais pour les
+   autres rôles, pour ne pas faire porter une dette technique à un
+   utilisateur qui ne peut rien y faire. */
+var SANIX_STORES_LOCAL_UNIQUEMENT = ['conflits_sync']; // écarts connus et voulus — jamais synchronisés au cloud par conception
+function sanixAutoDiagnostic(){
+  try{
+    var mappes = {}; SUPA_STORE_MAP.forEach(function(p){ mappes[p[1]]=true; });
+    var orphelins = ALL_STORES.filter(function(s){
+      return s!=='params' && s!=='users' && !mappes[s] && SANIX_STORES_LOCAL_UNIQUEMENT.indexOf(s)===-1;
+    });
+    if (orphelins.length){
+      console.warn('[SANIX Auto-diagnostic] '+orphelins.length+' store(s) dans ALL_STORES mais absent(s) de SUPA_STORE_MAP — écrits en local uniquement, jamais synchronisés au cloud :', orphelins);
+      if (typeof hasRole==='function' && hasRole('admin')){
+        setTimeout(function(){
+          toast('⚠️ Auto-diagnostic : '+orphelins.length+' store(s) jamais synchronisés au cloud (voir console). Signaler pour correction.', 'error');
+        }, 2500);
+      }
+    }
+  }catch(e){ console.warn('[SANIX Auto-diagnostic] échec', e); }
 }
 
 /* ──────────────────────────────────────────────────────
@@ -26327,6 +26485,25 @@ async function _pullBatchViaRPC() {
   for (var i = 0; i < SUPA_STORE_MAP.length; i++) {
     var table = SUPA_STORE_MAP[i][0], store = SUPA_STORE_MAP[i][1];
     if (store === 'suppressions_sync') continue;
+    /* [FIX] pi_users a un schéma à plat (login, password_hash, salt…) —
+       PAS de colonne "data" jsonb comme les 155 autres tables. La fonction
+       RPC pull_incremental() plantait dessus (colonne inexistante), ce qui
+       remontait un objet JSON malformé/vide pour cette table : le client
+       l'appliquait quand même, écrasant password_hash en mémoire par du
+       vide — d'où les déconnexions "mot de passe modifié" répétées sans
+       qu'aucun mot de passe n'ait réellement changé. La fonction serveur a
+       été corrigée pour exclure pi_users ; le client fait de même ici et la
+       synchronise via _syncUsersSeul() (méthode dédiée, colonnes à plat). */
+    if (table === 'pi_users') continue;
+    /* [FIX] pi_portail_medias stocke des photos compressées en base64
+       directement dans la colonne data — un lot de plusieurs images peut
+       représenter plusieurs Mo. Combinée aux 154 autres tables dans la
+       MÊME réponse JSON du lot RPC, elle risque de faire échouer (ou
+       tronquer silencieusement) tout le cycle de synchro dès qu'un
+       utilisateur publie plusieurs photos d'un coup — symptôme observé :
+       miniatures vides sur un autre poste alors que l'upload avait
+       réussi côté auteur. Synchronisée à part, comme pi_users. */
+    if (table === 'pi_portail_medias') continue;
     var complet = PULL_TOUJOURS_COMPLET.indexOf(table) !== -1 || PULL_INCR_INAPTES[table];
     curseurs[table] = complet ? '' : (_pullCurseurs()[table] || '');
     tablesConcernees.push([table, store]);
@@ -26346,7 +26523,37 @@ async function _pullBatchViaRPC() {
     var rows = data && data[t];
     if (rows && rows.length) total += await _appliquerLignesPullTable(t, s, rows);
   }
+  try { total += await _syncUsersSeul(); } catch(e) { console.warn('[Sync] pi_users non synchronisée ce cycle :', e); }
+  try {
+    var _resMedias = await _pullTable('pi_portail_medias');
+    total += await _appliquerLignesPullTable('pi_portail_medias', 'portail_medias', _resMedias.rows);
+  } catch(e) { console.warn('[Sync] pi_portail_medias non synchronisée ce cycle :', e); }
   return total;
+}
+
+/* Synchronisation dédiée de pi_users (schéma à plat, distinct des 155
+   autres tables) — colonnes réelles renvoyées directement par PostgREST,
+   pas de colonne "data" à déballer. Ne remplace un utilisateur local que
+   si la version cloud est réellement plus récente (même règle de
+   confiance que le reste de la synchro), pour ne jamais écraser un
+   changement local pas encore poussé. */
+async function _syncUsersSeul(){
+  if (!SB.url || !SB.key) return 0;
+  var rows = await sbFetch('pi_users?select=*', 'GET');
+  if (!rows || !rows.length) return 0;
+  var n = 0;
+  for (var i=0;i<rows.length;i++){
+    var ru = rows[i];
+    if (!ru || !ru.id) continue;
+    var idx = DATA.users.findIndex(function(x){ return x.id === ru.id; });
+    var local = idx>=0 ? DATA.users[idx] : null;
+    var cloudPlusRecent = !local || !local._modifie || !ru._modifie || ru._modifie >= local._modifie;
+    if (!cloudPlusRecent) continue;
+    if (idx>=0) DATA.users[idx] = ru; else DATA.users.push(ru);
+    try{ _pulling = true; await dbPut('users', ru); } finally { _pulling = false; }
+    n++;
+  }
+  return n;
 }
 
 async function pullFromCloudSilent() {
@@ -26496,6 +26703,7 @@ async function pullFromCloudSilent() {
   try { if (typeof repeuplerListes === 'function') repeuplerListes(); } catch(e){}
   try { if (typeof _synthAutoCheck === 'function') setTimeout(_synthAutoCheck, 4000); } catch(e){}
   try { _appliquerSuppressionsSync(); } catch(e){}
+  try { if (typeof sanixAutoDiagnostic === 'function') sanixAutoDiagnostic(); } catch(e){}
   try { if (typeof majNotificationsSidebar === 'function') majNotificationsSidebar(); if (typeof pmsgRender === 'function') pmsgRender(); } catch(e){}
 }
 
@@ -26852,6 +27060,7 @@ async function reinitialiserTousMotsDePasse(nouveauMdp) {
     u.pwd_algo = null;
     delete u.password;
     u.must_change = true;
+    u._modifie = new Date().toISOString();
     await dbPut('users', u);
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', u);
     n++;
@@ -26920,6 +27129,7 @@ async function _validerChangementMotDePasseForce() {
     user.pwd_algo = null;
     delete user.password;
     user.must_change = false;
+    user._modifie = new Date().toISOString();
     await dbPut('users', user);
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', user);
     var m = document.getElementById('modal-mdp-force'); if (m) m.remove();
@@ -26976,11 +27186,11 @@ async function checkSession() {
   if (!token) return null;
   try {
     var parts = token.split('.');
-    if (parts.length !== 2) throw 0;
+    if (parts.length !== 2) throw {r:'invalide'};
     var expected = await _signSession(parts[0]);
-    if (parts[1] !== expected) throw 0;                       /* signature invalide → rejet */
+    if (parts[1] !== expected) throw {r:'invalide'};                       /* signature invalide → rejet */
     var payload = JSON.parse(decodeURIComponent(escape(atob(parts[0]))));
-    if (!payload.exp || payload.exp < Date.now()) throw 0;
+    if (!payload.exp || payload.exp < Date.now()) throw {r:'expiree'};
     /* [Déconnexion forcée à distance] Un admin peut invalider TOUTES les
        sessions ouvertes (autres postes/onglets restés connectés avec un cache
        local périmé) depuis Paramétrage → Sécurité. Toute session émise avant
@@ -26988,12 +27198,40 @@ async function checkSession() {
        payload.iat absent (anciens tokens émis avant cette version) = traité
        comme antérieur à toute epoch, donc invalidé dès la première purge. */
     var epoch = (DATA.params || {}).force_logout_epoch || 0;
-    if (epoch && (!payload.iat || payload.iat < epoch)) throw 0;
+    if (epoch && (!payload.iat || payload.iat < epoch)) throw {r:'distance'};
     var u = DATA.users.find(function(x){ return x.id === payload.id; });
-    if (!u) throw 0;
-    if ((u.password_hash || '').slice(0, 16) !== (payload.ph || '')) throw 0; /* hash changé → invalidé */
+    if (!u) throw {r:'invalide'};
+    /* [FIX] Un hash différent ne signifie pas toujours "invalidée par un
+       administrateur" : migratePasswords() (exécutée une fois au démarrage,
+       silencieusement, pour convertir un mot de passe en clair vers un hash)
+       change u.password_hash sans lien avec une action d'un administrateur —
+       une session ouverte AVANT cette migration se retrouvait invalidée avec
+       le même message alarmant "terminée à distance par un administrateur",
+       alors qu'il ne s'agissait que d'une mise à jour de format interne.
+       Message désormais différencié selon la cause réelle. */
+    if ((u.password_hash || '').slice(0, 16) !== (payload.ph || '')) throw {r:'motdepasse'};
     return u;
-  } catch (e) { localStorage.removeItem('pici_auth_token'); return null; }
+  } catch (e) {
+    var raison = (e&&e.r)||'invalide';
+    /* [Diagnostic persistant] window._lastSessionInvalideRaison disparaissait
+       au rechargement — impossible à consulter APRÈS coup, alors que c'est
+       précisément le rechargement qui suit cette erreur. Trace minimale
+       conservée dans localStorage (survit au reload), lisible après coup :
+       localStorage.getItem('_sessionDiag') */
+    try {
+      var uDiag = DATA.users && payload && DATA.users.find(function(x){ return x.id === payload.id; });
+      localStorage.setItem('_sessionDiag', JSON.stringify({
+        quand: new Date().toISOString(), raison: raison,
+        token_ph: payload && payload.ph, token_iat: payload && payload.iat,
+        user_hash: uDiag ? (uDiag.password_hash||'').slice(0,16) : null,
+        user_modifie: uDiag ? uDiag._modifie : null,
+        epoch: (DATA.params||{}).force_logout_epoch || 0
+      }));
+    } catch(e2){}
+    window._lastSessionInvalideRaison = raison;
+    localStorage.removeItem('pici_auth_token');
+    return null;
+  }
 }
 
 /** Vérifie le rôle de l'utilisateur courant (hiérarchie admin > comptable > commercial) */
@@ -27094,7 +27332,14 @@ async function _verifierSessionEncoreValide() {
        libérer la connexion tout de suite compte, plutôt que de la laisser
        vivre encore 1,5 s pendant l'affichage du message. */
     if (typeof stopRealtime === 'function') { try { stopRealtime(); } catch(e){} }
-    try { if (typeof toast === 'function') toast('🔒 Session terminée à distance par un administrateur.', 'info'); } catch(e){}
+    var messages = {
+      distance: '🔒 Session terminée à distance par un administrateur.',
+      motdepasse: '🔑 Votre mot de passe a été modifié — reconnectez-vous.',
+      expiree: '⏱️ Votre session a expiré — reconnectez-vous.',
+      invalide: '🔒 Session invalide — reconnectez-vous.'
+    };
+    var msg = messages[window._lastSessionInvalideRaison] || messages.invalide;
+    try { if (typeof toast === 'function') toast(msg, 'info'); } catch(e){}
     setTimeout(function(){ location.reload(); }, 1500);
   }
 }
@@ -27124,6 +27369,7 @@ async function migratePasswords() {
       u.salt          = generateSalt();
       u.password_hash = await hashPassword(u.password, u.salt);
       delete u.password;
+      u._modifie = new Date().toISOString();
       await dbPut('users', u);
       if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', u);
       migrated++;
@@ -27132,16 +27378,22 @@ async function migratePasswords() {
   if (migrated > 0) console.log('[SEC] ' + migrated + ' mot(s) de passe migré(s) vers SHA-256.');
 }
 
-/* ─── Timer d'inactivité : déconnexion automatique après 30 min ──────── */
+/* ─── Timer d'inactivité : déconnexion automatique après le délai configuré ── */
 var _inactivityTimer = null;
 function resetInactivityTimer() {
   clearTimeout(_inactivityTimer);
+  /* [FIX] Le champ "Délai d'inactivité (min)" existe dans Paramètres et se
+     sauvegarde bien (DATA.params.inactivite_min), mais n'était JAMAIS lu ici
+     — le délai réel restait figé à 30 minutes quoi que l'administrateur
+     configure. Symptôme rapporté : déconnexions perçues comme intempestives
+     malgré un réglage plus long en Paramètres. */
+  var minutes = (DATA.params && parseInt(DATA.params.inactivite_min, 10)) || 30;
   _inactivityTimer = setTimeout(function() {
     if (APP.currentUser) {
-      toast('Session expirée (inactivité 30 min).', 'error');
+      toast('Session expirée (inactivité '+minutes+' min).', 'error');
       logout(true);
     }
-  }, 30 * 60 * 1000);
+  }, minutes * 60 * 1000);
 }
 function startInactivityTimer() {
   ['mousemove','keypress','click','touchstart'].forEach(function(e) {
@@ -27349,6 +27601,7 @@ async function doLogin() {
       user.salt          = generateSalt();
       user.password_hash = await hashPassword(p, user.salt);
       delete user.password;
+      user._modifie = new Date().toISOString();
       await dbPut('users', user);
       if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', user);
       console.log('[SEC] Mot de passe de « ' + u + ' » migré vers SHA-256.');
@@ -28463,13 +28716,35 @@ function buildDashTabCompta() {
       if (inYear) soldesAnnee[l.compte] = (soldesAnnee[l.compte]||0) + v;
     });
   });
-  function _sum(map,codes){ var t=0; (APP.planComptable||[]).forEach(function(c){ if(codes.some(function(p){return c.code.indexOf(p)===0;})) t+=map[c.code]||0; }); return t; }
+  /* [FIX structurel] Itérait sur APP.planComptable (≈158 comptes "courants"
+     pour les listes déroulantes) au lieu des comptes RÉELLEMENT postés dans
+     les écritures. Tout sous-compte utilisé en pratique mais absent de cette
+     liste curatée (ex. 4451/4453/4454/4455/4456 — confirmés utilisés par le
+     décompte à l'avancement, les factures fournisseur et le lettrage FNP/FAE,
+     mais seul 4452 de cette famille figure dans les 158) contribuait pour
+     zéro à CHAQUE KPI de cet écran (résultat, charges, trésorerie, dettes),
+     pas seulement la TVA — silencieusement, sans aucune anomalie visible
+     puisque le calcul ne plantait pas, il ignorait juste une partie réelle
+     des mouvements. */
+  function _sum(map,codes){ var t=0; for(var code in map){ if(codes.some(function(p){return code.indexOf(p)===0;})) t+=map[code]||0; } return t; }
   function S(codes){ return _sum(soldes,codes); }        /* cumulatif → bilan */
   function SA(codes){ return _sum(soldesAnnee,codes); }   /* exercice → résultat */
   var produits=-SA(['7']), charges=SA(['6']), resultat=produits-charges;
-  var tvaColl=-S(['443']), tvaDed=S(['445']), tvaDue=tvaColl-tvaDed;
+  /* [FIX v2] Après vérification complète : 4451-4456 sont des sous-comptes
+     RÉELLEMENT utilisés par plusieurs fonctions de comptabilisation
+     (décompte à l'avancement, factures fournisseur, lettrage FNP/FAE) — le
+     module "Déclaration de TVA" (calculerTVA/TVA_DEDUCTIBLE) le confirme
+     indépendamment. Seul le compte "445" PARENT (nu, 3 chiffres) est
+     réellement "TVA à décaisser" (une dette) dans ce plan — ses propres
+     sous-comptes numérotés servent à tout autre chose (récupérable). D'où
+     la liste explicite ci-dessous plutôt qu'un simple préfixe '445', qui
+     aurait à tort réintégré le parent lui-même dans le déductible. */
+  var tvaColl=-S(['443']), tvaDed=S(['444','4451','4452','4453','4454','4455','4456']), tvaDue=tvaColl-tvaDed;
   var treso=S(['51','52','53','55','57']);
-  var dFourn=Math.abs(S(['401','402','408'])), dSoc=Math.abs(S(['431','447','448'])), dPers=Math.abs(S(['422']));
+  /* [FIX] 432 (ITS à payer), 441 (Impôts et taxes) et 445 (TVA à décaisser —
+     la vraie dette, absente d'ici alors qu'elle y a précisément sa place)
+     manquaient de cette rubrique "Dettes sociales & fiscales". */
+  var dFourn=Math.abs(S(['401','402','408'])), dSoc=Math.abs(S(['431','432','441','445','447','448'])), dPers=Math.abs(S(['422']));
 
   var cards=[
     {l:'Résultat '+year,v:fmtF(Math.round(resultat))+' F',c:resultat>=0?'kpi-green':'kpi-red',d:(resultat>=0?'Bénéfice':'Perte')+' · produits '+fmtF(Math.round(produits))},
@@ -28481,7 +28756,7 @@ function buildDashTabCompta() {
   if(kpi) kpi.innerHTML=cards.map(function(k){return '<div class="kpi-card '+k.c+'"><div class="kpi-label">'+k.l+'</div><div class="kpi-value or" style="font-size:16px;">'+k.v+'</div><div class="kpi-delta '+(k.c==='kpi-red'?'negative':k.c==='kpi-green'?'positive':'')+'">'+k.d+'</div></div>';}).join('');
 
   var tv=document.getElementById('dash-compta-treso');
-  if(tv) tv.innerHTML=_cRow('TVA collectée (443)',tvaColl)+_cRow('TVA déductible (445)',tvaDed)
+  if(tv) tv.innerHTML=_cRow('TVA collectée (443)',tvaColl)+_cRow('TVA déductible (444)',tvaDed)
     +_cRow('<strong>TVA nette due</strong>',tvaDue,tvaDue>0?'var(--rouge)':'var(--vert)')
     +'<div style="height:8px"></div>'
     +_cRow('Produits (Cl.7)',produits)+_cRow('Charges (Cl.6)',charges)
@@ -28491,7 +28766,7 @@ function buildDashTabCompta() {
 
   var dt=document.getElementById('dash-compta-dettes');
   if(dt) dt.innerHTML=_cRow('Fournisseurs (401/402/408)',dFourn,'var(--or)')
-    +_cRow('Dettes sociales & fiscales (431/447/448)',dSoc,'var(--or)')
+    +_cRow('Dettes sociales & fiscales (431/432/441/445/447/448)',dSoc,'var(--or)')
     +_cRow('Personnel — net à payer (422)',dPers,'var(--or)')
     +'<div style="height:8px"></div>'
     +_cRow('<strong>Total dettes court terme</strong>',dFourn+dSoc+dPers,'var(--rouge)')
@@ -28525,8 +28800,8 @@ function buildDashTabFinance() {  var cessions      = DATA.cessions_foncieres ||
     {l:'Décaissements total',      v:fmtF(totalDec)+' FCFA',   i:'💸', c:'kpi-red',  d:'Charges enregistrées'},
     {l:'Décaissements du mois',    v:fmtF(decM)+' FCFA',       i:'📉', c:'',         d:'Charges du mois en cours'},
     {l:'Solde net (Enc. − Déc.)',  v:fmtF(soldeNet)+' FCFA',   i:'📊', c:soldeNet>=0?'kpi-green':'kpi-red', d:soldeNet>=0?'Trésorerie positive':'Attention : tension trésorerie'},
-    (function(){ var s=(typeof caisseSoldeGlobalTempsReel==='function')?caisseSoldeGlobalTempsReel():0; return {l:'Espèces en caisse', v:fmtF(s)+' FCFA', i:'💵', c:'kpi-copper', d:'Sessions ouvertes · temps réel'}; })(),
-    (function(){ var st=(typeof caisseAVentilerStats==='function')?caisseAVentilerStats():{nb:0,montant:0}; return {l:'Caisse — à ventiler', v:st.nb+' mvt', i:'🧾', c:st.nb?'kpi-red':'kpi-green', d:fmtF(st.montant)+' FCFA en attente', click:'goTo(\'caisse\')'}; })(),
+    (userCanAccess('Caisse') ? (function(){ var s=(typeof caisseSoldeGlobalTempsReel==='function')?caisseSoldeGlobalTempsReel():0; return {l:'Espèces en caisse', v:fmtF(s)+' FCFA', i:'💵', c:'kpi-copper', d:'Sessions ouvertes · temps réel'}; })() : null),
+    (userCanAccess('Caisse') ? (function(){ var st=(typeof caisseAVentilerStats==='function')?caisseAVentilerStats():{nb:0,montant:0}; return {l:'Caisse — à ventiler', v:st.nb+' mvt', i:'🧾', c:st.nb?'kpi-red':'kpi-green', d:fmtF(st.montant)+' FCFA en attente', click:'goTo(\'caisse\')'}; })() : null),
     (function(){ var k=(typeof _budgetKpiGlobal==='function')?_budgetKpiGlobal():null; if(!k) return null;
       return {l:"Suivi budgétaire — taux d'utilisation", v:k.tauxMoyen+'%', i:'📊', c:k.tauxMoyen>=90?'kpi-red':(k.tauxMoyen>=70?'':'kpi-green'), d:k.nbLignesActives+' ligne(s) budgétaire(s) active(s)', click:'goTo(\'budget\')'}; })(),
     (function(){ var k=(typeof _budgetKpiGlobal==='function')?_budgetKpiGlobal():null; if(!k) return null;
@@ -29565,13 +29840,13 @@ function refreshDashboard() {
      d:retardataires+' dossiers à relancer', click:'goTo(\'relances\')'},
     {l:'Programmes actifs', v:DATA.programmes.filter(function(p){return p.statut!=='termine';}).length, i:'🏗️', c:'',
      d:((DATA.parcelles||[]).length + (DATA.terrains||[]).length)+' parcelle(s) en portefeuille', click:'goTo(\'programmes\')'},   /* [FIX] lisait le store déprécié terrains */
-    (function(){ var ms = calcMasseSalariale(); return {
+    (userCanAccess('Employés (RH)') ? (function(){ var ms = calcMasseSalariale(); return {
       l:'Masse salariale (mois)', v:fmtF(ms.masseBrute)+' FCFA', i:'👥', c:'',
-      d:ms.effectif+' actifs · coût '+fmtF(ms.coutEmployeur)+' F', click:'goTo(\'rh-employes\')'}; })(),
-    (function(){ var s=(typeof caisseSoldeGlobalTempsReel==='function')?caisseSoldeGlobalTempsReel():0; var st=(typeof caisseAVentilerStats==='function')?caisseAVentilerStats():{nb:0}; return {
+      d:ms.effectif+' actifs · coût '+fmtF(ms.coutEmployeur)+' F', click:'goTo(\'rh-employes\')'}; })() : null),
+    (userCanAccess('Caisse') ? (function(){ var s=(typeof caisseSoldeGlobalTempsReel==='function')?caisseSoldeGlobalTempsReel():0; var st=(typeof caisseAVentilerStats==='function')?caisseAVentilerStats():{nb:0}; return {
       l:'Espèces en caisse', v:fmtF(s)+' FCFA', i:'💵', c:'kpi-copper',
-      d:(st.nb? st.nb+' mvt à ventiler':'Sessions ouvertes · temps réel'), click:'goTo(\'caisse\')'}; })(),
-  ].map(function(k){
+      d:(st.nb? st.nb+' mvt à ventiler':'Sessions ouvertes · temps réel'), click:'goTo(\'caisse\')'}; })() : null),
+  ].filter(Boolean).map(function(k){
     return '<div class="kpi-card '+k.c+'" data-icon="'+k.i+'"'+(k.click?' style="cursor:pointer;" title="Cliquer pour le détail" onclick="'+k.click+'"':'')+'>'
       +'<div class="kpi-label">'+k.l+'</div>'
       +'<div class="kpi-value or" style="font-size:17px;">'+k.v+'</div>'
@@ -30766,7 +31041,7 @@ function renderClients() {
     var reste = Math.max(0, (c.montant_total || 0) - verse);
     var pct = c.montant_total > 0 ? Math.round((verse / c.montant_total) * 100) : 0;
     var isRetard = !!retardSet[c.id];
-    var statut = verse >= c.montant_total && c.montant_total > 0 ? 'solde' : (isRetard ? 'retard' : c.statut || 'actif');
+    var statut = c.statut==='resilie' ? 'resilie' : (verse >= c.montant_total && c.montant_total > 0 ? 'solde' : (isRetard ? 'retard' : c.statut || 'actif'));
     var badgeMap = { solde: 'badge-vert', retard: 'badge-rouge', actif: 'badge-bleu', resilie: 'badge-violet' };
     var labelMap = { solde: 'Soldé', retard: 'En retard', actif: 'Actif', resilie: 'Résilié' };
 
@@ -30807,6 +31082,8 @@ function renderClients() {
       + '<button class="btn btn-secondary btn-sm btn-icon" onclick="openClientModal(\'' + c.id + '\')" title="Modifier">✏️</button> '
       + '<button class="btn btn-secondary btn-sm btn-icon" onclick="openPaiementModal(\'' + c.id + '\')" title="Versement">💳</button> '
       + '<button class="btn btn-secondary btn-sm btn-icon" onclick="genererCodeAcces(\'' + c.id + '\')" title="Code acces portail" style="background:#E0E8FF;color:#1D4ED8;border-color:#93C5FD;">🔑</button> '
+      + (c.statut!=='resilie' ? ('<button class="btn btn-secondary btn-sm btn-icon" onclick="resilierOuvrir(\'' + c.id + '\')" title="Résilier la souscription" style="background:#FEF3C7;color:#92400E;border-color:#FCD34D;">📄</button> ') : '')
+      + (c.statut==='resilie' && c.resiliation && c.resiliation.montant_rembourse>0 && !c.resiliation.rembourse ? ('<button class="btn btn-secondary btn-sm btn-icon" onclick="resilierOuvrirRemboursement(\'' + c.id + '\')" title="Marquer le remboursement effectué" style="background:#DCFCE7;color:#166534;border-color:#86EFAC;">💰</button> ') : '')
       + '<button class="btn btn-danger btn-sm btn-icon" onclick="deleteClient(\'' + c.id + '\')" title="Supprimer">🗑</button>'
       + '</td></tr>';
   }).join('');
@@ -30816,27 +31093,80 @@ function filterClients() { renderClients(); }
 function clientsPeriodeReset() { var d1 = document.getElementById('filter-client-date-debut'); var d2 = document.getElementById('filter-client-date-fin'); if (d1) d1.value = ''; if (d2) d2.value = ''; filterClients(); }
 
 async function deleteClient(id) {
-  if (!confirm('Supprimer ce souscripteur et tous ses versements ?')) return;
-  /* Libérer le lot rattaché */
+  if (!exigerDroit('Souscripteurs', 's', 'la suppression de ce souscripteur')) return;
   var cli = DATA.clients.find(function(c){ return c.id === id; });
+  /* [FIX conformité] Même garde que fournisseurs : un souscripteur gelé sur
+     sanction SFC ne doit jamais pouvoir être supprimé — la suppression
+     effacerait la preuve du gel, contraire à l'obligation de conservation. */
+  if (cli && cli.gele) { alert('Impossible : ce souscripteur est GELÉ (sanction SFC).\nLa suppression effacerait la preuve du gel. Traitez-le d\'abord dans Conformité LBC/FT → Criblage SFC.'); return; }
+  /* [FIX cohérence] La résiliation existe précisément pour conserver un
+     historique auditable (montants versés, décompte, écritures de
+     remboursement/retenue) au lieu d'une suppression pure — supprimer le
+     client APRÈS coup effacerait ce même historique, écritures de
+     résiliation devenant orphelines (aucun client à référencer). */
+  if (cli && cli.resiliation) { alert('Impossible : ce souscripteur a une résiliation enregistrée le '+dateShort(cli.resiliation.date)+'.\nLa suppression effacerait cet historique (décompte, écritures de remboursement/retenue). La fiche doit être conservée telle quelle.'); return; }
+  if (!confirm('Supprimer ce souscripteur et tous ses versements ?')) return;
   await logAudit('clients', id, 'delete', cli || null, null);
-  if (cli && cli.lot_id) {
-    var lot = DATA.lots.find(function(l){ return l.id === cli.lot_id; });
-    if (lot) { lot.statut = 'disponible'; lot.client_id = null; await dbPut('lots', lot); if (typeof syncToSupabase === 'function') syncToSupabase('pi_lots', lot); }
+
+  /* [FIX] Ne libérait que cli.lot_id (le lot "principal") — depuis le
+     support multi-lots (client.lot_ids), un souscripteur ayant plusieurs
+     lots sur un même programme voyait ses AUTRES lots rester à jamais
+     marqués "occupés" avec un client_id pointant vers un client supprimé :
+     invendables tant que personne ne s'en aperçoit manuellement. */
+  if (cli) {
+    var lotIds = (typeof _lotIdsDeClient === 'function') ? _lotIdsDeClient(cli) : (cli.lot_id ? [cli.lot_id] : []);
+    for (var iL=0; iL<lotIds.length; iL++) {
+      var lot = DATA.lots.find(function(l){ return l.id === lotIds[iL]; });
+      if (lot) { lot.statut = 'disponible'; lot.client_id = null; await dbPut('lots', lot); if (typeof syncToSupabase === 'function') syncToSupabase('pi_lots', lot); }
+    }
   }
-  /* Purger les commissions liées (au client ou à ses versements) */
-  if (DATA.commissions && DATA.commissions.length) {
-    var versIds = DATA.versements.filter(function(v){ return v.client_id === id; }).map(function(v){ return v.id; });
-    DATA.commissions.filter(function(cm){ return cm.client_id === id || versIds.indexOf(cm.versement_id) >= 0; })
-      .forEach(function(cm){ deleteRecord('commissions', cm.id).catch(function(){}); });
-    DATA.commissions = DATA.commissions.filter(function(cm){ return !(cm.client_id === id || versIds.indexOf(cm.versement_id) >= 0); });
+
+  /* [FIX] Les versements et leurs écritures n'étaient JAMAIS réellement
+     supprimés — seulement retirés du tableau DATA.versements en mémoire.
+     Ni deleteRecord (IndexedDB + cloud) ni supprimerEcritureVersement
+     n'étaient appelés : au rechargement suivant (loadAllData relit
+     IndexedDB), les versements réapparaissaient malgré le message
+     "Souscripteur supprimé" — et leurs écritures comptables restaient en
+     base indéfiniment, rattachées à un client qui n'existe plus. Même
+     cascade que deleteVersement (commissions, frais passerelle, paiement
+     en ligne source), répétée ici pour chaque versement du client. */
+  var versClient = DATA.versements.filter(function(v){ return v.client_id === id; });
+  for (var iV=0; iV<versClient.length; iV++) {
+    var v = versClient[iV];
+    await deleteRecord('versements', v.id);
+    await supprimerEcritureVersement(v.id);
+    var poLie = (DATA.paiements_online||[]).find(function(p){ return p.versement_id === v.id; });
+    if (poLie) {
+      var ecrFraisId = 'ecr_frais_' + poLie.transaction_id;
+      if ((DATA.ecritures||[]).some(function(e){ return e.id === ecrFraisId; })) {
+        try{ await deleteRecord('ecritures', ecrFraisId, { skipIntegrity: true }); }catch(e){}
+      }
+      poLie.reconcilie = false; poLie.versement_id = null; poLie.frais = 0; poLie._modifie = new Date().toISOString();
+      try{ await dbPut('paiements_online', poLie); }catch(e){}
+      if (typeof syncToSupabase === 'function') syncToSupabase('pi_paiements_online', poLie);
+    }
   }
-  DATA.clients = DATA.clients.filter(function(c) { return c.id !== id; });
   DATA.versements = DATA.versements.filter(function(v) { return v.client_id !== id; });
+
+  /* Purger les commissions liées (au client ou à ses versements) — celles
+     déjà payées sont conservées, même logique que deleteVersement. */
+  if (DATA.commissions && DATA.commissions.length) {
+    var versIds = versClient.map(function(v){ return v.id; });
+    var commsATraiter = DATA.commissions.filter(function(cm){
+      return (cm.client_id === id || versIds.indexOf(cm.versement_id) >= 0) && cm.statut !== 'payee';
+    });
+    for (var iC=0; iC<commsATraiter.length; iC++) { try{ await deleteRecord('commissions', commsATraiter[iC].id); }catch(e){} }
+    DATA.commissions = DATA.commissions.filter(function(cm){
+      return !((cm.client_id === id || versIds.indexOf(cm.versement_id) >= 0) && cm.statut !== 'payee');
+    });
+  }
+
+  DATA.clients = DATA.clients.filter(function(c) { return c.id !== id; });
   await deleteRecord('clients', id);
+  if (typeof renderCommissions === 'function') renderCommissions();
   renderClients();
   refreshDashboard();
-  toast('Souscripteur supprimé, lot libéré.', 'info');
+  toast('Souscripteur supprimé, '+versClient.length+' versement(s) et lot(s) libéré(s).', 'info');
 }
 
 function getRetardataires() {
@@ -30927,6 +31257,208 @@ function updateClientSolde() {
   var reste = Math.max(0, (client.montant_total || 0) - verse);
   info.style.display = '';
   text.textContent = 'Versé sur prix : ' + fcfa(verse) + ' | Reste dû : ' + fcfa(reste) + (frais > 0 ? ' | Frais (non remb.) : ' + fcfa(frais) : '');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RÉSILIATION DE SOUSCRIPTION — un souscripteur (logement ou foncier)
+   peut sortir d'un programme avant son terme. Jusqu'ici, aucun workflow
+   fonctionnel : seule la SUPPRESSION pure existait (deleteClient),
+   effaçant tout l'historique — inutilisable pour un cas juridiquement
+   encadré où la trace doit être conservée (montants versés, décision,
+   remboursement, réattribution du lot).
+   Règle appliquée, reprise TEXTUELLEMENT du cahier des charges contractuel
+   déjà en usage (_cdcTxt('autres_conditions')) : désistement souscripteur
+   → 60% ; désistement imputable au promoteur → 100%. Auto-suggestion du
+   motif "faute du promoteur" si le programme a dépassé sa date de
+   livraison prévue — reste modifiable manuellement (choix retenu). Le
+   sort des commissions déjà payées dépend du motif (choix retenu) :
+   conservées si faute du promoteur (le travail commercial était valide),
+   à récupérer si désistement du client. ═══════════════════════════════ */
+function resilierOuvrir(clientId){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;});
+  if (!c) return;
+  if (!exigerDroit('Souscripteurs', 'v', 'la résiliation de cette souscription')) return;
+  if (c.gele) { alert('Impossible : ce souscripteur est GELÉ (sanction SFC).\nTraitez-le dans Conformité LBC/FT → Criblage SFC avant toute résiliation.'); return; }
+  if (c.statut === 'resilie') { toast('Ce souscripteur est déjà résilié le '+dateShort(c.resiliation&&c.resiliation.date)+'.','error'); return; }
+  document.getElementById('rs-client-id').value = clientId;
+  document.getElementById('rs-justification').value = '';
+  document.getElementById('rs-confirme').checked = false;
+
+  var lotIds = (typeof _lotIdsDeClient==='function') ? _lotIdsDeClient(c) : (c.lot_id?[c.lot_id]:[]);
+  var lots = lotIds.map(function(id){ return (DATA.lots||[]).find(function(l){return l.id===id;}); }).filter(Boolean);
+  var prog = (DATA.programmes||[]).find(function(p){ return p.id===c.programme_id || (lots[0]&&lots[0].programme_id===p.id); });
+
+  var sel = document.getElementById('rs-motif');
+  var sugg = document.getElementById('rs-suggestion-auto');
+  var autoFaute = !!(prog && prog.date_livraison && prog.date_livraison < today());
+  sel.value = autoFaute ? 'faute_promoteur' : 'desistement_client';
+  sugg.textContent = autoFaute
+    ? '⚠️ Suggestion automatique : programme "'+(prog.nom||'')+'" au-delà de sa date de livraison prévue ('+dateShort(prog.date_livraison)+') — modifiable si non pertinent.'
+    : '';
+
+  document.getElementById('rs-recap').innerHTML =
+    '<b>'+escHtml(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</b> — '+(prog?escHtml(prog.nom):'—')
+    +'<br>Lot(s) concerné(s) : '+(lots.length?lots.map(function(l){return 'Lot '+(l.numero||l.id);}).join(', '):'—')
+    +'<br>Prix total : '+fcfa(c.montant_total||0);
+
+  var alerteGele = document.getElementById('rs-alerte-gele');
+  alerteGele.style.display='none';
+
+  resilierRecalculer();
+  openModal('modal-resiliation');
+}
+function resilierRecalculer(){
+  var clientId = document.getElementById('rs-client-id').value;
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;});
+  if (!c) return;
+  var motif = document.getElementById('rs-motif').value;
+  var verse = totalPayePrix(clientId);
+  var taux = motif === 'faute_promoteur' ? 1 : 0.6;
+  var rembourse = Math.round(verse * taux);
+  var retenu = verse - rembourse;
+  document.getElementById('rs-montant-verse').value = fcfa(verse);
+  document.getElementById('rs-taux').value = Math.round(taux*100)+'%';
+  document.getElementById('rs-montant-rembourse').value = fcfa(rembourse);
+  document.getElementById('rs-montant-retenu').value = fcfa(retenu);
+
+  var commsActives = (DATA.commissions||[]).filter(function(cm){
+    return (cm.client_id===clientId || (DATA.versements||[]).some(function(v){return v.id===cm.versement_id && v.client_id===clientId;})) && cm.statut!=='annulee';
+  });
+  var totalComm = commsActives.reduce(function(s,cm){return s+(parseFloat(cm.montant_comm)||0);},0);
+  var info = document.getElementById('rs-commissions-info');
+  if (!commsActives.length){
+    info.className='alert alert-info'; info.textContent='Aucune commission active liée à ce souscripteur.';
+  } else if (motif==='faute_promoteur'){
+    info.className='alert alert-info';
+    info.innerHTML='✅ '+commsActives.length+' commission(s) pour '+fcfa(totalComm)+' — <b>conservées</b> (faute du promoteur, travail commercial valide).';
+  } else {
+    info.className='alert alert-danger';
+    info.innerHTML='⚠️ '+commsActives.length+' commission(s) pour '+fcfa(totalComm)+' — <b>à récupérer</b> (désistement du client). '
+      +'Les commissions non payées seront annulées ; celles déjà payées seront marquées "à récupérer" pour reprise sur la prochaine paie.';
+  }
+}
+async function resilierConfirmer(){
+  var clientId = document.getElementById('rs-client-id').value;
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;});
+  if (!c) { toast('Souscripteur introuvable.','error'); return; }
+  if (!exigerDroit('Souscripteurs', 'v', 'la résiliation de cette souscription')) return;
+  var motif = document.getElementById('rs-motif').value;
+  var justification = document.getElementById('rs-justification').value.trim();
+  if (!justification) { toast('La justification est obligatoire — pièce du dossier juridique.','error'); return; }
+  if (!document.getElementById('rs-confirme').checked) { toast('Cochez la case de confirmation avant de valider.','error'); return; }
+
+  var verse = totalPayePrix(clientId);
+  var taux = motif === 'faute_promoteur' ? 1 : 0.6;
+  var rembourse = Math.round(verse * taux);
+  var retenu = verse - rembourse;
+
+  /* 1) Libérer TOUS les lots (principal + secondaires — même correctif multi-lots
+     que deleteClient/deleteLot) — mais SANS supprimer le client : trace conservée. */
+  var lotIds = (typeof _lotIdsDeClient==='function') ? _lotIdsDeClient(c) : (c.lot_id?[c.lot_id]:[]);
+  for (var i=0;i<lotIds.length;i++){
+    var lot = (DATA.lots||[]).find(function(l){return l.id===lotIds[i];});
+    if (!lot) continue;
+    lot.historique_statuts = lot.historique_statuts||[];
+    lot.historique_statuts.push({ date:new Date().toISOString(), ancien:lot.statut, nouveau:'disponible',
+      user:(APP.currentUser&&APP.currentUser.nom)||'—', notes:'Résiliation souscription '+((c.nom||'')+' '+(c.prenoms||'')).trim()+' — libéré pour réattribution' });
+    lot.statut='disponible'; lot.client_id=null;
+    await dbPut('lots', lot); if (typeof syncToSupabase==='function') syncToSupabase('pi_lots', lot);
+  }
+
+  /* 2) Écritures comptables — contre-passation du compte client_lots :
+     part remboursée → dette envers le souscripteur ; part retenue → produit. */
+  var compteClientLots = requireCompteDefaut('client_lots');
+  var dat = today();
+  if (rembourse > 0) {
+    var compteDette = requireCompteDefaut('resiliation_dette');
+    var ecrR = { id:'ecr_resil_dette_'+clientId+'_'+Date.now(), ref:'RESIL-'+clientId, date:dat, piece:'RESIL-'+(c.dossier||clientId),
+      libelle:'Résiliation — dette de remboursement — '+((c.nom||'')+' '+(c.prenoms||'')).trim(),
+      compte:compteDette, compte_debit:compteClientLots, compte_credit:compteDette, montant:rembourse, type:'passif', created_at:dat };
+    DATA.ecritures.push(ecrR); await dbPut('ecritures', ecrR); if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', ecrR);
+  }
+  if (retenu > 0) {
+    var compteProduit = requireCompteDefaut('resiliation_produit');
+    var ecrP = { id:'ecr_resil_produit_'+clientId+'_'+Date.now(), ref:'RESIL-'+clientId, date:dat, piece:'RESIL-'+(c.dossier||clientId),
+      libelle:'Résiliation — retenue conservée — '+((c.nom||'')+' '+(c.prenoms||'')).trim(),
+      compte:compteProduit, compte_debit:compteClientLots, compte_credit:compteProduit, montant:retenu, type:'produit', created_at:dat };
+    DATA.ecritures.push(ecrP); await dbPut('ecritures', ecrP); if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', ecrP);
+  }
+  if (typeof buildBalance==='function') buildBalance();
+  if (typeof buildGrandLivre==='function') buildGrandLivre();
+
+  /* 3) Commissions — sort dépendant du motif (choix retenu) */
+  var commsActives = (DATA.commissions||[]).filter(function(cm){
+    return (cm.client_id===clientId || (DATA.versements||[]).some(function(v){return v.id===cm.versement_id && v.client_id===clientId;})) && cm.statut!=='annulee';
+  });
+  var nbAnnulees=0, nbARecuperer=0;
+  if (motif !== 'faute_promoteur') {
+    for (var j=0;j<commsActives.length;j++){
+      var cm = commsActives[j];
+      if (cm.statut==='payee'){ cm.statut='a_recuperer'; cm.a_recuperer_motif='Résiliation souscription '+clientId; nbARecuperer++; }
+      else { cm.statut='annulee'; nbAnnulees++; }
+      cm._modifie=new Date().toISOString();
+      await dbPut('commissions', cm); if (typeof syncToSupabase==='function') syncToSupabase('pi_commissions', cm);
+    }
+  }
+
+  /* 4) Statut client — trace conservée, PAS de suppression */
+  c.statut = 'resilie';
+  /* [FIX] lot_id/lot_ids n'étaient jamais vidés ici — le lot est bien libéré
+     (statut, client_id) sur SA propre fiche juste au-dessus, mais la fiche
+     du souscripteur résilié continuait d'afficher ce même lot comme le sien
+     (colonne "Lot" de la liste, fiche client...). Dès qu'un nouveau
+     souscripteur reprend ce lot, DEUX fiches clients l'auraient affiché
+     simultanément. L'historique reste consultable via resiliation.lots_liberes. */
+  c.lot_id = null;
+  c.lot_ids = [];
+  c.resiliation = { date:dat, motif:motif, justification:justification, montant_verse:verse,
+    taux_remboursement:Math.round(taux*100), montant_rembourse:rembourse, montant_retenu:retenu,
+    commissions_annulees:nbAnnulees, commissions_a_recuperer:nbARecuperer,
+    lots_liberes:lotIds, valide_par:(APP.currentUser&&APP.currentUser.nom)||'—', cree_le:new Date().toISOString() };
+  c._modifie = new Date().toISOString();
+  await logAudit('clients', clientId, 'resiliation', null, c.resiliation);
+  await dbPut('clients', c); if (typeof syncToSupabase==='function') syncToSupabase('pi_clients', c);
+
+  closeModal('modal-resiliation');
+  renderClients(); if (typeof renderLots==='function') renderLots();
+  refreshDashboard();
+  toast('Souscription résiliée — '+fcfa(rembourse)+' à rembourser, '+fcfa(retenu)+' retenu, '+lotIds.length+' lot(s) libéré(s) pour réattribution.', 'success');
+  resilierImprimerDecompte(clientId);
+}
+function resilierImprimerDecompte(clientId){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;});
+  if (!c || !c.resiliation) { toast('Aucune résiliation enregistrée pour ce souscripteur.','error'); return; }
+  var r = c.resiliation;
+  var soc = (DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var w = window.open('','_blank');
+  if (!w) { toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  var motifLabel = r.motif==='faute_promoteur' ? 'Défaut/retard imputable au promoteur' : 'Désistement du souscripteur';
+  w.document.write('<html><head><title>Décompte de résiliation — '+escHtml(c.nom||'')+'</title>'
+    +'<style>body{font-family:Georgia,serif;padding:38px;color:#111;font-size:13px;line-height:1.55;}'
+    +'h1{font-size:17px;margin:0 0 4px;}h2{font-size:13.5px;margin:18px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px;}'
+    +'table{width:100%;border-collapse:collapse;margin:6px 0;}td{padding:5px 8px;border:1px solid #ccc;}td.k{width:45%;background:#f5f5f5;}'
+    +'.pied{margin-top:26px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Décompte résiliation', c.dossier||clientId)
+    +'<h1>'+escHtml(soc)+'</h1>'
+    +'<h1 style="margin-top:14px;">Notification de résiliation et décompte</h1>'
+    +'<div style="color:#555;font-size:11.5px;">Réf. souscripteur : '+escHtml(c.dossier||clientId)+' — '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    +'<h2>Souscripteur</h2><table><tbody>'
+    +'<tr><td class="k">Nom</td><td>'+escHtml(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</td></tr>'
+    +'<tr><td class="k">Pièce</td><td>'+escHtml((c.piece_type||'')+' '+(c.piece_num||''))+'</td></tr>'
+    +'<tr><td class="k">Téléphone</td><td>'+escHtml(c.tel||'')+'</td></tr>'
+    +'</tbody></table>'
+    +'<h2>Motif de la résiliation</h2><p>'+escHtml(motifLabel)+'</p><p style="font-style:italic;color:#444;">'+escHtml(r.justification||'')+'</p>'
+    +'<h2>Décompte financier</h2><table><tbody>'
+    +'<tr><td class="k">Montant total versé (hors frais de dossier)</td><td>'+fcfa(r.montant_verse)+'</td></tr>'
+    +'<tr><td class="k">Taux de remboursement applicable</td><td>'+r.taux_remboursement+'%</td></tr>'
+    +'<tr><td class="k"><b>Montant à rembourser</b></td><td><b>'+fcfa(r.montant_rembourse)+'</b></td></tr>'
+    +'<tr><td class="k">Montant retenu (frais de dossier non remboursables exclus)</td><td>'+fcfa(r.montant_retenu)+'</td></tr>'
+    +'</tbody></table>'
+    +'<div class="pied">Fondement contractuel : cahier des charges — clause de désistement (60%/100% selon partie à l\'origine de la résiliation).'
+    +'<br><br>Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')
+    +'<br><br>Pour '+escHtml(soc)+' : ___________________________<br><br>Le souscripteur (bon pour accord) : ___________________________</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
 }
 
 
@@ -31448,6 +31980,7 @@ async function verifierCommissionsVersementsUI(reparer){
     +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
     +'<strong>⚠️ Anomalies commissions/versements</strong>'
     +'<button class="btn btn-secondary btn-sm" onclick="imprimerRapportCommissionsVerif()">🖨️ Imprimer le rapport</button>'
+    +'<button class="btn btn-secondary btn-sm" onclick="partagerRapportCommissionsVerif()">📤 Partager</button>'
     +'</div>'
     +'<div style="font-size:12px;margin-top:4px;">'+nbManq+' manquante(s), '+r.doublons.length+' doublon(s), '+r.orphelines.length+' orpheline(s)</div>'
     +confirmation
@@ -31458,6 +31991,15 @@ async function verifierCommissionsVersementsUI(reparer){
     +'</div>';
 }
 
+function partagerRapportCommissionsVerif(){
+  var r = window._vcvDernierRapport; if(!r){ toast('Lancez d\'abord la vérification.','error'); return; }
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var nbManq=r.manquantes_commercial.length+r.manquantes_apporteur.length;
+  var lignes=['*Rapport commissions/versements* ('+escHtml(soc)+')', 'Généré le '+new Date().toLocaleDateString('fr-FR'), '',
+    r.total_versements+' versement(s) analysé(s)', nbManq+' manquante(s)', r.doublons.length+' doublon(s)', r.orphelines.length+' orpheline(s)'];
+  if (!nbManq && !r.doublons.length && !r.orphelines.length) lignes.push('', 'Aucune anomalie détectée.');
+  sanixPartager('Rapport commissions versements', lignes.join('\n'));
+}
 function imprimerRapportCommissionsVerif(){
   var r = window._vcvDernierRapport; if(!r){ toast('Lancez d\'abord la vérification.','error'); return; }
   var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
@@ -31550,6 +32092,7 @@ function renderCommissions() {
     a_payer: { lbl:'À payer',  col:'#EF4444', bg:'#FEF2F2' },
     payee:   { lbl:'Payée',    col:'#10B981', bg:'#ECFDF5' },
     annulee: { lbl:'Annulée',  col:'#94A3B8', bg:'#F1F5F9' },
+    a_recuperer: { lbl:'À récupérer (résiliation)', col:'#EF4444', bg:'#FEF2F2' },
   };
   var typeMeta = {
     commercial: { lbl:'Commercial', emoji:'💼' },
@@ -32000,6 +32543,7 @@ function detecterVersementsDoublons() {
     + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
     + '<strong>⚠️ Doublons probables détectés</strong>'
     + '<button class="btn btn-secondary btn-sm" onclick="imprimerRapportDoublonsVersements()">🖨️ Imprimer le rapport</button>'
+    + '<button class="btn btn-secondary btn-sm" onclick="partagerRapportDoublonsVersements()">📤 Partager</button>'
     + '</div>'
     + '<div style="font-size:12px;margin-top:4px;">Vérifiez avant toute suppression : cela peut aussi être deux paiements distincts et coïncidents.</div>'
     + blocs
@@ -32009,6 +32553,21 @@ function detecterVersementsDoublons() {
 /* Rapport imprimable — mêmes données que le panneau à l'écran, pour classement
    dans le dossier d'audit (ex. reprise d'historique Menko Holding, import
    caisse + ressaisie manuelle). */
+function partagerRapportDoublonsVersements(){
+  var rap = window._dvdDernierRapport || { groupes:[], croisements:[] };
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var nomClient=function(cid){ var c=(DATA.clients||[]).find(function(x){return x.id===cid;}); return c?((c.nom||'')+' '+(c.prenoms||'')).trim():'—'; };
+  var lignes=['*Rapport de doublons — Versements* ('+escHtml(soc)+')', 'Généré le '+new Date().toLocaleDateString('fr-FR'), ''];
+  lignes.push(rap.groupes.length+' doublon(s) entre versements, '+rap.croisements.length+' correspondance(s) versement/caisse.', '');
+  rap.groupes.slice(0,10).forEach(function(g){
+    lignes.push('• '+nomClient(g[0].client_id)+' — '+fmtF(g[0].montant)+' F — '+g.map(function(v){return v.date;}).join(' / '));
+  });
+  rap.croisements.slice(0,10).forEach(function(x){
+    lignes.push('• '+((x.cl.nom||'')+' '+(x.cl.prenoms||'')).trim()+' — '+fmtF(x.v.montant)+' F — versement '+(x.v.ref||x.v.id)+' ↔ '+x.mvts.length+' mvt(s) caisse');
+  });
+  if (!rap.groupes.length && !rap.croisements.length) lignes.push('Aucun doublon probable détecté.');
+  sanixPartager('Rapport doublons versements', lignes.join('\n'));
+}
 function imprimerRapportDoublonsVersements(){
   var rap = window._dvdDernierRapport || { groupes:[], croisements:[] };
   var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
@@ -33867,7 +34426,16 @@ async function deleteLot(id) {
   if (!lid) return;
   var l = DATA.lots.find(function(x){ return x.id===lid; });
   if (!l) return;
-  var cli = (DATA.clients||[]).find(function(c){ return c.lot_id===lid; });
+  if (!exigerDroit('Lots & Reservations', 's', 'la suppression de ce lot')) return;
+  /* [FIX] Ne vérifiait que c.lot_id (lot "principal") — un lot secondaire
+     d'un souscripteur multi-lots (client.lot_ids) pouvait donc être
+     supprimé sans le moindre avertissement alors qu'il est toujours
+     occupé : le client se retrouvait avec une référence vers un lot qui
+     n'existe plus, invisible tant que personne n'ouvre sa fiche. */
+  var cli = (DATA.clients||[]).find(function(c){
+    var ids = (typeof _lotIdsDeClient === 'function') ? _lotIdsDeClient(c) : (c.lot_id ? [c.lot_id] : []);
+    return ids.indexOf(lid) !== -1;
+  });
   if (cli) { alert('Impossible : le lot ' + (l.numero||'') + ' est réservé/vendu par « ' + ((cli.nom||'')+' '+(cli.prenoms||'')).trim() + ' ».\nRetirez d\'abord le souscripteur du lot.'); return; }
   if (!confirm('Supprimer définitivement le lot ' + (l.numero||'') + ' ?')) return;
   DATA.lots = DATA.lots.filter(function(x){ return x.id!==lid; });
@@ -35031,7 +35599,8 @@ var LIBELLES_COMPTES_DEFAUT = {
   travaux_interne_produit:'Travaux (dépt. interne) — Produit', travaux_externe_charge:'Travaux (constructeur externe) — Charge', penalites_produit:'Pénalités de retard — Produit accessoire',
   ecart_caisse_excedent:'Écart de caisse — Excédent (produit)', ecart_caisse_manquant:'Écart de caisse — Manquant (charge)',
   parc_carburant:'Parc auto — Carburant (charge)', parc_entretien:'Parc auto — Entretien/réparations (charge)',
-  parc_immobilisation:'Parc auto — Immobilisation (véhicules, compte 245X)'
+  parc_immobilisation:'Parc auto — Immobilisation (véhicules, compte 245X)',
+  resiliation_dette:'Résiliation — Dette de remboursement au souscripteur', resiliation_produit:'Résiliation — Retenue conservée (produit)'
 };
 
 /* Alimente la <datalist> partagée par tous les champs « cd-* » : saisie prédictive
@@ -35220,6 +35789,8 @@ function loadComptesDefaut() {
   var _pac=document.getElementById('cd-parc-carburant'); if(_pac)_pac.value=cd.parc_carburant|| '';
   var _pae=document.getElementById('cd-parc-entretien'); if(_pae)_pae.value=cd.parc_entretien|| '';
   var _pai=document.getElementById('cd-parc-immobilisation'); if(_pai)_pai.value=cd.parc_immobilisation|| '';
+  var _rd=document.getElementById('cd-resiliation-dette'); if(_rd)_rd.value=cd.resiliation_dette|| '';
+  var _rp=document.getElementById('cd-resiliation-produit'); if(_rp)_rp.value=cd.resiliation_produit|| '';
   document.getElementById('cd-taux-is').value = (DATA.params && DATA.params.taux_is != null) ? DATA.params.taux_is : 25;
   renderConflitsSync();
 }
@@ -35307,7 +35878,9 @@ function saveComptesDefaut() {
     chantier_sous_traitance:(document.getElementById('cd-chantier-sous-traitance')||{}).value ? document.getElementById('cd-chantier-sous-traitance').value.trim() : '',
     parc_carburant:      (document.getElementById('cd-parc-carburant')||{}).value ? document.getElementById('cd-parc-carburant').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.parc_carburant)|| ''),
     parc_entretien:       (document.getElementById('cd-parc-entretien')||{}).value ? document.getElementById('cd-parc-entretien').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.parc_entretien)|| ''),
-    parc_immobilisation:  (document.getElementById('cd-parc-immobilisation')||{}).value ? document.getElementById('cd-parc-immobilisation').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.parc_immobilisation)|| '')
+    parc_immobilisation:  (document.getElementById('cd-parc-immobilisation')||{}).value ? document.getElementById('cd-parc-immobilisation').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.parc_immobilisation)|| ''),
+    resiliation_dette:  (document.getElementById('cd-resiliation-dette')||{}).value ? document.getElementById('cd-resiliation-dette').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.resiliation_dette)|| ''),
+    resiliation_produit:  (document.getElementById('cd-resiliation-produit')||{}).value ? document.getElementById('cd-resiliation-produit').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.resiliation_produit)|| '')
   };
   DATA.params.taux_is = parseFloat(document.getElementById('cd-taux-is').value) || 25;
 
@@ -38964,25 +39537,55 @@ function buildBilan() {
     });
   });
 
+  /* [FIX structurel] Même défaut que celui corrigé dans buildDashTabCompta() :
+     itérait sur APP.planComptable (≈158 comptes "courants") au lieu des
+     comptes RÉELLEMENT postés dans les écritures. Tout sous-compte utilisé en
+     pratique mais absent de cette liste curatée (4451/4453/4454/4455/4456 —
+     confirmés utilisés par le décompte à l'avancement, une opération
+     courante pour un promoteur) contribuait pour zéro au Bilan, quel que
+     soit le préfixe demandé. Les 4 bilans d'ouverture déjà saisis restent
+     corrects (comptes tous dans la liste curatée), mais le Bilan se serait
+     déséquilibré dès la première vraie transaction sur un de ces sous-comptes. */
   function getSolde(codes) {
     var tot = 0;
-    codes.forEach(function(code) {
-      APP.planComptable.filter(function(c){ return c.code.startsWith(code); }).forEach(function(c) {
-        tot += soldes[c.code] || 0;
-      });
-    });
+    for (var code in soldes) {
+      if (codes.some(function(p){ return code.indexOf(p) === 0; })) tot += soldes[code] || 0;
+    }
     return tot;
   }
 
   // ACTIF
   var actifImmo = getSolde(['21','22','23','24','27']);
   var stocks = getSolde(['31','32','33','34','35','36']);
-  var creances = getSolde(['411','412','418','421','423','441','445','461','471']);
+  /* [FIX] Le "FIX SYSCOHADA" précédent (retiré ci-dessous) supposait la
+     numérotation SYSCOHADA standard où 445 = TVA récupérable — vérification
+     faite contre LE plan comptable réel de ce logiciel : ici 444 = TVA
+     récupérable (actif, jusqu'ici absent de tout le Bilan) et 445 = TVA À
+     DÉCAISSER (passif réel — une dette, pas une créance). Même défaut sur
+     441 "État — Impôts et taxes", tagué passif dans le plan, pas débiteur.
+     409 (Fournisseurs débiteurs — avances données, un actif réel) ajouté au
+     passage, absent lui aussi jusqu'ici. */
+  var creances = getSolde(['411','412','418','409','421','423','444','461','471']);
   var tresorerie = getSolde(['51','52','53','55','57']);
   var totalActif = actifImmo + stocks + creances + tresorerie;
 
   // PASSIF
-  var capitaux = getSolde(['101','106','111']);
+  /* [FIX] Ancienne formule : capitaux = getSolde(['101','106','111']) — brute,
+     sans redressement de signe. Un capital exceptionnellement négatif (posté
+     en débit, cas réel rencontré) était traité identiquement à un capital
+     positif, et surtout : AUCUN compte de résultat cumulé (121 bénéfice, 129
+     perte, 109, 119) n'était pris en compte — une perte reportée à l'ouverture
+     n'apparaissait nulle part dans le Bilan, ni comme actif ni comme réduction
+     des capitaux propres. Formule validée par simulation numérique sur 4
+     structures réelles du groupe (bilans d'ouverture 2026) avant déploiement :
+     les comptes normalement créditeurs (101 Capital, 106 Réserves, 109, 111
+     Report à nouveau créditeur, 121 Bénéfice) contribuent positivement une
+     fois leur signe inversé (et non passés en Math.abs(), qui écraserait à
+     tort un capital réellement négatif) ; les comptes normalement débiteurs
+     contraires (119 Report à nouveau débiteur, 129 Perte) sont soustraits. */
+  var capitauxCredit = -getSolde(['101','106','109','111','121']);
+  var capitauxDebitContra = getSolde(['119','129']);
+  var capitaux = capitauxCredit - capitauxDebitContra;
   /* Résultat provisoire = solde net des comptes de gestion (classe 7 − classe 6),
      strictement issu du grand livre — c'est la seule valeur qui garantit
      l'égalité Actif = Passif avant clôture. Le Compte de Résultat affiche par
@@ -38992,19 +39595,30 @@ function buildBilan() {
      une incohérence à corriger, injecter cet IS estimé ici casserait l'équilibre
      du Bilan puisqu'aucune écriture réelle ne le contrebalancerait au passif. */
   var resultBrut = getSolde(['7']) - getSolde(['6']);
-  var dettesLT = getSolde(['16','17','18']);
+  /* [FIX] Math.abs() manquant ici alors que TOUTES les autres catégories de
+     dettes ci-dessous l'utilisent — invisible tant qu'aucune entité du groupe
+     n'avait de solde réel sur les comptes 16-18 (emprunts, provisions),
+     démasqué par le premier cas réel rencontré (compte 168, MENKO SARL) :
+     Bilan déséquilibré de deux fois le montant de la provision. */
+  var dettesLT = Math.abs(getSolde(['16','17','18']));
   var dettesFournisseurs = Math.abs(getSolde(['401','402','408']));
-  /* [FIX SYSCOHADA] 441 (État, subventions à recevoir) et 445 (État, TVA
-     récupérable) sont des comptes normalement DÉBITEURS — des créances, pas
-     des dettes. Ils étaient inclus ici sous Math.abs(), ce qui transformait
-     une TVA récupérable (souvent un solde important pour un promoteur qui
-     paie beaucoup de TVA sur ses travaux) en fausse dette fiscale au passif,
-     sans jamais l'ajouter nulle part à l'actif — un vrai bilan aurait alors
-     paru équilibré par un double défaut qui se compense, ou franchement faux.
-     Cohérent avec calculerTVA() qui traite déjà 445 en sens Débit (déductible). */
-  var dettesFiscalesSociales = Math.abs(getSolde(['431','432','443','447','448']));
+  /* [FIX] 441 et 445 retirés d'ici (replacés dans creances par erreur d'un
+     fix précédent, voir commentaire ci-dessus) — ce sont bien des dettes
+     fiscales dans CE plan comptable, pas des créances. */
+  var dettesFiscalesSociales = Math.abs(getSolde(['431','432','441','443','445','447','448']));
   var dettesPersonnel = Math.abs(getSolde(['422']));
-  var totalPassif = capitaux + resultBrut + dettesLT + dettesFournisseurs + dettesFiscalesSociales + dettesPersonnel;
+  /* [FIX] Comptes 419 (Clients créditeurs — avances reçues : LE compte crédité
+     par chaque versement encaissé via genererEcritureVersement — sans doute le
+     compte le plus utilisé de tout le logiciel, et pourtant absent du Bilan
+     jusqu'ici), 462 (Créditeurs divers), 467/468 (Commissions commerciaux/
+     apporteurs à payer), 472 (Comptes de régularisation passif), 4651
+     (Financeurs — apports reçus sur programmes) ajoutés — tous absents de
+     toute rubrique. Un versement client, l'opération la plus fréquente de ce
+     logiciel, ne s'affichait donc dans AUCUNE ligne du Bilan avant ce correctif.
+     Compte 45 (Associés/groupe, 451 dans ce plan) et 48 (dettes HAO) déjà
+     couverts par un fix antérieur, regroupés ici avec les autres. */
+  var dettesDiverses = Math.abs(getSolde(['419','45','462','467','468','472','48','4651']));
+  var totalPassif = capitaux + resultBrut + dettesLT + dettesFournisseurs + dettesFiscalesSociales + dettesPersonnel + dettesDiverses;
 
   function bilanRow(label, val, color, detailHTML) {
     if (detailHTML) {
@@ -39029,7 +39643,7 @@ function buildBilan() {
     + bilanRow('Immobilisations corporelles (terrains, bâtiments)', actifImmo, 'var(--blanc)', _rubriqueDetailHTML(['21','22','23','24','27'], soldes))
     + '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Actif Circulant (Cl. 3-4)</td></tr>'
     + bilanRow('Stocks (lots, travaux en cours)', stocks, 'var(--blanc)', _rubriqueDetailHTML(['31','32','33','34','35','36'], soldes))
-    + bilanRow('Créances clients, État (TVA récupérable) et débiteurs divers', creances, 'var(--blanc)', _rubriqueDetailHTML(['411','412','418','421','423','441','445','461','471'], soldes))
+    + bilanRow('Créances clients, État (TVA récupérable) et débiteurs divers', creances, 'var(--blanc)', _rubriqueDetailHTML(['411','412','418','409','421','423','444','461','471'], soldes))
     + '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Trésorerie (Cl. 5)</td></tr>'
     + bilanRow('Banques, caisses, Mobile Money', tresorerie, 'var(--vert)', _rubriqueDetailHTML(['51','52','53','55','57'], soldes))
     + '<tr style="font-weight:700;border-top:2px solid var(--bleu);"><td>TOTAL ACTIF</td><td style="text-align:right;color:var(--bleu);font-size:15px;">' + fmtF(totalActif) + '</td></tr>'
@@ -39039,14 +39653,15 @@ function buildBilan() {
     + '<table style="width:100%;font-size:13px;">'
     + '<thead><tr><th style="text-align:left;">Rubriques SYSCOHADA</th><th style="text-align:right;">Montant (FCFA)</th></tr></thead><tbody>'
     + '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Capitaux Propres (Cl. 1)</td></tr>'
-    + bilanRow('Capital social', Math.abs(capitaux), 'var(--blanc)', _rubriqueDetailHTML(['101','106','111'], soldes))
+    + bilanRow('Capitaux propres (net du résultat cumulé)', Math.abs(capitaux), 'var(--blanc)', _rubriqueDetailHTML(['101','106','109','111','119','121','129'], soldes))
     + bilanRow('Résultat de l\'exercice ' + year, resultBrut, resultBrut >= 0 ? 'var(--vert)' : 'var(--rouge)')
     + '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Dettes Financières (Cl. 1)</td></tr>'
     + bilanRow('Emprunts et dettes à long terme', Math.abs(dettesLT), 'var(--blanc)', _rubriqueDetailHTML(['16','17','18'], soldes))
     + '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Dettes à Court Terme (Cl. 4)</td></tr>'
     + bilanRow('Fournisseurs et comptes rattachés', dettesFournisseurs, 'var(--blanc)', _rubriqueDetailHTML(['401','402','408'], soldes))
-    + bilanRow('Dettes fiscales et sociales (CNPS, ITS, IS)', dettesFiscalesSociales, 'var(--blanc)', _rubriqueDetailHTML(['431','432','443','447','448'], soldes))
+    + bilanRow('Dettes fiscales et sociales (CNPS, ITS, IS, TVA)', dettesFiscalesSociales, 'var(--blanc)', _rubriqueDetailHTML(['431','432','441','443','445','447','448'], soldes))
     + bilanRow('Dettes envers le personnel', dettesPersonnel, 'var(--blanc)', _rubriqueDetailHTML(['422'], soldes))
+    + bilanRow('Avances clients, associés et dettes diverses', dettesDiverses, 'var(--blanc)', _rubriqueDetailHTML(['419','45','462','467','468','472','48','4651'], soldes))
     + '<tr style="font-weight:700;border-top:2px solid var(--or);"><td>TOTAL PASSIF</td><td style="text-align:right;color:var(--or);font-size:15px;">' + fmtF(totalPassif) + '</td></tr>'
     + '</tbody></table></div>'
     + '</div>'
@@ -44643,6 +45258,7 @@ async function changeUserPassword(userId) {
   target.password_hash = await hashPassword(newPwd, target.salt);
   target.pwd_algo       = null;   /* [Fix] sans ça, un compte ex-pbkdf2 garderait cette étiquette alors que le hash ci-dessus est du SHA-256 simple — prochain login cassé de la même façon */
   delete target.password;
+  target._modifie = new Date().toISOString();
   await dbPut('users', target);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', target);
   await ajouterHistorique('user', userId, 'changement_mdp', 'Modifié par ' + APP.currentUser.nom);
@@ -45041,9 +45657,11 @@ function ajouterLotSupplementaireClient() {
    simple indicateur, jamais bloquant : l'utilisateur reste libre de sa saisie. */
 function clientCompareSurface() {
   var elEcart = document.getElementById('c-surface-ecart'); if (!elEcart) return;
+  var elAction = document.getElementById('c-surface-regul-action');
   var saisie = parseFloat(document.getElementById('c-surface').value) || 0;
   var lotIds = [document.getElementById('c-lot').value].concat(APP._clientLotsSupplementaires||[]).filter(Boolean);
   var reelle = lotIds.reduce(function(s,id){ var l=(DATA.lots||[]).find(function(x){return x.id===id;}); return s+(l&&l.surface?parseFloat(l.surface):0); }, 0);
+  if (elAction) elAction.innerHTML = '';
   if (!saisie || !reelle) { elEcart.style.display = 'none'; return; }
   var ecart = saisie - reelle, ecartPct = (ecart/reelle)*100;
   elEcart.style.display = '';
@@ -45053,7 +45671,117 @@ function clientCompareSurface() {
   } else {
     elEcart.style.color = Math.abs(ecartPct) >= 5 ? 'var(--rouge)' : '#E67E22';
     elEcart.textContent = '⚠ Écart avec la surface du/des lot(s) au dossier (' + reelle.toFixed(0) + ' m²) : ' + (ecart>=0?'+':'') + ecart.toFixed(1) + ' m² (' + (ecartPct>=0?'+':'') + ecartPct.toFixed(1) + '%).';
+    /* [Nouveau] La surface réelle du terrain (relevé/bornage) dépasse la
+       surface déclarée à la souscription — cas fréquent en foncier : le
+       surplus se facture au souscripteur. Jusqu'ici l'écart était affiché
+       à titre indicatif seulement, sans aucune action pour en tirer la
+       conséquence financière. Ne propose l'action que pour un souscripteur
+       DÉJÀ existant (APP.editingId) — à la création, on ajuste simplement
+       le prix total directement, pas besoin d'un avenant séparé. */
+    if (ecart < 0 && APP.editingId) {
+      elAction.innerHTML = '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:2px;" onclick="ouvrirRegularisationSurface()">📐 Facturer l\'écart de surface au souscripteur</button>';
+    }
   }
+}
+
+function ouvrirRegularisationSurface(){
+  var clientId = APP.editingId;
+  var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; });
+  if (!c) { toast('Enregistrez d\'abord le souscripteur avant de régulariser la surface.','error'); return; }
+  if (!exigerDroit('Souscripteurs', 'v', 'la facturation d\'un écart de surface')) return;
+  var saisie = parseFloat(document.getElementById('c-surface').value) || 0;
+  var lotIds = [document.getElementById('c-lot').value].concat(APP._clientLotsSupplementaires||[]).filter(Boolean);
+  var lots = lotIds.map(function(id){ return (DATA.lots||[]).find(function(l){return l.id===id;}); }).filter(Boolean);
+  var reelle = lots.reduce(function(s,l){ return s+(parseFloat(l.surface)||0); }, 0);
+  var ecart = reelle - saisie;
+  if (ecart <= 0) { toast('Aucun écart positif à facturer.','error'); return; }
+  /* Prix au m² : celui du lot principal s'il en a un, sinon dérivé du prix
+     total déclaré / surface déclarée — dernier recours, à vérifier avant
+     de valider (un prix au m² réel peut différer du simple prorata). */
+  var lotPrincipal = lots[0];
+  var prixM2 = (lotPrincipal && parseFloat(lotPrincipal.prix_m2)) || (saisie>0 ? (c.montant_total||0)/saisie : 0);
+  document.getElementById('rs2-client-id').value = clientId;
+  document.getElementById('rs2-surface-declaree').value = saisie;
+  document.getElementById('rs2-surface-reelle').value = reelle;
+  document.getElementById('rs2-ecart').value = ecart.toFixed(2);
+  document.getElementById('rs2-prix-m2').value = Math.round(prixM2);
+  document.getElementById('rs2-motif').value = '';
+  rs2Recalculer();
+  openModal('modal-regul-surface');
+}
+function rs2Recalculer(){
+  var ecart = parseFloat(document.getElementById('rs2-ecart').value) || 0;
+  var prixM2 = parseFloat(document.getElementById('rs2-prix-m2').value) || 0;
+  document.getElementById('rs2-montant').value = fcfa(Math.round(ecart * prixM2));
+}
+async function confirmerRegularisationSurface(){
+  var clientId = document.getElementById('rs2-client-id').value;
+  var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; });
+  if (!c) { toast('Souscripteur introuvable.','error'); return; }
+  if (!exigerDroit('Souscripteurs', 'v', 'la facturation d\'un écart de surface')) return;
+  var surfaceDeclaree = parseFloat(document.getElementById('rs2-surface-declaree').value) || 0;
+  var surfaceReelle = parseFloat(document.getElementById('rs2-surface-reelle').value) || 0;
+  var ecart = parseFloat(document.getElementById('rs2-ecart').value) || 0;
+  var prixM2 = parseFloat(document.getElementById('rs2-prix-m2').value) || 0;
+  var motif = document.getElementById('rs2-motif').value.trim();
+  var montant = Math.round(ecart * prixM2);
+  if (montant <= 0) { toast('Montant à facturer invalide.','error'); return; }
+  if (!motif) { toast('Précisez le motif (relevé topographique, bornage...).','error'); return; }
+
+  c.regularisations_surface = c.regularisations_surface || [];
+  var regul = { id: uid(), date: today(), surface_declaree: surfaceDeclaree, surface_reelle: surfaceReelle,
+    ecart_m2: ecart, prix_m2: prixM2, montant: montant, motif: motif,
+    valide_par: (APP.currentUser&&APP.currentUser.nom)||'—' };
+  c.regularisations_surface.push(regul);
+  /* Même principe que l'ajout de lot supplémentaire : le montant total est
+     la seule source de vérité de ce qui est dû. Les commissions et le
+     recouvrement suivent automatiquement via les futurs versements — pas
+     de traitement rétroactif nécessaire (voir échange précédent). */
+  c.montant_total = (parseFloat(c.montant_total)||0) + montant;
+  c.surface = surfaceReelle;
+  c._modifie = new Date().toISOString();
+  await logAudit('clients', clientId, 'regularisation_surface', null, regul);
+  await dbPut('clients', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+
+  closeModal('modal-regul-surface');
+  var mtEl = document.getElementById('c-montant-total'); if (mtEl) mtEl.value = c.montant_total;
+  var svEl = document.getElementById('c-surface'); if (svEl) svEl.value = surfaceReelle;
+  clientCompareSurface();
+  toast('✅ Régularisation enregistrée — montant total mis à jour (+'+fcfa(montant)+'). N\'oubliez pas d\'ajuster l\'échéancier/durée si besoin.', 'success');
+  imprimerRegularisationSurface(regul, c);
+}
+function imprimerRegularisationSurface(regul, c){
+  var soc = (DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var w = window.open('','_blank');
+  if (!w) { toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  w.document.write('<html><head><title>Avenant — Régularisation de surface</title>'
+    +'<style>body{font-family:Georgia,serif;padding:38px;color:#111;font-size:13px;line-height:1.55;}'
+    +'h1{font-size:17px;margin:0 0 4px;}table{width:100%;border-collapse:collapse;margin:10px 0;}'
+    +'td{padding:5px 8px;border:1px solid #ccc;}td.k{width:45%;background:#f5f5f5;}'
+    +'.pied{margin-top:26px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Avenant régularisation surface', c.dossier||c.id)
+    +'<h1>'+escHtml(soc)+'</h1>'
+    +'<h1 style="margin-top:14px;">Avenant — Régularisation de surface</h1>'
+    +'<div style="color:#555;font-size:11.5px;">Réf. souscripteur : '+escHtml(c.dossier||c.id)+' — '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    +'<h2>Souscripteur</h2><table><tbody>'
+    +'<tr><td class="k">Nom</td><td>'+escHtml(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</td></tr>'
+    +'</tbody></table>'
+    +'<h2>Constat</h2><p>'+escHtml(regul.motif)+'</p>'
+    +'<table><tbody>'
+    +'<tr><td class="k">Surface déclarée à la souscription</td><td>'+regul.surface_declaree+' m²</td></tr>'
+    +'<tr><td class="k">Surface réelle constatée</td><td>'+regul.surface_reelle+' m²</td></tr>'
+    +'<tr><td class="k">Écart facturable</td><td>'+regul.ecart_m2.toFixed(2)+' m²</td></tr>'
+    +'<tr><td class="k">Prix au m²</td><td>'+fcfa(regul.prix_m2)+'</td></tr>'
+    +'<tr><td class="k"><b>Montant complémentaire dû</b></td><td><b>'+fcfa(regul.montant)+'</b></td></tr>'
+    +'<tr><td class="k">Nouveau montant total du contrat</td><td>'+fcfa(c.montant_total)+'</td></tr>'
+    +'</tbody></table>'
+    +'<div class="pied">Le présent avenant complète et modifie le contrat de souscription initial à hauteur du montant ci-dessus, '
+    +'sans emporter aucune autre modification des conditions convenues.<br><br>'
+    +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>'
+    +'Pour '+escHtml(soc)+' : ___________________________<br><br>Le souscripteur (bon pour accord) : ___________________________</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
 }
 function retirerLotSupplementaireClient(lotId) {
   APP._clientLotsSupplementaires = (APP._clientLotsSupplementaires || []).filter(function(id){ return id !== lotId; });
@@ -48295,6 +49023,40 @@ function lancerAuditIntegrite(){
         A('majeur','Comptes par défaut','Compte par défaut absent du plan comptable','Le compte « '+code+' » configuré pour « '+libelles[key]+' » (Paramétrage → Comptes par défaut Débit/Crédit) n\'existe pas dans le plan comptable SYSCOHADA — les écritures automatiques utiliseront un compte inconnu.','parametres',_fixManuel('Corriger le compte','Ouvrez Paramétrage → Comptes par défaut et remplacez le code « '+code+' » par un compte existant du plan comptable.'));
       }
     });
+  })();
+
+  /* ─── CONFORMITÉ LBC/FT ────────────────────────────────────────
+     Cette section réutilise EXACTEMENT les mêmes calculs que le tableau
+     de bord de la page Conformité LBC/FT (lbcRenderConformite) — pour
+     qu'un point resté rouge ici et vert là-bas ne puisse jamais arriver.
+     Absente jusqu'ici : l'audit global (accès Paramètres/Admin) ne
+     remontait aucun signal de conformité, uniquement comptabilité/stock/
+     RH — un administrateur pouvait avoir un score d'intégrité "excellent"
+     alors qu'aucun correspondant CENTIF n'était désigné ou qu'une
+     correspondance SFC attendait un traitement depuis des semaines. */
+  (function(){
+    if (typeof _lbcParams !== 'function') return; /* module LBC/FT absent de ce build */
+    var P = _lbcParams();
+    if (!(P.correspondant && P.suppleant)) {
+      A('majeur','Conformité LBC/FT','Correspondant/suppléant CENTIF non désignés','Le dispositif interne LBC/FT (Conformité LBC/FT → Dispositif) exige un correspondant et un suppléant nommément désignés.','lbcft',_fixManuel('Désigner','Ouvrez Conformité LBC/FT → Dispositif interne et complétez les deux champs.'));
+    }
+    if (typeof _sfcListe === 'function' && !_sfcListe().length) {
+      A('critique','Conformité LBC/FT','Aucune liste de sanctions (SFC) chargée','Le criblage des clients/fournisseurs contre les listes RSNU (Rés. 1267 et subséquentes) est inopérant sans liste importée.','lbcft',_fixManuel('Importer','Ouvrez Conformité LBC/FT → Criblage SFC → Importer la liste.'));
+    }
+    if (typeof _sfcCriblages === 'function') {
+      var sfcATraiter = _sfcCriblages().reduce(function(n,r){ return n+r.resultats.filter(function(x){return x.decision==='a_traiter';}).length; },0);
+      if (sfcATraiter>0) {
+        A('critique','Conformité LBC/FT','Correspondance(s) SFC non traitée(s)',sfcATraiter+' correspondance(s) issue(s) d\'un criblage attendent une décision (confirmer le gel ou écarter).','lbcft',_fixManuel('Traiter','Ouvrez Conformité LBC/FT → Criblage SFC.'));
+      }
+    }
+    var dsBrouillon = (typeof _lbcD === 'function') ? _lbcD().filter(function(d){return d.statut==='brouillon';}).length : 0;
+    if (dsBrouillon>0) {
+      A('majeur','Conformité LBC/FT','Déclaration(s) de soupçon en brouillon',dsBrouillon+' déclaration(s) rédigée(s) mais jamais transmise(s) à la CENTIF.','lbcft',_fixManuel('Transmettre','Ouvrez Conformité LBC/FT → Déclarations.'));
+    }
+    var sansFiche = (DATA.clients||[]).filter(function(c){ return typeof _kycDe==='function' && !_kycDe(c.id); }).length;
+    if (sansFiche>0) {
+      A('mineur','Conformité LBC/FT','Souscripteur(s) sans fiche de vigilance KYC',sansFiche+' souscripteur(s) n\'ont aucune fiche KYC — vigilance clientèle incomplète.','lbcft',_fixManuel('Compléter','Ouvrez Conformité LBC/FT → Vigilance clientèle.'));
+    }
   })();
 
   /* ─── SYNTHÈSE ─────────────────────────────────────────────── */
@@ -52328,6 +53090,50 @@ function sanixQrHtml(typeDoc, reference){
     +'<div style="font-size:8px;color:#777;margin-top:2px;">Document ImmoSuite ERP</div></div>';
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   PARTAGE DE RAPPORT (WhatsApp / Email / autre app) — limite technique
+   à connaître : un navigateur ne peut JAMAIS joindre un fichier en
+   silence à un message WhatsApp ou un email (restriction de sécurité
+   du navigateur/OS, pas une limite de ce logiciel). Deux niveaux :
+   1) navigator.share() AVEC fichier — fonctionne sur mobile (Android
+      Chrome, iOS Safari récent) : ouvre le sélecteur natif, la personne
+      choisit WhatsApp/Gmail/Mail elle-même, fichier déjà joint.
+   2) Repli desktop — ouvre WhatsApp Web / le client mail avec un texte
+      prérempli (chiffres clés) ; le rapport imprimé (PDF) doit alors
+      être joint à la main, comme n'importe quel site le ferait. */
+function sanixPartager(titre, resumeTexte){
+  /* [FIX] navigator.share() AVEC fichier ouvrait le sélecteur natif Windows/
+     Chrome, qui reste bloqué en chargement sur desktop : aucune application
+     n'y est enregistrée comme cible de partage de FICHIER (WhatsApp Web et
+     Gmail sont des sites, pas des cibles de partage OS). Le bouton semblait
+     "ne pas fonctionner" alors que le navigateur attendait une réponse qui
+     ne viendrait jamais. Le menu direct (liens WhatsApp/Email) est donc
+     maintenant la voie principale, fiable sur desktop comme sur mobile ;
+     le partage natif — sans fichier, pour éviter le même blocage — n'est
+     proposé qu'en option secondaire, et seulement sur un appareil tactile
+     où un vrai sélecteur d'apps (WhatsApp, Mail…) est réellement disponible. */
+  var estTactile = ('ontouchstart' in window) || (navigator.maxTouchPoints||0) > 0;
+  sanixPartagerMenu(resumeTexte, titre, estTactile && !!navigator.share);
+}
+/* Menu de partage — liens directs WhatsApp Web / Email, fiables partout.
+   Partage natif proposé en option seulement sur mobile (voir sanixPartager). */
+function sanixPartagerMenu(texte, sujet, avecNatif){
+  var id='sanix-partage-menu';
+  var ex=document.getElementById(id); if (ex) ex.remove();
+  var div=document.createElement('div');
+  div.id=id;
+  div.style.cssText='position:fixed;z-index:99999;bottom:24px;right:24px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:6px;min-width:200px;';
+  div.innerHTML = '<div style="color:#fff;font-size:12px;font-weight:700;margin-bottom:4px;">Partager le rapport</div>'
+    + '<button style="background:#25D366;color:#fff;border:none;border-radius:6px;padding:8px;font-size:12px;cursor:pointer;" onclick="window.open(\'https://wa.me/?text=\'+encodeURIComponent(sanixPartageTexteActuel),\'_blank\');document.getElementById(\''+id+'\').remove();">📱 WhatsApp</button>'
+    + '<button style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:8px;font-size:12px;cursor:pointer;" onclick="window.location.href=\'mailto:?subject=\'+encodeURIComponent(sanixPartageSujetActuel)+\'&body=\'+encodeURIComponent(sanixPartageTexteActuel);document.getElementById(\''+id+'\').remove();">✉️ Email</button>'
+    + (avecNatif ? '<button style="background:#475569;color:#fff;border:none;border-radius:6px;padding:8px;font-size:12px;cursor:pointer;" onclick="document.getElementById(\''+id+'\').remove();navigator.share({title:sanixPartageSujetActuel,text:sanixPartageTexteActuel}).catch(function(){});">📲 Autre application…</button>' : '')
+    + '<button style="background:transparent;color:#94a3b8;border:none;padding:4px;font-size:11px;cursor:pointer;" onclick="document.getElementById(\''+id+'\').remove();">Annuler</button>';
+  window.sanixPartageTexteActuel = texte;
+  window.sanixPartageSujetActuel = sujet;
+  document.body.appendChild(div);
+  setTimeout(function(){ document.addEventListener('click', function fermer(e){ if (!div.contains(e.target)) { div.remove(); document.removeEventListener('click', fermer); } }); }, 50);
+}
+
 function lbcImprimerDS(id){
   if(!lbcPeutVoirDeclarations()){ toast('⛔ Accès refusé.','error'); return; }
   var d=_lbcD().find(function(x){return x.id===id;}); if(!d) return;
@@ -53090,6 +53896,254 @@ function sfcCentifImprimer(){
     +'<div class="pied">Généré depuis ImmoSuite ERP le '+new Date().toLocaleDateString('fr-FR')+'.</div>'
     +'</body></html>');
   w.document.close(); w.print();
+}
+/* Solde la dette de remboursement créée à la résiliation — sortie de
+   trésorerie réelle, distincte de la reconnaissance comptable de la dette
+   (qui peut précéder le paiement effectif de plusieurs jours/semaines). */
+function resilierOuvrirRemboursement(clientId){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;});
+  if (!c || !c.resiliation) { toast('Aucune résiliation enregistrée.','error'); return; }
+  if (c.resiliation.rembourse) { toast('Ce remboursement a déjà été acté le '+dateShort(c.resiliation.rembourse_le)+'.','info'); return; }
+  if (!exigerDroit('Comptabilite', 'v', 'ce remboursement de résiliation')) return;
+  document.getElementById('rr-client-id').value = clientId;
+  document.getElementById('rr-date').value = today();
+  document.getElementById('rr-reference').value = '';
+  document.getElementById('rr-recap').innerHTML =
+    '<b>'+escHtml(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</b> — montant à rembourser : <b>'+fcfa(c.resiliation.montant_rembourse)+'</b>'
+    +'<br>Résiliation du '+dateShort(c.resiliation.date)+' — motif : '+(c.resiliation.motif==='faute_promoteur'?'faute du promoteur':'désistement du souscripteur');
+  openModal('modal-resiliation-remb');
+}
+async function resilierConfirmerRemboursement(){
+  var clientId = document.getElementById('rr-client-id').value;
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;});
+  if (!c || !c.resiliation) { toast('Résiliation introuvable.','error'); return; }
+  if (c.resiliation.rembourse) { toast('Déjà remboursé.','error'); return; }
+  if (!exigerDroit('Comptabilite', 'v', 'ce remboursement de résiliation')) return;
+  var dat = document.getElementById('rr-date').value || today();
+  var mode = document.getElementById('rr-mode').value;
+  var reference = document.getElementById('rr-reference').value.trim();
+  var montant = c.resiliation.montant_rembourse;
+  if (montant <= 0) { toast('Aucun montant à rembourser pour cette résiliation.','error'); return; }
+
+  var compteDette = requireCompteDefaut('resiliation_dette');
+  var compteTreso = _compteTresoVersement(mode);
+  var ecr = { id:'ecr_resil_remb_'+clientId+'_'+Date.now(), ref:'REMB-RESIL-'+clientId, date:dat,
+    piece:reference||('REMB-'+(c.dossier||clientId)),
+    libelle:'Remboursement résiliation — '+((c.nom||'')+' '+(c.prenoms||'')).trim(),
+    compte:compteTreso, compte_debit:compteDette, compte_credit:compteTreso, montant:montant, type:'actif', mode:mode, created_at:today() };
+  DATA.ecritures.push(ecr); await dbPut('ecritures', ecr); if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', ecr);
+  if (typeof buildBalance==='function') buildBalance();
+  if (typeof buildGrandLivre==='function') buildGrandLivre();
+
+  c.resiliation.rembourse = true; c.resiliation.rembourse_le = dat; c.resiliation.rembourse_mode = mode; c.resiliation.rembourse_reference = reference;
+  c._modifie = new Date().toISOString();
+  await logAudit('clients', clientId, 'remboursement_resiliation', null, { montant:montant, mode:mode, date:dat });
+  await dbPut('clients', c); if (typeof syncToSupabase==='function') syncToSupabase('pi_clients', c);
+
+  closeModal('modal-resiliation-remb');
+  renderClients();
+  toast('✅ Remboursement de '+fcfa(montant)+' enregistré et comptabilisé.', 'success');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RÉSILIATION DE CESSION FONCIÈRE — pendant du module de résiliation
+   souscripteurs (voir resilierOuvrir), pour le registre Cessions
+   foncières (acquéreurs hors programme). Modèle comptable différent :
+   cesGenererEcriture débite le compte tiers du PRIX TOTAL dès la
+   signature (produit constaté intégralement, pas versement par
+   versement) — la résiliation doit donc ANNULER cette vente en entier,
+   puis répartir 60%/100% uniquement la part réellement ENCAISSÉE
+   (c.montant_encaisse), pas le prix de cession. ═══════════════════════ */
+function cesResilierOuvrir(cessionId){
+  var c = (DATA.cessions_foncieres||[]).find(function(x){return x.id===cessionId;});
+  if (!c) return;
+  if (!exigerDroit('Comptabilite', 'v', 'la résiliation de cette cession')) return;
+  if (c.statut==='resiliee') { toast('Cette cession est déjà résiliée.','info'); return; }
+  document.getElementById('cr-cession-id').value = cessionId;
+  document.getElementById('cr-justification').value = '';
+  document.getElementById('cr-confirme').checked = false;
+  document.getElementById('cr-motif').value = 'desistement_client';
+  document.getElementById('cr-recap').innerHTML =
+    '<b>'+escHtml(c.acquereur||'—')+'</b> — '+escHtml(c.designation||cesSourceRef(c.source_key))
+    +'<br>Dossier : '+escHtml(c.dossier||c.id)+' — Prix : '+fcfa(c.prix_cession||0);
+  cesResilierRecalculer();
+  openModal('modal-cesresil');
+}
+function cesResilierRecalculer(){
+  var cessionId = document.getElementById('cr-cession-id').value;
+  var c = (DATA.cessions_foncieres||[]).find(function(x){return x.id===cessionId;});
+  if (!c) return;
+  var motif = document.getElementById('cr-motif').value;
+  var encaisse = crecVerse(c);
+  var taux = motif === 'faute_promoteur' ? 1 : 0.6;
+  var rembourse = Math.round(encaisse * taux);
+  document.getElementById('cr-prix').value = fcfa(c.prix_cession||0);
+  document.getElementById('cr-encaisse').value = fcfa(encaisse);
+  document.getElementById('cr-taux').value = Math.round(taux*100)+'%';
+  document.getElementById('cr-rembourse').value = fcfa(rembourse);
+
+  var comms = (DATA.commissions||[]).filter(function(cm){ return cm.cession_id===cessionId && cm.statut!=='annulee'; });
+  var totalComm = comms.reduce(function(s,cm){return s+(parseFloat(cm.montant_comm)||0);},0);
+  var info = document.getElementById('cr-commissions-info');
+  if (!comms.length){ info.className='alert alert-info'; info.textContent='Aucune commission active liée à cette cession.'; }
+  else if (motif==='faute_promoteur'){ info.className='alert alert-info'; info.innerHTML='✅ '+comms.length+' commission(s) pour '+fcfa(totalComm)+' — <b>conservées</b> (faute du promoteur).'; }
+  else { info.className='alert alert-danger'; info.innerHTML='⚠️ '+comms.length+' commission(s) pour '+fcfa(totalComm)+' — <b>à récupérer</b> (désistement de l\'acquéreur).'; }
+}
+async function cesResilierConfirmer(){
+  var cessionId = document.getElementById('cr-cession-id').value;
+  var c = (DATA.cessions_foncieres||[]).find(function(x){return x.id===cessionId;});
+  if (!c) { toast('Cession introuvable.','error'); return; }
+  if (!exigerDroit('Comptabilite', 'v', 'la résiliation de cette cession')) return;
+  var motif = document.getElementById('cr-motif').value;
+  var justification = document.getElementById('cr-justification').value.trim();
+  if (!justification) { toast('La justification est obligatoire.','error'); return; }
+  if (!document.getElementById('cr-confirme').checked) { toast('Cochez la case de confirmation avant de valider.','error'); return; }
+
+  var encaisse = crecVerse(c);
+  var taux = motif === 'faute_promoteur' ? 1 : 0.6;
+  var rembourse = Math.round(encaisse * taux);
+  var retenu = encaisse - rembourse;
+  var dat = today();
+  var cptTiers = (typeof crecCompte === 'function') ? crecCompte() : requireCompteDefaut('client_foncier');
+
+  /* 1) Annulation intégrale de la vente constatée à la signature */
+  if (c.prix_cession > 0) {
+    var cptProduit = requireCompteDefaut('cession_produit');
+    var ecrAnnul = { id:'ecr_resil_ces_annul_'+cessionId+'_'+Date.now(), ref:'RESIL-CES-'+cessionId, date:dat, piece:'RESIL-'+(c.dossier||cessionId),
+      libelle:'Résiliation — annulation de la vente — '+(c.acquereur||''),
+      compte:cptProduit, compte_debit:cptProduit, compte_credit:cptTiers, montant:c.prix_cession, type:'produit', created_at:dat };
+    DATA.ecritures.push(ecrAnnul); await dbPut('ecritures', ecrAnnul); if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', ecrAnnul);
+  }
+  /* 2) Répartition de la part réellement encaissée (60/100%) */
+  if (rembourse > 0) {
+    var compteDette = requireCompteDefaut('resiliation_dette');
+    var ecrR = { id:'ecr_resil_ces_dette_'+cessionId+'_'+Date.now(), ref:'RESIL-CES-'+cessionId, date:dat, piece:'RESIL-'+(c.dossier||cessionId),
+      libelle:'Résiliation cession — dette de remboursement — '+(c.acquereur||''),
+      compte:compteDette, compte_debit:cptTiers, compte_credit:compteDette, montant:rembourse, type:'passif', created_at:dat };
+    DATA.ecritures.push(ecrR); await dbPut('ecritures', ecrR); if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', ecrR);
+  }
+  if (retenu > 0) {
+    var compteProduitR = requireCompteDefaut('resiliation_produit');
+    var ecrP = { id:'ecr_resil_ces_produit_'+cessionId+'_'+Date.now(), ref:'RESIL-CES-'+cessionId, date:dat, piece:'RESIL-'+(c.dossier||cessionId),
+      libelle:'Résiliation cession — retenue conservée — '+(c.acquereur||''),
+      compte:compteProduitR, compte_debit:cptTiers, compte_credit:compteProduitR, montant:retenu, type:'produit', created_at:dat };
+    DATA.ecritures.push(ecrP); await dbPut('ecritures', ecrP); if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', ecrP);
+  }
+  if (typeof buildBalance==='function') buildBalance();
+  if (typeof buildGrandLivre==='function') buildGrandLivre();
+
+  /* 3) Libérer le bien source pour réattribution */
+  if (c.source_type==='parcelle') {
+    var p=(DATA.parcelles||[]).find(function(x){return x.id===c.source_id;});
+    if (p) { p.superficie_cedee=Math.max(0,(p.superficie_cedee||0)-(c.superficie||0)); await dbPut('parcelles',p); if(typeof syncToSupabase==='function') syncToSupabase('pi_parcelles',p); }
+  } else if (c.source_type==='operation') {
+    var op=(DATA.af_operations||[]).find(function(x){return x.id===c.source_id;});
+    if (op) { op.lots_cedes=Math.max(0,(op.lots_cedes||0)-(c.nb_lots||0)); await dbPut('af_operations',op); if(typeof syncToSupabase==='function') syncToSupabase('pi_af_operations',op); }
+  }
+
+  /* 4) Commissions — même logique que souscripteurs, dépend du motif */
+  var comms = (DATA.commissions||[]).filter(function(cm){ return cm.cession_id===cessionId && cm.statut!=='annulee'; });
+  var nbAnnulees=0, nbARecuperer=0;
+  if (motif !== 'faute_promoteur') {
+    for (var i=0;i<comms.length;i++){
+      var cm = comms[i];
+      if (cm.statut==='payee'){ cm.statut='a_recuperer'; cm.a_recuperer_motif='Résiliation cession '+cessionId; nbARecuperer++; }
+      else { cm.statut='annulee'; nbAnnulees++; }
+      cm._modifie=new Date().toISOString();
+      await dbPut('commissions', cm); if (typeof syncToSupabase==='function') syncToSupabase('pi_commissions', cm);
+    }
+  }
+
+  /* 5) Statut cession — trace conservée, jamais de suppression */
+  c.statut = 'resiliee';
+  c.resiliation = { date:dat, motif:motif, justification:justification, montant_encaisse:encaisse,
+    taux_remboursement:Math.round(taux*100), montant_rembourse:rembourse, montant_retenu:retenu,
+    commissions_annulees:nbAnnulees, commissions_a_recuperer:nbARecuperer,
+    valide_par:(APP.currentUser&&APP.currentUser.nom)||'—', cree_le:new Date().toISOString() };
+  c._modifie = new Date().toISOString();
+  await logAudit('cessions_foncieres', cessionId, 'resiliation', null, c.resiliation);
+  await dbPut('cessions_foncieres', c); if (typeof syncToSupabase==='function') syncToSupabase('pi_cessions_foncieres', c);
+
+  closeModal('modal-cesresil');
+  if (typeof cesRender==='function') cesRender();
+  refreshDashboard();
+  toast('Cession résiliée — '+fcfa(rembourse)+' à rembourser, '+fcfa(retenu)+' retenu, bien libéré pour réattribution.', 'success');
+  cesResilierImprimerDecompte(cessionId);
+}
+function cesResilierImprimerDecompte(cessionId){
+  var c = (DATA.cessions_foncieres||[]).find(function(x){return x.id===cessionId;});
+  if (!c || !c.resiliation) { toast('Aucune résiliation enregistrée.','error'); return; }
+  var r = c.resiliation;
+  var soc = (DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var w = window.open('','_blank');
+  if (!w) { toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  var motifLabel = r.motif==='faute_promoteur' ? 'Défaut/retard imputable au promoteur' : 'Désistement de l\'acquéreur';
+  w.document.write('<html><head><title>Décompte de résiliation — '+escHtml(c.acquereur||'')+'</title>'
+    +'<style>body{font-family:Georgia,serif;padding:38px;color:#111;font-size:13px;line-height:1.55;}'
+    +'h1{font-size:17px;margin:0 0 4px;}h2{font-size:13.5px;margin:18px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px;}'
+    +'table{width:100%;border-collapse:collapse;margin:6px 0;}td{padding:5px 8px;border:1px solid #ccc;}td.k{width:45%;background:#f5f5f5;}'
+    +'.pied{margin-top:26px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Décompte résiliation cession', c.dossier||cessionId)
+    +'<h1>'+escHtml(soc)+'</h1>'
+    +'<h1 style="margin-top:14px;">Notification de résiliation et décompte — Cession foncière</h1>'
+    +'<div style="color:#555;font-size:11.5px;">Réf. dossier : '+escHtml(c.dossier||cessionId)+' — '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    +'<h2>Acquéreur / Bien</h2><table><tbody>'
+    +'<tr><td class="k">Acquéreur</td><td>'+escHtml(c.acquereur||'')+'</td></tr>'
+    +'<tr><td class="k">Désignation</td><td>'+escHtml(c.designation||cesSourceRef(c.source_key))+'</td></tr>'
+    +'</tbody></table>'
+    +'<h2>Motif de la résiliation</h2><p>'+escHtml(motifLabel)+'</p><p style="font-style:italic;color:#444;">'+escHtml(r.justification||'')+'</p>'
+    +'<h2>Décompte financier</h2><table><tbody>'
+    +'<tr><td class="k">Prix de cession (annulé)</td><td>'+fcfa(c.prix_cession||0)+'</td></tr>'
+    +'<tr><td class="k">Montant réellement encaissé</td><td>'+fcfa(r.montant_encaisse)+'</td></tr>'
+    +'<tr><td class="k">Taux de remboursement applicable</td><td>'+r.taux_remboursement+'%</td></tr>'
+    +'<tr><td class="k"><b>Montant à rembourser</b></td><td><b>'+fcfa(r.montant_rembourse)+'</b></td></tr>'
+    +'<tr><td class="k">Montant retenu</td><td>'+fcfa(r.montant_retenu)+'</td></tr>'
+    +'</tbody></table>'
+    +'<div class="pied">Fondement contractuel : clause de désistement (60%/100% selon partie à l\'origine de la résiliation).'
+    +'<br><br>Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')
+    +'<br><br>Pour '+escHtml(soc)+' : ___________________________<br><br>L\'acquéreur (bon pour accord) : ___________________________</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
+}
+function cesResilierOuvrirRemboursement(cessionId){
+  var c = (DATA.cessions_foncieres||[]).find(function(x){return x.id===cessionId;});
+  if (!c || !c.resiliation) { toast('Aucune résiliation enregistrée.','error'); return; }
+  if (c.resiliation.rembourse) { toast('Ce remboursement a déjà été acté le '+dateShort(c.resiliation.rembourse_le)+'.','info'); return; }
+  if (!exigerDroit('Comptabilite', 'v', 'ce remboursement de résiliation')) return;
+  document.getElementById('crr-cession-id').value = cessionId;
+  document.getElementById('crr-date').value = today();
+  document.getElementById('crr-reference').value = '';
+  document.getElementById('crr-recap').innerHTML = '<b>'+escHtml(c.acquereur||'')+'</b> — montant à rembourser : <b>'+fcfa(c.resiliation.montant_rembourse)+'</b>';
+  openModal('modal-cesresil-remb');
+}
+async function cesResilierConfirmerRemboursement(){
+  var cessionId = document.getElementById('crr-cession-id').value;
+  var c = (DATA.cessions_foncieres||[]).find(function(x){return x.id===cessionId;});
+  if (!c || !c.resiliation || c.resiliation.rembourse) { toast('Remboursement introuvable ou déjà acté.','error'); return; }
+  if (!exigerDroit('Comptabilite', 'v', 'ce remboursement de résiliation')) return;
+  var dat = document.getElementById('crr-date').value || today();
+  var mode = document.getElementById('crr-mode').value;
+  var reference = document.getElementById('crr-reference').value.trim();
+  var montant = c.resiliation.montant_rembourse;
+  if (montant <= 0) { toast('Aucun montant à rembourser.','error'); return; }
+
+  var compteDette = requireCompteDefaut('resiliation_dette');
+  var compteTreso = _compteTresoVersement(mode);
+  var ecr = { id:'ecr_resil_ces_remb_'+cessionId+'_'+Date.now(), ref:'REMB-RESIL-CES-'+cessionId, date:dat,
+    piece:reference||('REMB-'+(c.dossier||cessionId)), libelle:'Remboursement résiliation cession — '+(c.acquereur||''),
+    compte:compteTreso, compte_debit:compteDette, compte_credit:compteTreso, montant:montant, type:'actif', mode:mode, created_at:today() };
+  DATA.ecritures.push(ecr); await dbPut('ecritures', ecr); if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', ecr);
+  if (typeof buildBalance==='function') buildBalance();
+  if (typeof buildGrandLivre==='function') buildGrandLivre();
+
+  c.resiliation.rembourse = true; c.resiliation.rembourse_le = dat; c.resiliation.rembourse_mode = mode; c.resiliation.rembourse_reference = reference;
+  c._modifie = new Date().toISOString();
+  await logAudit('cessions_foncieres', cessionId, 'remboursement_resiliation', null, { montant:montant, mode:mode, date:dat });
+  await dbPut('cessions_foncieres', c); if (typeof syncToSupabase==='function') syncToSupabase('pi_cessions_foncieres', c);
+
+  closeModal('modal-cesresil-remb');
+  if (typeof cesRender==='function') cesRender();
+  toast('✅ Remboursement de '+fcfa(montant)+' enregistré et comptabilisé.', 'success');
 }
 function sfcCentifRenderHistorique(){
   var el=document.getElementById('cf-historique'); if(!el) return;
@@ -59466,6 +60520,7 @@ function sageApercu(){
     + '<br>Exemples : ' + r.rows.slice(0,3).map(function(x){ return x.code + ' « ' + escHtml(x.label) + ' » (' + x.nature + ')'; }).join(' · ');
 }
 async function validerImportSage(){
+  if (!hasRole('admin')) { toast('⛔ Import du plan comptable réservé à l\'administrateur — impact sur toute la comptabilité.', 'error'); return; }
   var r = sagePlanParse((document.getElementById('sage-paste')||{}).value);
   if (!r.rows.length) { toast('Aucun compte reconnu dans le texte collé.', 'error'); return; }
   var mod = IMPORT_MODULES.find(function(m){ return m.id === 'plan_comptable'; });
@@ -60933,6 +61988,7 @@ function facVentilerOuvrir(id) {
 window.facVentilerOuvrir = facVentilerOuvrir;
 
 async function facVentilerValider() {
+  if (!exigerDroit('Comptabilite', 'v', 'la ventilation de cette facture fournisseur')) return;
   var f = (DATA.factures_fournisseur_attente||[]).find(function(x){ return x.id === _faVentilId; });
   if (!f) return;
   var compteDebit = document.getElementById('fv-compte-debit').value.trim();
@@ -61292,22 +62348,27 @@ async function genererDotationsAnnuelles() {
   for (var i = 0; i < list.length; i++) {
     var im = list[i];
     var c = immoSocCalc(im, year);
+    /* [FIX] id déterministe — remplace uid() (aléatoire). Avec un id
+       aléatoire, un reclic ou une resynchronisation après coupure réseau
+       pouvait créer une DEUXIÈME écriture pour la même dotation au lieu
+       d'écraser proprement la même (dbPut fait un upsert par id). Même
+       convention que comptabiliserDotations() (foncier) : ecr_<source>_<id>_<année>
+       — garantit qu'appeler cette fonction OU le bouton unifié "Comptabiliser
+       dotations 681" pour le même véhicule/année produit exactement la même
+       écriture, jamais un doublon. */
     var ec = {
-      id: uid(), ref: 'DOT-' + year + '-' + String(i+1).padStart(3,'0'), date: year+'-12-31', piece: 'DOTATION',
+      id: 'ecr_immosoc_dot_'+im.id+'_'+year, ref: 'DOT-' + year + '-' + String(i+1).padStart(3,'0'), date: year+'-12-31', piece: 'DOTATION',
       type: 'charge', libelle: 'Dotation amortissement ' + year + ' — ' + im.designation,
       lignes: [ { compte: cptDotation, sens:'D', montant: c.dotationAnnuelle, libelle:'Dotation' }, { compte: cptCumul, sens:'C', montant: c.dotationAnnuelle, libelle:'Amortissement cumulé' } ],
       compte: cptDotation, compte_debit: cptDotation, compte_credit: cptCumul, montant: c.dotationAnnuelle,
       mode: 'od', programme_id: '', division: im.division_id||'', notes: 'Immobilisation ' + im.designation + ' — année ' + (c.anneesEcoulees) + '/' + c.duree, created_at: today()
     };
-    DATA.ecritures.push(ec); await dbPut('ecritures', ec);
+    var idxEc = DATA.ecritures.findIndex(function(e){ return e.id === ec.id; });
+    if (idxEc >= 0) DATA.ecritures[idxEc] = ec; else DATA.ecritures.push(ec);
+    await dbPut('ecritures', ec);
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', ec);
-    im.dotations_generees = im.dotations_generees || []; im.dotations_generees.push(year);
-    /* [FIX] Ces écritures de dotation ont un id ALÉATOIRE (uid()), pas
-       déterministe comme les autres modules — impossible de les retrouver par
-       motif de nommage à la suppression de l'immobilisation. On trace donc
-       explicitement leurs ids sur la fiche pour permettre une cascade fiable
-       (cf. deleteImmoSociete ci-dessous). */
-    im.ecritures_dotation_ids = im.ecritures_dotation_ids || []; im.ecritures_dotation_ids.push(ec.id);
+    im.dotations_generees = im.dotations_generees || []; if (im.dotations_generees.indexOf(year)===-1) im.dotations_generees.push(year);
+    im.ecritures_dotation_ids = im.ecritures_dotation_ids || []; if (im.ecritures_dotation_ids.indexOf(ec.id)===-1) im.ecritures_dotation_ids.push(ec.id);
     await dbPut('immobilisations', im);
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_immobilisations', im);
   }
@@ -61900,6 +62961,43 @@ function boCheckEquilibre() {
   return { ok: ok, totD: totD, totC: totC };
 }
 
+/* Import par collage — évite de ressaisir manuellement une à une des lignes
+   déjà préparées (ex. reprise depuis une liasse fiscale déposée à la DGI :
+   plusieurs dizaines de comptes pour une seule entité, ligne par ligne dans
+   l'écran serait long et propice aux erreurs de recopie). */
+function boOuvrirImport(){
+  document.getElementById('bo-import-texte').value = '';
+  document.getElementById('bo-import-apercu').textContent = '';
+  openModal('modal-bo-import');
+}
+function boConfirmerImport(){
+  var texte = (document.getElementById('bo-import-texte')||{}).value || '';
+  var lignes = texte.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+  if (!lignes.length){ toast('Collez au moins une ligne.','error'); return; }
+  var importees = [];
+  var erreurs = [];
+  lignes.forEach(function(l, idx){
+    var p = l.split('|').map(function(x){ return x.trim(); });
+    if (p.length < 3) { erreurs.push('Ligne ' + (idx+1) + ' : format invalide (' + l + ')'); return; }
+    var compte = p[0], sens = p[1].toUpperCase(), montant = parseFloat((p[2]||'').replace(/[^\d.-]/g,''));
+    if (!compte) { erreurs.push('Ligne ' + (idx+1) + ' : compte manquant'); return; }
+    if (sens !== 'D' && sens !== 'C') { erreurs.push('Ligne ' + (idx+1) + ' : sens « ' + p[1] + ' » invalide (D ou C attendu)'); return; }
+    if (!montant || montant <= 0) { erreurs.push('Ligne ' + (idx+1) + ' : montant invalide (' + p[2] + ')'); return; }
+    importees.push({ compte: compte, sens: sens, montant: montant });
+  });
+  if (!importees.length) { toast('Aucune ligne valide à importer.', 'error'); return; }
+  _boLignes = importees;
+  boRenderLignes();
+  closeModal('modal-bo-import');
+  var totD = importees.filter(function(l){return l.sens==='D';}).reduce(function(s,l){return s+l.montant;},0);
+  var totC = importees.filter(function(l){return l.sens==='C';}).reduce(function(s,l){return s+l.montant;},0);
+  toast(importees.length + ' ligne(s) chargée(s)'
+    + (erreurs.length ? ' — ⚠️ ' + erreurs.length + ' ligne(s) ignorée(s) (voir console).' : '')
+    + (Math.abs(totD-totC) < 1 ? ' — équilibré ✅' : ' — ⚠️ déséquilibre à vérifier.'),
+    erreurs.length ? 'warning' : 'success');
+  if (erreurs.length) console.warn('[Bilan ouverture — import]', erreurs.join('\n'));
+}
+
 /** Recharge le formulaire pour l'exercice sélectionné : préremplit si un bilan d'ouverture existe déjà */
 function renderBilanOuverture() {
   initPlanComptable();
@@ -61923,7 +63021,15 @@ function renderBilanOuverture() {
       : '';
   }
 
-  var existantes = (DATA.ecritures||[]).filter(function(e){ return e.reference === 'BO-' + annee; });
+  /* [FIX] Aucune des écritures ci-dessous n'était rattachée à la division en
+     cours (ni sur l'id, ni sur le champ division) : deux entités du groupe
+     saisies pour le même exercice s'écrasaient silencieusement sur chaque
+     compte en commun (101, 401, 12…), puisque l'id ne dépendait que de
+     l'année et du compte — jamais de la division. Bloquant pour une saisie
+     multi-entités (holding + filiales) sous le même exercice. */
+  var divBO = _comptaDivisionFilter() || '_sansdivision';
+
+  var existantes = (DATA.ecritures||[]).filter(function(e){ return e.reference === 'BO-' + annee && (e.division||'_sansdivision') === divBO; });
   var btnSuppr = document.getElementById('bo-btn-suppr');
   if (btnSuppr) btnSuppr.style.display = existantes.length ? 'inline-flex' : 'none';
 
@@ -61942,6 +63048,7 @@ function renderBilanOuverture() {
     _boLignes = [{ compte:'', sens:'D', montant:'' }, { compte:'', sens:'C', montant:'' }];
   }
   boRenderLignes();
+  boRenderRecap();
 }
 
 async function saveBilanOuverture() {
@@ -61981,12 +63088,19 @@ async function saveBilanOuverture() {
     if (!confirm('⚠️ Le bilan saisi est déséquilibré (écart ' + fmtF(Math.abs(eq.totD-eq.totC)) + ' FCFA). Le compte de liaison 890 portera cet écart. Enregistrer quand même ?')) return;
   }
 
-  /* Supprimer un éventuel bilan d'ouverture précédent pour cet exercice (idempotent) */
-  var anciennes = (DATA.ecritures||[]).filter(function(e){ return e.reference === 'BO-' + annee; });
+  /* Même correctif que renderBilanOuverture() : purge et reconstruction
+     limitées à la division en cours — sinon enregistrer Menko Digitech
+     après Menko Holding supprimerait le bilan d'ouverture de Holding
+     dès qu'un compte est commun aux deux (référence identique 'BO-<année>'
+     partagée par toutes les divisions jusqu'ici). */
+  var divBOsave = _comptaDivisionFilter() || '_sansdivision';
+
+  /* Supprimer un éventuel bilan d'ouverture précédent pour cette division/exercice (idempotent) */
+  var anciennes = (DATA.ecritures||[]).filter(function(e){ return e.reference === 'BO-' + annee && (e.division||'_sansdivision') === divBOsave; });
   for (var k = 0; k < anciennes.length; k++) {
     await deleteRecord('ecritures', anciennes[k].id, { skipIntegrity: true, forceCloture: true });
   }
-  DATA.ecritures = DATA.ecritures.filter(function(e){ return e.reference !== 'BO-' + annee; });
+  DATA.ecritures = DATA.ecritures.filter(function(e){ return !(e.reference === 'BO-' + annee && (e.division||'_sansdivision') === divBOsave); });
 
   var ref = 'BO-' + annee;
   var nb = 0;
@@ -61995,7 +63109,7 @@ async function saveBilanOuverture() {
     if (Math.abs(solde) < 1) continue;
     var cInfo = APP.planComptable.find(function(c){ return c.code === cpt; });
     var ecr = {
-      id: 'ecr_bo_' + annee + '_' + cpt,
+      id: 'ecr_bo_' + annee + '_' + divBOsave + '_' + cpt,
       date: date,
       ref: ref,
       reference: ref,
@@ -62006,6 +63120,7 @@ async function saveBilanOuverture() {
       compte_credit: solde > 0 ? '890' : cpt,
       type: 'a_nouveau',
       journal: 'AN',
+      division: _comptaDivisionFilter() || '',
       notes: note,
       _auto: 'bilan_ouverture',
       created_at: today()
@@ -62017,7 +63132,18 @@ async function saveBilanOuverture() {
   }
 
   toast('✅ Bilan d\'ouverture ' + annee + ' enregistré — ' + nb + ' compte(s).', 'success');
-  renderBilanOuverture();
+  /* [Fix ergonomie] renderBilanOuverture() rechargeait aussitôt les lignes
+     qu'on venait d'enregistrer dans le formulaire — pratique pour corriger,
+     gênant pour enchaîner une autre entité : il fallait tout effacer à la
+     main avant de saisir la division suivante. Formulaire vidé directement
+     ici (date et exercice conservés — la saisie suivante est très souvent
+     la même date), et le tableau récapitulatif ci-dessous prend le relais
+     pour consulter/modifier/supprimer ce qui est déjà enregistré. */
+  _boLignes = [{ compte:'', sens:'D', montant:'' }, { compte:'', sens:'C', montant:'' }];
+  var noteElSave = document.getElementById('bo-note'); if (noteElSave) noteElSave.value = '';
+  boRenderLignes();
+  var btnSupprSave = document.getElementById('bo-btn-suppr'); if (btnSupprSave) btnSupprSave.style.display = 'none';
+  boRenderRecap();
   if (typeof filterEcritures === 'function') filterEcritures();
   if (typeof buildBalance === 'function') buildBalance();
   if (typeof buildBilan === 'function') buildBilan();
@@ -62027,16 +63153,82 @@ async function saveBilanOuverture() {
 async function supprimerBilanOuverture() {
   var selAnnee = document.getElementById('bo-annee');
   var annee = parseInt((selAnnee||{}).value) || new Date().getFullYear();
-  if (!confirm('🗑 Supprimer le bilan d\'ouverture ' + annee + ' ?\n\nToutes les écritures d\'à-nouveaux saisies manuellement pour cet exercice seront supprimées.')) return;
+  var divBOdel = _comptaDivisionFilter() || '_sansdivision';
+  if (!confirm('🗑 Supprimer le bilan d\'ouverture ' + annee + ' de cette division ?\n\nToutes les écritures d\'à-nouveaux saisies manuellement pour cet exercice et cette division seront supprimées.')) return;
 
-  var toDelete = (DATA.ecritures||[]).filter(function(e){ return e.reference === 'BO-' + annee; });
+  var toDelete = (DATA.ecritures||[]).filter(function(e){ return e.reference === 'BO-' + annee && (e.division||'_sansdivision') === divBOdel; });
   for (var i = 0; i < toDelete.length; i++) {
     await deleteRecord('ecritures', toDelete[i].id, { skipIntegrity: true, forceCloture: true });
   }
-  DATA.ecritures = DATA.ecritures.filter(function(e){ return e.reference !== 'BO-' + annee; });
+  DATA.ecritures = DATA.ecritures.filter(function(e){ return !(e.reference === 'BO-' + annee && (e.division||'_sansdivision') === divBOdel); });
 
   toast('Bilan d\'ouverture ' + annee + ' supprimé (' + toDelete.length + ' écriture(s)).', 'info');
   renderBilanOuverture();
+  if (typeof filterEcritures === 'function') filterEcritures();
+  if (typeof buildBalance === 'function') buildBalance();
+  if (typeof buildBilan === 'function') buildBilan();
+}
+
+/* Récapitulatif — un bilan d'ouverture peut désormais exister pour chaque
+   division sous le même exercice (voir correctif ci-dessus) : sans cette
+   vue d'ensemble, rien à l'écran ne montre lesquelles sont déjà saisies une
+   fois le formulaire vidé après enregistrement. Une ligne par division +
+   exercice, avec accès direct pour consulter/modifier/supprimer. */
+function boRenderRecap(){
+  var box = document.getElementById('bo-recap-box');
+  if (!box) return;
+  var groupes = {};
+  (DATA.ecritures||[]).filter(function(e){ return e._auto === 'bilan_ouverture'; }).forEach(function(e){
+    var key = (e.division||'_sansdivision') + '|' + e.reference;
+    groupes[key] = groupes[key] || { division: e.division||'', reference: e.reference, date: e.date, notes: e.notes, lignes: [] };
+    groupes[key].lignes.push(e);
+  });
+  var lignesRecap = Object.keys(groupes).map(function(k){ return groupes[k]; });
+  if (!lignesRecap.length) { box.innerHTML = '<div style="color:var(--blanc-dim);font-size:12px;padding:12px;">Aucun bilan d\'ouverture enregistré pour l\'instant.</div>'; return; }
+  lignesRecap.sort(function(a,b){ return (a.division||'').localeCompare(b.division||'') || a.reference.localeCompare(b.reference); });
+  box.innerHTML = '<div class="table-wrap"><table style="width:100%;font-size:12.5px;">'
+    + '<thead><tr><th>Division</th><th>Exercice</th><th>Date</th><th style="text-align:right;">Total (débit)</th><th>Comptes</th><th>Note</th><th></th></tr></thead><tbody>'
+    + lignesRecap.map(function(g){
+      var divNom = (DATA.divisions||[]).find(function(d){ return d.id === g.division; });
+      var total = g.lignes.reduce(function(s,e){ return s + (e.compte_debit!=='890' ? (parseFloat(e.montant)||0) : 0); }, 0);
+      return '<tr>'
+        + '<td>' + (divNom ? escHtml(divNom.nom) : (g.division ? escHtml(g.division) : '<span style="color:var(--blanc-dim);">— Sans division —</span>')) + '</td>'
+        + '<td>' + escHtml(g.reference.replace('BO-','')) + '</td>'
+        + '<td>' + dateShort(g.date) + '</td>'
+        + '<td style="text-align:right;font-weight:700;">' + fmtF(total) + '</td>'
+        + '<td>' + g.lignes.length + '</td>'
+        + '<td style="font-size:11px;color:var(--blanc-dim);">' + escHtml(g.notes||'') + '</td>'
+        + '<td style="white-space:nowrap;">'
+        + '<button class="btn btn-secondary btn-sm btn-icon" title="Charger dans le formulaire" onclick="boChargerRecap(\'' + (g.division||'') + '\',\'' + g.reference + '\')">✏️</button> '
+        + '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer" onclick="boSupprimerRecap(\'' + (g.division||'') + '\',\'' + g.reference + '\')">🗑</button>'
+        + '</td></tr>';
+    }).join('')
+    + '</tbody></table></div>';
+}
+/* Bascule la division/exercice actifs sur ceux de la ligne choisie, puis
+   recharge le formulaire — évite d'avoir à retrouver soi-même la bonne
+   combinaison division/année dans les sélecteurs du haut. */
+function boChargerRecap(divisionId, reference){
+  var divEl = document.getElementById('filter-compta-division');
+  if (divEl && !userScopeDivision()) { divEl.value = divisionId || ''; }
+  var annee = parseInt(reference.replace('BO-',''), 10);
+  var anEl = document.getElementById('bo-annee');
+  if (anEl) anEl.value = annee;
+  renderBilanOuverture();
+  var wrap = document.getElementById('bo-lignes-wrap');
+  if (wrap) wrap.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+async function boSupprimerRecap(divisionId, reference){
+  var annee = parseInt(reference.replace('BO-',''), 10);
+  var divKey = divisionId || '_sansdivision';
+  if (!confirm('🗑 Supprimer le bilan d\'ouverture ' + annee + ' de cette division ?')) return;
+  var toDelete = (DATA.ecritures||[]).filter(function(e){ return e.reference === reference && (e.division||'_sansdivision') === divKey; });
+  for (var i = 0; i < toDelete.length; i++) {
+    await deleteRecord('ecritures', toDelete[i].id, { skipIntegrity: true, forceCloture: true });
+  }
+  DATA.ecritures = DATA.ecritures.filter(function(e){ return !(e.reference === reference && (e.division||'_sansdivision') === divKey); });
+  toast('Bilan d\'ouverture supprimé (' + toDelete.length + ' écriture(s)).', 'info');
+  boRenderRecap();
   if (typeof filterEcritures === 'function') filterEcritures();
   if (typeof buildBalance === 'function') buildBalance();
   if (typeof buildBilan === 'function') buildBilan();
@@ -62870,6 +64062,28 @@ function buildTiers461() {
 */
 
 /* ─── Calcul annuité ─────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   MISE À NIVEAU — Tableau d'amortissement limité au foncier (biens_amort),
+   jamais aux véhicules/matériel (DATA.immobilisations, module Immobilisations
+   Société / Parc Auto) : deux registres aux champs différents, jamais
+   unifiés dans les vues de consultation. Adaptateur en lecture seule —
+   ne touche jamais aux données réelles, ne crée jamais d'écriture (la
+   génération des dotations reste séparée : comptabiliserDotations() pour
+   le foncier, genererDotationsAnnuelles() pour Immobilisations Société —
+   les fusionner risquerait une double comptabilisation de la même dotation). */
+function _amortAdapterImmo(im){
+  return {
+    id: im.id, dossier: '', designation: im.designation||'', _source: 'immobilisations',
+    compte_immo: im.compte||'24', compte_amort: '28'+String(im.compte||'24').slice(1),
+    valeur_origine: parseFloat(im.valeur_acquisition)||0, valeur_residuelle: parseFloat(im.valeur_residuelle)||0,
+    duree: im.duree_ans||5, date_debut: im.date_acquisition||today(), methode: im.methode||'lineaire',
+    division_id: im.division_id||''
+  };
+}
+function _amortTousBiens(){
+  return (DATA.biens_amort||[]).map(function(b){ return Object.assign({_source:'biens_amort'}, b); })
+    .concat((DATA.immobilisations||[]).map(_amortAdapterImmo));
+}
 function calcAnnuite(bien, annee) {
   var val = bien.valeur_origine||0;
   var res = bien.valeur_residuelle||0;
@@ -63034,12 +64248,18 @@ function buildAmortBiens() {
   var filtMethode = (document.getElementById('filter-amort-methode')||{}).value||'';
   var filtStatut = (document.getElementById('filter-amort-statut')||{}).value||'';
 
-  // Populate tableau select
+  // Populate tableau select — élargi aux Immobilisations Société (véhicules,
+  // matériel) : jusqu'ici seul le foncier y apparaissait, rendant le
+  // Tableau d'amortissement inutilisable pour un véhicule Parc Auto.
   var tabSel = document.getElementById('filter-amort-bien');
   if (tabSel && tabSel.options.length <= 1) {
     biens.forEach(function(b){
       var o=document.createElement('option'); o.value=b.id;
-      o.textContent=(b.dossier?b.dossier+' — ':'')+b.designation.slice(0,30); tabSel.appendChild(o);
+      o.textContent='🏠 '+(b.dossier?b.dossier+' — ':'')+b.designation.slice(0,30); tabSel.appendChild(o);
+    });
+    (DATA.immobilisations||[]).forEach(function(im){
+      var o=document.createElement('option'); o.value=im.id;
+      o.textContent='🚗 '+(im.designation||'').slice(0,30); tabSel.appendChild(o);
     });
   }
 
@@ -63129,7 +64349,7 @@ function buildTableauAmort() {
   if (!box) return;
   if (!bienId) { box.innerHTML='<div style="color:var(--dim);font-size:13px;padding:16px;">Sélectionnez un bien.</div>'; return; }
 
-  var bien=DATA.biens_amort&&DATA.biens_amort.find(function(b){return b.id===bienId;});
+  var bien = _amortTousBiens().find(function(b){return b.id===bienId;});
   if (!bien) { box.innerHTML='<div style="color:var(--dim);">Bien introuvable.</div>'; return; }
 
   // Fiche résumé
@@ -63187,7 +64407,7 @@ function printTableauAmort() { _printFromElement('tableau-amort-box', 'Tableau d
 
 function exportTableauAmortCSV() {
   var bienId=(document.getElementById('filter-amort-bien')||{}).value||'';
-  var bien=DATA.biens_amort&&DATA.biens_amort.find(function(b){return b.id===bienId;});
+  var bien=_amortTousBiens().find(function(b){return b.id===bienId;});
   if(!bien){toast('Sélectionnez un bien.','error');return;}
   var anneeDebut=parseInt((bien.date_debut||'2024').slice(0,4));
   var rows=['Exercice,Valeur brute,Dotation 681,Amort. cumulé 281,VNC'];
@@ -63195,7 +64415,7 @@ function exportTableauAmortCSV() {
     rows.push([a,bien.valeur_origine,calcAnnuite(bien,a),calcAmortCumul(bien,a),calcVNC(bien,a)].join(','));
   }
   var blob=new Blob([rows.join('\n')],{type:'text/csv'});
-  var el=document.createElement('a'); el.href=URL.createObjectURL(blob); el.download='amort_'+bien.dossier+'.csv'; el.click();
+  var el=document.createElement('a'); el.href=URL.createObjectURL(blob); el.download='amort_'+(bien.dossier||bien.designation.replace(/[^a-z0-9]+/gi,'_').slice(0,20))+'.csv'; el.click();
   toast('Tableau exporté.','success');
 }
 
@@ -63207,7 +64427,13 @@ function buildDotations() {
     for(var a=anneeN;a>=anneeN-5;a--){var o=document.createElement('option');o.value=a;o.textContent=a;sel.appendChild(o);}
   }
   var annee=parseInt(sel?sel.value||anneeN:anneeN);
-  var biens=DATA.biens_amort||[];
+  /* [Unification] Élargi au registre Immobilisations Société (véhicules,
+     matériel — Parc Auto) : jusqu'ici seul le foncier apparaissait ici,
+     ce qui laissait croire qu'un véhicule ne pouvait jamais être amorti
+     à ce niveau. Sûr grâce à l'id déterministe de comptabiliserDotations()
+     ci-dessous : comptabiliser depuis ici ou depuis Immobilisations Société
+     produit exactement la même écriture, jamais un doublon. */
+  var biens=_amortTousBiens();
   var tbody=document.getElementById('tbody-dotations');
   var alertEl=document.getElementById('dotations-alerte');
   if(!tbody)return;
@@ -63235,7 +64461,7 @@ function buildDotations() {
     totalDot+=dot; totalCumul+=cumulN; totalVNC+=vnc;
     var amorti=dot===0;
     return '<tr>'
-      +'<td style="font-family:monospace;font-size:11px;color:var(--or);">'+(b.dossier||'—')+'</td>'
+      +'<td style="font-family:monospace;font-size:11px;color:var(--or);">'+(b._source==='immobilisations'?'🚗':'🏠')+' '+(b.dossier||'—')+'</td>'
       +'<td style="font-size:12px;">'+b.designation.slice(0,30)+'</td>'
       +'<td>'+fmtF(b.valeur_origine)+' FCFA</td>'
       +'<td style="color:var(--dim);">'+fmtF(cumulAnt)+' FCFA</td>'
@@ -63259,13 +64485,8 @@ function buildDotations() {
 async function comptabiliserDotations() {
   var sel=document.getElementById('filter-amort-annee');
   var annee=parseInt(sel?sel.value||new Date().getFullYear():new Date().getFullYear());
-  var biens=DATA.biens_amort||[];
+  var biens=_amortTousBiens();
   if(!biens.length){toast('Aucun bien à amortir.','error');return;}
-  /* [FIX] Aucun garde-fou exercice clos ici, contrairement à la fonction
-     sœur genererDotationsAnnuelles() (module Immobilisations). Sans lui,
-     dbPut rejette silencieusement chaque écriture sur un exercice clos,
-     mais la boucle continuait, affichant « ✅ N dotations comptabilisées »
-     alors qu'aucune ne persistait réellement. */
   if (typeof exerciceEstClos === 'function' && exerciceEstClos(annee+'-12-31')) {
     toast('🔒 Exercice ' + annee + ' clôturé — dotations bloquées.', 'error'); return;
   }
@@ -63276,9 +64497,14 @@ async function comptabiliserDotations() {
     var b=biens[i];
     var dot=calcAnnuite(b,annee);
     if(dot<=0)continue;
+    /* [Unification] Identifiant déterministe différent selon le registre
+       d'origine, mais IDENTIQUE à celui que produirait l'autre bouton
+       (genererDotationsAnnuelles pour un véhicule) — upsert sûr, jamais
+       de double écriture même si les deux boutons sont utilisés. */
+    var ecrId = b._source==='immobilisations' ? ('ecr_immosoc_dot_'+b.id+'_'+annee) : ('ecr_681_'+b.id+'_'+annee);
     var ecr={
-      id:'ecr_681_'+b.id+'_'+annee,
-      ref:'DAP-'+annee+'-'+b.dossier,
+      id:ecrId,
+      ref:'DAP-'+annee+'-'+(b.dossier||b.id.slice(-6).toUpperCase()),
       date:date31dec,
       piece:'681/'+b.compte_amort,
       libelle:'Dotation amortissement '+annee+' — '+b.designation.slice(0,50)+(b.dossier?' ('+b.dossier+')':''),
@@ -63289,15 +64515,11 @@ async function comptabiliserDotations() {
       type:'charge',
       mode:'interne',
       division:b.division_id||'',
-      notes:'Amortissement linéaire — '+b.duree+' ans',
+      notes:'Amortissement '+b.methode+' — '+b.duree+' ans',
       created_at:date31dec,
     };
     var idxDot = DATA.ecritures.findIndex(function(e){ return e.id === ecr.id; });
     if (idxDot >= 0) DATA.ecritures[idxDot] = ecr; else DATA.ecritures.push(ecr);
-    /* [FIX] Retour de dbPut vérifié — même filet que genererDotationsAnnuelles()
-       et genererEcritureCaisseMouvement(), sinon une écriture rejetée reste
-       fantôme en mémoire (visible dans la session en cours) sans jamais être
-       persistée ni synchronisée. */
     var _ok = await dbPut('ecritures',ecr);
     if (_ok === false) {
       var _idx2 = DATA.ecritures.findIndex(function(e){ return e.id === ecr.id; });
@@ -63306,17 +64528,30 @@ async function comptabiliserDotations() {
       continue;
     }
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', ecr);
+    /* Traçabilité sur la fiche réelle (pas l'objet adapté) — même champs
+       que genererDotationsAnnuelles(), pour que les deux boutons tiennent
+       le même registre de suivi sur l'immobilisation. */
+    if (b._source==='immobilisations') {
+      var imReel = (DATA.immobilisations||[]).find(function(x){ return x.id===b.id; });
+      if (imReel) {
+        imReel.dotations_generees = imReel.dotations_generees || []; if (imReel.dotations_generees.indexOf(annee)===-1) imReel.dotations_generees.push(annee);
+        imReel.ecritures_dotation_ids = imReel.ecritures_dotation_ids || []; if (imReel.ecritures_dotation_ids.indexOf(ecr.id)===-1) imReel.ecritures_dotation_ids.push(ecr.id);
+        await dbPut('immobilisations', imReel);
+        if (typeof syncToSupabase === 'function') syncToSupabase('pi_immobilisations', imReel);
+      }
+    }
     count++;
   }
   toast('✅ '+count+' dotation(s) comptabilisée(s) — Débit 681 / Crédit 281 pour '+annee+'.'+(refuses?' · ⛔ '+refuses+' refusée(s) (exercice clos).':''), refuses?'warning':'success');
   buildDotations();
   buildAmortBiens();
+  if (typeof renderImmoSociete === 'function') renderImmoSociete();
 }
 
 function exportDotationsCSV(){
   var sel=document.getElementById('filter-amort-annee');
   var annee=parseInt(sel?sel.value||new Date().getFullYear():new Date().getFullYear());
-  var biens=DATA.biens_amort||[];
+  var biens=_amortTousBiens();
   var rows=['Référence,Bien,Valeur origine,Amort. antérieur,Dotation '+annee+',Amort. cumulé,VNC'];
   biens.forEach(function(b){
     rows.push([b.dossier,b.designation,b.valeur_origine,calcAmortCumul(b,annee-1),calcAnnuite(b,annee),calcAmortCumul(b,annee),calcVNC(b,annee)].join(','));
@@ -66288,6 +67523,7 @@ async function regulariserEcarts() {
 }
 
 async function validerRapprochement() {
+  if (!exigerDroit('Comptabilite', 'v', 'la validation de ce rapprochement bancaire')) return;
   var mois = (document.getElementById('rapproch-periode')||{}).value||'';
   var compte = (document.getElementById('rapproch-compte')||{}).value||'';
   if (!mois) { toast('Sélectionnez une période.','error'); return; }
@@ -73803,9 +75039,6 @@ async function startApp() {
     });
   });
 
-  // ── Migration silencieuse des mots de passe en clair ───────────────
-  await migratePasswords();
-
   // ── Correction silencieuse CMU/CNPS sur bulletins déjà enregistrés
   //    (employés non déclarés / consultants facturés à tort avant fix) ──
   try { await repairBulletinsExoCnps(); } catch(e){}
@@ -73833,6 +75066,19 @@ async function startApp() {
     try { demarrerSyncAuto(); } catch(e){}
     try { _majBadgeStaffSession(); } catch(e){}
     try { setTimeout(function(){ pullFromCloudSilent(); }, 1500); } catch(e){}
+    /* [FIX régression RLS] migratePasswords() se trouvait AVANT ce bloc :
+       demarrerSyncAuto() est ce qui appelle staffCharger() et rétablit le
+       jeton "authenticated" émis par staff-login. Exécutée plus tôt, la
+       migration des mots de passe tentait TOUJOURS son envoi cloud avec la
+       seule clé anonyme — bloquée depuis le durcissement RLS (exige
+       authenticated). L'envoi échouait silencieusement à chaque démarrage,
+       le cloud restait figé sur l'ancienne version, et le prochain
+       rechargement de page revivait la migration en boucle avec un nouveau
+       sel à chaque fois — invalidant la session courante et affichant
+       "mot de passe modifié" alors qu'aucun administrateur n'était en
+       cause. Un court délai laisse le jeton staff se rétablir avant de
+       tenter la synchro de la migration. */
+    setTimeout(function(){ migratePasswords().catch(function(){}); }, 2000);
     goTo('dashboard');
     /* Démarrage Realtime après login */
     try { setTimeout(startRealtime, 1500); } catch(e){}
@@ -81030,44 +82276,67 @@ function etatBalance() {
 function etatBilan() {
   var year = _comptaYear();
   var soldes = {};
-  DATA.ecritures.filter(function(e){ return e.date && e.date < ((+year + 1) + '-01-01'); }).forEach(function(e){
-    var cd = e.compte_debit || e.compte, cc = e.compte_credit;
-    if (!soldes[cd]) soldes[cd] = 0; soldes[cd] += e.montant;
-    if (cc) { if (!soldes[cc]) soldes[cc] = 0; soldes[cc] -= e.montant; }
+  /* [FIX] Aucun filtre par division ici — "Imprimer Bilan" pour une entité
+     précise imprimait en réalité le cumul de TOUTES les divisions mélangées,
+     un document officiel donné à une banque ou un auditeur pouvait donc être
+     complètement faux. Même filtre que buildBilan() (écran), pour qu'écran
+     et impression donnent toujours le même résultat. */
+  var divFEtat = (typeof _comptaDivisionFilter === 'function') ? _comptaDivisionFilter() : '';
+  DATA.ecritures.filter(function(e){ return e.date && e.date < ((+year + 1) + '-01-01') && (!divFEtat || e.division === divFEtat); }).forEach(function(e){
+    ecrLignes(e).forEach(function(l){
+      if (!l.compte) return;
+      soldes[l.compte] = (soldes[l.compte]||0) + (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant)||0);
+    });
   });
+  /* [FIX structurel] Même défaut que buildBilan()/buildDashTabCompta() :
+     itérait sur APP.planComptable (comptes "courants") au lieu des comptes
+     réellement postés — tout sous-compte hors de cette liste curatée
+     (4451/4453-4456, notamment) contribuait pour zéro au document imprimé. */
   function gs(codes) {
     var t = 0;
-    codes.forEach(function(code){
-      APP.planComptable.filter(function(c){ return c.code.indexOf(code) === 0; }).forEach(function(c){ t += soldes[c.code] || 0; });
-    });
+    for (var code in soldes) { if (codes.some(function(p){ return code.indexOf(p) === 0; })) t += soldes[code] || 0; }
     return t;
   }
   var actifImmo = gs(['21','22','23','24','27']);
   var stocks    = gs(['31','32','33','34','35','36']);
-  var creances  = gs(['411','412','418','421','423','461','471']);
+  /* [FIX] 441/445 retirés (passif fiscal réel dans ce plan comptable, pas des
+     créances) ; 444 (TVA récupérable) et 409 (avances fournisseurs) ajoutés —
+     même correction que buildBilan(), voir son commentaire pour le détail. */
+  var creances  = gs(['411','412','418','409','421','423','444','461','471']);
   var treso     = gs(['51','52','53','55','57']);
   var totalActif = actifImmo + stocks + creances + treso;
-  var capitaux  = gs(['101','106','111']);
+  /* [FIX] Formule signée correctement (pas de simple abs() qui écraserait à
+     tort un capital réellement négatif) et étendue à 109/119/121/129 — un
+     résultat cumulé antérieur (bénéfice ou perte) n'apparaissait nulle part
+     avant ce correctif. Même formule validée numériquement que buildBilan(). */
+  var capitauxCredit = -gs(['101','106','109','111','121']);
+  var capitauxDebitContra = gs(['119','129']);
+  var capitaux  = capitauxCredit - capitauxDebitContra;
   var resultBrut = gs(['7']) - gs(['6']);
-  var dettesLT  = gs(['16','17','18']);
+  var dettesLT  = Math.abs(gs(['16','17','18']));
   var dF  = Math.abs(gs(['401','402','408']));
   var dFS = Math.abs(gs(['431','432','441','443','445','447','448']));
   var dP  = Math.abs(gs(['422']));
-  var totalPassif = capitaux + resultBrut + dettesLT + dF + dFS + dP;
+  /* [FIX] 419 (avances clients — le compte de chaque versement encaissé),
+     451 (groupe/associés), 462/467/468/472/4651 : absents jusqu'ici, comme
+     dans buildBilan() avant correction. */
+  var dDiv = Math.abs(gs(['419','45','462','467','468','472','48','4651']));
+  var totalPassif = capitaux + resultBrut + dettesLT + dF + dFS + dP + dDiv;
   function r(l, v){ return '<tr><td>' + l + '</td><td class="num">' + fmtF(Math.abs(v)) + '</td></tr>'; }
   var actif = '<h3>ACTIF</h3><table><thead><tr><th>Rubriques SYSCOHADA</th><th class="num">Montant (FCFA)</th></tr></thead><tbody>'
     + r('Immobilisations corporelles (Cl.2)', actifImmo)
     + r('Stocks (lots, travaux en cours)', stocks)
-    + r('Créances clients & débiteurs', creances)
+    + r('Créances clients, TVA récupérable & débiteurs', creances)
     + r('Trésorerie (banques, caisses, MM)', treso)
     + '<tr class="total"><td>TOTAL ACTIF</td><td class="num">' + fmtF(totalActif) + '</td></tr></tbody></table>';
   var passif = '<h3>PASSIF</h3><table><thead><tr><th>Rubriques SYSCOHADA</th><th class="num">Montant (FCFA)</th></tr></thead><tbody>'
-    + r('Capital social', Math.abs(capitaux))
+    + r('Capitaux propres (net du résultat cumulé)', Math.abs(capitaux))
     + r('Résultat de l\'exercice ' + year, resultBrut)
-    + r('Emprunts & dettes à LT', Math.abs(dettesLT))
+    + r('Emprunts & dettes à LT', dettesLT)
     + r('Fournisseurs', dF)
     + r('Dettes fiscales & sociales', dFS)
     + r('Dettes envers le personnel', dP)
+    + r('Avances clients, associés et dettes diverses', dDiv)
     + '<tr class="total"><td>TOTAL PASSIF</td><td class="num">' + fmtF(totalPassif) + '</td></tr></tbody></table>';
   var eq = Math.abs(totalActif - totalPassif) < 100 ? '✔ Bilan équilibré (Actif = Passif)'
     : '⚠ Écart Actif / Passif : ' + fmtF(Math.abs(totalActif - totalPassif)) + ' FCFA';
@@ -87925,6 +89194,7 @@ function togglePwdVisibility(inputId, eyeId) {
         user.caisse_pin_hash = await hashPassword(pin, user.caisse_pin_salt);
       }
       if (role !== 'caissiere') { user.caisse_pin_hash = null; user.caisse_pin_salt = null; }
+      user._modifie = new Date().toISOString();
       await dbPut('users', user);
       if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', user);
       await ajouterHistorique('user', user.id, 'modification', 'Modifié par '+APP.currentUser.nom);
@@ -89409,6 +90679,7 @@ function renderCongesDemandes() {
 }
 
 async function validerConge(id, ok) {
+  if (!exigerDroit('Conges', 'v', 'la validation de ce congé')) return;
   var cg = (DATA.conges_rh||[]).find(function(x){ return x.id === id; });
   if (!cg) return;
   cg.statut = ok ? 'approuve' : 'refuse';
@@ -96077,6 +97348,7 @@ async function budgetPrevisionnelSoumettre(id) {
 }
 async function budgetPrevisionnelValider(id) {
   var b = (DATA.caisse_budgets||[]).find(function(x){ return x.id===id; }); if (!b) return;
+  if (!exigerDroit('Budget', 'v', 'la validation de ce budget prévisionnel')) return;
   if (b.statut !== 'soumis') { toast('Seul un budget soumis peut être validé.', 'error'); return; }
   if (!exigerPlafond(b.montant, 'La validation de ce budget prévisionnel')) return;
   b.statut = 'valide'; b.valide_par = (APP.currentUser&&APP.currentUser.nom)||'—'; b.valide_le = new Date().toISOString(); b._modifie = new Date().toISOString();
@@ -98075,6 +99347,10 @@ async function saveBC(){
 }
 async function validateBC(id){
   var b=DATA.bons_commande.find(function(x){return x.id===id;}); if(!b)return;
+  if (typeof sfcTiersEstGele==='function' && sfcTiersEstGele('fournisseur', b.fournisseur_id)) {
+    toast('⛔ Ce fournisseur est gelé (SFC) — engagement de commande interdit tant que la mesure de gel est active.', 'error');
+    return;
+  }
   if(!hasRole('admin') && !confirm('Valider ce bon de commande (engagement) ?')) return;
   b.statut='valide'; b.valide_par=(APP.currentUser&&APP.currentUser.nom)||'—'; b.valide_date=today();
   await dbPut('bons_commande',b); if(typeof syncToSupabase==='function')syncToSupabase('pi_bons_commande',b);
@@ -98218,7 +99494,12 @@ function facRappro(){
 }
 async function saveFactureFournisseur(){
   if(!facCtxRec){ return; }
-  var r=facCtxRec; var num=document.getElementById('fac-numero').value.trim();
+  var r=facCtxRec;
+  if (typeof sfcTiersEstGele==='function' && sfcTiersEstGele('fournisseur', r.fournisseur_id)) {
+    toast('⛔ Ce fournisseur est gelé (SFC) — l\'enregistrement d\'une facture/paiement est interdit tant que la mesure de gel est active.', 'error');
+    return;
+  }
+  var num=document.getElementById('fac-numero').value.trim();
   if(!num){ toast('N° de facture obligatoire.','error'); return; }
   var ht=parseFloat(document.getElementById('fac-ht').value)||0;
   if(ht<=0){ toast('Montant HT invalide.','error'); return; }
@@ -98871,6 +100152,14 @@ async function saveFournisseur(){
   toast('Fournisseur ajouté.','success');
 }
 async function deleteFournisseur(id){
+  var f=(DATA.fournisseurs||[]).find(function(x){return x.id===id;});
+  /* [FIX conformité] Rien n'empêchait de supprimer un fournisseur gelé sur
+     sanction SFC (module Conformité LBC/FT → Criblage) — la suppression
+     effacerait la preuve même du gel, contraire à l'obligation de
+     conservation (10 ans) et neutraliserait le blocage sans laisser de
+     trace. Un fournisseur gelé ne peut être supprimé, quel que soit le
+     rôle : il faut d'abord le lever explicitement dans le module SFC. */
+  if (f && f.gele) { alert('Impossible : ce fournisseur est GELÉ (sanction SFC).\nLa suppression effacerait la preuve du gel. Traitez-le d\'abord dans Conformité LBC/FT → Criblage SFC.'); return; }
   if(!confirm('Supprimer ce fournisseur ?')) return;
   var ok=await deleteRecord('fournisseurs',id); if(ok===false)return;
   renderFournisseursListe();
@@ -99756,8 +101045,15 @@ async function backfillEcrituresCessions() {
 /* [v31] Duplicata supprimé : ancienne version de cesSave() — la définition active est plus bas dans ce fichier. */
 
 async function cesDelete() {
-  if (!_cesId || !confirm('Supprimer cette cession ? Les écritures liées seront retirées.')) return;
+  if (!_cesId) return;
   var c=DATA.cessions_foncieres.find(function(x){return x.id===_cesId;});
+  if (!exigerDroit('Comptabilite', 's', 'la suppression de cette cession')) return;
+  /* [FIX cohérence] Même garde que deleteClient : une cession déjà résiliée
+     porte un historique auditable (décompte, écritures de remboursement/
+     retenue) que la suppression effacerait, laissant en plus les écritures
+     de résiliation orphelines (aucune cession à référencer). */
+  if (c && c.resiliation) { alert('Impossible : cette cession a une résiliation enregistrée le '+dateShort(c.resiliation.date)+'.\nLa suppression effacerait cet historique. La fiche doit être conservée telle quelle.'); return; }
+  if (!confirm('Supprimer cette cession ? Les écritures liées seront retirées.')) return;
   if (c) {
     if (c.ecriture_vente_id && typeof deleteRecord==='function') await deleteRecord('ecritures', c.ecriture_vente_id);
     if (c.ecriture_enc_id && typeof deleteRecord==='function') await deleteRecord('ecritures', c.ecriture_enc_id);
@@ -99839,7 +101135,7 @@ function cesRender() {
   var tb = document.getElementById('tbody-cessions'); if (!tb) return;
   var q = ((document.getElementById('ces-search')||{}).value||'').toLowerCase();
   var L = DATA.cessions_foncieres || [];
-  var statutBadge = { promesse:'badge-or', cedee:'badge-bleu', soldee:'badge-vert' };
+  var statutBadge = { promesse:'badge-or', cedee:'badge-bleu', soldee:'badge-vert', resiliee:'badge-violet' };
   var list = L.filter(function(c){ return !q || ((c.acquereur||'')+' '+(c.designation||'')+' '+cesSourceRef(c.source_key)).toLowerCase().indexOf(q)!==-1; })
               .sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
   tb.innerHTML = list.length ? list.map(function(c){
@@ -99858,8 +101154,11 @@ function cesRender() {
       +'<td style="text-align:right;font-weight:700;">'+fmtF(c.prix_cession)+'</td>'
       +'<td style="text-align:right;">'+margeCell+'</td>'
       +'<td style="text-align:right;color:var(--vert);">'+fmtF(c.montant_encaisse)+(reste>0?('<br><span style="font-size:10px;color:var(--rouge);">reste '+fmtF(reste)+'</span>'):'')+'</td>'
-      +'<td><span class="badge '+(statutBadge[c.statut]||'badge-neutre')+'">'+(c.statut||'—')+'</span></td>'
-      +'<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm btn-icon" title="Acte / contrat" onclick="cesGenererContrat(\''+c.id+'\')">🖨</button> <button class="btn btn-secondary btn-sm btn-icon" onclick="cesOpen(\''+c.id+'\')">✏️</button></td>'
+      +'<td><span class="badge '+(statutBadge[c.statut]||'badge-neutre')+'">'+({promesse:'Promesse',cedee:'Cédée',soldee:'Soldée',resiliee:'Résiliée'}[c.statut]||c.statut||'—')+'</span></td>'
+      +'<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm btn-icon" title="Acte / contrat" onclick="cesGenererContrat(\''+c.id+'\')">🖨</button> <button class="btn btn-secondary btn-sm btn-icon" onclick="cesOpen(\''+c.id+'\')">✏️</button>'
+      +(c.statut!=='resiliee' ? (' <button class="btn btn-secondary btn-sm btn-icon" onclick="cesResilierOuvrir(\''+c.id+'\')" title="Résilier la cession" style="background:#FEF3C7;color:#92400E;border-color:#FCD34D;">📄</button>') : '')
+      +(c.statut==='resiliee' && c.resiliation && c.resiliation.montant_rembourse>0 && !c.resiliation.rembourse ? (' <button class="btn btn-secondary btn-sm btn-icon" onclick="cesResilierOuvrirRemboursement(\''+c.id+'\')" title="Marquer remboursé" style="background:#DCFCE7;color:#166534;border-color:#86EFAC;">💰</button>') : '')
+      +'</td>'
       +'</tr>';
   }).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--blanc-dim);padding:18px;">Aucune cession.</td></tr>';
 
@@ -115700,6 +116999,17 @@ function caisseRevueMensuelleUI(){
   }
   host.innerHTML=html;
 }
+function partagerRevueMensuelleCaisse(){
+  var r=window._crmDernierRapport; if(!r){ toast('Sélectionnez d\'abord un mois.','error'); return; }
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var libMois=new Date(r.moisKey+'-01').toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var lignes=['*Revue mensuelle de caisse — '+libMois+'* ('+escHtml(soc)+')', 'Généré le '+new Date().toLocaleDateString('fr-FR'), '',
+    r.nb+' mouvement(s)', 'Entrées: '+fmtF(r.totE)+' F', 'Sorties: '+fmtF(r.totD)+' F',
+    'Flux net: '+(r.totE-r.totD>=0?'+':'')+fmtF(r.totE-r.totD)+' F', '',
+    r.nonVentiles.length+' sortie(s) non ventilée(s)', r.doublons.length+' doublon(s) probable(s)', r.ecarts.length+' écart(s) de clôture'];
+  if (!r.doublons.length && !r.nonVentiles.length && !r.ecarts.length) lignes.push('', 'Aucune anomalie détectée.');
+  sanixPartager('Revue mensuelle caisse '+libMois, lignes.join('\n'));
+}
 function imprimerRevueMensuelleCaisse(){
   var r=window._crmDernierRapport; if(!r){ toast('Sélectionnez d\'abord un mois.','error'); return; }
   var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
@@ -115731,6 +117041,21 @@ function imprimerRevueMensuelleCaisse(){
   w.document.close(); w.print();
 }
 
+function partagerRapportAuditCaisse(){
+  if (!hasRole('admin')) { toast('Réservé aux administrateurs.', 'error'); return; }
+  var caisseId = document.getElementById('caisse-audit-caisse-id').value;
+  var c = (DATA.caisses||[]).find(function(x){ return x.id===caisseId; });
+  var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var ruptures = _caisseAuditChaineSessions(caisseId);
+  var theoImpossible = _caisseAuditTheoriqueImpossible(caisseId);
+  var reservesNonSoldees = _caisseAuditReserveRetour(caisseId);
+  var montantEnJeu = reservesNonSoldees.reduce(function(s,m){ return s+(parseFloat(m.montant)||0); }, 0);
+  var lignes=['*Rapport d\'audit caisse* — '+(c?escHtml(c.nom):'')+' ('+escHtml(soc)+')', 'Généré le '+new Date().toLocaleDateString('fr-FR'), '',
+    ruptures.length+' rupture(s) de chaîne', theoImpossible.length+' solde(s) théorique(s) impossible(s)',
+    reservesNonSoldees.length+' réserve(s) jamais soldée(s) — '+fmtF(montantEnJeu)+' F en jeu'];
+  if (!ruptures.length && !theoImpossible.length && !reservesNonSoldees.length) lignes.push('', 'Aucune anomalie détectée.');
+  sanixPartager('Rapport audit caisse', lignes.join('\n'));
+}
 function imprimerRapportAuditCaisse() {
   if (!hasRole('admin')) { toast('Réservé aux administrateurs.', 'error'); return; }
   var caisseId = document.getElementById('caisse-audit-caisse-id').value;
