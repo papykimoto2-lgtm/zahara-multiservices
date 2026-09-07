@@ -117075,15 +117075,43 @@ function _caisseCollecterFournisseurs401() {
     var solde = Math.max(0, totalTTC - avances - situ);
     if (solde <= 0) return;
     var anc = (typeof calcAncienneteFournisseur401 === 'function') ? calcAncienneteFournisseur401(convs) : { moisAnc: 0 };
-    /* Une convention peut viser plusieurs programmes — division de la première
-       convention avec un programme renseigné, repli raisonnable pour un
-       fournisseur qui n'interviendrait normalement pas sur deux entités à la fois. */
     var divisionConv = '';
     for (var i = 0; i < convs.length && !divisionConv; i++) {
       if (convs[i].programme_id) divisionConv = (typeof _divisionDeProgramme === 'function') ? _divisionDeProgramme(convs[i].programme_id) : '';
     }
     out.push({ compte:'401', tiers: constr.raison_sociale, solde: solde, joursRetard: Math.round((anc.moisAnc||0) * 30.5), division: divisionConv });
   });
+  /* [FIX] Cette fonction ne couvrait que 2 des 3 sources réelles de dette
+     fournisseur : conventions constructeurs + factures caisse en attente de
+     ventilation. La troisième — factures d'achats (Stock & Achats,
+     saveFactureFournisseur) et toute écriture 401/402/408 saisie
+     manuellement au grand livre — n'apparaissait dans AUCUNE prévision de
+     trésorerie, alors qu'elle est déjà correctement comptée dans le Bilan
+     (qui somme le grand livre directement). Corrigé en balayant le grand
+     livre pour ces comptes, en EXCLUANT les écritures source:'situation'
+     (déjà comptées ci-dessus via les conventions, sur le même compte
+     générique 'fournisseur' — les compter aussi ici doublonnerait). */
+  var soldesTiers = {};   // compte -> solde net (positif = dû)
+  var datesTiers = {};    // compte -> date la plus ancienne contribuant au solde
+  (DATA.ecritures||[]).forEach(function(e){
+    if (e.source === 'situation') return;   // déjà compté via les conventions
+    (typeof ecrLignes === 'function' ? ecrLignes(e) : []).forEach(function(l){
+      if (!l.compte) return;
+      if (!(l.compte.indexOf('401')===0 || l.compte.indexOf('402')===0 || l.compte.indexOf('408')===0)) return;
+      var m = (l.sens==='D' ? -1 : 1) * (parseFloat(l.montant)||0);   // crédit-normal : crédit augmente la dette
+      soldesTiers[l.compte] = (soldesTiers[l.compte]||0) + m;
+      if (e.date && (!datesTiers[l.compte] || e.date < datesTiers[l.compte])) datesTiers[l.compte] = e.date;
+    });
+  });
+  var todayD = new Date();
+  for (var compte in soldesTiers) {
+    var solde401 = Math.round(soldesTiers[compte]);
+    if (solde401 <= 0) continue;
+    var four = (DATA.fournisseurs||[]).find(function(f){ return f.compte===compte; });
+    var joursR = datesTiers[compte] ? Math.round((todayD - new Date(datesTiers[compte])) / (1000*60*60*24)) : 0;
+    out.push({ compte: compte, tiers: (four ? four.nom : 'Tiers à identifier (compte '+compte+')'),
+      solde: solde401, joursRetard: joursR, division: (four && four.division_id) || '' });
+  }
   /* Factures saisies par la caisse, pas encore ventilées par le comptable —
      visibles ici avec l'échéance réelle qu'a tapée la caissière, pour que
      la planification des paiements ne dépende pas du délai de ventilation. */
