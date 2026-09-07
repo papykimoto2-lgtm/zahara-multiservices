@@ -16795,6 +16795,10 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="form-group span-2">
             <label>Adresse</label>
             <input type="text" class="form-control" id="c-adresse">
+          </div>
+          <div class="form-group span-2">
+            <label>Commune / localisation <span style="font-weight:400;color:var(--blanc-dim);">— utilisée pour positionner le client sur la carte à défaut de position GPS réelle</span></label>
+            <input type="text" class="form-control" id="c-commune" placeholder="Ex. Cocody, Yopougon...">
             <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
               <button type="button" class="btn btn-secondary btn-sm" onclick="clientCapturerGeoloc()">📍 Capturer la position GPS réelle</button>
               <span id="c-geoloc-statut" style="font-size:11px;color:var(--blanc-dim);"></span>
@@ -30618,13 +30622,14 @@ function openClientModal(id) {
 }
 
 function clearClientForm() {
-  ['c-nom','c-prenoms','c-ddn','c-nationalite','c-profession','c-tel','c-email','c-adresse',
+  ['c-nom','c-prenoms','c-ddn','c-nationalite','c-profession','c-tel','c-email','c-adresse','c-commune','c-lat','c-lng',
    'c-piece-num','c-montant-total','c-apport','c-duree','c-date-debut','c-date-souscription','c-mensualite','c-type-logement','c-surface',
    'c-commercial','c-apporteur'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = el.id === 'c-nationalite' ? 'Ivoirienne' : el.id === 'c-duree' ? '60' : el.id === 'c-apport' ? '0' : '';
   });
   var svEcart = document.getElementById('c-surface-ecart'); if (svEcart) svEcart.style.display = 'none';
+  var cGeoStatutClear = document.getElementById('c-geoloc-statut'); if (cGeoStatutClear) cGeoStatutClear.textContent = '';
   document.getElementById('doc-btns').style.display = 'none';
   document.getElementById('doc-btns').innerHTML = '';
   var modeEl = document.getElementById('c-mode-livraison'); if (modeEl) modeEl.value = 'gros_oeuvre';
@@ -30640,7 +30645,7 @@ function fillClientForm(c) {
     'c-profession': 'profession', 'c-tel': 'tel', 'c-email': 'email', 'c-adresse': 'adresse',
     'c-piece-num': 'piece_num', 'c-montant-total': 'montant_total', 'c-apport': 'apport',
     'c-duree': 'duree', 'c-date-debut': 'date_debut', 'c-date-souscription': 'date_souscription', 'c-type-logement': 'type_logement', 'c-surface': 'surface',
-    'c-lat': 'lat', 'c-lng': 'lng'
+    'c-lat': 'lat', 'c-lng': 'lng', 'c-commune': 'commune'
   };
   Object.keys(map).forEach(function(id) {
     var el = document.getElementById(id);
@@ -30924,6 +30929,7 @@ async function saveClient() {
     lot_id: document.getElementById('c-lot').value,
     lot_ids: _tousLotIdsChoisis,
     surface: parseFloat(document.getElementById('c-surface').value) || 0,
+    commune: document.getElementById('c-commune').value.trim(),
     lat: parseFloat(document.getElementById('c-lat').value) || null,
     lng: parseFloat(document.getElementById('c-lng').value) || null,
     geoloc_at: (document.getElementById('c-lat').value ? ((DATA.clients.find(function(x){return x.id===APP.editingId;})||{}).geoloc_at || new Date().toISOString()) : null),
@@ -58595,7 +58601,11 @@ function renderCarteGeo() {
          client) doit toujours l'emporter sur l'approximation par commune
          (position aléatoire à ±2km du centre de la commune) — celle-ci ne
          reste qu'un repli quand aucune capture réelle n'existe encore. */
-      var coords = (c.lat!=null && c.lng!=null) ? [c.lat, c.lng] : getCoordsFromAdresse(c.adresse || c.commune || 'Abidjan');
+      /* [FIX] La commune déclarée explicitement (champ dédié, fiable) prévaut
+         désormais sur une extraction depuis le texte libre de l'adresse
+         (fragile — dépend de la présence du nom de commune dans le texte
+         saisi). Priorité : GPS réel > commune déclarée > texte de l'adresse. */
+      var coords = (c.lat!=null && c.lng!=null) ? [c.lat, c.lng] : getCoordsFromAdresse(c.commune || c.adresse || 'Abidjan');
       if (!coords) return;
       _geoAllPoints.push(coords);
       var verse = DATA.versements.filter(function(v){return v.client_id===c.id && v.statut!=='annule' && _versementSurPrix(v);}).reduce(function(s,v){return s+(parseFloat(v.montant)||0);},0);
