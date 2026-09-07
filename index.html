@@ -16795,6 +16795,11 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="form-group span-2">
             <label>Adresse</label>
             <input type="text" class="form-control" id="c-adresse">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="clientCapturerGeoloc()">📍 Capturer la position GPS réelle</button>
+              <span id="c-geoloc-statut" style="font-size:11px;color:var(--blanc-dim);"></span>
+            </div>
+            <input type="hidden" id="c-lat"><input type="hidden" id="c-lng">
           </div>
           <div class="form-group">
             <label>Pièce d'identité (type)</label>
@@ -20777,6 +20782,15 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <div class="form-group"><label>Commercial assigné</label><select class="form-control" id="ld-commercial"><option value="">— Choisir —</option></select></div>
         <div class="form-group"><label>Date de premier contact</label><input type="date" class="form-control" id="ld-date-contact"></div>
         <div class="form-group"><label>Date relance</label><input type="date" class="form-control" id="ld-date-relance"></div>
+        <div class="form-group span-2">
+          <label>Commune / localisation</label>
+          <input type="text" class="form-control" id="ld-commune" placeholder="Ex. Cocody, Yopougon...">
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="leadCapturerGeoloc()">📍 Capturer la position GPS réelle</button>
+            <span id="ld-geoloc-statut" style="font-size:11px;color:var(--blanc-dim);"></span>
+          </div>
+          <input type="hidden" id="ld-lat"><input type="hidden" id="ld-lng">
+        </div>
         <div class="form-group span-2"><label>Notes / Historique interactions</label><textarea class="form-control" id="ld-notes" style="min-height:80px;"></textarea></div>
       </div>
     </div>
@@ -30625,7 +30639,8 @@ function fillClientForm(c) {
   var map = { 'c-nom': 'nom', 'c-prenoms': 'prenoms', 'c-ddn': 'ddn', 'c-nationalite': 'nationalite',
     'c-profession': 'profession', 'c-tel': 'tel', 'c-email': 'email', 'c-adresse': 'adresse',
     'c-piece-num': 'piece_num', 'c-montant-total': 'montant_total', 'c-apport': 'apport',
-    'c-duree': 'duree', 'c-date-debut': 'date_debut', 'c-date-souscription': 'date_souscription', 'c-type-logement': 'type_logement', 'c-surface': 'surface'
+    'c-duree': 'duree', 'c-date-debut': 'date_debut', 'c-date-souscription': 'date_souscription', 'c-type-logement': 'type_logement', 'c-surface': 'surface',
+    'c-lat': 'lat', 'c-lng': 'lng'
   };
   Object.keys(map).forEach(function(id) {
     var el = document.getElementById(id);
@@ -30633,6 +30648,8 @@ function fillClientForm(c) {
     if (id === 'c-date-souscription') { el.value = c.date_souscription || c.date_debut || c.created_at || ''; return; }
     el.value = c[map[id]] || '';
   });
+  var cGeoStatut = document.getElementById('c-geoloc-statut');
+  if (cGeoStatut) cGeoStatut.textContent = c.geoloc_at ? ('✅ Position GPS capturée le '+dateShort(c.geoloc_at)) : '';
   setSelectValue('c-matrimonial', c.matrimonial);
   setSelectValue('c-standing', c.standing);
   setSelectValue('c-programme', c.programme_id);
@@ -30907,6 +30924,9 @@ async function saveClient() {
     lot_id: document.getElementById('c-lot').value,
     lot_ids: _tousLotIdsChoisis,
     surface: parseFloat(document.getElementById('c-surface').value) || 0,
+    lat: parseFloat(document.getElementById('c-lat').value) || null,
+    lng: parseFloat(document.getElementById('c-lng').value) || null,
+    geoloc_at: (document.getElementById('c-lat').value ? ((DATA.clients.find(function(x){return x.id===APP.editingId;})||{}).geoloc_at || new Date().toISOString()) : null),
     /* Distingue une souscription pour un bien bâti (maison/appartement) d'une
        souscription pour un terrain nu (parcelle). Priorité : 1) choix manuel
        explicite (« Nature du bien »), 2) nature du lot rattaché, 3) sinon
@@ -58571,7 +58591,11 @@ function renderCarteGeo() {
     DATA.clients.forEach(function(c) {
       if (filterComm && c.commercial !== filterComm) return;
       if (search && !(c.nom+' '+c.prenoms+' '+c.tel+' '+(c.adresse||'')).toLowerCase().includes(search)) return;
-      var coords = getCoordsFromAdresse(c.adresse || c.commune || 'Abidjan');
+      /* [FIX] Une vraie position GPS capturée (bouton dédié sur la fiche
+         client) doit toujours l'emporter sur l'approximation par commune
+         (position aléatoire à ±2km du centre de la commune) — celle-ci ne
+         reste qu'un repli quand aucune capture réelle n'existe encore. */
+      var coords = (c.lat!=null && c.lng!=null) ? [c.lat, c.lng] : getCoordsFromAdresse(c.adresse || c.commune || 'Abidjan');
       if (!coords) return;
       _geoAllPoints.push(coords);
       var verse = DATA.versements.filter(function(v){return v.client_id===c.id && v.statut!=='annule' && _versementSurPrix(v);}).reduce(function(s,v){return s+(parseFloat(v.montant)||0);},0);
@@ -58593,11 +58617,18 @@ function renderCarteGeo() {
   }
 
   // ── Prospects ────────────────────────────────────────────────────────────────
+  var nbPNonLocalises = 0;
   if (showProspects && _geoLayerProspects) {
     DATA.leads.forEach(function(l) {
       if (search && !(l.nom+' '+(l.tel||'')+' '+(l.commune||'')).toLowerCase().includes(search)) return;
-      var coords = getCoordsFromAdresse(l.commune || l.notes || 'Abidjan');
-      if (!coords) coords = [5.360+(Math.random()-0.5)*0.04, -4.008+(Math.random()-0.5)*0.04];
+      /* [FIX] Un prospect sans commune reconnue était placé à une position
+         ALÉATOIRE près d'Abidjan — un pin sur la carte qui ne correspond à
+         rien de réel, trompeur pour la planification de tournées terrain.
+         Même principe que pour les clients désormais : vraie capture GPS en
+         priorité, sinon approximation par commune si reconnue, sinon le
+         prospect n'est PAS positionné (compté à part plutôt qu'inventé). */
+      var coords = (l.lat!=null && l.lng!=null) ? [l.lat, l.lng] : getCoordsFromAdresse(l.commune || l.notes || '');
+      if (!coords) { nbPNonLocalises++; return; }
       _geoAllPoints.push(coords);
       nbP++;
       L.marker(coords, { icon: createMarkerIcon('#B87333','🎯') })
@@ -58607,7 +58638,7 @@ function renderCarteGeo() {
           tel: l.tel,
           adresse: l.commune || '',
           montant: 'Budget: ' + fmtF(l.budget||0) + ' FCFA',
-          action: "openLeadModal('" + l.id + "')", actionLabel: 'Fiche'
+          action: "openLead('" + l.id + "')", actionLabel: 'Fiche'
         }), { maxWidth: 260 })
         .addTo(_geoLayerProspects);
       geoListe.push({ color:'#B87333', emoji:'🎯', nom:l.nom, detail:'Prospect', adresse:l.commune||'' });
@@ -58686,7 +58717,7 @@ function renderCarteGeo() {
       { i:'💰', l:'CA portefeuille',v:fmtF(totalCA)+' F',          c:'#B87333' },
       { i:'✅', l:'Encaissé',       v:fmtF(totalEnc)+' F',         c:'#10B981' },
       { i:'📈', l:'Recouvrement',   v:taux+'%',                    c:taux>=50?'#10B981':'#EF4444' },
-    ].map(function(s) {
+    ].concat(nbPNonLocalises>0 ? [{ i:'❓', l:'Prospects non localisés', v:nbPNonLocalises, c:'#94A3B8' }] : []).map(function(s) {
       return '<div style="background:#F8FAFC;border:1px solid #E0E0EA;border-radius:8px;padding:8px;text-align:center;">'
         + '<div style="font-size:10px;color:#6B6B9A;">' + s.i + ' ' + s.l + '</div>'
         + '<div style="font-size:13px;font-weight:700;color:' + s.c + ';margin-top:3px;">' + s.v + '</div>'
@@ -77940,11 +77971,14 @@ function openLead(id) {
   if (id) {
     var l = DATA.leads.find(function(x){return x.id===id;});
     if (l) {
-      var fields={'ld-nom':l.nom,'ld-tel':l.tel,'ld-email':l.email,'ld-profession':l.profession,'ld-programme':l.programme_id,'ld-type-logement':l.type_logement,'ld-budget':l.budget,'ld-source':l.source,'ld-stade':l.stade,'ld-commercial':l.commercial_id,'ld-date-contact':l.date_contact,'ld-date-relance':l.date_relance,'ld-notes':l.notes};
+      var fields={'ld-nom':l.nom,'ld-tel':l.tel,'ld-email':l.email,'ld-profession':l.profession,'ld-programme':l.programme_id,'ld-type-logement':l.type_logement,'ld-budget':l.budget,'ld-source':l.source,'ld-stade':l.stade,'ld-commercial':l.commercial_id,'ld-date-contact':l.date_contact,'ld-date-relance':l.date_relance,'ld-notes':l.notes,'ld-commune':l.commune,'ld-lat':l.lat,'ld-lng':l.lng};
       Object.keys(fields).forEach(function(fid){var el=document.getElementById(fid);if(el)el.value=fields[fid]||'';});
+      var ldGeoStatut = document.getElementById('ld-geoloc-statut');
+      if (ldGeoStatut) ldGeoStatut.textContent = l.geoloc_at ? ('✅ Position GPS capturée le '+dateShort(l.geoloc_at)) : '';
     }
   } else {
-    ['ld-nom','ld-tel','ld-email','ld-profession','ld-budget','ld-notes'].forEach(function(fid){var el=document.getElementById(fid);if(el)el.value='';});
+    ['ld-nom','ld-tel','ld-email','ld-profession','ld-budget','ld-notes','ld-commune','ld-lat','ld-lng'].forEach(function(fid){var el=document.getElementById(fid);if(el)el.value='';});
+    var ldGeoStatutNew = document.getElementById('ld-geoloc-statut'); if (ldGeoStatutNew) ldGeoStatutNew.textContent = '';
     document.getElementById('ld-stade').value='prospect';
     document.getElementById('ld-source').value='bouche_oreille';
     document.getElementById('ld-date-contact').value=today();
@@ -77984,6 +78018,10 @@ async function saveLead() {
     date_contact: document.getElementById('ld-date-contact').value,
     date_relance: document.getElementById('ld-date-relance').value,
     notes: document.getElementById('ld-notes').value.trim(),
+    commune: document.getElementById('ld-commune').value.trim(),
+    lat: parseFloat(document.getElementById('ld-lat').value) || null,
+    lng: parseFloat(document.getElementById('ld-lng').value) || null,
+    geoloc_at: (document.getElementById('ld-lat').value ? ((DATA.leads.find(function(x){return x.id===APP.editingId;})||{}).geoloc_at || new Date().toISOString()) : null),
     created_at: APP.editingId ? undefined : today()
   };
   if (APP.editingId){var idx=DATA.leads.findIndex(function(x){return x.id===APP.editingId;});if(idx>=0)DATA.leads[idx]=Object.assign({}, DATA.leads[idx], l);}
@@ -77994,6 +78032,34 @@ async function saveLead() {
   var badge=document.getElementById('badge-leads');
   if(badge){var p=DATA.leads.filter(function(x){return x.stade==='prospect';}).length;badge.textContent=p;badge.style.display=p>0?'inline-flex':'none';}
   toast('Prospect enregistré.', 'success');
+}
+function leadCapturerGeoloc(){
+  if (!navigator.geolocation) { toast('Géolocalisation indisponible sur cet appareil.','error'); return; }
+  var statut = document.getElementById('ld-geoloc-statut');
+  if (statut) statut.textContent = '⏳ Capture en cours...';
+  navigator.geolocation.getCurrentPosition(function(p){
+    document.getElementById('ld-lat').value = p.coords.latitude.toFixed(6);
+    document.getElementById('ld-lng').value = p.coords.longitude.toFixed(6);
+    if (statut) statut.textContent = '✅ Position GPS capturée à l\'instant';
+    toast('📍 Position capturée — la carte utilisera cette position réelle.','success');
+  }, function(){
+    if (statut) statut.textContent = '';
+    toast('Position refusée ou indisponible.','error');
+  }, {enableHighAccuracy:true, timeout:8000});
+}
+function clientCapturerGeoloc(){
+  if (!navigator.geolocation) { toast('Géolocalisation indisponible sur cet appareil.','error'); return; }
+  var statut = document.getElementById('c-geoloc-statut');
+  if (statut) statut.textContent = '⏳ Capture en cours...';
+  navigator.geolocation.getCurrentPosition(function(p){
+    document.getElementById('c-lat').value = p.coords.latitude.toFixed(6);
+    document.getElementById('c-lng').value = p.coords.longitude.toFixed(6);
+    if (statut) statut.textContent = '✅ Position GPS capturée à l\'instant';
+    toast('📍 Position capturée — la carte utilisera cette position réelle.','success');
+  }, function(){
+    if (statut) statut.textContent = '';
+    toast('Position refusée ou indisponible.','error');
+  }, {enableHighAccuracy:true, timeout:8000});
 }
 
 function avancerLead(id) {
