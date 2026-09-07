@@ -3518,6 +3518,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div id="lots-dashboard"></div>
         </div>
         <div class="tab-pane" id="tab-lots-grille">
+          <div id="lots-dashboard-grille" style="margin-bottom:16px;"></div>
           <div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
             <input type="text" class="search-input" placeholder="🔍 Recherche générale (type, programme…)" id="search-lots" oninput="_debInput('filterLots')" style="flex:1;min-width:180px;">
             <input type="text" class="search-input" placeholder="🏘 Îlot (ex : A, B1…)" id="search-lots-ilot" oninput="_debInput('filterLots')" style="flex:0 0 170px;">
@@ -8858,9 +8859,15 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
              en arrière dans le flux. -->
         <div class="steps-nav" style="margin-bottom:18px;">
           <div class="etape">
+            <div class="etape-hd"><span class="etape-num">·</span>Vue d'ensemble</div>
+            <div class="etape-btns">
+              <button class="tab-btn active" onclick="switchTab('foncier','dashboard');renderFoncierDashboard()" title="Récapitulatif du portefeuille — répartition, valeur, alertes"><i>📊</i>Tableau de bord</button>
+            </div>
+          </div>
+          <div class="etape">
             <div class="etape-hd"><span class="etape-num">1</span>Acquisition</div>
             <div class="etape-btns">
-              <button class="tab-btn active" onclick="switchTab('foncier','parcelles')" title="Prospection, négociation et portefeuille des parcelles"><i>🗺️</i>Parcelles</button>
+              <button class="tab-btn" onclick="switchTab('foncier','parcelles')" title="Prospection, négociation et portefeuille des parcelles"><i>🗺️</i>Parcelles</button>
             </div>
           </div>
           <div class="etape">
@@ -34837,6 +34844,13 @@ function renderLotsDashboard() {
   html += tableauAgg('Par îlot', agg(function(l){ return l.ilot ? 'Îlot '+l.ilot : '—'; }), 20);
 
   box.innerHTML = html;
+  /* [Nouveau] Même récapitulatif affiché directement dans l'onglet Grille des
+     Lots — jusqu'ici seul l'onglet séparé "📊 Tableau de bord" l'affichait,
+     obligeant à changer d'onglet pour voir la synthèse pendant qu'on
+     parcourt/filtre la grille. Simple duplication d'affichage, un seul
+     calcul (aucune logique dupliquée). */
+  var boxGrille = document.getElementById('lots-dashboard-grille');
+  if (boxGrille) boxGrille.innerHTML = html;
 }
 
 /* ══════════════════════════════════════════════════════════════════
