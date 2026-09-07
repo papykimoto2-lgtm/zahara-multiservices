@@ -16894,6 +16894,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <div id="c-surface-ecart" style="font-size:11px;margin-top:4px;display:none;"></div>
             <div id="c-surface-regul-action" style="margin-top:6px;"></div>
             <div id="c-tma-action" style="margin-top:6px;"></div>
+            <div id="c-subrogation-action" style="margin-top:6px;"></div>
           </div>
           <div class="form-group">
             <label>Prix de vente total (FCFA)</label>
@@ -17258,6 +17259,48 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-tma-form');ouvrirTmaListe(document.getElementById('tma-liste-client-id').value)">Annuler</button>
       <button class="btn btn-primary" onclick="confirmerTma()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Subrogation de contrat -->
+<div class="modal-overlay" id="modal-subrogation">
+  <div class="modal">
+    <div class="modal-header"><h3>🔄 Subroger ce contrat</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-subrogation')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="sub-client-id">
+      <div class="alert alert-info" style="font-size:11.5px;">
+        Transfère ce contrat (lot, montant total, échéancier, historique des versements déjà réglés) à un nouveau
+        souscripteur — sans résiliation ni remboursement. Le nouveau titulaire reprend le contrat en l'état.
+        L'ancien titulaire reste consultable dans l'historique de la fiche.
+      </div>
+      <div id="sub-recap" class="card" style="margin:10px 0;padding:10px 12px;font-size:12px;"></div>
+      <div id="sub-alerte-gele" style="display:none;"></div>
+      <div class="form-section-title" style="margin-top:8px;">Nouveau souscripteur</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Nom *</label><input type="text" class="form-control" id="sub-nom"></div>
+        <div class="form-group"><label>Prénoms *</label><input type="text" class="form-control" id="sub-prenoms"></div>
+        <div class="form-group"><label>Téléphone *</label><input type="text" class="form-control" id="sub-tel"></div>
+        <div class="form-group"><label>Email</label><input type="text" class="form-control" id="sub-email"></div>
+        <div class="form-group"><label>Type de pièce</label>
+          <select class="form-control" id="sub-piece-type"><option value="CNI">CNI</option><option value="Passeport">Passeport</option><option value="Attestation">Attestation d'identité</option><option value="CS">Carte de séjour</option></select>
+        </div>
+        <div class="form-group"><label>N° de pièce *</label><input type="text" class="form-control" id="sub-piece-num"></div>
+        <div class="form-group"><label>Nationalité</label><input type="text" class="form-control" id="sub-nationalite" value="Ivoirienne"></div>
+        <div class="form-group"><label>Profession</label><input type="text" class="form-control" id="sub-profession"></div>
+      </div>
+      <div class="form-group"><label>Adresse</label><input type="text" class="form-control" id="sub-adresse"></div>
+      <div class="form-section-title" style="margin-top:8px;">Conditions de la subrogation</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Date de la subrogation</label><input type="date" class="form-control" id="sub-date"></div>
+        <div class="form-group"><label>Frais de dossier/mutation (FCFA) — facultatif</label><input type="number" class="form-control" id="sub-frais" placeholder="0" value="0"></div>
+      </div>
+      <div class="form-group"><label>Motif / justification (obligatoire)</label><textarea class="form-control" id="sub-motif" rows="2" placeholder="Ex. Cession amiable des droits du souscripteur initial, accord signé le..."></textarea></div>
+      <div class="form-group"><label><input type="checkbox" id="sub-confirme"> Je confirme avoir vérifié l'identité du nouveau souscripteur et l'accord des deux parties.</label></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-subrogation')">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmerSubrogation()">🔄 Confirmer la subrogation</button>
     </div>
   </div>
 </div>
@@ -30534,12 +30577,19 @@ function openClientModal(id) {
       tmaAction.innerHTML = '<button type="button" class="btn btn-secondary btn-sm" onclick="ouvrirTmaListe(\''+id+'\')">📝 Demandes de modification (TMA)'
         + (nbTma ? ' <span class="badge badge-or" style="margin-left:4px;">'+nbTma+'</span>' : '') + '</button>';
     }
+    var subroAction = document.getElementById('c-subrogation-action');
+    if (subroAction) {
+      var nbSubro = (c.subrogations||[]).length;
+      subroAction.innerHTML = '<button type="button" class="btn btn-secondary btn-sm" onclick="ouvrirSubrogation(\''+id+'\')">🔄 Subroger ce contrat'
+        + (nbSubro ? ' <span class="badge badge-bleu" style="margin-left:4px;">'+nbSubro+' déjà</span>' : '') + '</button>';
+    }
   } else {
     document.getElementById('modal-client-title').textContent = 'Nouveau Souscripteur';
     document.getElementById('c-date-debut').value = today();
     document.getElementById('c-date-souscription').value = today();
     document.getElementById('client-historique-block').innerHTML = '';
     var tmaActionNew = document.getElementById('c-tma-action'); if (tmaActionNew) tmaActionNew.innerHTML = '';
+    var subroActionNew = document.getElementById('c-subrogation-action'); if (subroActionNew) subroActionNew.innerHTML = '';
   }
   if (typeof updateLotsByProgramme === 'function') updateLotsByProgramme();
   openModal('modal-client');
@@ -31504,6 +31554,7 @@ async function resilierConfirmer(){
     lots_liberes:lotIds, valide_par:(APP.currentUser&&APP.currentUser.nom)||'—', cree_le:new Date().toISOString() };
   c._modifie = new Date().toISOString();
   await logAudit('clients', clientId, 'resiliation', null, c.resiliation);
+  await clientLierDossierJuridique(c, 'Résiliation de souscription — motif : '+(motif==='faute_promoteur'?'faute du promoteur':'désistement du souscripteur')+' ('+Math.round(taux*100)+'%). '+justification, rembourse, true);
   await dbPut('clients', c); if (typeof syncToSupabase==='function') syncToSupabase('pi_clients', c);
 
   closeModal('modal-resiliation');
@@ -45835,6 +45886,7 @@ async function confirmerRegularisationSurface(){
   c.surface = surfaceReelle;
   c._modifie = new Date().toISOString();
   await logAudit('clients', clientId, 'regularisation_surface', null, regul);
+  await clientLierDossierJuridique(c, 'Régularisation de surface — écart '+ecart.toFixed(2)+' m² × '+fcfa(prixM2)+'/m² = '+fcfa(montant)+'. '+motif, montant);
   await dbPut('clients', c);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
 
@@ -45988,6 +46040,7 @@ async function confirmerTma(){
     d.facture = true;
     d.montant_facture = coutEstime;
     await logAudit('clients', clientId, 'tma_facturation', null, { tma_id:d.id, montant:coutEstime, description:description });
+    await clientLierDossierJuridique(c, 'Travaux modificatifs acquéreur facturés — '+fcfa(coutEstime)+'. '+description, coutEstime);
     imprimerAvenantTma(d, c);
   } else if (!facturer) {
     d.facture = false;
@@ -46051,6 +46104,136 @@ function imprimerAvenantTma(d, c){
     +'La réalisation reste conditionnée à la faisabilité technique confirmée par le maître d\'œuvre.<br><br>'
     +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>'
     +'Pour '+escHtml(soc)+' : ___________________________<br><br>Le souscripteur (bon pour accord) : ___________________________</div>'
+    +'</body></html>');
+  w.document.close(); w.print();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SUBROGATION DE CONTRAT — transfert du contrat existant (lot, montant
+   total, échéancier, historique des versements déjà réglés) vers un
+   nouveau souscripteur, sans résiliation ni remboursement : le nouveau
+   titulaire reprend le contrat en l'état. Contrairement à la résiliation
+   (qui libère le lot et rembourse), l'id du client est CONSERVÉ — seuls
+   les champs d'identité changent — pour que versements, commissions et
+   lot restent automatiquement rattachés sans aucune réaffectation
+   manuelle. L'ancienne identité est archivée dans client.subrogations[]
+   avant d'être écrasée. Frais de dossier/mutation traités comme les
+   frais de souscription d'origine (non comptés dans montant_total —
+   voir _versementSurPrix) : documentés dans l'avenant, à percevoir via
+   un versement de type "frais_souscription" séparé, jamais mêlés au
+   prix du lot. Commissions déjà payées : jamais touchées automatiquement
+   (choix retenu) — à traiter au cas par cas si besoin. */
+function ouvrirSubrogation(clientId){
+  var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; });
+  if (!c) return;
+  if (!exigerDroit('Souscripteurs', 'v', 'la subrogation de ce contrat')) return;
+  var alerteGele = document.getElementById('sub-alerte-gele');
+  if (c.gele) {
+    alerteGele.style.display = '';
+    alerteGele.innerHTML = '<div class="alert alert-danger">🔒 Ce souscripteur est GELÉ (sanction SFC) — la subrogation est bloquée. Traitez-le dans Conformité LBC/FT → Criblage SFC avant toute cession de droits.</div>';
+    openModal('modal-subrogation');
+    return;
+  }
+  alerteGele.style.display = 'none';
+  document.getElementById('sub-client-id').value = clientId;
+  ['sub-nom','sub-prenoms','sub-tel','sub-email','sub-piece-num','sub-profession','sub-adresse'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('sub-piece-type').value = 'CNI';
+  document.getElementById('sub-nationalite').value = 'Ivoirienne';
+  document.getElementById('sub-date').value = today();
+  document.getElementById('sub-frais').value = 0;
+  document.getElementById('sub-motif').value = '';
+  document.getElementById('sub-confirme').checked = false;
+
+  var lot = (DATA.lots||[]).find(function(l){ return l.id===c.lot_id; });
+  var verse = (typeof totalPayePrix==='function') ? totalPayePrix(clientId) : 0;
+  document.getElementById('sub-recap').innerHTML =
+    '<b>Titulaire actuel :</b> '+escHtml(((c.nom||'')+' '+(c.prenoms||'')).trim())
+    +'<br><b>Lot :</b> '+(lot?escHtml('Lot '+(lot.numero||lot.id)):'—')
+    +'<br><b>Montant total du contrat :</b> '+fcfa(c.montant_total||0)
+    +'<br><b>Déjà versé :</b> '+fcfa(verse)+' — <b>Reste dû :</b> '+fcfa(Math.max(0,(c.montant_total||0)-verse))
+    +(c.subrogations&&c.subrogations.length ? '<br><span style="color:var(--or,#B87333);">⚠️ Ce contrat a déjà été subrogé '+c.subrogations.length+' fois.</span>' : '');
+  openModal('modal-subrogation');
+}
+async function confirmerSubrogation(){
+  var clientId = document.getElementById('sub-client-id').value;
+  var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; });
+  if (!c) { toast('Souscripteur introuvable.','error'); return; }
+  if (c.gele) { toast('Contrat gelé — subrogation impossible.','error'); return; }
+  var nom = document.getElementById('sub-nom').value.trim();
+  var prenoms = document.getElementById('sub-prenoms').value.trim();
+  var tel = document.getElementById('sub-tel').value.trim();
+  var pieceNum = document.getElementById('sub-piece-num').value.trim();
+  var motif = document.getElementById('sub-motif').value.trim();
+  if (!nom || !prenoms || !tel || !pieceNum) { toast('Nom, prénoms, téléphone et n° de pièce du nouveau souscripteur sont obligatoires.','error'); return; }
+  if (!motif) { toast('Le motif de la subrogation est obligatoire.','error'); return; }
+  if (!document.getElementById('sub-confirme').checked) { toast('Cochez la case de confirmation avant de valider.','error'); return; }
+
+  var frais = parseFloat(document.getElementById('sub-frais').value) || 0;
+  var dat = document.getElementById('sub-date').value || today();
+
+  c.subrogations = c.subrogations || [];
+  var archive = {
+    id: uid(), date: dat, motif: motif, frais_dossier: frais,
+    ancien_nom: c.nom, ancien_prenoms: c.prenoms, ancien_tel: c.tel, ancien_email: c.email,
+    ancien_piece_type: c.piece_type, ancien_piece_num: c.piece_num,
+    nouveau_nom: nom, nouveau_prenoms: prenoms, nouveau_tel: tel,
+    valide_par: (APP.currentUser&&APP.currentUser.nom)||'—', cree_le: new Date().toISOString()
+  };
+  c.subrogations.push(archive);
+
+  c.nom = nom; c.prenoms = prenoms; c.tel = tel;
+  c.email = document.getElementById('sub-email').value.trim();
+  c.piece_type = document.getElementById('sub-piece-type').value;
+  c.piece_num = pieceNum;
+  c.nationalite = document.getElementById('sub-nationalite').value.trim();
+  c.profession = document.getElementById('sub-profession').value.trim();
+  c.adresse = document.getElementById('sub-adresse').value.trim();
+  c._modifie = new Date().toISOString();
+
+  await logAudit('clients', clientId, 'subrogation', { nom:archive.ancien_nom, prenoms:archive.ancien_prenoms }, { nom:nom, prenoms:prenoms });
+  await clientLierDossierJuridique(c, 'Subrogation de contrat — cédant : '+((archive.ancien_nom||'')+' '+(archive.ancien_prenoms||'')).trim()+' → cessionnaire : '+nom+' '+prenoms+'. '+motif+(frais>0?' Frais de dossier : '+fcfa(frais)+'.':''), frais, false, nom+' '+prenoms);
+  await dbPut('clients', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+
+  closeModal('modal-subrogation');
+  renderClients();
+  if (APP.editingId===clientId) fillClientForm(c);
+  toast('✅ Contrat subrogé à '+nom+' '+prenoms+'.'+(frais>0?' Frais de dossier ('+fcfa(frais)+') à percevoir séparément — voir l\'avenant.':'')+' ⚠️ Pensez à cribler le nouveau titulaire (Conformité LBC/FT → Criblage SFC).', 'success');
+  imprimerAvenantSubrogation(archive, c);
+}
+function imprimerAvenantSubrogation(archive, c){
+  var soc = (DATA.params&&(DATA.params.societe||DATA.params.nom))||'';
+  var w = window.open('','_blank');
+  if (!w) { toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  var lot = (DATA.lots||[]).find(function(l){ return l.id===c.lot_id; });
+  w.document.write('<html><head><title>Avenant — Subrogation de contrat</title>'
+    +'<style>body{font-family:Georgia,serif;padding:38px;color:#111;font-size:13px;line-height:1.55;}'
+    +'h1{font-size:17px;margin:0 0 4px;}table{width:100%;border-collapse:collapse;margin:10px 0;}'
+    +'td{padding:5px 8px;border:1px solid #ccc;}td.k{width:40%;background:#f5f5f5;}'
+    +'.pied{margin-top:26px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Avenant subrogation', c.dossier||c.id)
+    +'<h1>'+escHtml(soc)+'</h1>'
+    +'<h1 style="margin-top:14px;">Avenant — Subrogation de contrat</h1>'
+    +'<div style="color:#555;font-size:11.5px;">Réf. dossier : '+escHtml(c.dossier||c.id)+' — '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    +'<h2>Souscripteur cédant</h2><table><tbody>'
+    +'<tr><td class="k">Nom</td><td>'+escHtml(((archive.ancien_nom||'')+' '+(archive.ancien_prenoms||'')).trim())+'</td></tr>'
+    +'<tr><td class="k">Téléphone</td><td>'+escHtml(archive.ancien_tel||'')+'</td></tr>'
+    +'</tbody></table>'
+    +'<h2>Souscripteur cessionnaire (nouveau titulaire)</h2><table><tbody>'
+    +'<tr><td class="k">Nom</td><td>'+escHtml(((archive.nouveau_nom||'')+' '+(archive.nouveau_prenoms||'')).trim())+'</td></tr>'
+    +'<tr><td class="k">Téléphone</td><td>'+escHtml(archive.nouveau_tel||'')+'</td></tr>'
+    +'</tbody></table>'
+    +'<h2>Objet</h2><p>'+escHtml(archive.motif)+'</p>'
+    +'<p>Le cessionnaire reprend le contrat de souscription en l\'état, avec l\'ensemble des droits et obligations '
+    +'du cédant : lot '+(lot?escHtml(lot.numero||lot.id):'—')+', montant total '+fcfa(c.montant_total||0)
+    +', et le bénéfice des versements déjà effectués.</p>'
+    +(archive.frais_dossier>0 ? '<table><tbody><tr><td class="k">Frais de dossier/mutation</td><td>'+fcfa(archive.frais_dossier)+'</td></tr></tbody></table>' : '')
+    +'<div class="pied">Le présent avenant constate la subrogation et ne modifie ni le lot, ni le montant total, ni '
+    +'l\'échéancier du contrat initial.<br><br>'
+    +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>'
+    +'Pour '+escHtml(soc)+' : ___________________________<br><br>'
+    +'Le cédant (bon pour accord) : ___________________________<br><br>'
+    +'Le cessionnaire (bon pour accord) : ___________________________</div>'
     +'</body></html>');
   w.document.close(); w.print();
 }
@@ -54333,6 +54516,7 @@ async function cesResilierConfirmer(){
     valide_par:(APP.currentUser&&APP.currentUser.nom)||'—', cree_le:new Date().toISOString() };
   c._modifie = new Date().toISOString();
   await logAudit('cessions_foncieres', cessionId, 'resiliation', null, c.resiliation);
+  await clientLierDossierJuridique(c, 'Résiliation de cession — motif : '+(motif==='faute_promoteur'?'faute du promoteur':'désistement de l\'acquéreur')+' ('+Math.round(taux*100)+'%). '+justification, rembourse, true);
   await dbPut('cessions_foncieres', c); if (typeof syncToSupabase==='function') syncToSupabase('pi_cessions_foncieres', c);
 
   closeModal('modal-cesresil');
@@ -65889,6 +66073,39 @@ async function locLierDossierJuridique(b, q, priorite){
   if(typeof syncToSupabase==='function') syncToSupabase('pi_dossiers_juridiques', d);
   if(typeof renderDossiersJuridiques==='function') renderDossiersJuridiques();
   toast('📂 Dossier juridique '+d.ref+' '+(b.dossier_juridique_id?'mis à jour':'ouvert')+'.', 'success');
+}
+
+/* ── Même liaison automatique, pour les avenants de contrat de vente
+   (résiliation, régularisation de surface, TMA, subrogation) — jusqu'ici
+   aucun des 4 modules construits ce soir n'était rattaché au Département
+   Juridique malgré la génération d'un avenant signable à chaque fois :
+   un juriste consultant les Dossiers Juridiques n'aurait jamais vu ces
+   événements. Un seul dossier "Contrat de vente" par client (comme un
+   dossier par bail côté locatif) : les événements suivants s'ajoutent en
+   notes plutôt que de multiplier les dossiers pour le même contrat. */
+async function clientLierDossierJuridique(c, note, montant, urgent, nomAffiche){
+  var nom = nomAffiche || ((c.nom||'')+' '+(c.prenoms||'')).trim() || c.acquereur || '—';
+  if (!DATA.dossiersJuridiques) DATA.dossiersJuridiques = [];
+  var d = c.dossier_juridique_id ? DATA.dossiersJuridiques.find(function(x){ return x.id===c.dossier_juridique_id; }) : null;
+  var ligne = new Date().toLocaleDateString('fr-FR') + ' — ' + note;
+  if (d) {
+    d.notes = (d.notes||'') + '\n' + ligne;
+    if (montant) d.montant = montant;
+    if (urgent) d.priorite = 'urgente';
+    if (d.statut==='clos_favorable' || d.statut==='clos_defavorable') d.statut = 'ouvert';
+  } else {
+    d = { id:uid(), ref:'JUR-CV-'+String(DATA.dossiersJuridiques.length+1).padStart(4,'0'),
+      type:'contrat_vente', objet:'Contrat de vente — '+nom,
+      interlocuteur:nom, avocat:'',
+      date_ouv:today(), date_ech:'', priorite:urgent?'urgente':'normale', statut:'ouvert', montant:montant||0,
+      notes:ligne, client_id:c.id, created_at:today() };
+    DATA.dossiersJuridiques.push(d);
+    c.dossier_juridique_id = d.id;
+  }
+  await dbPut('dossiersJuridiques', d);
+  if (typeof syncToSupabase==='function') syncToSupabase('pi_dossiers_juridiques', d);
+  if (typeof renderDossiersJuridiques==='function') renderDossiersJuridiques();
+  return d;
 }
 function locOuvrirDossierLie(bailId){
   var b=_locBaux().find(function(x){ return x.id===bailId; });
