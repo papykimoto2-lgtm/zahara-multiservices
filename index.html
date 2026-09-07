@@ -18414,6 +18414,14 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </select>
         </div>
         <div class="form-group">
+          <label>N° Titre Foncier du lot <span style="font-weight:400;color:var(--blanc-dim);">— une fois morcelé/acquis</span></label>
+          <input type="text" class="form-control" id="l-numero-tf" placeholder="Ex. TF 21289/512">
+        </div>
+        <div class="form-group">
+          <label>Frais de notaire (FCFA)</label>
+          <input type="number" class="form-control" id="l-frais-notaire" placeholder="0">
+        </div>
+        <div class="form-group">
           <label>Nature du lot</label>
           <select class="form-control" id="l-nature" onchange="lotNatureUI()">
             <option value="villa">Villa / plain-pied (1 lot = 1 unité)</option>
@@ -34629,6 +34637,8 @@ function openLotModal(id) {
     setSelectValue('l-statut', l.statut);
     setSelectValue('l-nature', l.nature || 'villa');
     setSelectValue('l-mode-livraison', l.mode_livraison || 'gros_oeuvre');
+    document.getElementById('l-numero-tf').value = l.numero_tf || '';
+    document.getElementById('l-frais-notaire').value = l.frais_notaire || '';
     lotNatureUI(); lotRecalcPrixM2(); lotRecalcCoutM2();
   } else {
     document.getElementById('modal-lot-title').textContent = 'Nouveau Lot';
@@ -34638,7 +34648,7 @@ function openLotModal(id) {
 }
 
 function clearLotForm() {
-  ['l-numero','l-ilot','l-surface','l-surface-mesuree','l-pieces','l-prix','l-prix-m2','l-cout-revient','l-cout-m2','l-notes'].forEach(function(id) {
+  ['l-numero','l-ilot','l-surface','l-surface-mesuree','l-pieces','l-prix','l-prix-m2','l-cout-revient','l-cout-m2','l-notes','l-numero-tf','l-frais-notaire'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -34802,6 +34812,8 @@ async function saveLot() {
     cout_m2: _coutM2,
     standing: document.getElementById('l-standing').value,
     mode_livraison: document.getElementById('l-mode-livraison').value,
+    numero_tf: document.getElementById('l-numero-tf').value.trim(),
+    frais_notaire: parseFloat(document.getElementById('l-frais-notaire').value) || 0,
     nature: _lotNature,
     statut: document.getElementById('l-statut').value,
     notes: document.getElementById('l-notes').value,
