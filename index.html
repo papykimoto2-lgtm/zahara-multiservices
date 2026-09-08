@@ -24516,39 +24516,93 @@ async function sbFetch(path, method, body, prefer) {
     /* Sinon : tenter (réseau revenu ou délai écoulé) */
   }
 
+  /* [FIX DIVERGENCE 09/2026] PostgREST/Supabase plafonne par défaut toute
+     requête GET sans "limit=" explicite à 1000 lignes (db.max_rows). Ce code
+     ne paginait jamais : sur une table de +1000 lignes (écritures comptables,
+     caisse, audit log…), un simple "select=id" ou "select=*" ne renvoyait que
+     les 1000 premières. Conséquence directe et vérifiée en capture d'écran :
+     l'écran de synchro affichait "cloud = 1000" pour CHAQUE table dépassant
+     ce seuil et en déduisait à tort des milliers de lignes "à envoyer" alors
+     qu'elles étaient déjà dans le cloud — et pire, syncFromSupabase() /
+     pullReinitialiserCurseurs() (qui utilisent le même sbFetch) ne
+     RÉCUPÉRAIENT ELLES AUSSI que les 1000 premières lignes de chaque table,
+     ce qui explique la divergence réelle de données d'un poste à l'autre.
+     Correction : toute requête GET sans "limit=" est désormais paginée en
+     interne (1000 lignes/page, tri stable par id) et les pages sont
+     concaténées avant d'être rendues à l'appelant. Aucun appelant n'a besoin
+     d'être modifié : la signature et le contrat de retour de sbFetch sont
+     inchangés (tableau JSON, [] si vide, null en cas d'échec réseau/HTTP). */
+  var _m = (method || 'GET').toUpperCase();
+  var _paginer = (_m === 'GET') && !/[?&]limit=/.test(path);
+  var _PAGE = 1000;
+  var _MAX_PAGES = 500; /* soit 500 000 lignes max par appel — garde-fou */
+  var _nbPages = 0;
+  var _hasOrder = /[?&]order=/.test(path);
+
   try {
-    var opts = {
-      method: method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SB.key,
-        'Authorization': 'Bearer ' + sbAuth(),
-        'Prefer': prefer || 'return=representation'
+    var _resultats = [];
+    var _offset = 0;
+    var _page;
+    do {
+      var _sep = path.indexOf('?') === -1 ? '?' : '&';
+      var _chemin = _paginer
+        ? (path + _sep + 'limit=' + _PAGE + '&offset=' + _offset + (_hasOrder ? '' : '&order=id.asc'))
+        : path;
+
+      var opts = {
+        method: _m,
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SB.key,
+          'Authorization': 'Bearer ' + sbAuth(),
+          'Prefer': prefer || 'return=representation'
+        }
+      };
+      if (body) opts.body = JSON.stringify(body);
+      var resp = await fetch(SB.url + '/rest/v1/' + _chemin, opts);
+
+      /* Succès réseau → fermer le circuit + mettre à jour le badge */
+      if (SB._breakerOpen) {
+        SB._breakerOpen = false;
+        console.info('[Supabase] Connexion rétablie — synchronisation reprise.');
+        _majBadgeSync('ok');
+        /* Rejouer la file d'attente hors-ligne */
+        if (typeof flushSyncOutbox === 'function') setTimeout(flushSyncOutbox, 1000);
       }
-    };
-    if (body) opts.body = JSON.stringify(body);
-    var resp = await fetch(SB.url + '/rest/v1/' + path, opts);
 
-    /* Succès réseau → fermer le circuit + mettre à jour le badge */
-    if (SB._breakerOpen) {
-      SB._breakerOpen = false;
-      console.info('[Supabase] Connexion rétablie — synchronisation reprise.');
-      _majBadgeSync('ok');
-      /* Rejouer la file d'attente hors-ligne */
-      if (typeof flushSyncOutbox === 'function') setTimeout(flushSyncOutbox, 1000);
-    }
+      if (!resp.ok) {
+        try {
+          var t = await resp.text();
+          console.warn('[Supabase] ' + _m + ' ' + _chemin + ' → HTTP ' + resp.status + ' : ' + t);
+          window._lastSupaError = 'HTTP ' + resp.status + ' : ' + t;
+        } catch(_) {}
+        /* [Prod] Échec net en cas de page manquante — jamais de résultat partiel
+           silencieux : un appelant qui recevrait une liste tronquée sans le
+           savoir pourrait, ailleurs dans le code, la traiter comme le reflet
+           complet du cloud. On préserve donc EXACTEMENT le contrat d'origine :
+           échec = null, comme un sbFetch non paginé. */
+        return null;
+      }
+      var txt = await resp.text();
+      if (!txt) { _page = []; }
+      else { try { _page = JSON.parse(txt); } catch(e) { _page = []; } }
 
-    if (!resp.ok) {
-      try {
-        var t = await resp.text();
-        console.warn('[Supabase] ' + (method || 'GET') + ' ' + path + ' → HTTP ' + resp.status + ' : ' + t);
-        window._lastSupaError = 'HTTP ' + resp.status + ' : ' + t;
-      } catch(_) {}
-      return null;
-    }
-    var txt = await resp.text();
-    if (!txt) return [];
-    try { return JSON.parse(txt); } catch(e) { return []; }
+      if (!_paginer) return _page; /* comportement inchangé : POST/PATCH/DELETE ou limit explicite */
+      if (!Array.isArray(_page)) return _page; /* garde-fou : réponse non tabulaire */
+
+      _resultats = _resultats.concat(_page);
+      _offset += _PAGE;
+      _nbPages++;
+      if (_nbPages > _MAX_PAGES) {
+        /* Garde-fou : ne devrait jamais se produire (borne à 500 000 lignes
+           par requête), évite toute boucle infinie si un paramètre offset
+           venait à être ignoré côté serveur. */
+        console.error('[Supabase] Pagination interrompue — plus de ' + _MAX_PAGES + ' pages pour ' + path);
+        break;
+      }
+    } while (_page.length === _PAGE);
+
+    return _resultats;
   } catch(e) {
     if (!SB._breakerOpen) {
       SB._breakerOpen = true;
@@ -25604,6 +25658,11 @@ async function analyserDivergence(){
     return { store: store, pushN:pushN, pullN:pullN, pushM:pushM, pullM:pullM, fantomes:fantomes, noTs: !hasTs };
   }));
 
+  /* Même garde que diagnostiquerCloud() : ce scan est long, le host capturé
+     plus haut peut avoir été remplacé entre-temps par un rafraîchissement de
+     renderSyncStatus(). On reprend la référence DOM actuelle. */
+  host = document.getElementById('sync-extra-panel') || document.getElementById('sync-status-panel') || host;
+
   var diverg = res.filter(function(d){ return d.err || d.pushN||d.pullN||d.pushM||d.pullM; });
   var tEnvN=0,tEnvM=0,tRecN=0,tRecM=0,tErr=0,tFant=0;
   res.forEach(function(d){ if(d.err){tErr++;return;} tEnvN+=d.pushN; tEnvM+=d.pushM; tRecN+=d.pullN; tRecM+=d.pullM; tFant+=(d.fantomes||0); });
@@ -25951,6 +26010,13 @@ async function diagnostiquerCloud() {
     else autres.push({ table: table, err: e.slice(0, 120) });
   }
 
+  /* Le scan ci-dessus prend plusieurs secondes ; si renderSyncStatus() s'est
+     rafraîchi entre-temps (interval, autre clic), il a réécrit tout
+     #sync-status-panel et donc remplacé le nœud #sync-extra-panel capturé au
+     début de cette fonction — écrire dedans serait invisible. On reprend la
+     référence actuelle du DOM juste avant d'afficher le résultat. */
+  host = document.getElementById('sync-extra-panel') || document.getElementById('sync-status-panel') || host;
+
   var html = '<div style="border:1px solid var(--bord);border-radius:10px;padding:14px;">'
     + '<div style="font-weight:800;margin-bottom:8px;">🩺 Diagnostic cloud — ' + new Date().toLocaleString('fr-FR') + '</div>'
     + '<div style="font-size:12px;display:flex;flex-wrap:wrap;gap:14px;margin-bottom:10px;">'
@@ -26239,6 +26305,13 @@ function demarrerSyncAuto() {
      pas dans 10 minutes. */
   try { setTimeout(function(){ _verifierNouvelleVersion(); }, 20000); } catch(e){}
   if (window._autoSyncTimer) return;
+  /* Premier passage de réconciliation à 1 min après le démarrage plutôt que
+     d'attendre le premier cycle de 30 min (tick % 60) : sur un poste qui
+     vient d'ouvrir l'app, les écarts hérités (enregistrements jamais
+     marqués dirty) sont comblés rapidement au lieu de rester visibles
+     dans la colonne Action pendant une demi-heure. Les passages suivants
+     restent sur le rythme normal de 30 min via le tick du setInterval. */
+  setTimeout(function(){ try { autoReconcilierEcarts(); } catch(e){} }, 60000);
   var _tickAutoSync = 0;
   window._autoSyncTimer = setInterval(function(){
     try { flushDirtySync(); } catch(e){}
@@ -26284,10 +26357,60 @@ function demarrerSyncAuto() {
     if (_tickAutoSync % 12 === 0 && navigator.onLine) {
       try { if (typeof pullFromCloudSilent === 'function') pullFromCloudSilent(); } catch(e){}
     }
+    /* [Auto-réconciliation 08/09] Filet de secours pour les enregistrements
+       "orphelins" que flushDirtySync() ne voit jamais : données migrées ou
+       créées avant l'activation du suivi dirty, jamais marquées à envoyer.
+       Sans ce filet, la colonne Action du tableau de sync (Comptabilité →
+       Cloud/Sync) pouvait rester non vide indéfiniment tant que l'utilisateur
+       ne cliquait pas manuellement "Tout envoyer". Toutes les ~30 min
+       (60 passes de 30 s) — même prudence de charge que le pull périodique
+       ci-dessus — et seulement en ligne. */
+    if (_tickAutoSync % 60 === 0 && navigator.onLine) {
+      try { autoReconcilierEcarts(); } catch(e){}
+    }
     /* Vérifie si cette session a été invalidée à distance (Paramétrage →
        Sécurité → Déconnecter tous les autres postes). */
     try { if (typeof _verifierSessionEncoreValide === 'function') _verifierSessionEncoreValide(); } catch(e){}
   }, 30000);
+}
+
+/* [Auto-réconciliation 08/09] Pousse silencieusement, sans confirmation ni
+   toast, les enregistrements locaux absents du cloud — même logique que le
+   bouton "Tout envoyer" mais ciblée : ne renvoie que les id manquants côté
+   cloud (comparaison légère par id, pas par contenu complet), pour ne pas
+   re-pousser inutilement ce qui est déjà synchronisé. */
+async function autoReconcilierEcarts() {
+  if (!navigator.onLine || !SB.url || !SB.key) return;
+  /* Priorité : souscription (client + son échéancier de versements/commissions)
+     et caisse (mouvements de trésorerie) sont les données les plus sensibles
+     à un écart cloud↔local — impact direct sur l'encaissement client et le
+     solde de caisse visible par d'autres postes. Elles sont réconciliées en
+     premier ; le reste de SUPA_STORE_MAP suit dans son ordre habituel. */
+  var ORDRE_PRIORITE = ['clients', 'versements', 'commissions',
+                         'caisses', 'caisse_sessions', 'caisse_mouvements', 'caisse_budgets'];
+  var reste = SUPA_STORE_MAP.filter(function(e){ return ORDRE_PRIORITE.indexOf(e[1]) === -1; });
+  var ordonne = ORDRE_PRIORITE
+    .map(function(store){ return SUPA_STORE_MAP.find(function(e){ return e[1] === store; }); })
+    .filter(Boolean)
+    .concat(reste);
+  var total = 0;
+  for (var i = 0; i < ordonne.length; i++) {
+    var table = ordonne[i][0], store = ordonne[i][1];
+    var rows = DATA[store] || [];
+    if (!rows.length) continue;
+    try {
+      var cloudIds = await sbFetch(table + '?select=id', 'GET');
+      if (!cloudIds) continue;                       // table inaccessible : on ne force rien
+      var cloudSet = {};
+      cloudIds.forEach(function(r){ cloudSet[r.id] = true; });
+      for (var j = 0; j < rows.length; j++) {
+        if (!cloudSet[rows[j].id]) {
+          try { var ok = await syncToSupabase(table, rows[j]); if (ok) total++; } catch(e){}
+        }
+      }
+    } catch(e) { /* table en erreur : on continue avec les suivantes */ }
+  }
+  if (total) { try { majDerniereSync('Réconciliation auto (' + total + ' comblé(s))'); } catch(e){} }
 }
 
 /* Push global : envoie tous les enregistrements locaux vers Supabase */
@@ -116775,7 +116898,62 @@ function imprimerFactureFNE(facId) {
    de la ventilation, après vérification — jamais par la caissière.
 ══════════════════════════════════════════════════════════════════════════ */
 
-var CAISSE_UI = { brouillardCaisseId: null, brouillardSessionId: null, brouillardMode: 'session', brouillardDebut: null, brouillardFin: null };
+var CAISSE_UI = { brouillardCaisseId: null, brouillardSessionId: null, brouillardMode: 'session', brouillardDebut: null, brouillardFin: null,
+  verrouille: false, derniereActivite: null };
+
+/* [Verrouillage par inactivité 08/09] La caisse reste OUVERTE (session
+   comptable intacte, aucune clôture) mais se verrouille après 10 min sans
+   activité sur l'écran Caisse — équivalent d'un écran de veille de POS :
+   évite qu'un tiroir laissé ouvert sans surveillance soit manipulé par
+   quelqu'un d'autre pendant une pause. Se déverrouille avec le PIN caisse
+   (si configuré) ou le mot de passe du compte. */
+function caisseNoterActivite() {
+  CAISSE_UI.derniereActivite = Date.now();
+}
+
+function caisseVerifierInactivite() {
+  if (APP.currentPage !== 'caisse') return;      // ne verrouille que si l'écran Caisse est affiché
+  if (CAISSE_UI.verrouille) return;
+  if (!CAISSE_UI.derniereActivite) return;
+  if (Date.now() - CAISSE_UI.derniereActivite >= 10 * 60 * 1000) caisseVerrouiller();
+}
+document.addEventListener('click', function(){ if (APP.currentPage === 'caisse' && !CAISSE_UI.verrouille) caisseNoterActivite(); }, true);
+document.addEventListener('keydown', function(){ if (APP.currentPage === 'caisse' && !CAISSE_UI.verrouille) caisseNoterActivite(); }, true);
+setInterval(caisseVerifierInactivite, 30000);
+
+function caisseVerrouiller() {
+  CAISSE_UI.verrouille = true;
+  var aUnPin = !!(APP.currentUser && APP.currentUser.caisse_pin_hash);
+  var gPin = document.getElementById('cv-pin-group'), gPwd = document.getElementById('cv-pwd-group');
+  if (gPin) gPin.style.display = aUnPin ? '' : 'none';
+  if (gPwd) gPwd.style.display = aUnPin ? 'none' : '';
+  var eErr = document.getElementById('cv-err'); if (eErr) eErr.textContent = '';
+  var ePin = document.getElementById('cv-pin'); if (ePin) ePin.value = '';
+  var ePwd = document.getElementById('cv-pwd'); if (ePwd) ePwd.value = '';
+  openModal('modal-caisse-verrou');
+  setTimeout(function(){ (aUnPin ? ePin : ePwd) && (aUnPin ? ePin : ePwd).focus(); }, 100);
+}
+
+async function caisseDeverrouiller() {
+  var u = APP.currentUser;
+  var eErr = document.getElementById('cv-err');
+  var ok = false;
+  if (u && u.caisse_pin_hash) {
+    var pinSaisi = (document.getElementById('cv-pin')||{}).value || '';
+    if (!pinSaisi) { if (eErr) eErr.textContent = 'Saisissez votre code PIN.'; return; }
+    var pinHash = await hashPassword(pinSaisi, u.caisse_pin_salt || '');
+    ok = (pinHash === u.caisse_pin_hash);
+  } else {
+    var pwdSaisi = (document.getElementById('cv-pwd')||{}).value || '';
+    if (!pwdSaisi) { if (eErr) eErr.textContent = 'Saisissez votre mot de passe.'; return; }
+    var pwdHash = await hashPassword(pwdSaisi, (u && u.salt) || '');
+    ok = !!(u && pwdHash === u.password_hash);
+  }
+  if (!ok) { if (eErr) eErr.textContent = '❌ Code incorrect.'; return; }
+  CAISSE_UI.verrouille = false;
+  caisseNoterActivite();
+  closeModal('modal-caisse-verrou');
+}
 
 /* ── Utilitaires ─────────────────────────────────────────────────────── */
 function _caissePad3(n) { n = String(n); while (n.length < 3) n = '0' + n; return n; }
@@ -116953,6 +117131,22 @@ function caisseSoldeSession(session) {
 function caisseNomUser(userId) {
   var u = (DATA.users || []).find(function(x){ return x.id === userId; });
   return u ? u.nom : userId;
+}
+
+/* [Exclusivité opérateur] Une caisse ouverte est réputée « tenue » par la
+   personne qui l'a ouverte (session.ouverte_par_id) — deux caissier(ère)s
+   ne doivent jamais pouvoir saisir concurremment sur la même session : celui
+   qui n'est pas responsable ne sait pas ce que l'autre vient d'enregistrer,
+   risque de doublons/écarts, et la traçabilité (numéro de bon, décompte
+   physique à la clôture) devient ambiguë sur qui répond de quoi. Un
+   admin garde la main pour intervenir (erreur, remplacement, congé du
+   titulaire) — c'est un contrôle opérationnel, pas une barrière de sécurité
+   absolue. Sessions ouvertes avant ce correctif (ouverte_par_id absent) ne
+   sont pas bloquées rétroactivement. */
+function caisseSessionEstOperable(session) {
+  if (!session || !session.ouverte_par_id) return true;
+  if (hasRole('admin')) return true;
+  return APP.currentUser && APP.currentUser.id === session.ouverte_par_id;
 }
 
 /* ── Intégrité de synchronisation caisse (garde-fou comptable) ──────────
@@ -117767,6 +117961,7 @@ function caisseRenderBalanceAgee() {
 window.caisseRenderBalanceAgee = caisseRenderBalanceAgee;
 
 async function caisseEnter() {
+  caisseNoterActivite();
   /* En premier, protégé — indépendant du reste. Sans ça, une erreur dans
      caisseRenderDashboard/Liste/Ecarts/Validations (fréquent quand Supabase
      est injoignable, cf. bandeau "Hors ligne") empêchait tout ce qui suit
@@ -117789,8 +117984,13 @@ async function caisseEnter() {
   caisseRenderDashboard();
   caisseRenderListe();
   document.getElementById('caisse-brouillard-box').innerHTML = '';
-  caisseRenderEcarts();
-  caisseRenderValidations();
+  /* [FIX] Ces 4 rendus étaient annoncés protégés par le commentaire ci-dessus
+     mais ne l'étaient pas réellement — caisseRenderEcarts() en particulier
+     peut lever (compte_defaut « écart de caisse » non paramétré via
+     requireCompteDefaut) et casser tout ce qui suit (validations, index
+     documents, ventilation, bandeau sync) sans aucun message clair. */
+  try { caisseRenderEcarts(); } catch(e) { console.warn('[Caisse] Écarts non affichés :', e); }
+  try { caisseRenderValidations(); } catch(e) { console.warn('[Caisse] Validations non affichées :', e); }
   await caisseLoadDocIndex();
   caisseRenderVentilation();
   try { await caisseSyncPreflight(); } catch(e){}
@@ -118082,7 +118282,9 @@ async function caisseOuvrir() {
     id: uid(), caisse_id: caisseId, date: today(),
     fond_ouverture: fond, fond_cloture_theorique: null, fond_cloture_reel: null, ecart: null,
     statut: 'ouverte',
-    ouverte_par: (APP.currentUser && APP.currentUser.nom) || '—', ouverte_le: new Date().toISOString(),
+    ouverte_par: (APP.currentUser && APP.currentUser.nom) || '—',
+    ouverte_par_id: (APP.currentUser && APP.currentUser.id) || null,
+    ouverte_le: new Date().toISOString(),
     cloturee_par: null, cloturee_le: null,
     envoye_journalier: false, envoye_journalier_le: null
   };
@@ -118105,8 +118307,13 @@ function caisseOuvrirBonModal(caisseId, type) {
      d'être ventilé normalement, sans aucune erreur visible. Seul
      daOuvrirDecaissement() refixe ce flag, juste après cet appel. */
   window._daPourDecaissement = null;
+  if (CAISSE_UI.verrouille) { toast('🔒 Caisse verrouillée par inactivité — déverrouillez d\'abord.', 'error'); return; }
   var session = caisseGetSessionOuverte(caisseId);
   if (!session) { toast('Cette caisse n\'est pas ouverte.', 'error'); return; }
+  if (!caisseSessionEstOperable(session)) {
+    toast('🔒 Cette caisse est actuellement tenue par ' + (session.ouverte_par || 'un(e) autre utilisateur(rice)') + '. Seul(e) elle/lui (ou un administrateur) peut y saisir des bons tant qu\'elle n\'est pas clôturée.', 'error', 6000);
+    return;
+  }
   var c = (DATA.caisses || []).find(function(x){ return x.id === caisseId; });
   document.getElementById('cb-modal-title').textContent = type === 'entree' ? '📥 Bon d\'entrée de caisse' : '📤 Bon de sortie de caisse';
   document.getElementById('cb-mvt-id').value = '';
@@ -118319,6 +118526,14 @@ async function caisseSaveBon() {
   /* ── MODE CRÉATION ────────────────────────────────────────────────────── */
   var session = caisseGetSessionOuverte(caisseId);
   if (!session) { toast('La caisse a été clôturée entre-temps — impossible d\'enregistrer ce bon.', 'error'); closeModal('modal-caisse-bon'); return; }
+  /* Revérifié ici (pas seulement à l'ouverture de la modale) : la modale a pu
+     rester ouverte pendant qu'un autre utilisateur prenait la caisse — le
+     contrôle définitif doit être au moment réel de l'enregistrement. */
+  if (!caisseSessionEstOperable(session)) {
+    toast('🔒 Cette caisse est désormais tenue par ' + (session.ouverte_par || 'un(e) autre utilisateur(rice)') + ' — enregistrement refusé.', 'error', 6000);
+    closeModal('modal-caisse-bon');
+    return;
+  }
 
   /* [Anti-doublon Paiements ↔ Caisse] Un versement souscripteur en espèces
      peut être saisi deux fois : une fois via le module Paiements (crée un
@@ -119380,8 +119595,13 @@ function caisseImprimerBrouillardPeriode() {
 
 /* ── Clôture de caisse ───────────────────────────────────────────────── */
 function caisseClôturerModal(caisseId) {
+  if (CAISSE_UI.verrouille) { toast('🔒 Caisse verrouillée par inactivité — déverrouillez d\'abord.', 'error'); return; }
   var session = caisseGetSessionOuverte(caisseId);
   if (!session) { toast('Cette caisse n\'est pas ouverte.', 'error'); return; }
+  if (!caisseSessionEstOperable(session)) {
+    toast('🔒 Cette caisse est actuellement tenue par ' + (session.ouverte_par || 'un(e) autre utilisateur(rice)') + '. Seul(e) elle/lui (ou un administrateur) peut la clôturer.', 'error', 6000);
+    return;
+  }
   var c = (DATA.caisses || []).find(function(x){ return x.id === caisseId; });
   var solde = caisseSoldeSession(session);
   document.getElementById('ccl-caisse-id').value = caisseId;
@@ -124542,6 +124762,31 @@ goTo = function(page) {
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-caisse-ouvrir')">Annuler</button>
       <button class="btn btn-primary" onclick="caisseOuvrir()">🔓 Ouvrir la caisse</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : Verrouillage caisse par inactivité (10 min) — pas de bouton Fermer,
+     c'est un écran de verrouillage, pas une modale annulable -->
+<div class="modal-overlay" id="modal-caisse-verrou" style="z-index:9999;">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <h3>🔒 Caisse verrouillée</h3>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:12px;font-size:13px;color:var(--blanc-dim);">Verrouillée après 10 minutes d'inactivité. Ressaisissez votre code pour continuer — aucune donnée n'a été perdue.</div>
+      <div class="form-group" id="cv-pin-group" style="display:none;">
+        <label>Code PIN</label>
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" class="form-control" id="cv-pin" placeholder="••••" autocomplete="off" onkeydown="if(event.key==='Enter') caisseDeverrouiller();">
+      </div>
+      <div class="form-group" id="cv-pwd-group" style="display:none;">
+        <label>Mot de passe</label>
+        <input type="password" class="form-control" id="cv-pwd" placeholder="Votre mot de passe" autocomplete="off" onkeydown="if(event.key==='Enter') caisseDeverrouiller();">
+      </div>
+      <div id="cv-err" style="color:var(--rouge);font-size:12px;margin-top:6px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="caisseDeverrouiller()">🔓 Déverrouiller</button>
     </div>
   </div>
 </div>
