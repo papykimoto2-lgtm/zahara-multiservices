@@ -3143,6 +3143,12 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <button class="btn btn-primary" onclick="openClientModal()">+ Nouveau</button>
         </div>
 
+        <div class="tab-nav" style="margin-bottom:14px;">
+          <button class="tab-btn active" onclick="switchTab('clients','liste')">📋 Liste</button>
+          <button class="tab-btn" onclick="switchTab('clients','doublons')" title="Détecte les souscripteurs potentiellement saisis en double (nom, téléphone, email, pièce d'identité, n° de dossier)">🧬 Analyse de doublons</button>
+        </div>
+
+        <div class="tab-pane active" id="tab-clients-liste">
         <div class="filters-bar">
           <input type="text" class="search-input" placeholder="🔍 Nom, email, téléphone..." id="search-clients" oninput="_debInput('filterClients')">
           <select class="filter-select" id="filter-programme" onchange="filterClients()">
@@ -3215,6 +3221,20 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             </table>
           </div>
         </div>
+        </div>
+        <!-- /tab-clients-liste -->
+
+        <div class="tab-pane" id="tab-clients-doublons">
+          <div class="card" style="margin-bottom:16px;padding:14px 16px;">
+            <div style="font-size:12px;color:var(--blanc-dim);line-height:1.6;">
+              🧬 Détection automatique des souscripteurs potentiellement en double dans le portefeuille — par téléphone, email, n° de pièce d'identité, n° de dossier ou nom identique/très proche.
+              Aucune fusion n'est effectuée automatiquement : chaque groupe doit être vérifié puis traité manuellement (fusion, correction ou suppression d'une fiche).
+            </div>
+          </div>
+          <div id="clients-doublons-kpi" class="kpi-grid" style="margin-bottom:16px;"></div>
+          <div id="clients-doublons-content"></div>
+        </div>
+        <!-- /tab-clients-doublons -->
       </div>
 
       <!-- ── PAIEMENTS ─────────────────────────────── -->
@@ -5673,6 +5693,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <div class="etape-hd"><span class="etape-num">6</span>Intégrations</div>
             <div class="etape-btns">
               <button class="tab-btn" onclick="switchTab('params','cloud')" title="Connexion Supabase, état et diagnostic de la synchronisation"><i>☁️</i>Cloud / Sync</button>
+              <button class="tab-btn" onclick="switchTab('params','conflits')" title="Enregistrements modifiés ailleurs (autre poste) avant votre enregistrement — à vérifier manuellement, poste par poste"><i>⚠️</i>Conflits de synchro<span id="conflits-sync-badge"></span></button>
               <button class="tab-btn" onclick="switchTab('params','holdingdiag')" title="Comparaison en lecture seule des comptes hub/Agro et des comptes ERP Immo"><i>🔍</i>Comptes Holding</button>
               <button class="tab-btn" onclick="switchTab('params','comms')" title="Messagerie sortante, SMS, WhatsApp"><i>📧</i>Communications</button>
               <button class="tab-btn" onclick="switchTab('params','reporting');renderParamsReporting()" title="Rapports périodiques et destinataires"><i>📊</i>Reporting</button>
@@ -6634,6 +6655,16 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </div>
         </div>
 
+        <!-- Conflits de synchronisation -->
+        <div class="tab-pane" id="tab-params-conflits">
+          <div class="alert alert-info" style="margin-bottom:16px;">
+            ⚠️ Enregistrements (souscripteurs, écritures, lots…) modifiés ailleurs (autre poste) avant que ce poste n'ait pu enregistrer sa propre version. Pour protéger vos données, l'envoi est bloqué automatiquement au lieu d'écraser silencieusement — à vérifier et résoudre manuellement. <strong>Cette liste reste strictement locale à cet ordinateur</strong> : elle n'est jamais partagée via le cloud, donc à consulter sur le poste où l'alerte est apparue.
+          </div>
+          <div class="card">
+            <div id="conflits-sync-list"></div>
+          </div>
+        </div>
+
         <!-- Comptes Holding — diagnostic lecture seule -->
         <div class="tab-pane" id="tab-params-holdingdiag">
           <div class="alert alert-info" style="margin-bottom:16px;">
@@ -7457,12 +7488,6 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <div class="form-group"></div>
             </div>
             <div style="margin-top:14px;"><button class="btn btn-primary" onclick="saveComptesDefaut()">💾 Enregistrer les comptes par défaut</button></div>
-
-            <div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--bord);">
-              <div class="form-section-title" style="color:var(--rouge);">⚠️ Conflits de synchronisation</div>
-              <div style="font-size:11px;color:var(--blanc-dim);margin-bottom:8px;">Écritures modifiées ailleurs (autre poste) avant votre enregistrement. Non écrasées automatiquement — à résoudre manuellement.</div>
-              <div id="conflits-sync-list"></div>
-            </div>
           </div>
         </div>
 
@@ -17200,6 +17225,24 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
   </div>
 </div>
 
+<!-- Modal Sélection du contour (import DXF Bornage — plusieurs polygones détectés) -->
+<div class="modal-overlay" id="modal-dxf-choix-contour">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header"><h3>📐 Plusieurs contours détectés — choisir la parcelle</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-dxf-choix-contour')">✕</button></div>
+    <div class="modal-body">
+      <div class="alert alert-info" style="font-size:11.5px;">
+        Ce fichier contient <span id="dxf-choix-total"></span> contours fermés exploitables (plan de masse à
+        plusieurs lots, pas une parcelle isolée) — sélectionnez celui qui correspond à la parcelle en cours.
+      </div>
+      <input type="text" class="search-input" id="dxf-choix-recherche" placeholder="🔍 Filtrer par label..." oninput="dxfChoixFiltrer()" style="margin-bottom:8px;">
+      <div id="dxf-choix-liste" style="max-height:400px;overflow-y:auto;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-dxf-choix-contour')">Annuler</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal TMA — liste des demandes de modification d'un souscripteur -->
 <div class="modal-overlay" id="modal-tma-liste">
   <div class="modal" style="max-width:720px;">
@@ -24961,8 +25004,8 @@ async function syncToSupabase(table, obj, opts) {
      on n'écrase pas silencieusement : on journalise le conflit et on alerte.
      Ne s'active que si obj._baseModifie est fourni (édition d'un enregistrement existant) —
      une création ne peut pas être en conflit. */
-  var _STORES_CONFLIT = ['pi_ecritures','pi_factures_client','pi_financements_programme','pi_cessions_foncieres','pi_versements','pi_lots','pi_programmes','pi_clients','pi_employes'];
-  if (_STORES_CONFLIT.indexOf(table) !== -1 && obj && obj.id && obj._baseModifie && !_pulling && !obj._forceCloture) {
+  var _STORES_CONFLIT = ['pi_ecritures','pi_factures_client','pi_financements_programme','pi_cessions_foncieres','pi_versements','pi_lots','pi_programmes','pi_clients','pi_employes','pi_caisse_mouvements','pi_caisse_sessions'];
+  if (!(opts && opts.skipConflict) && _STORES_CONFLIT.indexOf(table) !== -1 && obj && obj.id && obj._baseModifie && !_pulling && !obj._forceCloture) {
     try {
       var remote = await sbFetch(table + '?id=eq.' + obj.id + '&select=id,m:data->>_modifie', 'GET');
       var remoteModifie = remote && remote.length ? remote[0].m : null;
@@ -25550,7 +25593,16 @@ async function syncPushStore(store){
   var motif = '';
   for (var i=0;i<rows.length;i++){
     window._lastSupaError = '';
-    var r = await syncToSupabase(table, rows[i]);
+    /* [FIX] Envoyait chaque ligne telle quelle, _baseModifie compris — un
+       champ qui n'a de sens QUE pendant une édition humaine active (« ai-je
+       la même version que celle que je viens d'ouvrir ? »). Ce bouton sert à
+       forcer l'alignement local→cloud, aucune édition n'est en cours : la
+       détection de conflit s'appliquait à tort, bloquant le renvoi de lignes
+       déjà bien présentes dans le cloud dès que leur _modifie stocké
+       localement datait un peu (souvent hérité d'un ancien enregistrement,
+       avant les correctifs de ce soir sur saveClient()). skipConflict fait
+       explicitement ce que ce bouton promet : envoyer, sans y réfléchir. */
+    var r = await syncToSupabase(table, rows[i], { skipConflict: true });
     if (r) ok++;
     else { err++; if (!motif && window._lastSupaError) motif = window._lastSupaError; }
   }
@@ -26368,6 +26420,18 @@ function demarrerSyncAuto() {
     if (_tickAutoSync % 60 === 0 && navigator.onLine) {
       try { autoReconcilierEcarts(); } catch(e){}
     }
+    /* [Réduction charge 09/09] SFC/LBC — voir exclusion correspondante dans
+       _pullBatchViaRPC(). 600 passes de 30 s = ~5 h, largement suffisant pour
+       des données de conformité qui ne changent pas d'une minute à l'autre. */
+    if (_tickAutoSync % 600 === 0 && navigator.onLine) {
+      var _tablesSfcLbc = [['pi_sfc_liste','sfc_liste'],['pi_sfc_criblages','sfc_criblages'],['pi_sfc_centif','sfc_centif'],
+                            ['pi_lbc_cappi','lbc_cappi'],['pi_lbc_conformx','lbc_conformx'],['pi_lbc_artci','lbc_artci']];
+      _tablesSfcLbc.forEach(function(tb){
+        (async function(t, s){
+          try { var res = await _pullTable(t); await _appliquerLignesPullTable(t, s, res.rows); } catch(e){}
+        })(tb[0], tb[1]);
+      });
+    }
     /* Vérifie si cette session a été invalidée à distance (Paramétrage →
        Sécurité → Déconnecter tous les autres postes). */
     try { if (typeof _verifierSessionEncoreValide === 'function') _verifierSessionEncoreValide(); } catch(e){}
@@ -26405,7 +26469,7 @@ async function autoReconcilierEcarts() {
       cloudIds.forEach(function(r){ cloudSet[r.id] = true; });
       for (var j = 0; j < rows.length; j++) {
         if (!cloudSet[rows[j].id]) {
-          try { var ok = await syncToSupabase(table, rows[j]); if (ok) total++; } catch(e){}
+          try { var ok = await syncToSupabase(table, rows[j], { skipConflict: true }); if (ok) total++; } catch(e){}
         }
       }
     } catch(e) { /* table en erreur : on continue avec les suivantes */ }
@@ -26450,7 +26514,10 @@ async function syncAllToSupabase() {
     if (!rows.length) continue;                 // table vide : on n'envoie rien (n'écrase jamais le Cloud)
     if (out) out.textContent = '⬆️ ' + store + ' (' + rows.length + ')…';
     for (var j = 0; j < rows.length; j++) {
-      var ok = await syncToSupabase(table, rows[j]);
+      /* [FIX] Même correctif que syncPushStore() — un envoi global délibéré
+         ne doit jamais être bloqué par la détection de conflit, conçue pour
+         protéger une édition humaine en cours, pas un renvoi en masse. */
+      var ok = await syncToSupabase(table, rows[j], { skipConflict: true });
       if (ok) total++; else erreurs++;
     }
   }
@@ -26776,6 +26843,14 @@ async function _pullBatchViaRPC() {
        miniatures vides sur un autre poste alors que l'upload avait
        réussi côté auteur. Synchronisée à part, comme pi_users. */
     if (table === 'pi_portail_medias') continue;
+    /* [Réduction charge 09/09] SFC (criblage sanctions) et LBC/FT (CAPPI,
+       ConformX, ARTCI) sont des données de conformité à faible fréquence de
+       changement réelle — la liste de sanctions RSNU ou un dossier ARTCI ne
+       bouge pas en quelques minutes. Les inclure dans le balayage général
+       toutes les ~6 min n'apportait aucune fraîcheur utile, seulement de la
+       charge. Basculées sur leur propre cycle, toutes les ~5 h (voir le tick
+       dédié dans demarrerSyncAuto). */
+    if (['pi_sfc_liste','pi_sfc_criblages','pi_sfc_centif','pi_lbc_cappi','pi_lbc_conformx','pi_lbc_artci'].indexOf(table) !== -1) continue;
     var complet = PULL_TOUJOURS_COMPLET.indexOf(table) !== -1 || PULL_INCR_INAPTES[table];
     curseurs[table] = complet ? '' : (_pullCurseurs()[table] || '');
     tablesConcernees.push([table, store]);
@@ -28469,6 +28544,7 @@ function switchTab(context, tab) {
 
   // Hook : rafraîchir l'état de synchro à l'ouverture de l'onglet Cloud/Synchro
   if (context==='params' && tab==='cloud') { setTimeout(function(){ try { if (typeof renderSyncStatus==='function') renderSyncStatus(); } catch(e){} }, 250); }
+  if (context==='params' && tab==='conflits' && typeof renderConflitsSync==='function') renderConflitsSync();
 
   // ── Traitement dédié : Rapports Commerciaux ─────────────────────────────
   // Implémentation ciblée pour éviter toute interférence avec les autres
@@ -28569,6 +28645,7 @@ function switchTab(context, tab) {
   if (context === 'validations') {
     if ((tab === 'histo-caisse' || tab === 'histo-da') && typeof renderHistoriqueValidations === 'function') renderHistoriqueValidations();
   }
+  if (context === 'clients' && tab === 'doublons' && typeof renderClientsDoublons === 'function') renderClientsDoublons();
 
   /* Mettre à jour les boutons .tab-btn du même contexte */
   document.querySelectorAll('.tab-btn').forEach(function(b) {
@@ -31081,8 +31158,21 @@ async function saveClient() {
     duree: parseInt(document.getElementById('c-duree').value) || 60,
     date_debut: document.getElementById('c-date-debut').value,
     date_souscription: document.getElementById('c-date-souscription').value,
-    statut: 'actif',
+    /* [FIX] 'actif' était codé en dur ici — un souscripteur résilié dont on
+       modifiait juste un champ anodin (téléphone, email...) repassait
+       silencieusement "actif", sans repasser par la résiliation. Préserve
+       désormais le statut spécial existant (résilié) au lieu de l'écraser ;
+       'actif' reste le défaut correct pour une création ou un statut standard. */
+    statut: (function(){ var ex=DATA.clients.find(function(c){return c.id===id;}); return (ex && ex.statut==='resilie') ? 'resilie' : 'actif'; })(),
     dossier: _dossier,
+    /* [FIX] _baseModifie (référence) était posé, mais _modifie (le nouvel
+       horodatage) ne l'était jamais — même défaut que plusieurs fonctions
+       de mot de passe corrigées plus tôt ce soir. Conséquence directe : la
+       détection de conflit de synchronisation (qui compare précisément ce
+       champ) pouvait se déclencher à tort, puisque l'horodatage stocké ne
+       reflétait jamais les modifications faites par cette fonction, la plus
+       utilisée du module Souscripteurs. */
+    _modifie: new Date().toISOString(),
     _baseModifie: APP.editingId ? (APP._clientBaseModifie || null) : null,
     commercial_id: document.getElementById('c-commercial') ? document.getElementById('c-commercial').value : '',
     commercial:    (function(){ var e=document.getElementById('c-commercial'); if(!e||!e.value) return ''; var opt=e.options[e.selectedIndex]; return opt?opt.textContent.trim():''; })(),
@@ -31381,6 +31471,153 @@ function renderClients() {
       + '<button class="btn btn-danger btn-sm btn-icon" onclick="deleteClient(\'' + c.id + '\')" title="Supprimer">🗑</button>'
       + '</td></tr>';
   }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SOUSCRIPTEURS — Analyse de doublons
+   Détecte les fiches Souscripteur potentiellement en double, sur plusieurs
+   critères indépendants (téléphone, email, n° de pièce d'identité, n° de
+   dossier, nom complet identique ou très proche). Aucune fusion/suppression
+   automatique : la décision (fusionner, corriger, ignorer) reste manuelle,
+   car un homonyme ou un même souscripteur multi-programmes légitime peut
+   ressembler à un doublon sans en être un. Réutilise la normalisation/
+   similarité de noms du module de criblage LBC/FT (sfcNormalise/sfcSimilarite)
+   pour éviter de dupliquer cette logique. ═══════════════════════════════ */
+function _cdNormPhone(t) { return (t || '').toString().replace(/[^0-9]/g, '').replace(/^00225/, '').replace(/^225/, '').replace(/^0+/, ''); }
+function _cdNormEmail(e) { return (e || '').toString().trim().toLowerCase(); }
+function _cdNormPiece(p) { return (p || '').toString().toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function _cdNormDossier(d) { return (d || '').toString().trim().toUpperCase(); }
+function _cdNomComplet(c) { return sfcNormalise((c.nom || '') + ' ' + (c.prenoms || '')); }
+
+function _cdGrouper(list, keyFn, minLen) {
+  var groups = {};
+  list.forEach(function (c) {
+    var k = keyFn(c);
+    if (!k || (minLen && k.length < minLen)) return;
+    (groups[k] = groups[k] || []).push(c);
+  });
+  var out = [];
+  Object.keys(groups).forEach(function (k) { if (groups[k].length > 1) out.push({ key: k, items: groups[k] }); });
+  return out;
+}
+
+function renderClientsDoublons() {
+  var box = document.getElementById('clients-doublons-content');
+  var kpiBox = document.getElementById('clients-doublons-kpi');
+  if (!box) return;
+  var clients = (DATA.clients || []).slice();
+  var idxProg = {}; (DATA.programmes || []).forEach(function (p) { idxProg[p.id] = p; });
+
+  var parTel = _cdGrouper(clients, function (c) { return _cdNormPhone(c.tel); }, 6);
+  var parEmail = _cdGrouper(clients, function (c) { return _cdNormEmail(c.email); }, 5);
+  var parPiece = _cdGrouper(clients, function (c) { return _cdNormPiece(c.piece_num); }, 4);
+  var parDossier = _cdGrouper(clients, function (c) { return _cdNormDossier(c.dossier); }, 1);
+  var parNomExact = _cdGrouper(clients, function (c) { return _cdNomComplet(c); }, 3);
+
+  /* Quasi-doublons de nom (orthographe proche, ex. "Kouassi Jean" / "Kouassy Jean") :
+     comparaison par paires, coûteuse en O(n²) — plafonnée pour rester fluide
+     sur un gros portefeuille. Les noms strictement identiques sont exclus
+     (déjà couverts par parNomExact) pour ne pas doublonner l'affichage. */
+  var parNomProche = [];
+  var FUZZY_LIMIT = 800;
+  var fuzzySkipped = clients.length > FUZZY_LIMIT;
+  if (!fuzzySkipped) {
+    var used = {};
+    for (var i = 0; i < clients.length; i++) {
+      var ci = clients[i], nomI = _cdNomComplet(ci);
+      if (!nomI || nomI.length < 3) continue;
+      var cluster = null;
+      for (var j = i + 1; j < clients.length; j++) {
+        var cj = clients[j], nomJ = _cdNomComplet(cj);
+        if (!nomJ || nomJ.length < 3 || nomI === nomJ) continue;
+        var sim = sfcSimilarite(nomI, nomJ);
+        if (sim >= 0.85) {
+          if (!cluster) { cluster = { key: nomI, items: [ci] }; }
+          if (cluster.items.indexOf(cj) === -1) cluster.items.push(cj);
+          used[ci.id] = true; used[cj.id] = true;
+        }
+      }
+      if (cluster && cluster.items.length > 1) parNomProche.push(cluster);
+    }
+  }
+
+  var flaggedIds = {};
+  [parTel, parEmail, parPiece, parDossier, parNomExact, parNomProche].forEach(function (grp) {
+    grp.forEach(function (g) { g.items.forEach(function (c) { flaggedIds[c.id] = true; }); });
+  });
+  var totalFlagged = Object.keys(flaggedIds).length;
+
+  kpiBox.innerHTML =
+      _cdKpi('👥', totalFlagged, 'Souscripteur(s) impliqué(s)', totalFlagged ? 'kpi-red' : 'kpi-green')
+    + _cdKpi('📞', parTel.length, 'Doublon(s) téléphone', parTel.length ? 'kpi-red' : 'kpi-green')
+    + _cdKpi('✉️', parEmail.length, 'Doublon(s) email', parEmail.length ? 'kpi-red' : 'kpi-green')
+    + _cdKpi('🪪', parPiece.length, 'Doublon(s) pièce d\'identité', parPiece.length ? 'kpi-red' : 'kpi-green')
+    + _cdKpi('📁', parDossier.length, 'Doublon(s) n° dossier', parDossier.length ? 'kpi-red' : 'kpi-green')
+    + _cdKpi('🔤', parNomExact.length + parNomProche.length, 'Nom identique / proche', (parNomExact.length + parNomProche.length) ? 'kpi-red' : 'kpi-green');
+
+  if (!totalFlagged) {
+    box.innerHTML = '<div class="card" style="padding:30px;text-align:center;color:#16A34A;font-weight:600;">✅ Aucun doublon détecté sur le portefeuille actuel.</div>';
+    return;
+  }
+
+  var sections = [
+    { titre: '🪪 Même n° de pièce d\'identité', gravite: 'critique', groupes: parPiece, note: 'Un même document d\'identité rattaché à plusieurs fiches — vérifier en priorité.' },
+    { titre: '📁 Même n° de dossier', gravite: 'critique', groupes: parDossier, note: 'Deux fiches partagent la même référence de dossier.' },
+    { titre: '📞 Même numéro de téléphone', gravite: 'majeur', groupes: parTel, note: 'Peut être légitime (même foyer) — à vérifier au cas par cas.' },
+    { titre: '✉️ Même adresse email', gravite: 'majeur', groupes: parEmail, note: '' },
+    { titre: '🔤 Nom et prénoms identiques', gravite: 'majeur', groupes: parNomExact, note: 'Peut être un homonyme réel — vérifier pièce d\'identité et téléphone avant fusion.' },
+    { titre: '🔎 Nom très proche (orthographe)', gravite: 'mineur', groupes: parNomProche, note: fuzzySkipped ? '' : 'Similarité ≥ 85% — fautes de saisie probables.' }
+  ];
+
+  var html = '';
+  if (fuzzySkipped) {
+    html += '<div class="card" style="padding:12px 14px;margin-bottom:14px;font-size:12px;color:#92400E;background:#FEF3C7;">⚠️ Portefeuille de ' + clients.length + ' souscripteurs — l\'analyse de similarité orthographique des noms (quasi-doublons) est désactivée au-delà de ' + FUZZY_LIMIT + ' fiches pour rester fluide. Les autres critères (téléphone, email, pièce, dossier, nom exact) restent actifs.</div>';
+  }
+
+  sections.forEach(function (sec) {
+    if (!sec.groupes.length) return;
+    html += '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="padding:12px 16px;border-bottom:1px solid var(--bordure,#EEE);display:flex;align-items:center;gap:10px;">'
+      + '<strong style="font-size:14px;">' + sec.titre + '</strong>'
+      + '<span class="badge ' + (sec.gravite === 'critique' ? 'badge-rouge' : sec.gravite === 'majeur' ? 'badge-or' : 'badge-neutre') + '">' + sec.groupes.length + ' groupe(s)</span>'
+      + (sec.note ? '<span style="font-size:11px;color:var(--blanc-dim);margin-left:auto;">' + sec.note + '</span>' : '')
+      + '</div>';
+
+    sec.groupes.forEach(function (g, gi) {
+      html += '<div style="padding:10px 16px;' + (gi < sec.groupes.length - 1 ? 'border-bottom:1px dashed var(--bordure,#EEE);' : '') + '">'
+        + '<div class="table-wrap"><table style="width:100%;font-size:12px;"><thead><tr>'
+        + '<th>Souscripteur</th><th>Téléphone</th><th>Email</th><th>Pièce</th><th>N° dossier</th><th>Programme</th><th>Montant</th><th>Statut</th><th>Actions</th>'
+        + '</tr></thead><tbody>'
+        + g.items.map(function (c) {
+            var prog = idxProg[c.programme_id];
+            var statutLabel = c.statut === 'resilie' ? '<span class="badge badge-violet">Résilié</span>' : '<span class="badge badge-bleu">Actif</span>';
+            return '<tr>'
+              + '<td><strong>' + escHtml((c.nom || '') + ' ' + (c.prenoms || '')) + '</strong></td>'
+              + '<td>' + escHtml(c.tel || '—') + '</td>'
+              + '<td>' + escHtml(c.email || '—') + '</td>'
+              + '<td>' + escHtml((c.piece_type || '') + ' ' + (c.piece_num || '') || '—') + '</td>'
+              + '<td>' + escHtml(c.dossier || '—') + '</td>'
+              + '<td>' + (prog ? escHtml(prog.nom) : '—') + '</td>'
+              + '<td>' + fcfa(c.montant_total) + '</td>'
+              + '<td>' + statutLabel + '</td>'
+              + '<td style="white-space:nowrap;">'
+              + '<button class="btn btn-secondary btn-sm btn-icon" onclick="openClientModal(\'' + c.id + '\')" title="Ouvrir la fiche">✏️</button> '
+              + '<button class="btn btn-danger btn-sm btn-icon" onclick="deleteClient(\'' + c.id + '\')" title="Supprimer">🗑</button>'
+              + '</td></tr>';
+          }).join('')
+        + '</tbody></table></div></div>';
+    });
+    html += '</div>';
+  });
+
+  box.innerHTML = html;
+}
+
+function _cdKpi(icon, val, label, cls) {
+  return '<div class="kpi-card ' + (cls || '') + '" data-icon="' + icon + '">'
+    + '<div class="kpi-label">' + label + '</div>'
+    + '<div class="kpi-value">' + val + '</div>'
+    + '</div>';
 }
 
 function filterClients() { renderClients(); }
@@ -31753,7 +31990,7 @@ function resilierImprimerDecompte(clientId){
     +'<br><br>Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')
     +'<br><br>Pour '+escHtml(soc)+' : ___________________________<br><br>Le souscripteur (bon pour accord) : ___________________________</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 
 
@@ -32326,7 +32563,7 @@ function imprimerRapportCommissionsVerif(){
     +'<div class="pied">Les commissions déjà payées ne sont jamais supprimées automatiquement, même en cas de doublon ou d\'orpheline : une régularisation manuelle est requise.<br><br>'
     +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>Contrôlé par : ___________________________</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 
 /** Régénérer les commissions pour tous les versements existants */
@@ -32898,7 +33135,7 @@ function imprimerRapportDoublonsVersements(){
     +'Un résultat signalé n\'est pas nécessairement un doublon réel — deux paiements distincts peuvent coïncider — vérification manuelle requise avant toute suppression.<br><br>'
     +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>Contrôlé par : ___________________________</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 
 async function backfillEcrituresVersements() {
@@ -36101,24 +36338,105 @@ function loadComptesDefaut() {
   renderConflitsSync();
 }
 
+/* Libellé humain du type de store en conflit (affiché en badge) et fonction
+   de résumé de l'enregistrement — chaque store a des champs différents, un
+   fallback générique unique (ancienne version) retombait sur l'id technique
+   pour clients/employés/financements, illisible pour l'utilisateur. */
+var _CONFLIT_TYPE_LABEL = {
+  clients:                'Souscripteur',
+  ecritures:               'Écriture comptable',
+  factures_client:         'Facture client',
+  financements_programme:  'Financement programme',
+  cessions_foncieres:      'Cession foncière',
+  lots:                    'Lot',
+  programmes:              'Programme',
+  employes:                'Employé',
+  caisse_mouvements:       'Mouvement de caisse',
+  caisse_sessions:         'Session de caisse'
+};
+function _conflitResume(store, e) {
+  switch (store) {
+    case 'clients':  return ((e.nom || '') + ' ' + (e.prenoms || '')).trim() || 'Souscripteur sans nom';
+    case 'employes': return ((e.nom || '') + ' ' + (e.prenoms || '')).trim() || 'Employé sans nom';
+    case 'financements_programme': return (e.type || 'Financement') + (e.source ? ' — ' + e.source : '');
+    case 'cessions_foncieres': return 'Cession — ' + (e.designation || e.acquereur || '');
+    case 'lots': return 'Lot ' + (e.numero || '');
+    case 'programmes': return e.nom || '';
+    case 'ecritures': return e.libelle || '';
+    case 'factures_client': return 'Facture ' + (e.numero || '');
+    case 'caisse_mouvements': {
+      var cs = (DATA.caisses || []).find(function(x){ return x.id === e.caisse_id; });
+      return (e.type === 'sortie' ? '📤 Sortie' : '📥 Entrée') + ' ' + (e.numero || '') + ' — ' + (cs ? cs.nom : '') + (e.motif ? ' (' + e.motif + ')' : '');
+    }
+    case 'caisse_sessions': {
+      var c2 = (DATA.caisses || []).find(function(x){ return x.id === e.caisse_id; });
+      return 'Session ' + (c2 ? c2.nom : '') + ' du ' + (e.date || e.ouverte_le || '').toString().slice(0, 10);
+    }
+    default: return e.libelle || e.designation || e.numero || '';
+  }
+}
 function renderConflitsSync() {
   var el = document.getElementById('conflits-sync-list'); if (!el) return;
   var list = (DATA.conflits_sync || []).filter(function(c){ return !c.resolu; });
+  var badge = document.getElementById('conflits-sync-badge');
+  if (badge) badge.innerHTML = list.length ? ' <span class="badge badge-rouge" style="font-size:9px;">' + list.length + '</span>' : '';
   if (!list.length) { el.innerHTML = '<div style="font-size:12px;color:var(--vert);">✅ Aucun conflit en attente.</div>'; return; }
-  var reopenFn = { ecritures:'openEcritureModal', factures_client:'imprimerFactureFNE', financements_programme:'bpEditFinancement', cessions_foncieres:'cesOpen', lots:'openLotModal', programmes:'openProgrammeModal', clients:'openClientModal', employes:'openEmployeModal' };
   el.innerHTML = list.map(function(c){
     var e = c.local_snapshot || {};
-    var label = e.libelle || e.designation || e.client || e.numero || c.record_id;
+    var typeLabel = _CONFLIT_TYPE_LABEL[c.store] || c.store;
+    var label = _conflitResume(c.store, e) || c.record_id;
     var montant = e.montant || e.ttc || e.montant_prevu || e.prix_cession || 0;
-    var fn = reopenFn[c.store] || null;
     return '<div style="padding:10px 12px;border-left:3px solid var(--rouge);background:var(--card2);border-radius:6px;margin-bottom:8px;font-size:12px;">'
-      + '<span class="badge badge-or" style="font-size:9px;">' + c.store + '</span> <strong>' + escHtml(label) + '</strong>' + (montant ? ' — ' + fmtF(montant) + ' F' : '')
+      + '<span class="badge badge-or" style="font-size:9px;">' + escHtml(typeLabel) + '</span> <strong>' + escHtml(label) + '</strong>' + (montant ? ' — ' + fmtF(montant) + ' F' : '')
       + '<br><span style="color:var(--dim);">Détecté le ' + new Date(c.detecte_le).toLocaleString('fr-FR') + '</span>'
       + '<div style="margin-top:6px;display:flex;gap:6px;">'
-      + (fn ? '<button class="btn btn-secondary btn-sm" onclick="' + fn + '(\'' + c.record_id + '\')">✏️ Rouvrir</button>' : '')
-      + '<button class="btn btn-secondary btn-sm" onclick="_conflitMarquerResolu(\'' + c.id + '\')">✔ Marquer résolu</button>'
+      + '<button class="btn btn-secondary btn-sm" onclick="_conflitRecharger(\'' + c.id + '\')" title="Recharge la version actuellement sur le cloud pour cet enregistrement, puis rouvre sa fiche — évite de resaisir sur une base locale périmée et de reproduire le même conflit">🔄 Recharger &amp; rouvrir</button>'
+      + '<button class="btn btn-secondary btn-sm" onclick="_conflitMarquerResolu(\'' + c.id + '\')" title="Masque cette alerte SANS renvoyer vos modifications au cloud — à utiliser seulement après avoir vérifié/réenregistré la fiche via « Recharger & rouvrir »">✔ Marquer résolu</button>'
       + '</div></div>';
   }).join('');
+}
+
+/* Recharge la version CLOUD actuelle d'un enregistrement en conflit, avant
+   réouverture de sa fiche. Sans cette étape, « Rouvrir » seul rechargeait le
+   formulaire depuis le cache local — donc depuis la MÊME base périmée qui a
+   déclenché le conflit — et un ré-enregistrement immédiat reproduisait
+   exactement la même alerte en boucle. On aligne d'abord DATA[]/IndexedDB
+   sur le cloud pour que la prochaine sauvegarde compare une base à jour. */
+async function _conflitRecharger(conflitId) {
+  var c = (DATA.conflits_sync || []).find(function(x){ return x.id === conflitId; });
+  if (!c) return;
+  var entry = SUPA_STORE_MAP.find(function(x){ return x[1] === c.store; });
+  if (!entry) { if (typeof toast === 'function') toast('⚠️ Table cloud introuvable pour ce type d\'enregistrement.', 'error'); return; }
+  var table = entry[0];
+  var remoteRow;
+  try {
+    var rows = await sbFetch(table + '?id=eq.' + c.record_id + '&select=*', 'GET');
+    remoteRow = (rows && rows.length) ? _supaUnwrap(table, rows[0]) : null;
+  } catch (e) {
+    if (typeof toast === 'function') toast('⚠️ Impossible de joindre le cloud pour recharger cet enregistrement — réessayez une fois connecté.', 'error');
+    return;
+  }
+  if (!remoteRow) {
+    if (typeof toast === 'function') toast('⚠️ Introuvable côté cloud — probablement supprimé ailleurs entre-temps. Vérifiez avant de recréer.', 'error');
+    return;
+  }
+  var arr = DATA[c.store] = DATA[c.store] || [];
+  var idx = arr.findIndex(function(x){ return x.id === c.record_id; });
+  if (idx !== -1) arr[idx] = remoteRow; else arr.push(remoteRow);
+  try { await dbPut(c.store, remoteRow, { forceRole: true }); } catch (e) {}
+  var reopenFn = { ecritures:'openEcritureModal', factures_client:'imprimerFactureFNE', financements_programme:'bpEditFinancement', cessions_foncieres:'cesOpen', lots:'openLotModal', programmes:'openProgrammeModal', clients:'openClientModal', employes:'openEmployeModal', caisse_mouvements:'caisseEditBonModal' };
+  var fnName = reopenFn[c.store];
+  if (fnName && typeof window[fnName] === 'function') { window[fnName](c.record_id); }
+  else if (c.store === 'caisse_sessions') {
+    /* Pas de modal d'édition unique pour une session (clôture/écart/ajustement
+       sont des actions séparées) — on ramène l'utilisateur sur la caisse
+       concernée, version cloud déjà rechargée en local, pour qu'il rejoue
+       l'action (clôturer, ajuster le fond, régulariser l'écart…) via les
+       outils habituels du module. */
+    if (typeof goTo === 'function') goTo('caisse');
+    if (typeof toast === 'function') toast('☁️ Session rechargée depuis le cloud — reprenez l\'action (clôture, ajustement, régularisation) depuis la caisse concernée.', 'info', 6000);
+  }
+  if (typeof toast === 'function') toast('☁️ Version cloud rechargée — comparez avec vos données avant de ré-enregistrer.', 'success');
 }
 
 async function _conflitMarquerResolu(id) {
@@ -42375,7 +42693,7 @@ function printContrat(clientId) {
     + '<div class="sig-box">Pour ' + (params.societe || 'ImmoSuite ERP') + '<br><br><br></div></div>'
     + '</body></html>';
   win.document.write(html);
-  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); win.print();
+  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 function printEcheancier(clientId) {
@@ -42400,7 +42718,7 @@ function printEcheancier(clientId) {
     + '<table><thead><tr><th>Échéance</th><th>Mois</th><th>Mensualité (FCFA)</th><th>Cumul (FCFA)</th><th>Signature</th></tr></thead><tbody>' + rows + '</tbody></table>'
     + '</body></html>';
   win.document.write(html);
-  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); win.print();
+  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 /* ──────────────────────────────────────────────────────
@@ -42408,6 +42726,7 @@ function printEcheancier(clientId) {
 ────────────────────────────────────────────────────── */
 function loadParams() {
   loadParamFields();
+  try { if (typeof renderConflitsSync === 'function') renderConflitsSync(); } catch(e){}
   // Utilisateurs
   var ul = document.getElementById('users-list');
   if (ul) ul.innerHTML = DATA.users.map(function(u) {
@@ -46071,6 +46390,12 @@ async function confirmerRegularisationSurface(){
   c.montant_total = (parseFloat(c.montant_total)||0) + montant;
   c.surface = surfaceReelle;
   c._modifie = new Date().toISOString();
+  /* [FIX faux conflit] Ce module se déclenche DEPUIS l'intérieur de la fiche
+     client déjà ouverte (bouton dans le formulaire), qui reste ouverte après
+     coup. Sans rafraîchir la référence ici, un "Enregistrer" ultérieur sur ce
+     même formulaire comparerait contre un horodatage devenu périmé par cette
+     action même — se déclarant à tort en conflit avec sa propre modification. */
+  if (APP.editingId === clientId) APP._clientBaseModifie = c._modifie;
   await logAudit('clients', clientId, 'regularisation_surface', null, regul);
   await clientLierDossierJuridique(c, 'Régularisation de surface — écart '+ecart.toFixed(2)+' m² × '+fcfa(prixM2)+'/m² = '+fcfa(montant)+'. '+motif, montant);
   await dbPut('clients', c);
@@ -46113,7 +46438,7 @@ function imprimerRegularisationSurface(regul, c){
     +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>'
     +'Pour '+escHtml(soc)+' : ___________________________<br><br>Le souscripteur (bon pour accord) : ___________________________</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -46233,6 +46558,9 @@ async function confirmerTma(){
   }
 
   c._modifie = new Date().toISOString();
+  /* [FIX faux conflit] Même correctif que la régularisation de surface —
+     ce module se déclenche depuis la fiche client déjà ouverte. */
+  if (APP.editingId === clientId) APP._clientBaseModifie = c._modifie;
   await dbPut('clients', c);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
 
@@ -46257,6 +46585,7 @@ async function supprimerTma(tmaId){
   if (!confirm('Supprimer cette demande de modification ?')) return;
   c.demandes_modification = (c.demandes_modification||[]).filter(function(x){ return x.id!==tmaId; });
   c._modifie = new Date().toISOString();
+  if (APP.editingId === clientId) APP._clientBaseModifie = c._modifie;
   await dbPut('clients', c);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
   tmaRenderListe();
@@ -46291,7 +46620,7 @@ function imprimerAvenantTma(d, c){
     +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>'
     +'Pour '+escHtml(soc)+' : ___________________________<br><br>Le souscripteur (bon pour accord) : ___________________________</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -46375,6 +46704,7 @@ async function confirmerSubrogation(){
   c.profession = document.getElementById('sub-profession').value.trim();
   c.adresse = document.getElementById('sub-adresse').value.trim();
   c._modifie = new Date().toISOString();
+  if (APP.editingId === clientId) APP._clientBaseModifie = c._modifie;
 
   await logAudit('clients', clientId, 'subrogation', { nom:archive.ancien_nom, prenoms:archive.ancien_prenoms }, { nom:nom, prenoms:prenoms });
   await clientLierDossierJuridique(c, 'Subrogation de contrat — cédant : '+((archive.ancien_nom||'')+' '+(archive.ancien_prenoms||'')).trim()+' → cessionnaire : '+nom+' '+prenoms+'. '+motif+(frais>0?' Frais de dossier : '+fcfa(frais)+'.':''), frais, false, nom+' '+prenoms);
@@ -46421,7 +46751,7 @@ function imprimerAvenantSubrogation(archive, c){
     +'Le cédant (bon pour accord) : ___________________________<br><br>'
     +'Le cessionnaire (bon pour accord) : ___________________________</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 function retirerLotSupplementaireClient(lotId) {
   APP._clientLotsSupplementaires = (APP._clientLotsSupplementaires || []).filter(function(id){ return id !== lotId; });
@@ -52037,7 +52367,7 @@ function vefaImprimer(){
     +'<table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:12px;"><tr><th>Souscripteur</th><th>Prix</th><th>Exigible</th><th>Encaissé</th><th>Appel de fonds</th></tr>'
     +rows.map(function(r){return '<tr><td>'+escHtml(r.c.nom||'—')+'</td><td align="right">'+fmtF(r.prix)+'</td><td align="right">'+fmtF(r.exig)+'</td><td align="right">'+fmtF(r.enc)+'</td><td align="right">'+fmtF(r.appel)+'</td></tr>';}).join('')
     +'</table>';
-  var w=window.open('','_blank'); if(!w){alert('Popup bloquée.');return;} w.document.write('<html><head><title>Appels VEFA</title></head><body>'+html+'</body></html>'); w.document.close(); w.focus(); w.print();
+  var w=window.open('','_blank'); if(!w){alert('Popup bloquée.');return;} w.document.write('<html><head><title>Appels VEFA</title></head><body>'+html+'</body></html>'); w.document.close(); w.focus(); setTimeout(function(){ w.print(); }, 400);
 }
 
 /* ══════ WORKFLOW TITRE FONCIER CI — Lettre d'attribution → ACD → TF → Mutation ══════ */
@@ -53825,7 +54155,7 @@ function lbcImprimerDS(id){
     +'à la personne concernée ni à aucun tiers.'
     +'<br><br>Fait à Abidjan, le '+new Date().toLocaleDateString('fr-FR')+'<br><br>Signature du correspondant CENTIF</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 /* ─── Politique LBC/FT/FP — document de gouvernance ────────────────
    Formalise par écrit le dispositif interne exigé par l'ordonnance
@@ -53903,7 +54233,7 @@ function lbcImprimerPolitique(){
     +'À valider et signer par le dirigeant avant classement au dossier de conformité.'
     +'<br><br>Fait à Abidjan, le _____________________<br><br>Signature du dirigeant</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
   DATA.params=DATA.params||{}; DATA.params.lbcft=DATA.params.lbcft||{};
   DATA.params.lbcft.politique_generee_le=new Date().toISOString();
   try{ dbPut('params',DATA.params); }catch(e){}
@@ -53956,7 +54286,7 @@ function lbcImprimerDesignation(){
     +'<br><br>Signature et cachet du dirigeant'
     +'<br><br><i>Document généré depuis ImmoSuite ERP — à imprimer sur papier en-tête, signer et transmettre en original à la CENTIF-CI, copie à la CAPPI.</i></div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
   DATA.params=DATA.params||{}; DATA.params.lbcft=DATA.params.lbcft||{};
   DATA.params.lbcft.designation_generee_le=new Date().toISOString();
   try{ dbPut('params',DATA.params); }catch(e){}
@@ -54318,7 +54648,7 @@ function artciImprimerFiche(){
     +'À compléter, valider et joindre au dossier de déclaration déposé sur CERTINUM (certinumapdp.ci).'
     +'<br><br>Fait à Abidjan, le _____________________<br><br>Signature du responsable de traitement</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -54535,7 +54865,7 @@ function sfcCentifImprimer(){
     +(g('cf-suivi-autre-txt')?('<div><i>Autres :</i> '+escHtml(g('cf-suivi-autre-txt'))+'</div>'):'')
     +'<div class="pied">Généré depuis ImmoSuite ERP le '+new Date().toLocaleDateString('fr-FR')+'.</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 /* Solde la dette de remboursement créée à la résiliation — sortie de
    trésorerie réelle, distincte de la reconnaissance comptable de la dette
@@ -54744,7 +55074,7 @@ function cesResilierImprimerDecompte(cessionId){
     +'<br><br>Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')
     +'<br><br>Pour '+escHtml(soc)+' : ___________________________<br><br>L\'acquéreur (bon pour accord) : ___________________________</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 function cesResilierOuvrirRemboursement(cessionId){
   var c = (DATA.cessions_foncieres||[]).find(function(x){return x.id===cessionId;});
@@ -54976,7 +55306,7 @@ function sfcImprimerRetour(runId){
     +'directement ou indirectement, par la personne ou l\'entité visée, et interdit leur mise à disposition sous quelque forme que ce soit.'
     +'<br><br>Fait à Abidjan, le '+new Date().toLocaleDateString('fr-FR')+'<br><br>Signature du correspondant CENTIF</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
   run.transmis_centif=true; run.transmis_le=today();
   dbPut('sfc_criblages',run).catch(function(){});
   if(typeof syncToSupabase==='function') syncToSupabase('pi_sfc_criblages',run);
@@ -66206,7 +66536,7 @@ function _locImprimerDoc(titre, corps){
     +'<style>body{font-family:Georgia,serif;padding:40px;color:#222;line-height:1.7;}h2{margin-bottom:4px;}'
     +'.entete{margin-bottom:24px;}.signature{margin-top:60px;}table{width:100%;border-collapse:collapse;margin-top:14px;}'
     +'td{padding:6px 0;}.tot{border-top:2px solid #0f4c81;font-weight:700;}</style></head><body>'+corps+'</body></html>');
-  w.document.close(); w.focus(); w.print();
+  w.document.close(); w.focus(); setTimeout(function(){ w.print(); }, 400);
 }
 async function locImprimerMiseEnDemeure(quittanceId){
   var q=_locQ().find(function(x){ return x.id===quittanceId; }); if(!q) return;
@@ -66774,7 +67104,7 @@ function dspImprimerAncrage(){
   var w=window.open('','_blank');
   if(!w){ toast('Autorisez les fenêtres surgissantes.','error'); return; }
   w.document.write('<html><head><title>Certificat d\'ancrage</title><style>body{font-family:Georgia,serif;padding:40px;}table{width:100%;}h3{text-align:center;}</style></head><body>'+el.innerHTML+'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 /* ─── Dossiers ────────────────────────────────────────── */
 function dspOpenDossier(id){
@@ -67723,7 +68053,7 @@ function portalImprimerCertificat(dossierId){
   var w=window.open('','_blank');
   if(!w){ toast('Autorisez les fenêtres surgissantes.','error'); return; }
   w.document.write('<html><head><title>Certificat</title><style>body{font-family:Georgia,serif;padding:40px;}table{width:100%;}</style></head><body>'+html+'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 
 async function saveReleveBank() {
@@ -68736,7 +69066,7 @@ function printCampagneObj(c) {
     +'<div class="sig"><div class="sb">LE RESPONSABLE COMMERCIAL<br><br><br>Signature</div>'
     +'<div class="sb" style="text-align:right;">LA DIRECTION GÉNÉRALE<br><br><br>Signature et cachet</div></div>'
     +'</body></html>');
-  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); win.print();
+  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 function printPAC() {
@@ -68759,7 +69089,7 @@ function printPAC() {
     +actions.sort(function(a,b){return(a.date||'').localeCompare(b.date||'');}).map(function(a){return '<tr><td>'+( a.date||'—')+'</td><td>'+a.type+'</td><td>'+a.nom+'</td><td>'+(a.responsable||'—')+'</td><td>'+fmtF(a.budget||0)+'</td><td>'+a.statut+'</td></tr>';}).join('')
     +'</table>'
     +'</body></html>');
-  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); win.print();
+  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 function exportPAC() {
@@ -69391,7 +69721,7 @@ async function saveConception(){
 }
 async function deleteConception(id){if(!confirm('Supprimer ce projet ?'))return;if(await deleteRecord('conceptions',id)===false)return;renderConceptionsFull();montageLiveRefresh('conceptions');toast('Supprimé.','info');}
 function exportConceptionCSV(){var rows=['Référence,Programme,Type,Architecte,Surface,Unités,Phase,Statut'];DATA.conceptions.forEach(function(c){var pr=DATA.programmes.find(function(p){return p.id===c.programme_id;})||{nom:''};rows.push([c.ref,pr.nom,c.type_logements,c.architecte,c.surface,c.nb_unites,c.phase,c.statut].join(','));});var b=new Blob([rows.join('\n')],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='conceptions.csv';a.click();}
-function printFicheConception(id){var c=DATA.conceptions.find(function(x){return x.id===id;});if(!c)return;var pr=DATA.programmes.find(function(p){return p.id===c.programme_id;})||{nom:'—'};var win=window.open('','','width=800,height=700');win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche Conception</title><style>body{font-family:Georgia,serif;padding:36px;font-size:13px;}h1{color:#1D4ED8;border-bottom:2px solid #2563EB;padding-bottom:8px;}table{border-collapse:collapse;width:100%;margin:10px 0;}td,th{border:1px solid #ccc;padding:7px 12px;}th{background:#f5f0e0;}.ph{padding:6px 12px;border-left:4px solid;margin-bottom:6px;}.pf{border-color:#2E8B57;background:#f0f9f0;}.pc{border-color:#2563EB;background:#fdf8ea;}.pa{border-color:#bbb;background:#f8f8f8;}</style></head><body><h1>📐 Fiche Conception — '+c.ref+'</h1><table><tr><th>Programme</th><td>'+pr.nom+'</td><th>Type</th><td>'+c.type_logements+'</td></tr><tr><th>Architecte</th><td>'+(c.architecte||'—')+'</td><th>Phase</th><td>'+c.phase+'</td></tr><tr><th>Surface</th><td>'+(c.surface||'—')+' m²</td><th>Statut</th><td>'+c.statut+'</td></tr></table><h3>Phases</h3>'+(c.phases||[]).map(function(p){var cls=p.statut==='termine'?'pf':p.statut==='en_cours'?'pc':'pa';return'<div class="ph '+cls+'">'+p.nom+' — '+p.pct+'% — '+p.statut+'</div>';}).join('')+'<h3>Description</h3><p>'+(c.description||'—')+'</p></body></html>');try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); win.print();}
+function printFicheConception(id){var c=DATA.conceptions.find(function(x){return x.id===id;});if(!c)return;var pr=DATA.programmes.find(function(p){return p.id===c.programme_id;})||{nom:'—'};var win=window.open('','','width=800,height=700');win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche Conception</title><style>body{font-family:Georgia,serif;padding:36px;font-size:13px;}h1{color:#1D4ED8;border-bottom:2px solid #2563EB;padding-bottom:8px;}table{border-collapse:collapse;width:100%;margin:10px 0;}td,th{border:1px solid #ccc;padding:7px 12px;}th{background:#f5f0e0;}.ph{padding:6px 12px;border-left:4px solid;margin-bottom:6px;}.pf{border-color:#2E8B57;background:#f0f9f0;}.pc{border-color:#2563EB;background:#fdf8ea;}.pa{border-color:#bbb;background:#f8f8f8;}</style></head><body><h1>📐 Fiche Conception — '+c.ref+'</h1><table><tr><th>Programme</th><td>'+pr.nom+'</td><th>Type</th><td>'+c.type_logements+'</td></tr><tr><th>Architecte</th><td>'+(c.architecte||'—')+'</td><th>Phase</th><td>'+c.phase+'</td></tr><tr><th>Surface</th><td>'+(c.surface||'—')+' m²</td><th>Statut</th><td>'+c.statut+'</td></tr></table><h3>Phases</h3>'+(c.phases||[]).map(function(p){var cls=p.statut==='termine'?'pf':p.statut==='en_cours'?'pc':'pa';return'<div class="ph '+cls+'">'+p.nom+' — '+p.pct+'% — '+p.statut+'</div>';}).join('')+'<h3>Description</h3><p>'+(c.description||'—')+'</p></body></html>');try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); setTimeout(function(){ win.print(); }, 400);}
 
 /* ─── Permis ───────────────────────────────────────── */
 function buildPermisKPIs(){var el=document.getElementById('permis-kpi');if(!el)return;var list=DATA.permis||[];var now=today();var exp=list.filter(function(p){if(!p.date_obtention||!p.validite)return false;var d=new Date(p.date_obtention);d.setMonth(d.getMonth()+parseInt(p.validite));return d.toISOString().slice(0,10)<now&&p.statut==='obtenu';});el.innerHTML=[{l:'Déposés',v:list.filter(function(p){return p.statut==='depose';}).length,i:'📬'},{l:'Obtenus',v:list.filter(function(p){return p.statut==='obtenu';}).length,i:'✅'},{l:'En attente',v:list.filter(function(p){return p.statut==='en_attente';}).length,i:'⏳'},{l:'Expirés/Alerte',v:exp.length,i:'⚠️'}].map(function(k){return'<div class="kpi-card" data-icon="'+k.i+'"><div class="kpi-label">'+k.l+'</div><div class="kpi-value or" style="font-size:20px;">'+k.v+'</div></div>';}).join('');}
@@ -69697,7 +70027,7 @@ async function saveSituationAndCompta(){
   if(typeof filterEcritures==='function')filterEcritures();
 }
 async function deleteSituation(id){if(!confirm('Supprimer ?'))return;if(await deleteRecord('situations',id)===false)return;renderSituations();toast('Supprimé.','info');}
-function printSituation(id){var s=DATA.situations.find(function(x){return x.id===id;});if(!s)return;var conv=DATA.conventions.find(function(c){return c.id===s.convention_id;})||{numero:'—'};var constr=DATA.constructeurs.find(function(c){return c.id===conv.constructeur_id;})||{raison_sociale:'—'};var win=window.open('','','width=800,height=700');win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Situation '+s.numero+'</title><style>body{font-family:Georgia,serif;padding:36px;font-size:13px;}h1{color:#1A6B3A;border-bottom:2px solid #1A6B3A;padding-bottom:8px;}table{width:100%;border-collapse:collapse;margin:14px 0;}td,th{border:1px solid #ccc;padding:8px 12px;}th{background:#E8F4EE;}.sig{display:flex;justify-content:space-between;margin-top:50px;}.sb{border-top:1px solid #999;width:40%;padding-top:8px;font-size:12px;color:#666;}</style></head><body><h1>SITUATION DE TRAVAUX N° '+s.numero+'</h1><table><tr><td><strong>Maître d\'ouvrage:</strong> '+(DATA.params.societe||'ImmoSuite ERP')+'</td><td><strong>Constructeur:</strong> '+constr.raison_sociale+'</td></tr><tr><td><strong>Convention:</strong> '+conv.numero+'</td><td><strong>Date:</strong> '+s.date+'</td></tr></table><h3>Travaux réalisés</h3><p style="border:1px solid #ddd;padding:12px;">'+(s.travaux||'—')+'</p><table><tr><th>Désignation</th><th style="text-align:right;">Montant (FCFA)</th></tr><tr><td>Montant HT</td><td style="text-align:right;">'+fmtF(s.montant_ht||0)+'</td></tr><tr><td>TVA</td><td style="text-align:right;">'+fmtF((s.montant_ttc||0)-(s.montant_ht||0))+'</td></tr><tr><td><strong>Montant TTC</strong></td><td style="text-align:right;font-weight:700;">'+fmtF(s.montant_ttc||0)+'</td></tr><tr style="color:#c0392b;"><td>Retenue garantie 10%</td><td style="text-align:right;">− '+fmtF(s.retenue||0)+'</td></tr><tr><td><strong>NET À PAYER</strong></td><td style="text-align:right;font-size:17px;font-weight:bold;color:#1A6B3A;">'+fmtF(s.net||0)+' FCFA</td></tr></table><div class="sig"><div class="sb">LE CONSTRUCTEUR<br><br><br>Signature</div><div class="sb" style="text-align:right;">LE MAÎTRE D\'OUVRAGE<br><br><br>Signature</div></div></body></html>');try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); win.print();}
+function printSituation(id){var s=DATA.situations.find(function(x){return x.id===id;});if(!s)return;var conv=DATA.conventions.find(function(c){return c.id===s.convention_id;})||{numero:'—'};var constr=DATA.constructeurs.find(function(c){return c.id===conv.constructeur_id;})||{raison_sociale:'—'};var win=window.open('','','width=800,height=700');win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Situation '+s.numero+'</title><style>body{font-family:Georgia,serif;padding:36px;font-size:13px;}h1{color:#1A6B3A;border-bottom:2px solid #1A6B3A;padding-bottom:8px;}table{width:100%;border-collapse:collapse;margin:14px 0;}td,th{border:1px solid #ccc;padding:8px 12px;}th{background:#E8F4EE;}.sig{display:flex;justify-content:space-between;margin-top:50px;}.sb{border-top:1px solid #999;width:40%;padding-top:8px;font-size:12px;color:#666;}</style></head><body><h1>SITUATION DE TRAVAUX N° '+s.numero+'</h1><table><tr><td><strong>Maître d\'ouvrage:</strong> '+(DATA.params.societe||'ImmoSuite ERP')+'</td><td><strong>Constructeur:</strong> '+constr.raison_sociale+'</td></tr><tr><td><strong>Convention:</strong> '+conv.numero+'</td><td><strong>Date:</strong> '+s.date+'</td></tr></table><h3>Travaux réalisés</h3><p style="border:1px solid #ddd;padding:12px;">'+(s.travaux||'—')+'</p><table><tr><th>Désignation</th><th style="text-align:right;">Montant (FCFA)</th></tr><tr><td>Montant HT</td><td style="text-align:right;">'+fmtF(s.montant_ht||0)+'</td></tr><tr><td>TVA</td><td style="text-align:right;">'+fmtF((s.montant_ttc||0)-(s.montant_ht||0))+'</td></tr><tr><td><strong>Montant TTC</strong></td><td style="text-align:right;font-weight:700;">'+fmtF(s.montant_ttc||0)+'</td></tr><tr style="color:#c0392b;"><td>Retenue garantie 10%</td><td style="text-align:right;">− '+fmtF(s.retenue||0)+'</td></tr><tr><td><strong>NET À PAYER</strong></td><td style="text-align:right;font-size:17px;font-weight:bold;color:#1A6B3A;">'+fmtF(s.net||0)+' FCFA</td></tr></table><div class="sig"><div class="sb">LE CONSTRUCTEUR<br><br><br>Signature</div><div class="sb" style="text-align:right;">LE MAÎTRE D\'OUVRAGE<br><br><br>Signature</div></div></body></html>');try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); setTimeout(function(){ win.print(); }, 400);}
 
 /* ─── Avenants ─────────────────────────────────────── */
 function renderAvenants(){var tbody=document.getElementById('tbody-avenants');if(!tbody)return;var list=DATA.avenants||[];if(!list.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--blanc-dim);">Aucun avenant.</td></tr>';return;}var sC={projet:'badge-bleu',signe:'badge-vert',rejete:'badge-rouge'};tbody.innerHTML=list.map(function(a){var conv=DATA.conventions.find(function(c){return c.id===a.convention_id;})||{numero:'—'};var constr=DATA.constructeurs.find(function(c){return c.id===conv.constructeur_id;})||{raison_sociale:'—'};return'<tr><td style="font-family:monospace;color:var(--or);">'+a.numero+'</td><td style="font-size:12px;">'+conv.numero+' — '+constr.raison_sociale+'</td><td style="font-size:12px;">'+a.objet+'</td><td style="font-weight:700;color:var(--or);">'+fmtF(a.montant_ttc||0)+' FCFA</td><td>'+a.date+'</td><td><span class="badge '+(sC[a.statut]||'badge-bleu')+'">'+a.statut+'</span></td><td><button class="btn btn-secondary btn-sm btn-icon" onclick="openAvenantEdit(\''+a.id+'\')">✏️</button> <button class="btn btn-danger btn-sm btn-icon" onclick="deleteAvenant(\''+a.id+'\')">🗑</button></td></tr>';}).join('');}
@@ -73223,7 +73553,7 @@ function telechargerAttestationVersement() {
       +'<div class="sb" style="text-align:right;">LA DIRECTION<br>'+societe+'<br><br><br>Signature et cachet</div>'
     +'</div>'
     +'</body></html>');
-  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); win.print();
+  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 function telechargerRecu(versementId) {
@@ -77887,7 +78217,7 @@ function printConventionId(id) {
     + '<div class="sig"><div class="sig-box">LE CONSTRUCTEUR<br>' + (constr.raison_sociale||'') + '<br><br><br>Signature et cachet</div>'
     + '<div class="sig-box" style="text-align:right;">LE MAÎTRE D\'OUVRAGE<br>' + societe + '<br><br><br>Signature et cachet</div></div>'
     + '</body></html>');
-  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); win.print();
+  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 /* openSituation : stub supprimé — la vraie fonction (modal-situation) est définie plus haut */
@@ -78474,7 +78804,7 @@ function printRapportId(id){
     +(r.difficultes?'<h3>Difficultés</h3><div class="diff">'+r.difficultes+'</div>':'')
     +photosHtml
     +'<div class="sig"><div class="sb">LE CHEF DE CHANTIER<br>'+constr.raison_sociale+'<br><br><br>Signature</div><div class="sb" style="text-align:right;">LE MAÎTRE D\'OUVRAGE<br>'+societe+'<br><br><br>Signature</div></div></body></html>');
-  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); win.print();
+  try{ if(win.document.body && !win.document.querySelector('.doc-qr')){ var _qr=(win.document.querySelector('title')||{}).textContent||'DOC'; win.document.body.insertAdjacentHTML('beforeend', printQrFooter(_qr)); } }catch(e){} win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 function exportRapportsChantier(){
@@ -82493,15 +82823,25 @@ function genererEtatPDF(opts) {
            : '<div class="etat-ref">Édité le ' + dateStr + '</div>')
     + '</div>';
 
+  /* [FIX] L'ancienne mise en page (<table class="page-table"><thead>/<tfoot>)
+     répétait l'en-tête/pied sur chaque page imprimée — astuce CSS connue pour
+     produire une PAGE BLANCHE à l'impression sur certains moteurs (Chrome
+     mobile, certains navigateurs embarqués), particulièrement sur un document
+     court tenant sur une seule page — exactement le cas d'un reçu. Rapporté :
+     aperçu écran correct, aperçu d'impression vide — signature caractéristique
+     de ce défaut précis, pas d'un problème de timing (déjà traité plus bas). Mise
+     en page div classique à la place : l'en-tête/pied ne se répète plus sur
+     chaque page d'un document multi-pages (perte mineure, cosmétique), mais
+     s'affiche de façon fiable sur tous les moteurs d'impression, y compris
+     pour un document court — le compromis inverse (fiabilité contre
+     répétition) est le bon choix ici. */
   var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
     + '<title>' + escHtml(titre + (ref ? ' ' + ref : '')) + '</title>' + css + '</head><body>'
     + '<div class="no-print"><button onclick="_printFromElement ? _printFromElement(document.body.id||document.body.parentElement.id,\'Itinéraire\') : window.print();">🖨️ Imprimer / Enregistrer en PDF</button>'
     +   '<button class="sec" onclick="window.close()">Fermer</button></div>'
-    + '<table class="page-table">'
-    +   '<thead><tr><td>' + _enteteEtatHTML(opts, s) + '</td></tr></thead>'
-    +   '<tfoot><tr><td><div class="etat-pied"><span>' + escHtml(mention) + '</span><span>' + dateStr + '</span></div></td></tr></tfoot>'
-    +   '<tbody><tr><td><div class="etat-content">' + bande + (opts.contenu || '') + '</div></td></tr></tbody>'
-    + '</table>'
+    + _enteteEtatHTML(opts, s)
+    + '<div class="etat-content">' + bande + (opts.contenu || '') + '</div>'
+    + '<div class="etat-pied"><span>' + escHtml(mention) + '</span><span>' + dateStr + '</span></div>'
     + '<script>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},' + (s.logo ? 350 : 150) + ');};<\/script>'
     + '</body></html>';
 
@@ -89743,13 +90083,14 @@ function applyRoleToSidebar() {
         return '<span style="background:#FEF2F2;color:#DC2626;padding:2px 6px;border-radius:10px;font-size:10px;border:1px solid #FECACA;">'+m+'</span>';
       }).join(' ');
     } else if (denied) { denied.innerHTML=''; }
-    /* Le PIN de caisse n'a de sens que pour le rôle Caissière : on l'affiche
-       uniquement dans ce cas, et on ne l'exige (astérisque) qu'à la création. */
+    /* [DURCI] Le PIN caisse est désormais exigé à l'ouverture pour TOUS les
+       rôles (pas seulement Caissière) — le champ reste donc visible quel que
+       soit le rôle choisi ; il peut aussi être laissé vide ici et défini plus
+       tard en self-service par l'utilisateur lui-même au moment d'ouvrir sa
+       première caisse. */
     var pinGroup = document.getElementById('new-user-pin-group');
     if (pinGroup) {
-      var isCaissiere = (role === 'caissiere');
-      pinGroup.style.display = isCaissiere ? '' : 'none';
-      if (!isCaissiere) { var pinInp = document.getElementById('new-user-pin'); if (pinInp) pinInp.value = ''; }
+      pinGroup.style.display = '';
       var star = document.getElementById('pin-req-star');
       var isEditModal = !!(document.getElementById('modal-user-create') && document.getElementById('modal-user-create').dataset.editId);
       if (star) star.style.display = isEditModal ? 'none' : '';
@@ -89913,11 +90254,16 @@ function togglePwdVisibility(inputId, eyeId) {
         user.pwd_algo       = null;
         delete user.password;
       }
-      if (role === 'caissiere' && pin) {
+      /* [DURCI] Le PIN caisse est désormais utilisable par N'IMPORTE QUEL rôle
+         (l'ouverture de caisse l'exige pour tout le monde, pas seulement les
+         caissières) — on ne le purge donc plus automatiquement si le rôle
+         n'est pas « caissière ». Auparavant cette purge effaçait aussi le PIN
+         qu'un manager/comptable/admin s'était défini lui-même (self-service),
+         au premier enregistrement de son profil pour une raison sans rapport. */
+      if (pin) {
         user.caisse_pin_salt = generateSalt();
         user.caisse_pin_hash = await hashPassword(pin, user.caisse_pin_salt);
       }
-      if (role !== 'caissiere') { user.caisse_pin_hash = null; user.caisse_pin_salt = null; }
       user._modifie = new Date().toISOString();
       await dbPut('users', user);
       if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', user);
@@ -89931,7 +90277,7 @@ function togglePwdVisibility(inputId, eyeId) {
       var hash = await hashPassword(pwd, salt);
       var newUser = { id:uid(), nom:nom, login:login, email:email, role:role, statut:statut,
         division_id: divisionId, password_hash:hash, salt:salt };
-      if (role === 'caissiere' && pin) {
+      if (pin) {
         newUser.caisse_pin_salt = generateSalt();
         newUser.caisse_pin_hash = await hashPassword(pin, newUser.caisse_pin_salt);
       }
@@ -92913,7 +93259,7 @@ function edsExportPDF(id) {
     '<tr><td>Marge ' + (e.coef.marge) + '%</td><td style="text-align:right;">' + fmtF(c.marge) + '</td></tr>' +
     '<tr><td><strong>PRIX DE VENTE HT</strong></td><td style="text-align:right;font-size:15px;color:#1A6B3A;"><strong>' + fmtF(c.prixVente) + ' FCFA</strong></td></tr>' +
     '</table></body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 
 /* ════════════ ONGLET 3 — SUIVI BUDGÉTAIRE ════════════ */
@@ -93408,6 +93754,40 @@ function _dxfParse(txt){
   return { polylines:polylines, points:points, labels:labels, lines:lines };
 }
 
+/* [Nouveau] Sur un DXF à une seule parcelle, une seule polyligne fermée
+   existe généralement — le choix automatique du plus grand contour restait
+   fiable. Sur un plan de masse réel (lotissement entier, des milliers de
+   polylignes), cette heuristique attrape n'importe quel contour selon les
+   surfaces en présence, presque jamais celui voulu. Cette fonction recense
+   TOUS les contours fermés exploitables, avec leur surface et le label le
+   plus proche, pour que l'utilisateur choisisse — au lieu qu'un seul soit
+   deviné silencieusement. */
+function _dxfCandidatsPolygones(parsed){
+  function area(vs){ if(vs.length<3) return 0; var s=0; for(var i=0;i<vs.length;i++){ var a=vs[i],b=vs[(i+1)%vs.length]; s+=a.x*b.y-b.x*a.y; } return Math.abs(s/2); }
+  function centroide(vs){ var sx=0,sy=0; vs.forEach(function(v){sx+=v.x;sy+=v.y;}); return {x:sx/vs.length, y:sy/vs.length}; }
+  var out = [];
+  (parsed.polylines||[]).forEach(function(p, idx){
+    var vs = (p.verts||[]).filter(function(v){ return isFinite(v.x)&&isFinite(v.y); });
+    if (vs.length < 3) return;
+    var a = area(vs);
+    if (a < 1) return;   // segment dégénéré, pas un vrai contour
+    var c = centroide(vs);
+    var label = null, bestD = 40;   // rayon de recherche élargi (plan de masse à grande échelle)
+    (parsed.labels||[]).forEach(function(l){ var d=Math.hypot(l.x-c.x, l.y-c.y); if(d<bestD){ bestD=d; label=l.t; } });
+    out.push({ idx:idx, verts:vs, aire:a, label:label, centre:c });
+  });
+  out.sort(function(a,b){ return b.aire - a.aire; });
+  return out;
+}
+
+function _dxfNommerSommets(pts, parsed){
+  // Nommage : label le plus proche (< 5 m), sinon B1..Bn
+  return pts.map(function(p,idx){
+    var nom='B'+(idx+1), best=6;
+    (parsed.labels||[]).forEach(function(l){ var d=Math.hypot(l.x-p.x, l.y-p.y); if(d<best){ best=d; nom=l.t; } });
+    return { nom:nom, x:+p.x.toFixed(3), y:+p.y.toFixed(3), z:+((p.z||0).toFixed(3)), angle:0, distance:0 };
+  });
+}
 function _dxfToBornes(parsed){
   // Choisit la polyligne à plus grande surface comme contour parcellaire.
   function area(vs){ if(vs.length<3) return 0; var s=0; for(var i=0;i<vs.length;i++){ var a=vs[i],b=vs[(i+1)%vs.length]; s+=a.x*b.y-b.x*a.y; } return Math.abs(s/2); }
@@ -93437,12 +93817,7 @@ function _dxfToBornes(parsed){
     pts = ordered;
   }
   if (!pts.length) return [];
-  // Nommage : label le plus proche (< 5 m), sinon B1..Bn
-  return pts.map(function(p,idx){
-    var nom='B'+(idx+1), best=6;
-    parsed.labels.forEach(function(l){ var d=Math.hypot(l.x-p.x, l.y-p.y); if(d<best){ best=d; nom=l.t; } });
-    return { nom:nom, x:+p.x.toFixed(3), y:+p.y.toFixed(3), z:+((p.z||0).toFixed(3)), angle:0, distance:0 };
-  });
+  return _dxfNommerSommets(pts, parsed);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -94098,7 +94473,7 @@ function brnImportDXF(input){
       if (binDwg){
         toast('DWG binaire détecté — lecture native en cours…','info');
         _dwgParseNatif(ev.target.result).then(function(res){
-          _dxfApplyBornes(_dxfToBornes(res), name);
+          _dxfTraiterEtAppliquer(res, name);
         }).catch(function(){
           toast('DWG illisible (hors ligne au premier usage, ou entités non couvertes). Exportez le plan en DXF depuis AutoCAD/Covadis (Fichier → Enregistrer sous → DXF), puis réimportez.','error');
         });
@@ -94124,12 +94499,56 @@ function brnImportDXF(input){
         }
         var txt;
         try { txt = new TextDecoder(encodageB).decode(arr); } catch(eDecB) { txt = new TextDecoder('utf-8').decode(arr); }
-        _dxfApplyBornes(_dxfToBornes(_dxfParse(txt)), name);
+        _dxfTraiterEtAppliquer(_dxfParse(txt), name);
       }
     } catch(e){ toast('Lecture impossible : '+(e.message||e),'error'); }
     input.value='';
   };
   rd.readAsArrayBuffer(fl);
+}
+
+/* [Nouveau] Aiguillage unique après parsing (DXF ou DWG natif) : applique
+   directement s'il n'y a aucune ambiguïté (une seule parcelle dans le
+   fichier — cas d'usage historique de ce module, comportement inchangé),
+   ouvre un sélecteur sinon. Avant ce correctif, un plan de masse réel à
+   plusieurs milliers de polylignes (lotissement entier plutôt qu'une
+   parcelle isolée) faisait deviner silencieusement « le plus grand contour »
+   au lieu du bon lot — constaté sur un vrai fichier qui échouait ainsi côté
+   Bornage tout en fonctionnant côté SIG (qui, lui, force un choix explicite
+   par calque). */
+function _dxfTraiterEtAppliquer(parsed, name){
+  var candidats = _dxfCandidatsPolygones(parsed);
+  if (candidats.length <= 1) { _dxfApplyBornes(_dxfToBornes(parsed), name); return; }
+  _dxfChoixParsed = parsed; _dxfChoixCandidats = candidats; _dxfChoixSrcLabel = name;
+  document.getElementById('dxf-choix-total').textContent = candidats.length;
+  document.getElementById('dxf-choix-recherche').value = '';
+  dxfChoixRender(candidats);
+  openModal('modal-dxf-choix-contour');
+}
+var _dxfChoixParsed = null, _dxfChoixCandidats = [], _dxfChoixSrcLabel = '';
+function dxfChoixRender(liste){
+  var box = document.getElementById('dxf-choix-liste'); if (!box) return;
+  var affiches = liste.slice(0, 200);
+  box.innerHTML = affiches.map(function(c){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--ligne,#333);cursor:pointer;" '
+      + 'onclick="dxfChoixSelectionner('+c.idx+')" onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" onmouseout="this.style.background=\'\'">'
+      + '<span>' + (c.label ? '<b>'+escHtml(c.label)+'</b>' : '<span style="color:var(--blanc-dim);">Sans label</span>')
+      + ' <span style="color:var(--blanc-dim);font-size:11px;"> — ' + c.verts.length + ' sommets</span></span>'
+      + '<span style="font-size:11.5px;color:var(--or,#B87333);">' + (c.aire/10000).toFixed(4) + ' ha</span>'
+      + '</div>';
+  }).join('') + (liste.length>200 ? '<div style="padding:8px;text-align:center;color:var(--blanc-dim);font-size:11px;">… '+(liste.length-200)+' de plus — affinez la recherche pour les voir.</div>' : '');
+}
+function dxfChoixFiltrer(){
+  var q = (document.getElementById('dxf-choix-recherche').value||'').trim().toLowerCase();
+  if (!q) { dxfChoixRender(_dxfChoixCandidats); return; }
+  dxfChoixRender(_dxfChoixCandidats.filter(function(c){ return (c.label||'').toLowerCase().indexOf(q)!==-1; }));
+}
+function dxfChoixSelectionner(idx){
+  var cand = _dxfChoixCandidats.find(function(c){ return c.idx===idx; });
+  if (!cand) return;
+  closeModal('modal-dxf-choix-contour');
+  var bornes = _dxfNommerSommets(cand.verts, _dxfChoixParsed);
+  _dxfApplyBornes(bornes, _dxfChoixSrcLabel + (cand.label ? ' — '+cand.label : ''));
 }
 
 /* ══════════════════════════════════════════════
@@ -95698,7 +96117,7 @@ function brnPrintPlan() {
     + '<table><tr><th>Borne</th><th style="text-align:right;">X</th><th style="text-align:right;">Y</th><th style="text-align:right;">Z</th><th style="text-align:right;">Angle</th><th style="text-align:right;">Distance</th></tr>'+rows+'</table>'
     + '<p>Surface calculée (formule de Gauss) : <strong>'+fmtF(Math.round(a))+' m²</strong></p>'
     + '</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 
 
@@ -98502,7 +98921,7 @@ function budgetImprimerLigne(ligneCompte, divisionId, exercice) {
     + '</div>'
     + '</body></html>');
   try { if (win.document.body && !win.document.querySelector('.doc-qr')) { win.document.body.insertAdjacentHTML('beforeend', printQrFooter('BUDGET-'+ligneCompte+'-'+exercice)); } } catch(e) {}
-  win.document.close(); win.print();
+  win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 /* [État périodique] Vue d'ensemble imprimable de TOUTE la situation
@@ -98571,7 +98990,7 @@ function budgetEtatPeriodique() {
     + '<table><thead><tr><th>#</th><th>Ligne</th><th>Libellé</th><th class="r">Alloué</th><th class="r">Engagé</th><th class="r">Disponible</th><th class="r">Taux</th></tr></thead><tbody>'+rows+'</tbody></table>'
     + '</body></html>');
   try { if (win.document.body) { win.document.body.insertAdjacentHTML('beforeend', printQrFooter('BUDGET-ETAT-'+(divisionId||'CONSOLIDE')+'-'+exercice)); } } catch(e) {}
-  win.document.close(); win.print();
+  win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -100103,7 +100522,7 @@ function printBC(id){
     +'<div style="margin-top:40px;display:flex;justify-content:space-between;"><div class="muted">Établi par : '+((APP.currentUser&&APP.currentUser.nom)||'')+'</div><div class="muted">Visa Direction : '+(b.valide_par?(b.valide_par+' ('+b.valide_date+')'):'____________')+'</div></div>'
     +'</body></html>');
   try{ if(win.document.body&&!win.document.querySelector('.doc-qr')){win.document.body.insertAdjacentHTML('beforeend',printQrFooter('BC-'+b.numero));}}catch(e){}
-  win.document.close(); win.print();
+  win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 /* ── Réception (BL) ── */
@@ -100274,7 +100693,7 @@ function printFacture(id){
     +'<table style="width:300px;margin-left:auto;"><tr><td>HT</td><td class="r">'+fmtF(Math.round(fc.ht))+'</td></tr><tr><td>TVA</td><td class="r">'+fmtF(Math.round(fc.tva))+'</td></tr>'+(fc.airsi>0?('<tr><td>AIRSI</td><td class="r">−'+fmtF(Math.round(fc.airsi))+'</td></tr>'):'')+'<tr><td><strong>Net à payer</strong></td><td class="r"><strong>'+fmtF(Math.round(fc.net))+' FCFA</strong></td></tr></table>'
     +'</body></html>');
   try{ if(win.document.body&&!win.document.querySelector('.doc-qr')){win.document.body.insertAdjacentHTML('beforeend',printQrFooter('FAC-'+fc.numero));}}catch(e){}
-  win.document.close(); win.print();
+  win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 
@@ -100502,7 +100921,7 @@ function printRect(id){
     +'<div class="sign"><div class="muted">Le Maître d\'ouvrage<br><br><br>____________</div><div class="muted">Le Constructeur<br><br><br>____________</div></div>'
     +'</body></html>');
   try{ if(win.document.body&&!win.document.querySelector('.doc-qr')){win.document.body.insertAdjacentHTML('beforeend',printQrFooter('PV-RECEP-'+r.numero));}}catch(e){}
-  win.document.close(); win.print();
+  win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 /* ── Livraison souscripteur ── */
@@ -100573,7 +100992,7 @@ function printLiv(id){
     +'<div class="sign"><div class="muted">Le Promoteur<br><br><br>____________</div><div class="muted">Le Souscripteur<br>'+(l.signe?('(signé le '+(l.signature_date||l.date)+')'):'')+'<br><br>____________</div></div>'
     +'</body></html>');
   try{ if(win.document.body&&!win.document.querySelector('.doc-qr')){win.document.body.insertAdjacentHTML('beforeend',printQrFooter('PV-LIV-'+l.numero));}}catch(e){}
-  win.document.close(); win.print();
+  win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 
@@ -100753,7 +101172,7 @@ function dosPrintPV(kind){
     +'<div class="sign"><div class="muted">Le Promoteur<br><br>____________</div>'+(kind!=='pre'?'<div class="muted">Le Souscripteur<br><br>____________</div>':'')+'<div class="muted">Le Constructeur<br><br>____________</div></div>'
     +'</body></html>');
   try{ if(win.document.body&&!win.document.querySelector('.doc-qr')){win.document.body.insertAdjacentHTML('beforeend',printQrFooter('DOS-RECLIV-'+d.numero));}}catch(e){}
-  win.document.close(); win.print();
+  win.document.close(); setTimeout(function(){ win.print(); }, 400);
 }
 
 function fournisseurOptions(sel){
@@ -116932,6 +117351,38 @@ var CAISSE_UI = { brouillardCaisseId: null, brouillardSessionId: null, brouillar
    évite qu'un tiroir laissé ouvert sans surveillance soit manipulé par
    quelqu'un d'autre pendant une pause. Se déverrouille avec le PIN caisse
    (si configuré) ou le mot de passe du compte. */
+/* ── Alerte explicite si l'envoi cloud d'un mouvement/session de caisse échoue ──
+   [FIX CRITIQUE] Les 20 appels syncToSupabase('pi_caisse_mouvements'/'pi_caisse_sessions', …)
+   du module n'étaient ni attendus (pas de await) ni vérifiés (retour ignoré).
+   Tant que ces deux stores étaient hors de _STORES_CONFLIT, l'échec possible se
+   limitait au mode hors-ligne (mis en file d'attente automatiquement — sans
+   gravité). Mais depuis leur ajout à _STORES_CONFLIT, syncToSupabase peut aussi
+   renvoyer false pour un CONFLIT réel (enregistrement modifié ailleurs) — et
+   dans ce cas il n'est PAS remis en file d'attente : sans ce garde-fou, une
+   caissière clôture sa caisse, voit "🔒 Caisse clôturée" (succès local
+   uniquement), mais la clôture n'atteint jamais le cloud. Sur un autre poste,
+   la caisse reste alors visible comme "ouverte" indéfiniment — exactement le
+   symptôme signalé : "les utilisateurs clôturent mais les caisses restent
+   ouvertes" ailleurs. On attend maintenant le résultat et on alerte fortement
+   si l'envoi échoue pour une raison AUTRE que le hors-ligne simple. */
+async function caisseSyncEtAlerter(table, obj) {
+  if (typeof syncToSupabase !== 'function') return true;
+  var avantConflits = (DATA.conflits_sync || []).length;
+  var ok = await syncToSupabase(table, obj);
+  if (ok === false) {
+    var apresConflits = (DATA.conflits_sync || []).length;
+    if (apresConflits > avantConflits) {
+      try { if (typeof toast === 'function') toast('⚠️ CONFLIT — cette opération de caisse est enregistrée EN LOCAL SEULEMENT, elle n\'a pas atteint le cloud. Les autres postes ne la verront pas tant qu\'elle n\'est pas résolue : Paramètres → ⚠️ Conflits de synchro.', 'error', 9000); } catch(e){}
+    } else if (navigator.onLine) {
+      try { if (typeof toast === 'function') toast('⚠️ Échec d\'envoi au cloud pour cette opération de caisse (' + table.replace('pi_','') + ') — elle reste locale à ce poste pour l\'instant. Réessayez ou signalez-le.', 'error', 7000); } catch(e){}
+    }
+    /* Hors-ligne (navigator.onLine === false) : mise en file d'attente automatique
+       via l'outbox, déjà signalée par la bannière de synchro de la caisse — pas
+       besoin d'un toast supplémentaire ici. */
+  }
+  return ok;
+}
+
 function caisseNoterActivite() {
   CAISSE_UI.derniereActivite = Date.now();
 }
@@ -117056,8 +117507,9 @@ async function caisseReparerNumerosDupliques() {
     var ancien = m.numero;
     m.numero = await caisseProchainNumero(m.caisse_id, m.type, (m.date || '').slice(0,10), caisse && caisse.compte);
     m.numero_precedent = ancien;   /* trace d'audit : l'ancien numéro figure peut-être sur un bon papier */
+    m._baseModifie = m._modifie || null;
     await dbPut('caisse_mouvements', m);
-    if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', m);
+    await caisseSyncEtAlerter('pi_caisse_mouvements', m);
     /* L'écriture comptable porte le numéro en référence : la garder alignée */
     if (m.ecriture_id) {
       var e = (DATA.ecritures || []).find(function(x){ return x.id === m.ecriture_id; });
@@ -117861,7 +118313,7 @@ function imprimerRevueMensuelleCaisse(){
     +'<div class="pied">Détection automatique — un doublon signalé n\'est pas nécessairement réel, vérification manuelle requise avant toute suppression.<br><br>'
     +'Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')+'<br><br>Contrôlé par : ___________________________</div>'
     +'</body></html>');
-  w.document.close(); w.print();
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 
 function partagerRapportAuditCaisse(){
@@ -118008,6 +118460,20 @@ async function caisseEnter() {
   if (btnAudit) btnAudit.style.display = hasRole('admin') ? '' : 'none';
   caisseRenderDashboard();
   caisseRenderListe();
+  /* [FIX lecture temps réel] Le rendu ci-dessus part du cache local, qui peut
+     être en retard de quelques secondes/minutes sur le cloud (cycle de synchro
+     périodique). Sans ce best-effort, un utilisateur qui ouvre la page Caisse
+     juste après qu'un autre poste a clôturé une session pouvait continuer à la
+     voir « ouverte » jusqu'au prochain cycle — exactement le scénario signalé
+     (« une caisse fermée ne peut être vue ouverte par un autre utilisateur »).
+     Rendu initial instantané depuis le cache, puis correction silencieuse dès
+     que le pull cloud répond. */
+  if (navigator.onLine && typeof syncPullStore === 'function') {
+    syncPullStore('caisse_sessions').then(function(){
+      caisseRenderListe();
+      if (typeof caisseRenderDashboard === 'function') caisseRenderDashboard();
+    }).catch(function(){});
+  }
   document.getElementById('caisse-brouillard-box').innerHTML = '';
   /* [FIX] Ces 4 rendus étaient annoncés protégés par le commentaire ci-dessus
      mais ne l'étaient pas réellement — caisseRenderEcarts() en particulier
@@ -118284,15 +118750,64 @@ async function caisseOuvrirModal(caisseId) {
   document.getElementById('co-fond-note').textContent = derniere
     ? 'Repris automatiquement du solde de clôture réel du ' + derniere.date + ' (' + fmtF(fondSuggere) + ' FCFA). Modifiable si besoin.'
     : 'Première ouverture de cette caisse — aucun solde antérieur.';
-  /* Le PIN n'est demandé que si le compte de l'utilisateur en cours en possède un
-     (attribué à sa création en tant que caissière). Sans PIN configuré, l'ouverture
-     reste possible sans blocage (défensif, cf. principe de la caisse). */
+  /* [DURCI] Le PIN est désormais OBLIGATOIRE pour toute ouverture de caisse,
+     quel que soit le rôle (caissière, comptable, manager, admin) — ce n'est
+     plus une option réservée aux seuls comptes « caissière ». Si le compte
+     courant n'a pas encore de PIN, on l'affiche clairement et on bloque via
+     caisseOuvrir() plutôt que de laisser passer silencieusement. */
   var pinGroup = document.getElementById('co-pin-group');
   var pinInp = document.getElementById('co-pin');
   var aUnPin = !!(APP.currentUser && APP.currentUser.caisse_pin_hash);
-  if (pinGroup) pinGroup.style.display = aUnPin ? '' : 'none';
+  if (pinGroup) pinGroup.style.display = '';
+  var pinPresentEl = document.getElementById('co-pin-present');
+  var pinAbsentEl = document.getElementById('co-pin-absent');
+  if (pinPresentEl) pinPresentEl.style.display = aUnPin ? '' : 'none';
+  if (pinAbsentEl) pinAbsentEl.style.display = aUnPin ? 'none' : '';
   if (pinInp) pinInp.value = '';
   openModal('modal-caisse-ouvrir');
+}
+
+/* Ouvre le self-service de définition du PIN sans perdre la caisse/le fond
+   déjà saisis dans le formulaire d'ouverture — on les remet en place au
+   retour, pour ne pas faire retaper l'utilisateur. */
+function caisseOuvrirDefinirPinDepuisModal() {
+  CAISSE_UI._reprisePin = {
+    caisseId: document.getElementById('co-caisse-id').value,
+    fond: document.getElementById('co-fond').value
+  };
+  document.getElementById('cdp-mdp').value = '';
+  document.getElementById('cdp-pin1').value = '';
+  document.getElementById('cdp-pin2').value = '';
+  document.getElementById('cdp-err').textContent = '';
+  closeModal('modal-caisse-ouvrir');
+  openModal('modal-caisse-definir-pin');
+}
+
+async function caisseDefinirPinConfirmer() {
+  var err = document.getElementById('cdp-err');
+  err.textContent = '';
+  var mdp = document.getElementById('cdp-mdp').value || '';
+  var pin1 = document.getElementById('cdp-pin1').value || '';
+  var pin2 = document.getElementById('cdp-pin2').value || '';
+  if (!mdp) { err.textContent = 'Saisissez votre mot de passe.'; return; }
+  if (!/^[0-9]{4}$/.test(pin1)) { err.textContent = 'Le code PIN doit comporter exactement 4 chiffres.'; return; }
+  if (pin1 !== pin2) { err.textContent = 'Les deux codes PIN ne correspondent pas.'; return; }
+  var u = APP.currentUser;
+  var mdpHash = await hashPassword(mdp, u.salt || '');
+  if (mdpHash !== u.password_hash) { err.textContent = '❌ Mot de passe incorrect.'; return; }
+  u.caisse_pin_salt = generateSalt();
+  u.caisse_pin_hash = await hashPassword(pin1, u.caisse_pin_salt);
+  u._modifie = new Date().toISOString();
+  await dbPut('users', u);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', u);
+  toast('✅ Code PIN caisse enregistré.', 'success');
+  closeModal('modal-caisse-definir-pin');
+  var reprise = CAISSE_UI._reprisePin; CAISSE_UI._reprisePin = null;
+  if (reprise && reprise.caisseId) {
+    await caisseOuvrirModal(reprise.caisseId);
+    var fondInp = document.getElementById('co-fond');
+    if (fondInp && reprise.fond !== undefined) fondInp.value = reprise.fond;
+  }
 }
 
 async function caisseOuvrir() {
@@ -118323,14 +118838,18 @@ async function caisseOuvrir() {
       return;
     }
   }
-  /* Vérification du code PIN de la caissière avant toute ouverture — le PIN est
-     personnel à l'utilisateur (attribué à la création de son compte), pas à la caisse. */
-  if (APP.currentUser && APP.currentUser.caisse_pin_hash) {
-    var pinSaisi = (document.getElementById('co-pin')||{}).value || '';
-    if (!pinSaisi) { toast('⚠️ Veuillez saisir votre code PIN.', 'error'); return; }
-    var pinHash = await hashPassword(pinSaisi, APP.currentUser.caisse_pin_salt || '');
-    if (pinHash !== APP.currentUser.caisse_pin_hash) { toast('❌ Code PIN incorrect.', 'error'); return; }
+  /* [DURCI] Vérification du code PIN — désormais OBLIGATOIRE pour toute
+     ouverture de caisse, quel que soit le rôle. Un compte sans PIN configuré
+     ne peut plus ouvrir de caisse du tout (auparavant : passait sans contrôle). */
+  if (!APP.currentUser || !APP.currentUser.caisse_pin_hash) {
+    toast('🔒 Vous devez d\'abord définir votre code PIN caisse avant de pouvoir ouvrir une caisse.', 'error', 6000);
+    caisseOuvrirDefinirPinDepuisModal();
+    return;
   }
+  var pinSaisi = (document.getElementById('co-pin')||{}).value || '';
+  if (!pinSaisi) { toast('⚠️ Veuillez saisir votre code PIN.', 'error'); return; }
+  var pinHash = await hashPassword(pinSaisi, APP.currentUser.caisse_pin_salt || '');
+  if (pinHash !== APP.currentUser.caisse_pin_hash) { toast('❌ Code PIN incorrect.', 'error'); return; }
   var session = {
     id: uid(), caisse_id: caisseId, date: today(),
     fond_ouverture: fond, fond_cloture_theorique: null, fond_cloture_reel: null, ecart: null,
@@ -118342,8 +118861,9 @@ async function caisseOuvrir() {
     envoye_journalier: false, envoye_journalier_le: null
   };
   DATA.caisse_sessions.push(session);
+  session._baseModifie = session._modifie || null;
   await dbPut('caisse_sessions', session);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_sessions', session);
+  await caisseSyncEtAlerter('pi_caisse_sessions', session);
   closeModal('modal-caisse-ouvrir');
   toast('🔓 Caisse ouverte avec un fond de ' + fmtF(fond) + ' FCFA.', 'success');
   caisseRenderListe();
@@ -118552,16 +119072,18 @@ async function caisseSaveBon() {
       var _regen = await genererEcritureCaisseMouvement(mvt, compteV);
       if (!_regen) {
         mvt.statut = 'a_ventiler'; mvt.ecriture_id = null;
+        mvt._baseModifie = mvt._modifie || null;
         await dbPut('caisse_mouvements', mvt);
-        if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', mvt);
+        await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
         closeModal('modal-caisse-bon');
         caisseRenderListe();
         if (typeof caisseRenderVentilation === 'function') caisseRenderVentilation();
         return;
       }
     } else {
+      mvt._baseModifie = mvt._modifie || null;
       await dbPut('caisse_mouvements', mvt);
-      if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', mvt);
+      await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
     }
     await cbCommitDocs(editId);
     closeModal('modal-caisse-bon');
@@ -118658,8 +119180,9 @@ async function caisseSaveBon() {
     nouveau.demande_le = new Date().toISOString();
   }
   DATA.caisse_mouvements.push(nouveau);
+  nouveau._baseModifie = nouveau._modifie || null;
   await dbPut('caisse_mouvements', nouveau);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', nouveau);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', nouveau);
   /* [Lien Budget → Caisse] Si ce bon vient du décaissement d'une DA validée
      (voir daOuvrirDecaissement), on relie le mouvement à la DA — via un
      champ da_id qui survit même si ce décaissement nécessite lui-même une
@@ -118682,8 +119205,9 @@ async function caisseSaveBon() {
     /* Si validation différée requise : le mouvement reste 'a_ventiler', la DA
        reste 'validee' — c'est caisseValiderDecaissement (voir plus bas) qui
        finalisera les deux à la sortie RÉELLE de l'argent, pas avant. */
+    nouveau._baseModifie = nouveau._modifie || null;
     await dbPut('caisse_mouvements', nouveau);
-    if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', nouveau);
+    await caisseSyncEtAlerter('pi_caisse_mouvements', nouveau);
     if (typeof caisseRenderDecaissementsAFaire === 'function') caisseRenderDecaissementsAFaire();
   }
   await cbCommitDocs(nouveau.id);
@@ -118968,8 +119492,9 @@ async function caisseImportCSVConfirmer() {
     mvt.demande_role = (APP.currentUser && APP.currentUser.role) || '';
     mvt.demande_le = new Date().toISOString();
     DATA.caisse_mouvements.push(mvt);
+    mvt._baseModifie = mvt._modifie || null;
     await dbPut('caisse_mouvements', mvt);
-    if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', mvt);
+    await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
     if (mvt.compte_suggere) nSuggeres++;
     nCrees++;
   }
@@ -119726,8 +120251,9 @@ async function caisseCloturer() {
   session.cloturee_par = (APP.currentUser && APP.currentUser.nom) || '—';
   session.cloturee_le = new Date().toISOString();
 
+  session._baseModifie = session._modifie || null;
   await dbPut('caisse_sessions', session);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_sessions', session);
+  await caisseSyncEtAlerter('pi_caisse_sessions', session);
   closeModal('modal-caisse-cloturer');
   toast('🔒 Caisse clôturée. Solde réel : ' + fmtF(fondReel) + ' FCFA.', 'success');
 
@@ -119964,8 +120490,9 @@ async function caisseEnvoyerEtatJournalier(sessionId, manuel) {
   if (!_provisoire) {
     session.envoye_journalier = true;
     session.envoye_journalier_le = new Date().toISOString();
+    session._baseModifie = session._modifie || null;
     await dbPut('caisse_sessions', session);
-    if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_sessions', session);
+    await caisseSyncEtAlerter('pi_caisse_sessions', session);
   }
 
   if (manuel || _provisoire) {
@@ -120100,8 +120627,9 @@ async function caisseEnvoyerEtatConfirm() {
 
   session.envoye_journalier = true;
   session.envoye_journalier_le = new Date().toISOString();
+  session._baseModifie = session._modifie || null;
   await dbPut('caisse_sessions', session);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_sessions', session);
+  await caisseSyncEtAlerter('pi_caisse_sessions', session);
 
   closeModal('modal-caisse-envoi');
   toast('✉️ État transmis' + (internes.length?' · '+internes.length+' interne(s)':'') + (emails.length?' · '+emails.length+' email(s)':'') + (pdf?' · PDF joint':'') + '.', 'success');
@@ -120489,13 +121017,18 @@ function caisseControleIntegrite() {
   var caisseFantome = mvts.filter(function(m){ return m.caisse_id && !idxCaisse[m.caisse_id]; });
   if (caisseFantome.length) pb.push('❌ ' + caisseFantome.length + ' mouvement(s) rattaché(s) à une caisse supprimée.');
 
-  /* 7. Cohérence solde de clôture ↔ somme des mouvements, par session clôturée */
+  /* 7. Cohérence solde de clôture ↔ somme des mouvements, par session clôturée
+     [FIX] Le recalcul dupliquait ici la logique de caisseSoldeSession() au lieu
+     de l'appeler : il excluait bien les sorties en attente de validation, mais
+     PAS les entrées (asymétrie oubliée lors de l'extension de la validation aux
+     entrées — cf. caisseSoldeSession). Résultat : dès qu'une session avait une
+     entrée encore en attente/rejetée au moment de la clôture, ce contrôle
+     signalait un écart qui n'existait pas réellement (ou masquait un vrai). On
+     réutilise directement caisseSoldeSession() pour garantir que l'audit
+     recalcule EXACTEMENT comme la clôture elle-même — une seule source de vérité. */
   var ecartsSolde = [];
   sessions.filter(function(s){ return s.statut==='cloturee'; }).forEach(function(s){
-    var mvtsS = mvts.filter(function(m){ return m.session_id === s.id; });
-    var entrees = mvtsS.filter(function(m){ return m.type==='entree'; }).reduce(function(a,m){ return a + (parseFloat(m.montant)||0); }, 0);
-    var sorties = mvtsS.filter(function(m){ return m.type==='sortie' && !(m.requiert_validation && !m.valide); }).reduce(function(a,m){ return a + (parseFloat(m.montant)||0); }, 0);
-    var theorique = (parseFloat(s.fond_ouverture)||0) + entrees - sorties;
+    var theorique = caisseSoldeSession(s);
     var enregistre = (s.fond_cloture_theorique != null) ? (parseFloat(s.fond_cloture_theorique)||0) : null;
     if (enregistre !== null && Math.abs(theorique - enregistre) > 1) {
       ecartsSolde.push({ s:s, theorique:theorique, enregistre:enregistre });
@@ -120590,8 +121123,9 @@ async function caisseFusionnerSessionsDoublons() {
       var mvts = (DATA.caisse_mouvements || []).filter(function(m){ return m.session_id === doublon.id; });
       for (var k = 0; k < mvts.length; k++) {
         mvts[k].session_id = canonique.id;
+        mvts[k]._baseModifie = mvts[k]._modifie || null;
         await dbPut('caisse_mouvements', mvts[k]);
-        if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', mvts[k]);
+        await caisseSyncEtAlerter('pi_caisse_mouvements', mvts[k]);
         nMvts++;
       }
       doublon.statut = 'cloturee';
@@ -120600,8 +121134,9 @@ async function caisseFusionnerSessionsDoublons() {
       doublon.ecart = 0;
       doublon.cloturee_par = 'Fusion automatique (session en double) — ' + ((APP.currentUser && APP.currentUser.nom) || '—');
       doublon.cloturee_le = new Date().toISOString();
+      doublon._baseModifie = doublon._modifie || null;
       await dbPut('caisse_sessions', doublon);
-      if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_sessions', doublon);
+      await caisseSyncEtAlerter('pi_caisse_sessions', doublon);
       nSessions++;
     }
   }
@@ -120630,8 +121165,9 @@ async function caisseAnnulerVentilationsAutoParRegle(motCle) {
     }
     m.statut = 'a_ventiler'; m.compte_ventile = null; m.ecriture_id = null;
     m.ventile_par = null; m.ventile_le = null; m.ventile_auto = false;
+    m._baseModifie = m._modifie || null;
     await dbPut('caisse_mouvements', m);
-    if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', m);
+    await caisseSyncEtAlerter('pi_caisse_mouvements', m);
     n++;
   }
   if (typeof buildBalance === 'function') buildBalance();
@@ -120695,8 +121231,9 @@ async function caisseConfirmerAjustementFond() {
   });
   session.fond_ouverture = nouveau;
 
+  session._baseModifie = session._modifie || null;
   await dbPut('caisse_sessions', session);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_sessions', session);
+  await caisseSyncEtAlerter('pi_caisse_sessions', session);
 
   closeModal('modal-caisse-ajuster-fond');
   toast('✅ Fond d\'ouverture ajusté : ' + fmtF(ancien) + ' → ' + fmtF(nouveau) + ' FCFA (écart ' + fmtF(nouveau - ancien) + ' FCFA).', 'success');
@@ -120746,8 +121283,9 @@ async function caisseRestaurerSnapshot(cle) {
   /* Réécrire l'état snapshoté */
   DATA.caisse_mouvements = raw.caisse_mouvements || [];
   for (var j = 0; j < DATA.caisse_mouvements.length; j++) {
+    DATA.caisse_mouvements[j]._baseModifie = DATA.caisse_mouvements[j]._modifie || null;
     await dbPut('caisse_mouvements', DATA.caisse_mouvements[j]);
-    if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', DATA.caisse_mouvements[j]);
+    await caisseSyncEtAlerter('pi_caisse_mouvements', DATA.caisse_mouvements[j]);
   }
   toast('♻️ État de la caisse restauré (' + DATA.caisse_mouvements.length + ' mouvement(s)).', 'success');
   if (typeof caisseEnter === 'function') caisseEnter();
@@ -120810,8 +121348,9 @@ async function genererEcritureCaisseMouvement(mvt, compteContrepartie, viaAuto) 
   mvt.statut = 'ventile'; mvt.compte_ventile = compteContrepartie; mvt.ecriture_id = ecr.id;
   mvt.ventile_par = (APP.currentUser && APP.currentUser.nom) || '—'; mvt.ventile_le = new Date().toISOString();
   mvt.ventile_auto = !!viaAuto;
+  mvt._baseModifie = mvt._modifie || null;
   await dbPut('caisse_mouvements', mvt);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', mvt);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
   return ecr;
 }
 
@@ -120892,8 +121431,9 @@ async function caisseDecaisserMouvement(mvtId) {
   m.decaisse = true;
   m.decaisse_par = (APP.currentUser && APP.currentUser.nom) || '—';
   m.decaisse_le = new Date().toISOString();
+  m._baseModifie = m._modifie || null;
   await dbPut('caisse_mouvements', m);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', m);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', m);
   toast('✅ ' + (m.type==='entree'?'Encaissement':'Décaissement') + ' confirmé.', 'success');
   if (typeof caisseRenderMesDemandes === 'function') caisseRenderMesDemandes();
 }
@@ -121147,8 +121687,9 @@ async function caisseValiderDecaissement(mvtId) {
     mvt.compte_ventile = _daDiff ? _daDiff.compte : mvt.compte_ventile;
     mvt.statut = 'ventile'; mvt.ventile_par = (APP.currentUser&&APP.currentUser.nom)||'—'; mvt.ventile_le = new Date().toISOString();
   }
+  mvt._baseModifie = mvt._modifie || null;
   await dbPut('caisse_mouvements', mvt);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', mvt);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
   toast('✅ ' + (mvt.type==='entree'?'Entrée':'Décaissement') + ' de ' + fmtF(montant) + ' FCFA validé' + (mvt.type==='entree'?'e':'') + '.', 'success');
   caisseRenderValidations();
   caisseRenderListe();
@@ -121170,8 +121711,9 @@ async function caisseRejeterDecaissement(mvtId) {
   mvt.motif_rejet = motif.trim();
   mvt.rejete_par = (APP.currentUser && APP.currentUser.nom) || '—';
   mvt.rejete_le = new Date().toISOString();
+  mvt._baseModifie = mvt._modifie || null;
   await dbPut('caisse_mouvements', mvt);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_caisse_mouvements', mvt);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
   toast('✖ Décaissement rejeté — le bon reste tracé mais n\'affecte pas le solde.', 'info');
   caisseRenderValidations();
   caisseRenderListe();
@@ -121779,8 +122321,9 @@ async function genererEcritureEcartCaisse(session){
   session.ecart_ecriture_id = ecr.id;
   session.ecart_regularise_par = (APP.currentUser&&APP.currentUser.nom)||'—';
   session.ecart_regularise_le = new Date().toISOString();
+  session._baseModifie = session._modifie || null;
   await dbPut('caisse_sessions', session);
-  if (typeof syncToSupabase==='function') syncToSupabase('pi_caisse_sessions', session);
+  await caisseSyncEtAlerter('pi_caisse_sessions', session);
   return ecr;
 }
 
@@ -124802,9 +125345,15 @@ goTo = function(page) {
       <input type="hidden" id="co-caisse-id">
       <div id="co-caisse-nom" style="font-weight:700;margin-bottom:10px;"></div>
       <div class="form-group" id="co-pin-group" style="display:none;">
-        <label>Code PIN *</label>
-        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" class="form-control" id="co-pin" placeholder="••••" autocomplete="off">
-        <div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">Votre code PIN personnel, attribué à la création de votre compte caissière.</div>
+        <div id="co-pin-present">
+          <label>Code PIN *</label>
+          <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" class="form-control" id="co-pin" placeholder="••••" autocomplete="off">
+          <div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">Votre code PIN personnel, requis pour toute ouverture de caisse.</div>
+        </div>
+        <div id="co-pin-absent" style="display:none;padding:10px 12px;background:var(--card2);border-radius:var(--r);border:1px solid var(--rouge);">
+          <div style="font-size:12px;color:var(--rouge);font-weight:600;margin-bottom:6px;">⚠️ Aucun code PIN défini sur votre compte — obligatoire pour ouvrir une caisse.</div>
+          <button type="button" class="btn btn-primary btn-sm" onclick="caisseOuvrirDefinirPinDepuisModal()">🔑 Définir mon code PIN maintenant</button>
+        </div>
       </div>
       <div class="form-group">
         <label>Fond de caisse à l'ouverture (FCFA)</label>
@@ -124815,6 +125364,36 @@ goTo = function(page) {
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-caisse-ouvrir')">Annuler</button>
       <button class="btn btn-primary" onclick="caisseOuvrir()">🔓 Ouvrir la caisse</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : définition du code PIN caisse (self-service, obligatoire à l'ouverture) -->
+<div class="modal-overlay" id="modal-caisse-definir-pin">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🔑 Définir mon code PIN caisse</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-caisse-definir-pin')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">Ce code à 4 chiffres vous sera demandé à chaque ouverture de caisse et pour déverrouiller l'écran après une inactivité prolongée. Il est personnel — ne le partagez pas.</div>
+      <div class="form-group">
+        <label>Mot de passe de votre compte (vérification d'identité) *</label>
+        <input type="password" class="form-control" id="cdp-mdp" autocomplete="current-password">
+      </div>
+      <div class="form-group">
+        <label>Nouveau code PIN (4 chiffres) *</label>
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" class="form-control" id="cdp-pin1" placeholder="••••" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Confirmer le code PIN *</label>
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" class="form-control" id="cdp-pin2" placeholder="••••" autocomplete="off">
+      </div>
+      <div id="cdp-err" style="color:var(--rouge);font-size:12px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-caisse-definir-pin')">Annuler</button>
+      <button class="btn btn-primary" onclick="caisseDefinirPinConfirmer()">✅ Enregistrer mon PIN</button>
     </div>
   </div>
 </div>
