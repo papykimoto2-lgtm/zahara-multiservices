@@ -44055,11 +44055,20 @@ var SYSTEM_ROLES = {
     permissions: Object.fromEntries(ALL_MODULES.map(function(m){
       return [m, !['Comptabilite','Paie','Parametres'].includes(m)]; })) },  /* Accueil déjà inclus (non exclu) */
   comptable:  { id:'comptable',  label:'Comptable',      icon:'💼', level:2, system:true,
+    /* [Retrait droit de suppression] Seuls admin et manager conservent le
+       droit de supprimer — le comptable corrige par une écriture inverse ou
+       un avoir, jamais par effacement : c'est la condition d'un grand livre
+       auditable. Protégé au niveau le plus bas (deleteRecord), donc effectif
+       sur toute suppression du logiciel sans exception module par module. */
+    peut_supprimer: false,
     permissions: Object.fromEntries(ALL_MODULES.map(function(m){
       return [m, ['Tableau de bord','Accueil','DQE & Cout de revient','Souscripteurs','Paiements',
                   'Relances','Comptabilite','Tresorerie','Caisse','Budget','Paie','Declarations & Teledeclaration','Journaliers & Temporaires','Messagerie',
                   'Gestion Locative','Investisseurs Diaspora'].includes(m)]; })) },
   commercial: { id:'commercial', label:'Commercial',     icon:'🎯', level:1, system:true,
+    /* [Retrait droit de suppression] Même principe — un commercial corrige
+       ou annule, ne supprime jamais un souscripteur/lead/lot directement. */
+    peut_supprimer: false,
     permissions: Object.fromEntries(ALL_MODULES.map(function(m){
       return [m, ['Tableau de bord','Accueil','Programmes','Pipeline Leads','Plan Action Commercial',
                   'Carte & Geoloc','Itineraires Terrain','Ordres de Mission','Commercialisation','Lots & Reservations','Souscripteurs','Relances',
@@ -44205,7 +44214,18 @@ function userPeut(module, action) {
   var r = getAllRoles()[APP.currentUser.role];
   if (!r) return false;
   if (module && r.permissions && r.permissions[module] === false) return false;
-  if (action === 's' && r.peut_supprimer === false) return false;
+  /* [Règle absolue] Seuls admin et manager peuvent supprimer — demandé
+     explicitement, appliqué au niveau du code plutôt que du seul réglage
+     peut_supprimer par rôle : un rôle personnalisé créé plus tard avec
+     peut_supprimer resté à true (valeur par défaut) ne pourrait pas
+     autrement contourner cette règle. Le réglage peut_supprimer par rôle
+     reste utile pour retirer le droit à admin/manager eux-mêmes si besoin
+     un jour, mais ne peut plus jamais l'ACCORDER à un autre rôle. */
+  if (action === 's') {
+    var _roleId = APP.currentUser.role;
+    if (_roleId !== 'admin' && _roleId !== 'manager') return false;
+    if (r.peut_supprimer === false) return false;
+  }
   var d = r.droits && module ? r.droits[module] : null;
   if (d === undefined || d === null) return true;      /* non restreint */
   return String(d).indexOf(action) !== -1;
@@ -44296,6 +44316,11 @@ function userPeutSupprimer() {
   if (!APP.currentUser) return false;
   var r = getAllRoles()[APP.currentUser.role];
   if (!r) return false;
+  /* [Règle absolue] Même règle que userPeut(module,'s') — cohérence obligatoire,
+     sinon cette fonction et userPeut() donneraient des réponses différentes
+     à la même question selon l'endroit du code qui interroge. */
+  var _roleId = APP.currentUser.role;
+  if (_roleId !== 'admin' && _roleId !== 'manager') return false;
   return r.peut_supprimer !== false;
 }
 function userCanAccess(module) {
@@ -118245,7 +118270,12 @@ async function caisseOuvrirModal(caisseId) {
   if (navigator.onLine && typeof syncPullStore === 'function') {
     try { await syncPullStore('caisse_sessions'); } catch(e){}
   }
-  if (caisseGetSessionOuverte(caisseId)) { toast('Cette caisse est déjà ouverte (session détectée après vérification cloud).', 'error'); caisseRenderListe(); return; }
+  if (caisseGetSessionOuverte(caisseId)) {
+    var _so = caisseGetSessionOuverte(caisseId);
+    var _hOuv = _so && _so.ouverte_le ? new Date(_so.ouverte_le).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
+    toast('Cette caisse est déjà ouverte par ' + (_so&&_so.ouverte_par||'un(e) autre utilisateur(rice)') + (_hOuv?' depuis '+_hOuv:'') + ' (détecté après vérification cloud).', 'error');
+    caisseRenderListe(); return;
+  }
   var derniere = caisseDernièreSessionCloturee(caisseId);
   var fondSuggere = derniere ? (parseFloat(derniere.fond_cloture_reel) || 0) : 0;
   document.getElementById('co-caisse-id').value = caisseId;
@@ -118269,7 +118299,30 @@ async function caisseOuvrir() {
   if (!exigerDroit('Caisse','c','une session de caisse')) return;
   var caisseId = document.getElementById('co-caisse-id').value;
   var fond = parseFloat(document.getElementById('co-fond').value) || 0;
-  if (caisseGetSessionOuverte(caisseId)) { toast('Cette caisse est déjà ouverte.', 'error'); closeModal('modal-caisse-ouvrir'); return; }
+  if (caisseGetSessionOuverte(caisseId)) {
+    var _soL = caisseGetSessionOuverte(caisseId);
+    var _hOuvL = _soL && _soL.ouverte_le ? new Date(_soL.ouverte_le).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
+    toast('Cette caisse est déjà ouverte par ' + (_soL&&_soL.ouverte_par||'un(e) autre utilisateur(rice)') + (_hOuvL?' depuis '+_hOuvL:'') + '.', 'error');
+    closeModal('modal-caisse-ouvrir'); return;
+  }
+  /* [FIX multi-poste] caisseOuvrirModal() vérifie déjà le cloud à l'OUVERTURE
+     du formulaire — mais entre ce moment et ce clic sur « Confirmer », un
+     autre poste a le temps d'ouvrir la même caisse (saisie du fond, PIN...).
+     Sans cette seconde vérification, ICI, juste avant la création réelle de
+     la session, seule la copie locale (potentiellement périmée) était
+     revérifiée : deux sessions 'ouverte' pouvaient coexister sans qu'aucun
+     message n'alerte personne avant l'audit d'intégrité. */
+  if (navigator.onLine && typeof syncPullStore === 'function') {
+    try { await syncPullStore('caisse_sessions'); } catch(e){}
+    var _dejaOuverte = caisseGetSessionOuverte(caisseId);
+    if (_dejaOuverte) {
+      var _heureOuv = _dejaOuverte.ouverte_le ? new Date(_dejaOuverte.ouverte_le).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
+      toast('🔒 Cette caisse vient d\'être ouverte par ' + (_dejaOuverte.ouverte_par||'un(e) autre utilisateur(rice)') + (_heureOuv?' à '+_heureOuv:'') + ' — impossible d\'en ouvrir une deuxième.', 'error', 6000);
+      closeModal('modal-caisse-ouvrir');
+      caisseRenderListe();
+      return;
+    }
+  }
   /* Vérification du code PIN de la caissière avant toute ouverture — le PIN est
      personnel à l'utilisateur (attribué à la création de son compte), pas à la caisse. */
   if (APP.currentUser && APP.currentUser.caisse_pin_hash) {
