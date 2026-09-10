@@ -6512,6 +6512,27 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
 
         </div>
 
+        <!-- ═══ MODAL DÉTAIL / RÉPONSE INCIDENT ════════════════════════════ -->
+        <div class="modal-overlay" id="modal-incident-detail">
+          <div class="modal" style="max-width:720px;">
+            <div class="modal-header">
+              <h3>🚨 Détail de l'incident</h3>
+              <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-incident-detail')">✕</button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" id="incd-id">
+              <div id="incd-corps"></div>
+              <div class="form-section-title" style="margin-top:14px;">💬 Réponse / Résolution</div>
+              <div id="incd-reponse-meta" style="font-size:11px;color:var(--blanc-dim);margin-bottom:6px;"></div>
+              <textarea class="form-control" id="incd-reponse" rows="5" placeholder="Cause identifiée, action corrective effectuée, correctif logiciel le cas échéant..."></textarea>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" onclick="closeModal('modal-incident-detail')">Fermer</button>
+              <button class="btn btn-primary" onclick="incidentEnregistrerReponse()">💾 Enregistrer la réponse</button>
+            </div>
+          </div>
+        </div>
+
         <!-- ═══ MODAL CRÉATION/ÉDITION RÔLE ════════════════════════════════ -->
         <div class="modal-overlay" id="modal-role-editor">
           <div class="modal" style="max-width:700px;">
@@ -7574,6 +7595,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <div class="form-group"><label>Parc auto — Immobilisation véhicules</label><input class="form-control" id="cd-parc-immobilisation" list="dl-plan-comptable" placeholder="2451"></div>
               <div class="form-group"><label>Résiliation — Dette de remboursement au souscripteur</label><input class="form-control" id="cd-resiliation-dette" list="dl-plan-comptable" placeholder="4197"></div>
               <div class="form-group"><label>Résiliation — Retenue conservée (produit)</label><input class="form-control" id="cd-resiliation-produit" list="dl-plan-comptable" placeholder="758"></div>
+              <div class="form-group"><label>Virement interne entre caisses (compte relais)</label><input class="form-control" id="cd-virement-interne" list="dl-plan-comptable" placeholder="585"></div>
 
               <div class="form-group"><label>Taux Impôt sur les Sociétés (%)</label><input type="number" step="0.1" class="form-control" id="cd-taux-is" placeholder="25"></div>
               <div class="form-group"></div>
@@ -36254,7 +36276,8 @@ var LIBELLES_COMPTES_DEFAUT = {
   ecart_caisse_excedent:'Écart de caisse — Excédent (produit)', ecart_caisse_manquant:'Écart de caisse — Manquant (charge)',
   parc_carburant:'Parc auto — Carburant (charge)', parc_entretien:'Parc auto — Entretien/réparations (charge)',
   parc_immobilisation:'Parc auto — Immobilisation (véhicules, compte 245X)',
-  resiliation_dette:'Résiliation — Dette de remboursement au souscripteur', resiliation_produit:'Résiliation — Retenue conservée (produit)'
+  resiliation_dette:'Résiliation — Dette de remboursement au souscripteur', resiliation_produit:'Résiliation — Retenue conservée (produit)',
+  virement_interne:'Virement interne entre caisses (585 — compte relais)'
 };
 
 /* Alimente la <datalist> partagée par tous les champs « cd-* » : saisie prédictive
@@ -36445,6 +36468,7 @@ function loadComptesDefaut() {
   var _pai=document.getElementById('cd-parc-immobilisation'); if(_pai)_pai.value=cd.parc_immobilisation|| '';
   var _rd=document.getElementById('cd-resiliation-dette'); if(_rd)_rd.value=cd.resiliation_dette|| '';
   var _rp=document.getElementById('cd-resiliation-produit'); if(_rp)_rp.value=cd.resiliation_produit|| '';
+  var _vi=document.getElementById('cd-virement-interne'); if(_vi)_vi.value=cd.virement_interne|| '';
   document.getElementById('cd-taux-is').value = (DATA.params && DATA.params.taux_is != null) ? DATA.params.taux_is : 25;
   renderConflitsSync();
 }
@@ -36615,7 +36639,8 @@ function saveComptesDefaut() {
     parc_entretien:       (document.getElementById('cd-parc-entretien')||{}).value ? document.getElementById('cd-parc-entretien').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.parc_entretien)|| ''),
     parc_immobilisation:  (document.getElementById('cd-parc-immobilisation')||{}).value ? document.getElementById('cd-parc-immobilisation').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.parc_immobilisation)|| ''),
     resiliation_dette:  (document.getElementById('cd-resiliation-dette')||{}).value ? document.getElementById('cd-resiliation-dette').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.resiliation_dette)|| ''),
-    resiliation_produit:  (document.getElementById('cd-resiliation-produit')||{}).value ? document.getElementById('cd-resiliation-produit').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.resiliation_produit)|| '')
+    resiliation_produit:  (document.getElementById('cd-resiliation-produit')||{}).value ? document.getElementById('cd-resiliation-produit').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.resiliation_produit)|| ''),
+    virement_interne:  (document.getElementById('cd-virement-interne')||{}).value ? document.getElementById('cd-virement-interne').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.virement_interne)|| '')
   };
   DATA.params.taux_is = parseFloat(document.getElementById('cd-taux-is').value) || 25;
 
@@ -50410,9 +50435,52 @@ function renderIncidents() {
       + '<td>' + escHtml(i.module||'') + '</td>'
       + '<td><span class="badge ' + (gravBadge[i.gravite]||'badge-neutre') + '">' + (gravLabel[i.gravite]||i.gravite) + '</span></td>'
       + '<td>' + statutSelect + '</td>'
-      + '<td><button class="btn btn-secondary btn-sm" onclick="alert(' + "'" + (String(i.description||'').replace(/'/g,"\\'").replace(/\n/g,' ')) + "'" + ')" title="Voir la description complète">👁 Détail</button></td>'
+      + '<td><button class="btn btn-secondary btn-sm" onclick="incidentOuvrirDetail(\'' + i.id + '\')" title="Voir le détail et répondre">👁 Détail' + (i.reponse ? ' 💬' : '') + '</button></td>'
       + '</tr>';
   }).join('');
+}
+
+/* [Nouveau] Le bouton « Détail » se contentait d'un alert() affichant la
+   description brute — aucun moyen de tracer une réponse/résolution dans le
+   logiciel lui-même, obligeant à garder ça ailleurs (mémoire, messages).
+   Vrai modal de détail, avec un champ Réponse dédié et horodaté. */
+function incidentOuvrirDetail(id){
+  var i = (DATA.incidents||[]).find(function(x){ return x.id===id; });
+  if (!i) return;
+  var gravLabel = { critique:'🔴 Critique', majeure:'🟠 Majeure', mineure:'🟢 Mineure' };
+  document.getElementById('incd-id').value = id;
+  document.getElementById('incd-corps').innerHTML =
+    '<div class="form-grid" style="margin-bottom:10px;">'
+    + '<div><b>Ticket</b><br>' + escHtml(i.ticket||'') + '</div>'
+    + '<div><b>Gravité</b><br>' + (gravLabel[i.gravite]||i.gravite) + '</div>'
+    + '<div><b>Module</b><br>' + escHtml(i.module||'') + '</div>'
+    + '<div><b>Date</b><br>' + escHtml(i.date||'') + (i.heure?' '+escHtml(i.heure):'') + '</div>'
+    + '<div><b>Déclarant</b><br>' + escHtml(i.declarant_nom||'') + (i.declarant_division?' — '+escHtml(i.declarant_division):'') + '</div>'
+    + '<div><b>Reproductible</b><br>' + escHtml(i.reproductible||'—') + '</div>'
+    + '</div>'
+    + '<div style="margin-bottom:8px;"><b>Description</b><div style="white-space:pre-wrap;background:var(--bg-alt,#1a1a1a);padding:8px;border-radius:6px;margin-top:4px;">' + escHtml(i.description||'—') + '</div></div>'
+    + (i.etapes ? '<div style="margin-bottom:8px;"><b>Étapes</b><div style="white-space:pre-wrap;">' + escHtml(i.etapes) + '</div></div>' : '')
+    + (i.resultat_attendu ? '<div style="margin-bottom:8px;"><b>Résultat attendu</b><div style="white-space:pre-wrap;">' + escHtml(i.resultat_attendu) + '</div></div>' : '')
+    + (i.resultat_obtenu ? '<div style="margin-bottom:8px;"><b>Résultat obtenu</b><div style="white-space:pre-wrap;">' + escHtml(i.resultat_obtenu) + '</div></div>' : '');
+  document.getElementById('incd-reponse').value = i.reponse || '';
+  document.getElementById('incd-reponse-meta').textContent = (i.reponse_le || i.reponse_par)
+    ? 'Dernière réponse : ' + (i.reponse_par||'—') + (i.reponse_le ? ' le '+dateShort(i.reponse_le) : '')
+    : '';
+  openModal('modal-incident-detail');
+}
+async function incidentEnregistrerReponse(){
+  var id = document.getElementById('incd-id').value;
+  var i = (DATA.incidents||[]).find(function(x){ return x.id===id; });
+  if (!i) return;
+  i.reponse = document.getElementById('incd-reponse').value.trim();
+  i.reponse_par = (APP.currentUser&&APP.currentUser.nom)||'—';
+  i.reponse_le = new Date().toISOString();
+  i._modifie = new Date().toISOString();
+  await dbPut('incidents', i);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_incidents', i);
+  toast('💬 Réponse enregistrée sur ' + (i.ticket||'l\'incident') + '.', 'success');
+  closeModal('modal-incident-detail');
+  renderIncidents();
 }
 
 function updateRHKPIs() {
@@ -76126,12 +76194,24 @@ function _printFromElement(elementId, titre, extraCss) {
   var el = document.getElementById(elementId);
   if (!el) { window.print(); return; }
 
-  /* Collecter tous les styles de la page */
+  /* Collecter les styles de la page — SAUF les règles @media print, qui
+     ciblent des éléments propres à l'application principale (#pp-printzone,
+     .sidebar, .topbar, .bottom-nav...) absents du document imprimé séparé.
+     [FIX CRITIQUE] La toute première règle @media print du document (masquer
+     tout enfant de body qui n'est pas #pp-printzone, prévue pour UN AUTRE
+     mécanisme d'impression) était copiée telle quelle ici — comme
+     #pp-printzone n'existe jamais dans ce document séparé, elle masquait
+     PURPOSE ET SIMPLEMENT TOUT LE CONTENU à l'impression, quel que soit le
+     document imprimé via cette fonction (reçus, et tout autre appelant de
+     _printFromElement). L'aperçu à l'écran restait correct, seule
+     l'impression réelle déclenchait cette règle — signature exacte du bug
+     rapporté (aperçu bon, impression vierge). */
   var styles = '';
   try {
     Array.from(document.styleSheets).forEach(function(sheet){
       try {
         Array.from(sheet.cssRules || sheet.rules || []).forEach(function(rule){
+          if (rule.media && /\bprint\b/i.test(rule.media.mediaText||'')) return;   // exclut tout bloc @media print
           styles += rule.cssText + '\n';
         });
       } catch(e){ /* cross-origin */ }
@@ -90220,7 +90300,8 @@ var PAGE_MODULE_MAP = {
   'diaspo':             'Investisseurs Diaspora',
   'lbcft':              'Conformite LBC-FT',
   'parc-auto':          'Parc Auto',
-  'budget':             'Budget'
+  'budget':             'Budget',
+  'incidents':          null   /* accès libre à tout utilisateur connecté — déclarer un incident ne doit dépendre d'aucun module métier */
 };
 
 /* ── 2. hasRole() corrigé — inclut manager + custom roles ── */
@@ -90256,7 +90337,7 @@ var PAGE_MODULE_MAP = {
   var _lastGoTo = goTo;
   goTo = function(page) {
     /* Pages toujours accessibles */
-    var publicPages = ['dashboard','portail-souscripteur'];
+    var publicPages = ['dashboard','portail-souscripteur','incidents'];
     if (publicPages.indexOf(page) >= 0) { _lastGoTo(page); applyRoleToSidebar(); return; }
     /* Vérifier le module requis */
     var module = PAGE_MODULE_MAP[page];
@@ -118885,6 +118966,7 @@ function caisseRenderListe() {
     } else {
       actions += '<button class="btn btn-secondary btn-sm" onclick="caisseOuvrirBonModal(\'' + c.id + '\',\'entree\')">📥 Entrée</button>'
         + '<button class="btn btn-secondary btn-sm" onclick="caisseOuvrirBonModal(\'' + c.id + '\',\'sortie\')">📤 Sortie</button>'
+        + '<button class="btn btn-secondary btn-sm" onclick="caisseTransfertModal(\'' + c.id + '\')" title="Provisionner une autre caisse (virement interne, compte relais 585)">🔄 Transférer</button>'
         + '<button class="btn btn-secondary btn-sm" onclick="caisseAfficherBrouillard(\'' + c.id + '\')">📋 Brouillard</button>'
         + '<button class="btn btn-secondary btn-sm" onclick="caisseImportCSVModal(\'' + c.id + '\')">📥 Import CSV</button>'
         + ((DATA.params||{})['caisse_dernier_import_' + c.id] ? '<button class="btn btn-secondary btn-sm" onclick="caisseEtatDernierImport(\'' + c.id + '\')" title="Écritures non ventilées du dernier import CSV">🧾 État dernier import</button>' : '')
@@ -119032,9 +119114,31 @@ async function caisseOuvrirModal(caisseId) {
   document.getElementById('co-caisse-id').value = caisseId;
   document.getElementById('co-caisse-nom').textContent = c.nom;
   document.getElementById('co-fond').value = fondSuggere;
-  document.getElementById('co-fond-note').textContent = derniere
-    ? 'Repris automatiquement du solde de clôture réel du ' + derniere.date + ' (' + fmtF(fondSuggere) + ' FCFA). Modifiable si besoin.'
-    : 'Première ouverture de cette caisse — aucun solde antérieur.';
+  /* [FIX incident 2026-09-10, Menko Agro] Une session ouverte le 20 août,
+     oubliée pendant 21 jours, clôturée tardivement ce matin sans compte
+     réel (théorique accepté tel quel), s'est retrouvée « plus récemment
+     clôturée » qu'une chaîne de sessions parfaitement réelle et continue
+     clôturée entre-temps — le solde proposé venait donc d'une session
+     fantôme, sans que personne ne puisse le deviner avant d'ouvrir la
+     caisse. Détection : si une AUTRE session de cette caisse a été
+     clôturée alors que la session retenue ici était OUVERTE DEPUIS PLUS
+     LONGTEMPS qu'elle (donc une chaîne parallèle a tourné et s'est
+     clôturée pendant que celle-ci dormait), avertir clairement au lieu de
+     suggérer silencieusement un solde potentiellement obsolète. */
+  var autresCloturees = (DATA.caisse_sessions||[]).filter(function(s){
+    return s.caisse_id === caisseId && s.statut === 'cloturee' && s.id !== (derniere && derniere.id)
+      && derniere && s.cloturee_le && derniere.ouverte_le && s.cloturee_le > derniere.ouverte_le && s.ouverte_le > derniere.ouverte_le;
+  });
+  var noteBox = document.getElementById('co-fond-note');
+  if (derniere && autresCloturees.length) {
+    var joursOuverte = Math.round((new Date(derniere.cloturee_le) - new Date(derniere.ouverte_le)) / 86400000);
+    noteBox.innerHTML = '<span style="color:var(--rouge);font-weight:600;">⚠️ Ce solde vient d\'une session restée ouverte ' + joursOuverte + ' jour(s) avant sa clôture'
+      + ' — pendant qu\'au moins une AUTRE session de cette caisse a été ouverte ET clôturée. Vérifiez qu\'il s\'agit bien du bon solde avant de continuer (comptez physiquement si besoin).</span>';
+  } else {
+    noteBox.textContent = derniere
+      ? 'Repris automatiquement du solde de clôture réel du ' + derniere.date + ' (' + fmtF(fondSuggere) + ' FCFA). Modifiable si besoin.'
+      : 'Première ouverture de cette caisse — aucun solde antérieur.';
+  }
   /* [DURCI] Le PIN est désormais OBLIGATOIRE pour toute ouverture de caisse,
      quel que soit le rôle (caissière, comptable, manager, admin) — ce n'est
      plus une option réservée aux seuls comptes « caissière ». Si le compte
@@ -119078,8 +119182,22 @@ async function caisseDefinirPinConfirmer() {
   if (!/^[0-9]{4}$/.test(pin1)) { err.textContent = 'Le code PIN doit comporter exactement 4 chiffres.'; return; }
   if (pin1 !== pin2) { err.textContent = 'Les deux codes PIN ne correspondent pas.'; return; }
   var u = APP.currentUser;
-  var mdpHash = await hashPassword(mdp, u.salt || '');
-  if (mdpHash !== u.password_hash) { err.textContent = '❌ Mot de passe incorrect.'; return; }
+  /* [FIX] Ne vérifiait que l'ancien hash SHA-256+sel — un compte déjà migré
+     vers PBKDF2 (migration transparente à la connexion, voir staff-login)
+     avait alors un password_hash au format PBKDF2, jamais reconnu par
+     hashPassword() : "Mot de passe incorrect" systématique, même juste.
+     Même correctif que le vrai bug trouvé sur staff-login (Zahara) plus tôt
+     ce soir — même double-algorithme à respecter partout où un mot de passe
+     est vérifié côté client. */
+  var mdpValide = false;
+  if (u.pwd_algo === 'pbkdf2' && u.password_hash && u.salt) {
+    mdpValide = (await pbkdf2Client(mdp, u.salt, u.pwd_iter || 210000)) === u.password_hash;
+  } else if (u.password_hash && u.salt) {
+    mdpValide = (await hashPassword(mdp, u.salt)) === u.password_hash;
+  } else if (u.password) {
+    mdpValide = (mdp === u.password);
+  }
+  if (!mdpValide) { err.textContent = '❌ Mot de passe incorrect.'; return; }
   u.caisse_pin_salt = generateSalt();
   u.caisse_pin_hash = await hashPassword(pin1, u.caisse_pin_salt);
   u._modifie = new Date().toISOString();
@@ -119507,6 +119625,133 @@ async function caisseSaveBon() {
   if (typeof caisseRenderValidations === 'function') caisseRenderValidations();
   if (CAISSE_UI.brouillardCaisseId === caisseId) caisseAfficherBrouillard(caisseId);
   if (nouveau.requiert_validation && typeof caisseNotifierValidation === 'function') caisseNotifierValidation(nouveau, 'demande');
+}
+
+/* ── TRANSFERT / PROVISIONNEMENT ENTRE CAISSES ────────────────────────────
+   Crée systématiquement DEUX mouvements (sortie côté source, entrée côté
+   destination), tous deux ventilés sur le compte relais 585 « Virement
+   interne » (Paramètres → Comptes par défaut) — jamais sur un compte de
+   classe 6/7, pour ne jamais faire apparaître ce transfert comme une charge
+   ou un produit. Les DEUX bons passent par le même circuit de validation
+   que tout mouvement de caisse (règle DG : aucune exception) — ce n'est
+   qu'une fois validés qu'ils sont ventilés, automatiquement, via une règle
+   de ventilation par mot-clé enregistrée une fois pour toutes ci-dessous
+   (réutilise le mécanisme existant plutôt que d'en inventer un nouveau). */
+var CAISSE_TRANSFERT_MOTCLE = 'virement interne caisse';
+
+function caisseTransfertModal(caisseSourceId) {
+  var source = (DATA.caisses || []).find(function (c) { return c.id === caisseSourceId; });
+  if (!source) return;
+  var sessionSource = caisseGetSessionOuverte(caisseSourceId);
+  if (!sessionSource) { toast('Cette caisse doit être ouverte pour émettre un transfert.', 'error'); return; }
+
+  document.getElementById('ct-source-id').value = caisseSourceId;
+  document.getElementById('ct-source-label').textContent = '📤 Depuis : ' + (source.nom || '');
+  document.getElementById('ct-montant').value = 0;
+  document.getElementById('ct-date').value = today();
+  document.getElementById('ct-motif').value = '';
+
+  var selDest = document.getElementById('ct-destination');
+  var candidates = (DATA.caisses || []).filter(function (c) {
+    return c.id !== caisseSourceId && c.actif !== false && caisseGetSessionOuverte(c.id);
+  });
+  if (!candidates.length) {
+    selDest.innerHTML = '<option value="">— Aucune autre caisse ouverte —</option>';
+    toast('⚠️ Aucune autre caisse n\'est actuellement ouverte pour recevoir ce transfert.', 'error', 6000);
+  } else {
+    selDest.innerHTML = candidates.map(function (c) { return '<option value="' + c.id + '">' + escHtml(c.nom || '') + '</option>'; }).join('');
+  }
+
+  var solde = caisseSoldeSession(sessionSource);
+  document.getElementById('ct-solde-actuel').textContent = 'Solde actuel de la caisse source : ' + fmtF(solde) + ' FCFA';
+
+  openModal('modal-caisse-transfert');
+}
+
+async function caisseTransfererFonds() {
+  if (!exigerDroit('Caisse', 'c', 'un transfert entre caisses')) return;
+  var sourceId = document.getElementById('ct-source-id').value;
+  var destId = document.getElementById('ct-destination').value;
+  var montant = parseFloat(document.getElementById('ct-montant').value) || 0;
+  var date = document.getElementById('ct-date').value || today();
+  var motifSaisi = document.getElementById('ct-motif').value.trim();
+
+  if (!destId) { toast('Sélectionnez une caisse de destination.', 'error'); return; }
+  if (sourceId === destId) { toast('La caisse de destination doit être différente de la caisse source.', 'error'); return; }
+  if (montant <= 0) { toast('Le montant doit être supérieur à zéro.', 'error'); return; }
+
+  var compte585 = (DATA.params && DATA.params.comptes_defaut && DATA.params.comptes_defaut.virement_interne) || '';
+  if (!compte585) {
+    toast('⚠️ Compte "Virement interne entre caisses" non paramétré — allez dans Paramètres → Comptes par défaut avant de transférer des fonds.', 'error', 7000);
+    return;
+  }
+  /* Enregistre (une seule fois) la règle de ventilation automatique liant
+     notre mot-clé fixe au compte 585 configuré — réutilise le mécanisme
+     existant de _caisseRuleMatch()/ventilation automatique. */
+  var map = (DATA.params && DATA.params.caisse_ventilation_map) || {};
+  if (map[CAISSE_TRANSFERT_MOTCLE] !== compte585) { await _caisseAjouterRegle(CAISSE_TRANSFERT_MOTCLE, compte585); }
+
+  var source = (DATA.caisses || []).find(function (c) { return c.id === sourceId; });
+  var dest = (DATA.caisses || []).find(function (c) { return c.id === destId; });
+  if (!source || !dest) { toast('Caisse introuvable.', 'error'); return; }
+
+  var sessionSource = caisseGetSessionOuverte(sourceId);
+  var sessionDest = caisseGetSessionOuverte(destId);
+  if (!sessionSource) { toast('La caisse source a été clôturée entre-temps.', 'error'); closeModal('modal-caisse-transfert'); return; }
+  if (!sessionDest) { toast('La caisse de destination a été clôturée entre-temps.', 'error'); closeModal('modal-caisse-transfert'); return; }
+  if (!caisseSessionEstOperable(sessionSource)) { toast('🔒 Caisse source désormais tenue par un(e) autre utilisateur(rice).', 'error'); return; }
+  if (!caisseSessionEstOperable(sessionDest)) { toast('🔒 Caisse de destination désormais tenue par un(e) autre utilisateur(rice).', 'error'); return; }
+
+  var soldeSource = caisseSoldeSession(sessionSource);
+  if (montant > soldeSource) {
+    if (!confirm('⚠️ Solde de la caisse source insuffisant (solde actuel : ' + fmtF(soldeSource) + ' FCFA pour un transfert de ' + fmtF(montant) + ' FCFA).\n\nConfirmer tout de même ?')) return;
+  }
+
+  var transfertId = uid();
+  var motifSortie = CAISSE_TRANSFERT_MOTCLE + ' : vers ' + (dest.nom || '') + (motifSaisi ? ' — ' + motifSaisi : '');
+  var motifEntree = CAISSE_TRANSFERT_MOTCLE + ' : reçu de ' + (source.nom || '') + (motifSaisi ? ' — ' + motifSaisi : '');
+  var plafondAuteur = (typeof userPlafond === 'function') ? userPlafond() : Infinity;
+  var auteurNom = (APP.currentUser && APP.currentUser.nom) || '—';
+  var auteurRole = (APP.currentUser && APP.currentUser.role) || '';
+
+  var numeroSortie = await caisseProchainNumero(sourceId, 'sortie', date, source.compte);
+  var mvtSortie = {
+    id: uid(), session_id: sessionSource.id, caisse_id: sourceId,
+    date: date + 'T' + new Date().toISOString().slice(11, 19), numero: numeroSortie,
+    type: 'sortie', montant: montant, motif: motifSortie, beneficiaire: dest.nom || '',
+    piece_ref: '', statut: 'a_ventiler', compte_ventile: null, ecriture_id: null,
+    ventile_par: null, ventile_le: null, transfert_id: transfertId, transfert_vers: destId,
+    requiert_validation: true, valide: false, rejete: false,
+    plafond_demandeur: plafondAuteur, demande_par: auteurNom, demande_role: auteurRole, demande_le: new Date().toISOString(),
+    created_by: auteurNom, created_at: new Date().toISOString()
+  };
+  var numeroEntree = await caisseProchainNumero(destId, 'entree', date, dest.compte);
+  var mvtEntree = {
+    id: uid(), session_id: sessionDest.id, caisse_id: destId,
+    date: date + 'T' + new Date().toISOString().slice(11, 19), numero: numeroEntree,
+    type: 'entree', montant: montant, motif: motifEntree, beneficiaire: source.nom || '',
+    piece_ref: '', statut: 'a_ventiler', compte_ventile: null, ecriture_id: null,
+    ventile_par: null, ventile_le: null, transfert_id: transfertId, transfert_depuis: sourceId,
+    requiert_validation: true, valide: false, rejete: false,
+    plafond_demandeur: plafondAuteur, demande_par: auteurNom, demande_role: auteurRole, demande_le: new Date().toISOString(),
+    created_by: auteurNom, created_at: new Date().toISOString()
+  };
+
+  DATA.caisse_mouvements.push(mvtSortie);
+  DATA.caisse_mouvements.push(mvtEntree);
+  mvtSortie._baseModifie = mvtSortie._modifie || null;
+  mvtEntree._baseModifie = mvtEntree._modifie || null;
+  await dbPut('caisse_mouvements', mvtSortie);
+  await dbPut('caisse_mouvements', mvtEntree);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', mvtSortie);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', mvtEntree);
+
+  closeModal('modal-caisse-transfert');
+  toast('🔄 Transfert de ' + fmtF(montant) + ' FCFA enregistré (bons ' + numeroSortie + ' / ' + numeroEntree + ') — en attente de validation avant impact sur les soldes. Ventilation automatique sur le compte ' + compte585 + ' dès approbation.', 'info', 8000);
+  caisseRenderListe();
+  if (typeof caisseRenderDashboard === 'function') caisseRenderDashboard();
+  if (typeof caisseRenderValidations === 'function') caisseRenderValidations();
+  if (typeof caisseNotifierValidation === 'function') { caisseNotifierValidation(mvtSortie, 'demande'); caisseNotifierValidation(mvtEntree, 'demande'); }
 }
 
 /* ── PIÈCES JUSTIFICATIVES DES MOUVEMENTS DE CAISSE ──────────────────
@@ -120230,9 +120475,13 @@ function caisseRenderBrouillardPeriode() {
   var sessionsCaisse = (DATA.caisse_sessions || []).filter(function(s){ return s.caisse_id === caisseId; })
     .sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
   var soldeOuverture = sessionsCaisse.length ? (parseFloat(sessionsCaisse[0].fond_ouverture) || 0) : 0;
+  /* [FIX incident 2026-09-10, Menko Agro] Même défaut que la vue Par session
+     — un mouvement en attente de validation (ou rejeté) était compté ici
+     aussi, y compris dans le solde d'ouverture reporté avant `debut`. */
   tousMvts.forEach(function(m){
     var d = (m.date||'').slice(0,10);
-    if (d && d < debut) soldeOuverture += (m.type==='entree' ? (parseFloat(m.montant)||0) : -(parseFloat(m.montant)||0));
+    var effectif = !m.requiert_validation || m.valide === true;
+    if (d && d < debut && effectif) soldeOuverture += (m.type==='entree' ? (parseFloat(m.montant)||0) : -(parseFloat(m.montant)||0));
   });
 
   var mvts = tousMvts.filter(function(m){
@@ -120246,27 +120495,30 @@ function caisseRenderBrouillardPeriode() {
   var solde = soldeOuverture;
   var rows = '<tr style="font-weight:700;background:rgba(255,255,255,0.04);"><td colspan="6">Solde d\'ouverture au ' + dateShort(debut) + '</td><td style="text-align:right;">' + fmtF(solde) + '</td></tr>';
   mvts.forEach(function(m) {
-    solde += m.type === 'entree' ? (parseFloat(m.montant)||0) : -(parseFloat(m.montant)||0);
+    var effectif = !m.requiert_validation || m.valide === true;
+    if (effectif) solde += m.type === 'entree' ? (parseFloat(m.montant)||0) : -(parseFloat(m.montant)||0);
     var sess = sessById[m.session_id];
     var estImporte = /import CSV/i.test(m.created_by || '');
-    rows += '<tr>'
+    rows += '<tr' + (effectif ? '' : ' style="opacity:.55;"') + '>'
       + '<td>' + (m.date||'').slice(0,10) + '</td>'
       + '<td>' + (sess ? sess.date : '—') + (estImporte ? ' <span title="Donnée importée — date réelle peut différer de la session" style="color:var(--or);">📥</span>' : '') + '</td>'
       + '<td>' + escHtml(m.numero||'') + '</td>'
-      + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + '</td>'
+      + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + (m.requiert_validation && !m.valide && !m.rejete ? ' <span title="En attente de validation — n\'impacte pas encore le solde" style="color:var(--or);">🔐</span>' : '') + (m.rejete ? ' <span title="Rejeté — jamais compté" style="color:var(--rouge);">✖</span>' : '') + '</td>'
       + '<td style="text-align:right;color:var(--vert);">' + (m.type==='entree' ? fmtF(m.montant) : '') + '</td>'
       + '<td style="text-align:right;color:var(--rouge);">' + (m.type==='sortie' ? fmtF(m.montant) : '') + '</td>'
-      + '<td style="text-align:right;">' + fmtF(solde) + '</td>'
+      + '<td style="text-align:right;">' + (effectif ? fmtF(solde) : '<span style="color:var(--or);font-size:11px;">— en attente —</span>') + '</td>'
       + '</tr>';
   });
 
-  var totalEntrees = mvts.filter(function(m){ return m.type==='entree'; }).reduce(function(s,m){ return s+(parseFloat(m.montant)||0); }, 0);
-  var totalSorties = mvts.filter(function(m){ return m.type==='sortie'; }).reduce(function(s,m){ return s+(parseFloat(m.montant)||0); }, 0);
+  var mvtsEffectifs2 = mvts.filter(function(m){ return !m.requiert_validation || m.valide === true; });
+  var totalEntrees = mvtsEffectifs2.filter(function(m){ return m.type==='entree'; }).reduce(function(s,m){ return s+(parseFloat(m.montant)||0); }, 0);
+  var totalSorties = mvtsEffectifs2.filter(function(m){ return m.type==='sortie'; }).reduce(function(s,m){ return s+(parseFloat(m.montant)||0); }, 0);
+  var nbEnAttente2 = mvts.length - mvtsEffectifs2.length - mvts.filter(function(m){return m.rejete;}).length;
 
   tbl.innerHTML = '<div style="overflow-x:auto;">'
     + '<table class="data-table"><thead><tr><th>Date</th><th>Session</th><th>N° bon</th><th>Motif</th><th style="text-align:right;">Entrée</th><th style="text-align:right;">Sortie</th><th style="text-align:right;">Solde</th></tr></thead>'
     + '<tbody>' + rows + '</tbody>'
-    + '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bord);"><td colspan="4">Totaux ' + dateShort(debut) + ' → ' + dateShort(fin) + '</td><td style="text-align:right;color:var(--vert);">' + fmtF(totalEntrees) + '</td><td style="text-align:right;color:var(--rouge);">' + fmtF(totalSorties) + '</td><td style="text-align:right;">' + fmtF(solde) + '</td></tr></tfoot>'
+    + '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bord);"><td colspan="4">Totaux ' + dateShort(debut) + ' → ' + dateShort(fin) + (nbEnAttente2>0 ? ' <span style="font-weight:400;font-size:11px;color:var(--or);">(' + nbEnAttente2 + ' en attente, non comptée' + (nbEnAttente2>1?'s':'') + ')</span>' : '') + '</td><td style="text-align:right;color:var(--vert);">' + fmtF(totalEntrees) + '</td><td style="text-align:right;color:var(--rouge);">' + fmtF(totalSorties) + '</td><td style="text-align:right;">' + fmtF(solde) + '</td></tr></tfoot>'
     + '</table></div>'
     + '<div style="margin-top:10px;font-size:11px;color:var(--blanc-dim);">' + mvts.length + ' mouvement(s) · 📥 = donnée importée (rattachée techniquement à la session ouverte au moment de l\'import, pas forcément celle de sa date réelle)</div>';
 }
@@ -120284,35 +120536,48 @@ function caisseRenderBrouillardSession(sessionId) {
   var solde = parseFloat(session.fond_ouverture) || 0;
   var rows = '<tr style="font-weight:700;background:rgba(255,255,255,0.04);"><td colspan="5">Fond d\'ouverture</td><td style="text-align:right;">' + fmtF(solde) + '</td></tr>';
   mvts.forEach(function(m) {
-    solde += m.type === 'entree' ? (parseFloat(m.montant)||0) : -(parseFloat(m.montant)||0);
-    rows += '<tr>'
+    /* [FIX incident 2026-09-10, Menko Agro] Un mouvement en attente de
+       validation (ou rejeté) était quand même additionné/soustrait au solde
+       courant affiché ici, et compté dans les totaux du pied de tableau —
+       alors que caisseSoldeSession() (le calcul officiel, utilisé à la
+       clôture réelle) les exclut correctement tant qu'ils ne sont pas
+       validés. Le brouillard divergeait donc de la vraie clôture, pouvant
+       laisser croire à un solde de fin de journée faux. L'icône 🔐 restait
+       affichée (le mouvement est bien visible), mais son montant ne doit
+       impacter le solde qu'une fois validé — jamais avant, jamais s'il est
+       rejeté. */
+    var effectif = !m.requiert_validation || m.valide === true;
+    if (effectif) solde += m.type === 'entree' ? (parseFloat(m.montant)||0) : -(parseFloat(m.montant)||0);
+    rows += '<tr' + (effectif ? '' : ' style="opacity:.55;"') + '>'
       + '<td>' + (m.date||'').slice(11,16) + '</td>'
       + '<td>' + escHtml(m.numero||'') + '</td>'
       + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + '</td>'
       + '<td style="text-align:right;color:var(--vert);">' + (m.type==='entree' ? fmtF(m.montant) : '') + '</td>'
       + '<td style="text-align:right;color:var(--rouge);">' + (m.type==='sortie' ? fmtF(m.montant) : '') + '</td>'
-      + '<td style="text-align:right;">' + fmtF(solde) + '</td>'
+      + '<td style="text-align:right;">' + (effectif ? fmtF(solde) : '<span style="color:var(--or);font-size:11px;">— en attente —</span>') + '</td>'
       + '<td>'
       + (caisseCanEditBon(m) ? '<button class="btn btn-secondary btn-sm btn-icon" title="Modifier le bon" onclick="caisseEditBonModal(\'' + m.id + '\')">✏️</button> ' : '')
       + '<button class="btn btn-secondary btn-sm btn-icon" title="Imprimer le bon" onclick="caisseImprimerBon(\'' + m.id + '\')">🖨️</button>'
       + (caisseDocCount(m.id) ? ' <button class="btn btn-primary btn-sm" title="Pièces justificatives" onclick="caisseViewDocs(\'' + m.id + '\')">📎 ' + caisseDocCount(m.id) + '</button>' : '')
       + (caisseRoleAdminLike() ? ' <button class="btn btn-danger btn-sm btn-icon" title="Supprimer le mouvement" onclick="caisseSupprimerMouvement(\'' + m.id + '\')">🗑️</button>' : '')
       + (m.statut === 'ventile' ? '<span title="Ventilé" style="margin-left:4px;color:var(--vert);">✓</span>' : '<span title="En attente de ventilation" style="margin-left:4px;color:var(--dim);">⏳</span>')
-      + (m.requiert_validation && !m.valide && !m.rejete ? '<span title="En attente de validation" style="margin-left:4px;color:var(--or);">🔐</span>' : '')
-      + (m.rejete ? '<span title="Mouvement rejeté" style="margin-left:4px;color:var(--rouge);">✖</span>' : '')
+      + (m.requiert_validation && !m.valide && !m.rejete ? '<span title="En attente de validation — n\'impacte pas encore le solde" style="margin-left:4px;color:var(--or);">🔐</span>' : '')
+      + (m.rejete ? '<span title="Mouvement rejeté — jamais compté dans le solde" style="margin-left:4px;color:var(--rouge);">✖</span>' : '')
       + (_caissePending(m.id) ? '<span title="Non synchronisé au cloud — écriture locale seulement" style="margin-left:4px;color:var(--rouge,#dc2626);font-weight:700;">☁✗</span>' : '')
       + (m.modifie_le ? '<span title="Modifié le ' + (m.modifie_le||'').slice(0,16).replace('T',' ') + ' par ' + escHtml(m.modifie_par||'') + '" style="margin-left:4px;color:var(--or,#B87333);">✎</span>' : '')
       + '</td>'
       + '</tr>';
   });
 
-  var totalEntrees = mvts.filter(function(m){ return m.type==='entree'; }).reduce(function(s,m){ return s+(parseFloat(m.montant)||0); }, 0);
-  var totalSorties = mvts.filter(function(m){ return m.type==='sortie'; }).reduce(function(s,m){ return s+(parseFloat(m.montant)||0); }, 0);
+  var mvtsEffectifs = mvts.filter(function(m){ return !m.requiert_validation || m.valide === true; });
+  var totalEntrees = mvtsEffectifs.filter(function(m){ return m.type==='entree'; }).reduce(function(s,m){ return s+(parseFloat(m.montant)||0); }, 0);
+  var totalSorties = mvtsEffectifs.filter(function(m){ return m.type==='sortie'; }).reduce(function(s,m){ return s+(parseFloat(m.montant)||0); }, 0);
+  var nbEnAttente = mvts.length - mvtsEffectifs.length - mvts.filter(function(m){return m.rejete;}).length;
 
   tbl.innerHTML = '<div style="overflow-x:auto;">'
     + '<table class="data-table"><thead><tr><th>Heure</th><th>N° bon</th><th>Motif</th><th style="text-align:right;">Entrée</th><th style="text-align:right;">Sortie</th><th style="text-align:right;">Solde</th><th></th></tr></thead>'
     + '<tbody>' + rows + '</tbody>'
-    + '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bord);"><td colspan="3">Totaux</td><td style="text-align:right;color:var(--vert);">' + fmtF(totalEntrees) + '</td><td style="text-align:right;color:var(--rouge);">' + fmtF(totalSorties) + '</td><td style="text-align:right;">' + fmtF(solde) + '</td><td></td></tr></tfoot>'
+    + '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bord);"><td colspan="3">Totaux' + (nbEnAttente>0 ? ' <span style="font-weight:400;font-size:11px;color:var(--or);">(' + nbEnAttente + ' en attente, non comptée' + (nbEnAttente>1?'s':'') + ')</span>' : '') + '</td><td style="text-align:right;color:var(--vert);">' + fmtF(totalEntrees) + '</td><td style="text-align:right;color:var(--rouge);">' + fmtF(totalSorties) + '</td><td style="text-align:right;">' + fmtF(solde) + '</td><td></td></tr></tfoot>'
     + '</table></div>'
     + (session.statut === 'cloturee'
         ? '<div style="margin-top:10px;font-size:12px;color:var(--blanc-dim);">Clôturée le ' + (session.cloturee_le||'').slice(0,16).replace('T',' ') + ' par ' + escHtml(session.cloturee_par||'—') + ' · fond réel compté : ' + fmtF(session.fond_cloture_reel) + ' FCFA · écart : <strong style="color:' + (session.ecart ? 'var(--rouge)' : 'var(--vert)') + ';">' + fmtF(session.ecart||0) + ' FCFA</strong>' + (session.envoye_journalier ? ' · ✉️ état transmis' : ' · état non encore transmis') + '</div>'
@@ -125750,6 +126015,37 @@ goTo = function(page) {
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-caisse-bon')">Annuler</button>
       <button class="btn btn-primary" onclick="caisseSaveBon()">💾 Enregistrer le bon</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : Transfert / provisionnement entre caisses (virement interne, compte relais 585) -->
+<div class="modal-overlay" id="modal-caisse-transfert">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🔄 Transférer vers une autre caisse</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-caisse-transfert')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ct-source-id">
+      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">
+        Crée automatiquement une <strong>sortie</strong> dans la caisse source et une <strong>entrée</strong> dans la caisse de destination, toutes deux ventilées sur le compte relais <strong>585 — Virement interne</strong> une fois validées. Aucun impact sur le compte de résultat, aucun lien avec un souscripteur.
+      </div>
+      <div id="ct-source-label" style="font-size:13px;font-weight:600;margin-bottom:10px;"></div>
+      <div class="form-grid">
+        <div class="form-group span-2">
+          <label>Caisse de destination *</label>
+          <select class="form-control" id="ct-destination"></select>
+        </div>
+        <div class="form-group"><label>Montant (FCFA) *</label><input type="number" class="form-control" id="ct-montant" value="0"></div>
+        <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="ct-date"></div>
+        <div class="form-group span-2"><label>Motif / précision (optionnel)</label><input class="form-control" id="ct-motif" placeholder="Ex : besoin de fond pour paiement fournisseur"></div>
+      </div>
+      <div id="ct-solde-actuel" style="font-size:12px;color:var(--blanc-dim);margin-top:6px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-caisse-transfert')">Annuler</button>
+      <button class="btn btn-primary" onclick="caisseTransfererFonds()">🔄 Effectuer le transfert</button>
     </div>
   </div>
 </div>
