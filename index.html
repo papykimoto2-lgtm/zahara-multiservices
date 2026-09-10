@@ -2696,6 +2696,10 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <span class="nav-icon">🔍</span><span>Audit d'intégrité</span>
         <span class="nav-badge" id="badge-audit" style="display:none;"></span>
       </div>
+          <div class="nav-item" onclick="goTo('incidents')" data-page="incidents">
+        <span class="nav-icon">🚨</span><span>Incidents</span>
+        <span class="nav-badge" id="badge-incidents" style="display:none;"></span>
+      </div>
           <div class="nav-item" onclick="goTo('parametres')" data-page="parametres">
         <span class="nav-icon">⚙️</span><span>Paramètres</span>
       </div>
@@ -5594,6 +5598,110 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <div class="kpi-grid" id="audit-kpi" style="margin-bottom:18px;"></div>
         <div id="audit-resultats">
           <div class="card"><div style="padding:24px;text-align:center;color:var(--blanc-dim);">Cliquez sur <strong>▶ Lancer l'audit</strong> pour scanner l'intégrité des données.</div></div>
+        </div>
+      </div>
+
+      <!-- ── INCIDENTS ─────────────────────────────── -->
+      <div class="page" id="page-incidents">
+        <div class="page-header">
+          <div>
+            <div class="page-title">🚨 Déclarations d'incident</div>
+            <div class="page-subtitle">Centralise les incidents remontés par les utilisateurs — notification automatique par email et WhatsApp</div>
+          </div>
+          <div class="spacer"></div>
+          <button class="btn btn-primary" onclick="openIncidentModal()">+ Déclarer un incident</button>
+        </div>
+        <div class="kpi-grid" id="incidents-kpi" style="margin-bottom:18px;"></div>
+        <div class="filters-bar">
+          <select class="form-control" id="inc-filtre-statut" style="max-width:180px;" onchange="renderIncidents()">
+            <option value="">Tous les statuts</option>
+            <option value="nouveau">🆕 Nouveau</option>
+            <option value="en_cours">⏳ En cours</option>
+            <option value="resolu">✅ Résolu</option>
+          </select>
+          <select class="form-control" id="inc-filtre-gravite" style="max-width:180px;" onchange="renderIncidents()">
+            <option value="">Toutes gravités</option>
+            <option value="critique">🔴 Critique</option>
+            <option value="majeure">🟠 Majeure</option>
+            <option value="mineure">🟢 Mineure</option>
+          </select>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>N° ticket</th><th>Date</th><th>Déclarant</th><th>Module</th><th>Gravité</th><th>Statut</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="tbody-incidents"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal : Déclarer un incident -->
+      <div class="modal-overlay" id="modal-incident">
+        <div class="modal" style="max-width:720px;">
+          <div class="modal-header">
+            <h3>🚨 Déclarer un incident</h3>
+            <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-incident')">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-section-title">Identification</div>
+            <div class="form-grid">
+              <div class="form-group"><label>Nom et prénoms *</label><input class="form-control" id="inc-nom"></div>
+              <div class="form-group"><label>Fonction / Poste</label><input class="form-control" id="inc-fonction"></div>
+              <div class="form-group"><label>Société / Division</label><input class="form-control" id="inc-division"></div>
+              <div class="form-group"><label>Téléphone</label><input class="form-control" id="inc-tel"></div>
+              <div class="form-group"><label>Email</label><input class="form-control" id="inc-email"></div>
+              <div class="form-group"><label>Poste de travail (PC / navigateur)</label><input class="form-control" id="inc-poste-travail"></div>
+            </div>
+            <div class="form-section-title" style="margin-top:14px;">Incident</div>
+            <div class="form-grid">
+              <div class="form-group"><label>Date</label><input type="date" class="form-control" id="inc-date"></div>
+              <div class="form-group"><label>Heure approx.</label><input type="time" class="form-control" id="inc-heure"></div>
+              <div class="form-group"><label>Module concerné *</label>
+                <select class="form-control" id="inc-module">
+                  <option value="Souscripteurs">Souscripteurs</option>
+                  <option value="Paiements">Paiements</option>
+                  <option value="Caisse">Caisse</option>
+                  <option value="Comptabilité">Comptabilité</option>
+                  <option value="CRM">CRM</option>
+                  <option value="RH / Paie">RH / Paie</option>
+                  <option value="Programme / Lots">Programme / Lots</option>
+                  <option value="Portail">Portail</option>
+                  <option value="SIG / Cartographie">SIG / Cartographie</option>
+                  <option value="Synchronisation Cloud">Synchronisation Cloud</option>
+                  <option value="Paramètres">Paramètres</option>
+                  <option value="Autre">Autre</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Gravité *</label>
+                <select class="form-control" id="inc-gravite">
+                  <option value="critique">🔴 Critique — bloque le travail</option>
+                  <option value="majeure" selected>🟠 Majeure — gêne importante</option>
+                  <option value="mineure">🟢 Mineure — sans urgence</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Incident reproductible ?</label>
+                <select class="form-control" id="inc-reproductible">
+                  <option value="">— Ne sais pas —</option>
+                  <option value="oui">Oui</option>
+                  <option value="non">Non</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group"><label>Description *</label><textarea class="form-control" id="inc-description" rows="3" placeholder="Que s'est-il passé ? Écran concerné, message affiché..."></textarea></div>
+            <div class="form-group"><label>Étapes pour reproduire</label><textarea class="form-control" id="inc-etapes" rows="2"></textarea></div>
+            <div class="form-grid">
+              <div class="form-group"><label>Résultat attendu</label><input class="form-control" id="inc-resultat-attendu"></div>
+              <div class="form-group"><label>Résultat obtenu</label><input class="form-control" id="inc-resultat-obtenu"></div>
+            </div>
+            <div style="font-size:11px;color:var(--blanc-dim);margin-top:8px;">📧 Une notification sera envoyée par email (et un message WhatsApp pré-rempli sera proposé) au support dès l'enregistrement.</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-incident')">Annuler</button>
+            <button class="btn btn-primary" onclick="saveIncident()">🚨 Enregistrer et notifier</button>
+          </div>
         </div>
       </div>
 
@@ -23217,6 +23325,7 @@ var db = null;
 /* Liste COMPLÈTE et définitive de tous les stores */
 var ALL_STORES = [
   'clients','versements','programmes','lots','terrains','ecritures','relances',
+  'incidents',
   'users','params','employes','divisions','bulletins','declarations','parcelles','mutations',
   'dossiersJuridiques','constructeurs','conventions','situations','avenants',
   'conceptions','leads','pointages','itineraires','etapes_itineraire',
@@ -25209,6 +25318,7 @@ function _filtrerFantomes(table, store, ids) {
 
 /* Correspondance table Supabase ↔ store local (IndexedDB / DATA) */
 var SUPA_STORE_MAP = [
+  ['pi_incidents',            'incidents'],
   ['pi_lbc_cappi',        'lbc_cappi'],
   ['pi_lbc_conformx',     'lbc_conformx'],
   ['pi_lbc_artci',        'lbc_artci'],
@@ -25437,7 +25547,7 @@ function _libelleStore(store) {
     releves_bank:'Relevés bancaires', rapprochements:'Rapprochements', dossiersJuridiques:'Dossiers juridiques', docs_juridiques:'Documents juridiques',
     custom_roles:'Rôles personnalisés', portail_messages:'Messages portail', portail_medias:'Médias portail', declarations_versement_foncier:'Déclarations de versement (foncier)', coproprietes:'Copropriétés', lots_copro:'Lots copropriété', budgets_copro:'Budgets copropriété', appels_charges_copro:'Appels de charges', ag_copro:'Assemblées générales', fonds_travaux_copro:'Fonds travaux', demarcheurs:'Démarcheurs', etats_lieux_bail:'États des lieux', restitutions_caution:'Restitutions de caution', relances_locatives:'Relances loyers impayés',
     visites_rdv:'Rendez-vous/Visites', visites_log:'Registre des visites', visites_blacklist:'Liste noire visites',
-    logs_connexion:'Journaux de connexion', historique_actions:'Historique des actions',
+    logs_connexion:'Journaux de connexion', historique_actions:'Historique des actions', incidents:'Déclarations d\'incident',
     relances:'Relances CRM', itineraires:'Itinéraires', etapes_itineraire:'Étapes itinéraire', cr_visites:'Comptes-rendus visites', ordres_mission:'Ordres de mission',
     params:'Paramètres'
   };
@@ -28424,6 +28534,7 @@ function goTo(page) {
   if (page === 'rh-employes') { populateDivisionSelects(); renderEmployes(); updateRHKPIs(); }
   if (page === 'rh-cockpit') { renderCockpitRH(); }
   if (page === 'audit-integrite') { if(_AUDIT_RESULTS) renderAuditResultats(); }
+  if (page === 'incidents') { renderIncidents(); }
   if (page === 'rh-paie') { loadPaie(); }
   if (page === 'rh-declarations') { loadDeclarations(); }
   if (page === 'rh-livre-paie')   { loadLivrePaie(); }
@@ -50128,6 +50239,180 @@ function exportAuditRapport(){
   var blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Audit_integrite_'+today()+'.csv';a.click();
   toast('Rapport d\'audit exporté.','success');
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   INCIDENTS — Déclaration centralisée + notification email/WhatsApp
+   [Rappel important, signalé à l'utilisateur] La notification WhatsApp ne
+   peut PAS être envoyée automatiquement en tâche de fond : aucune API
+   gratuite/côté-navigateur ne le permet sans service tiers payant. On ouvre
+   donc wa.me avec le message déjà rédigé — un seul clic sur « Envoyer »
+   suffit côté déclarant, mais ce clic reste nécessaire. L'email, lui, part
+   réellement tout seul via EmailJS (déjà configuré dans Paramètres →
+   Communications), sans action de l'utilisateur. ══════════════════════ */
+function _incidentNextTicket() {
+  var max = 0;
+  (DATA.incidents || []).forEach(function (i) {
+    var m = /^INC-(\d+)$/.exec((i.ticket || '').trim());
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  });
+  return 'INC-' + String(max + 1).padStart(4, '0');
+}
+
+function openIncidentModal() {
+  ['inc-nom','inc-fonction','inc-division','inc-tel','inc-email','inc-poste-travail',
+   'inc-heure','inc-description','inc-etapes','inc-resultat-attendu','inc-resultat-obtenu'
+  ].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('inc-date').value = today();
+  document.getElementById('inc-module').value = 'Souscripteurs';
+  document.getElementById('inc-gravite').value = 'majeure';
+  document.getElementById('inc-reproductible').value = '';
+  /* Pré-remplissage à partir du compte connecté, pour aller plus vite */
+  if (APP.currentUser) {
+    document.getElementById('inc-nom').value = ((APP.currentUser.prenoms||'') + ' ' + (APP.currentUser.nom||'')).trim() || APP.currentUser.login || '';
+    document.getElementById('inc-email').value = APP.currentUser.email || '';
+  }
+  openModal('modal-incident');
+}
+
+async function saveIncident() {
+  var nom = document.getElementById('inc-nom').value.trim();
+  var description = document.getElementById('inc-description').value.trim();
+  if (!nom || !description) { toast('Nom et description sont obligatoires.', 'error'); return; }
+  /* [FIX popup] window.open() doit être appelé de façon SYNCHRONE, dans la
+     continuité directe du clic utilisateur, sinon le navigateur bloque la
+     fenêtre comme un pop-up indésirable dès qu'un await (dbPut, EmailJS...)
+     s'intercale avant. On ouvre donc un onglet vide tout de suite et on lui
+     affecte l'URL WhatsApp définitive une fois le message prêt. */
+  var _waWin = window.open('', '_blank');
+  var incident = {
+    id: uid(),
+    ticket: _incidentNextTicket(),
+    declarant_nom: nom,
+    declarant_fonction: document.getElementById('inc-fonction').value.trim(),
+    declarant_division: document.getElementById('inc-division').value.trim(),
+    declarant_tel: document.getElementById('inc-tel').value.trim(),
+    declarant_email: document.getElementById('inc-email').value.trim(),
+    declarant_poste_travail: document.getElementById('inc-poste-travail').value.trim(),
+    date: document.getElementById('inc-date').value || today(),
+    heure: document.getElementById('inc-heure').value,
+    module: document.getElementById('inc-module').value,
+    gravite: document.getElementById('inc-gravite').value,
+    reproductible: document.getElementById('inc-reproductible').value,
+    description: description,
+    etapes: document.getElementById('inc-etapes').value.trim(),
+    resultat_attendu: document.getElementById('inc-resultat-attendu').value.trim(),
+    resultat_obtenu: document.getElementById('inc-resultat-obtenu').value.trim(),
+    statut: 'nouveau',
+    created_at: new Date().toISOString(),
+    _modifie: new Date().toISOString(),
+    _baseModifie: null
+  };
+  DATA.incidents = DATA.incidents || [];
+  DATA.incidents.push(incident);
+  await dbPut('incidents', incident);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_incidents', incident);
+  closeModal('modal-incident');
+  toast('🚨 Incident ' + incident.ticket + ' enregistré.', 'success');
+  renderIncidents();
+  await incidentNotifier(incident, _waWin);
+}
+
+/* Envoie l'email (automatique, si EmailJS configuré) et propose le relais WhatsApp
+   (nécessite un clic — voir remarque en tête de section). */
+async function incidentNotifier(incident, _waWin) {
+  var p = DATA.params || {};
+  var texte = '🚨 Nouvel incident ' + incident.ticket + ' (' + (incident.gravite||'').toUpperCase() + ')\n'
+    + 'Module : ' + incident.module + '\n'
+    + 'Déclarant : ' + incident.declarant_nom + (incident.declarant_tel ? ' — ' + incident.declarant_tel : '') + '\n'
+    + 'Date : ' + incident.date + (incident.heure ? ' ' + incident.heure : '') + '\n'
+    + 'Description : ' + incident.description;
+
+  /* Email automatique via EmailJS — mêmes identifiants que testerEmailJS()/le reste de l'app */
+  if (p.emailjs_service && p.emailjs_template && p.emailjs_key && typeof emailjs !== 'undefined') {
+    try {
+      emailjs.init(p.emailjs_key);
+      await emailjs.send(p.emailjs_service, p.emailjs_template, {
+        to_email: p.email || '',
+        to_name: p.societe || 'ImmoSuite ERP',
+        subject: '🚨 Incident ' + incident.ticket + ' — ' + incident.module + ' (' + incident.gravite + ')',
+        message: texte
+      });
+      toast('📧 Notification email envoyée.', 'success');
+    } catch (e) {
+      toast('⚠️ Échec de l\'email de notification (EmailJS) — pensez à relancer manuellement.', 'error');
+    }
+  } else {
+    toast('ℹ️ Email non envoyé : configurez EmailJS dans Paramètres → Communications pour une notification automatique.', 'info', 7000);
+  }
+
+  /* WhatsApp — pattern identique à rdEnvoyerWhatsApp() utilisé ailleurs dans
+     l'app : ouverture directe de wa.me. Un clic sur « Envoyer » reste
+     nécessaire à l'intérieur de WhatsApp lui-même (voir remarque en tête de
+     section) — toast() n'accepte que du texte brut, un lien cliquable dans
+     la notification elle-même n'aurait donc pas fonctionné. */
+  var numero = (p.whatsapp || '').replace(/[^0-9]/g, '');
+  var url = numero ? ('https://wa.me/' + numero + '?text=' + encodeURIComponent(texte))
+                    : ('https://wa.me/?text=' + encodeURIComponent(texte));
+  if (_waWin && !_waWin.closed) { try { _waWin.location.href = url; } catch (e) { window.open(url, '_blank'); } }
+  else { window.open(url, '_blank'); }
+  toast('📲 WhatsApp ouvert avec le message pré-rempli' + (numero ? '' : ' — choisissez le destinataire') + ' : il ne reste qu\'à cliquer sur Envoyer.', 'info', 6000);
+}
+
+function incidentChangerStatut(id, statut) {
+  var inc = (DATA.incidents || []).find(function (i) { return i.id === id; });
+  if (!inc) return;
+  inc.statut = statut;
+  inc._modifie = new Date().toISOString();
+  dbPut('incidents', inc);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_incidents', inc);
+  toast('Statut mis à jour.', 'success');
+  renderIncidents();
+}
+
+function renderIncidents() {
+  var tbody = document.getElementById('tbody-incidents');
+  var kpiBox = document.getElementById('incidents-kpi');
+  if (!tbody) return;
+  var list = (DATA.incidents || []).slice().sort(function (a, b) { return (b.created_at||'').localeCompare(a.created_at||''); });
+
+  var fStatut = (document.getElementById('inc-filtre-statut')||{}).value || '';
+  var fGravite = (document.getElementById('inc-filtre-gravite')||{}).value || '';
+  var filtres = list.filter(function (i) {
+    return (!fStatut || i.statut === fStatut) && (!fGravite || i.gravite === fGravite);
+  });
+
+  if (kpiBox) {
+    var nouveau = list.filter(function(i){return i.statut==='nouveau';}).length;
+    var enCours = list.filter(function(i){return i.statut==='en_cours';}).length;
+    var critiques = list.filter(function(i){return i.gravite==='critique' && i.statut!=='resolu';}).length;
+    kpiBox.innerHTML =
+        '<div class="kpi-card"><div class="kpi-label">Total</div><div class="kpi-value">' + list.length + '</div></div>'
+      + '<div class="kpi-card kpi-red"><div class="kpi-label">Nouveaux</div><div class="kpi-value">' + nouveau + '</div></div>'
+      + '<div class="kpi-card"><div class="kpi-label">En cours</div><div class="kpi-value">' + enCours + '</div></div>'
+      + '<div class="kpi-card ' + (critiques?'kpi-red':'kpi-green') + '"><div class="kpi-label">Critiques non résolus</div><div class="kpi-value">' + critiques + '</div></div>';
+  }
+
+  if (!filtres.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--blanc-dim);">Aucun incident.</td></tr>'; return; }
+
+  var gravBadge = { critique:'badge-rouge', majeure:'badge-or', mineure:'badge-vert' };
+  var gravLabel = { critique:'🔴 Critique', majeure:'🟠 Majeure', mineure:'🟢 Mineure' };
+  var statutOpts = { nouveau:'🆕 Nouveau', en_cours:'⏳ En cours', resolu:'✅ Résolu' };
+
+  tbody.innerHTML = filtres.map(function (i) {
+    var statutSelect = '<select class="form-control" style="font-size:11px;padding:2px 6px;" onchange="incidentChangerStatut(\'' + i.id + '\',this.value)">'
+      + Object.keys(statutOpts).map(function(s){ return '<option value="'+s+'"'+(i.statut===s?' selected':'')+'>'+statutOpts[s]+'</option>'; }).join('')
+      + '</select>';
+    return '<tr>'
+      + '<td><strong>' + escHtml(i.ticket||'') + '</strong></td>'
+      + '<td>' + escHtml(i.date||'') + (i.heure?' '+escHtml(i.heure):'') + '</td>'
+      + '<td>' + escHtml(i.declarant_nom||'') + '<br><span style="font-size:11px;color:var(--blanc-dim);">' + escHtml(i.declarant_division||'') + '</span></td>'
+      + '<td>' + escHtml(i.module||'') + '</td>'
+      + '<td><span class="badge ' + (gravBadge[i.gravite]||'badge-neutre') + '">' + (gravLabel[i.gravite]||i.gravite) + '</span></td>'
+      + '<td>' + statutSelect + '</td>'
+      + '<td><button class="btn btn-secondary btn-sm" onclick="alert(' + "'" + (String(i.description||'').replace(/'/g,"\\'").replace(/\n/g,' ')) + "'" + ')" title="Voir la description complète">👁 Détail</button></td>'
+      + '</tr>';
+  }).join('');
 }
 
 function updateRHKPIs() {
