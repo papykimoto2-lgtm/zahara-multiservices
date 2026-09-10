@@ -126750,6 +126750,21 @@ function masseImportDXF(input){
       var buf=new Uint8Array(ev.target.result), sig='';
       for(var i=0;i<Math.min(22,buf.length);i++) sig+=String.fromCharCode(buf[i]);
       if(sig.indexOf('AutoCAD Binary DXF')===0){ toast('DXF binaire non pris en charge — ré-exportez en DXF ASCII 2018.','error'); input.value=''; return; }
+      /* [FIX] Un vrai .dwg (format binaire propriétaire AutoCAD, distinct du DXF
+         binaire ci-dessus) n'était pas détecté ici : il tombait dans le décodage
+         texte puis masseParseDXF(), qui ne trouvait bien sûr aucune entité
+         exploitable — l'utilisateur recevait alors un message générique
+         « fichier vide ou mauvaise feuille », sans savoir que la vraie cause
+         était simplement le mauvais FORMAT de fichier (DWG au lieu de DXF).
+         Un DWG commence toujours par une signature de version "AC10xx"/"AC2x"
+         (ex. AC1018 = AutoCAD 2004-2006, AC1032 = AutoCAD 2018+) sur les
+         6 premiers octets — on la détecte explicitement pour donner la bonne
+         explication et la marche à suivre, au lieu d'un échec silencieux. */
+      var sig6 = sig.slice(0,6);
+      if (/^AC(10\d\d|1021|1024|1027|1032)$/.test(sig6)) {
+        toast('⚠️ « ' + name + ' » est un fichier DWG (format binaire propriétaire AutoCAD, version ' + sig6 + ') — pas un DXF. L\'import ne peut lire que le DXF ASCII. Convertissez-le d\'abord : dans AutoCAD/DraftSight/BricsCAD → Fichier → Enregistrer sous → DXF (choisir une version ASCII, ex. « AutoCAD 2018 DXF ») ; ou avec le convertisseur gratuit ODA File Converter (Open Design Alliance) si vous n\'avez pas de logiciel CAO installé.', 'error', 12000);
+        input.value=''; return;
+      }
       var txt;
       try { txt=new TextDecoder('iso-8859-1').decode(buf); } catch(e){ txt=new TextDecoder('utf-8').decode(buf); }
       var P=masseParseDXF(txt);
@@ -127117,7 +127132,7 @@ async function masseGenMorcellement(progId){
 
 function masseImportLauncher(){
   var inp=document.getElementById('masse-dxf-file');
-  if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.id='masse-dxf-file'; inp.accept='.dxf'; inp.style.display='none';
+  if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.id='masse-dxf-file'; inp.accept='.dxf,.dwg'; inp.style.display='none';
     inp.onchange=function(){ masseImportDXF(this); }; document.body.appendChild(inp); }
   inp.value=''; inp.click();
 }
