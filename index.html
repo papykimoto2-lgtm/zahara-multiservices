@@ -71776,6 +71776,49 @@ function verifierSessionApporteur() {
   return false;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   [FIX sécurité] Vérification serveur des connexions portail.
+   Jusqu'ici, chaque portail (apporteur, souscripteur…) comparait le code
+   d'accès au hash+sel EN LOCAL, dans le navigateur, contre DATA.apporteurs/
+   DATA.clients — des tableaux déjà entièrement synchronisés en mémoire
+   AVANT toute connexion. Un visiteur du portail pouvait donc lire le hash
+   et le sel de n'importe quel compte directement en mémoire (console du
+   navigateur) et casser un code à 6 chiffres (900 000 combinaisons) hors
+   ligne, sans aucune limitation de tentatives réelle — le compteur
+   `_portailBruteforceBloque` vit dans localStorage, contournable en
+   vidant le stockage local ou en appelant la fonction directement.
+   L'Edge Function `portal-login` (index.ts, déjà dans le dépôt) fait la
+   vérification côté SERVEUR : le hash ne quitte jamais Supabase, et une
+   limite de 5 tentatives/10 min par (IP, identifiant) y est appliquée
+   (HTTP 429). On l'utilise désormais en priorité, avec repli sur
+   l'ancienne vérification locale UNIQUEMENT si le serveur est injoignable
+   (Cloud non configuré, hors ligne, fonction non déployée) — jamais en
+   cas de refus explicite — pour ne pas bloquer le portail hors ligne.
+   Ne couvre pour l'instant que les kinds supportés par index.ts tel que
+   déployé (apporteur, souscripteur) : un identifiant/code s'y résout en
+   AU PLUS un enregistrement. authentifierAcquereurFoncier() gère un
+   acquéreur avec PLUSIEURS cessions (donc plusieurs hash pour un même
+   login) — un cas que index.ts ne sait pas renvoyer (il ne retourne
+   qu'un seul id) ; migrer ce flux nécessite d'abord d'étendre la fonction
+   serveur (voir portal-login-unifie.ts, déjà prêt mais pas câblé dans
+   index.ts) — laissé en vérification locale pour ne pas le casser. */
+async function _portailVerifierEdge(kind, ident, code) {
+  getSBConfig();
+  if (!SB.url || !SB.key || !navigator.onLine) return { status: 'unavailable' };
+  try {
+    var resp = await fetch(SB.url + '/functions/v1/portal-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SB.key, 'Authorization': 'Bearer ' + SB.key },
+      body: JSON.stringify({ kind: kind, ident: ident, code: code })
+    });
+    if (resp.status === 429) return { status: 'rate_limited' };
+    if (resp.status === 401 || resp.status === 403) return { status: 'denied' };
+    if (!resp.ok) return { status: 'unavailable' };
+    var data = await resp.json();
+    return (data && data.id) ? { status: 'ok', id: String(data.id) } : { status: 'denied' };
+  } catch (e) { return { status: 'unavailable' }; }
+}
+
 /* ─── Authentification ───────────────────────────────── */
 function ouvrirLoginApporteur() {
   document.getElementById('ap-login-id').value = '';
@@ -71796,21 +71839,33 @@ async function authentifierApporteur() {
     errEl.style.display = 'block'; return;
   }
 
-  var loginNorm = login.replace(/\s/g,'').toLowerCase();
-  var cand = DATA.apporteurs.find(function(a) {
-    var tel = (a.tel || '').replace(/\s/g,'');
-    return (a.email || '').toLowerCase() === loginNorm || tel === login.replace(/\s/g,'');
-  });
-
-  var codeOk = false;
-  if (cand) {
-    if (cand.code_acces_hash && cand.code_acces_salt) {
-      codeOk = (await hashPassword(code, cand.code_acces_salt)) === cand.code_acces_hash;
-    } else if (cand.code_acces) {
-      codeOk = String(cand.code_acces) === code;
+  var edge = await _portailVerifierEdge('apporteur', login, code);
+  var apporteur = null;
+  if (edge.status === 'rate_limited') {
+    errEl.textContent = '🔒 Trop de tentatives. Réessayez dans quelques minutes.';
+    errEl.style.display = 'block';
+    await logConnexion('[APPORTEUR] ' + login, false, 'Bloqué (serveur)');
+    return;
+  } else if (edge.status === 'ok') {
+    apporteur = (DATA.apporteurs||[]).find(function(a){ return String(a.id) === edge.id; }) || null;
+  } else if (edge.status === 'unavailable') {
+    /* Repli local — Edge Function injoignable, cf. commentaire au-dessus de _portailVerifierEdge. */
+    var loginNorm = login.replace(/\s/g,'').toLowerCase();
+    var cand = DATA.apporteurs.find(function(a) {
+      var tel = (a.tel || '').replace(/\s/g,'');
+      return (a.email || '').toLowerCase() === loginNorm || tel === login.replace(/\s/g,'');
+    });
+    var codeOk = false;
+    if (cand) {
+      if (cand.code_acces_hash && cand.code_acces_salt) {
+        codeOk = (await hashPassword(code, cand.code_acces_salt)) === cand.code_acces_hash;
+      } else if (cand.code_acces) {
+        codeOk = String(cand.code_acces) === code;
+      }
     }
+    apporteur = codeOk ? cand : null;
   }
-  var apporteur = codeOk ? cand : null;
+  // edge.status === 'denied' → apporteur reste null (refus explicite du serveur)
 
   if (!apporteur) {
     errEl.textContent = 'Identifiants incorrects. Vérifiez votre email/téléphone et votre code d\'accès.';
@@ -74283,24 +74338,35 @@ async function authentifierSouscripteur() {
     return;
   }
 
-  // Recherche par dossier, email ou tel
-  var cand = DATA.clients.find(function(c) {
-    var tel = (c.tel || '').replace(/\s/g,'');
-    return c.dossier === login || c.email === login
-      || c.tel === login || tel === login.replace(/\s/g,'');
-  });
-  // Vérification du code : hash si dispo, sinon clair (compatibilité ancien)
-  var codeOk = false;
-  if (cand) {
-    if (cand.code_acces_hash && cand.code_acces_salt) {
-      codeOk = (await hashPassword(code, cand.code_acces_salt)) === cand.code_acces_hash;
-    } else if (cand.code_acces) {
-      codeOk = String(cand.code_acces) === code;
-    } else if (cand.mot_de_passe) {
-      codeOk = String(cand.mot_de_passe) === code;
+  var edge = await _portailVerifierEdge('souscripteur', login, code);
+  var client = null;
+  if (edge.status === 'rate_limited') {
+    errEl.textContent = '🔒 Trop de tentatives. Réessayez dans quelques minutes.';
+    errEl.style.display = 'block';
+    await logConnexion('[SOUSCRIPTEUR] ' + login, false, 'Bloqué (serveur)');
+    return;
+  } else if (edge.status === 'ok') {
+    client = (DATA.clients||[]).find(function(c){ return String(c.id) === edge.id; }) || null;
+  } else if (edge.status === 'unavailable') {
+    /* Repli local — Edge Function injoignable, cf. commentaire au-dessus de _portailVerifierEdge. */
+    var cand = DATA.clients.find(function(c) {
+      var tel = (c.tel || '').replace(/\s/g,'');
+      return c.dossier === login || c.email === login
+        || c.tel === login || tel === login.replace(/\s/g,'');
+    });
+    var codeOk = false;
+    if (cand) {
+      if (cand.code_acces_hash && cand.code_acces_salt) {
+        codeOk = (await hashPassword(code, cand.code_acces_salt)) === cand.code_acces_hash;
+      } else if (cand.code_acces) {
+        codeOk = String(cand.code_acces) === code;
+      } else if (cand.mot_de_passe) {
+        codeOk = String(cand.mot_de_passe) === code;
+      }
     }
+    client = codeOk ? cand : null;
   }
-  var client = codeOk ? cand : null;
+  // edge.status === 'denied' → client reste null (refus explicite du serveur)
 
   if (!client) {
     errEl.textContent = 'Identifiants incorrects. Vérifiez votre n° de dossier/téléphone et votre code acces.';
