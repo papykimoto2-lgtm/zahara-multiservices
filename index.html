@@ -51890,6 +51890,12 @@ async function saveBulletin() {
     else DATA.bulletins.push(bull);
   }
   await dbPut('bulletins', bull);
+  /* [FIX] Seul dbPut() était appelé ici — sans syncToSupabase(), le bulletin
+     ne partait vers le cloud qu'au prochain cycle de synchro des enregistrements
+     "dirty" (jusqu'à 30 s plus tard), contrairement à toutes les autres voies
+     d'enregistrement d'un bulletin (génération en masse, depuis le pointage),
+     qui synchronisent immédiatement. */
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_bulletins', bull);
   closeModal('modal-bulletin');
   var moisPaie = document.getElementById('paie-mois').value;
   renderPayslips(moisPaie); buildPaieRecap(moisPaie); buildVirements(moisPaie);
@@ -92918,6 +92924,10 @@ async function saveConge() {
   }
   /* Allocation de congé (indemnité) pour les congés annuels. */
   var allocation = (emp && type==='annuel' && typeof rhAllocationConge==='function') ? rhAllocationConge(emp, jours) : 0;
+  /* [FIX] created_at était mis à `undefined` en édition au lieu d'être
+     préservé (perte de la date de création réelle à chaque modification —
+     ex. simple changement de statut lors de l'approbation). */
+  var _cgExisting = APP.editingId ? (DATA.conges_rh||[]).find(function(x){ return x.id === APP.editingId; }) : null;
   var cg = {
     id: APP.editingId || 'cg_' + Date.now(),
     employe_id: empId,
@@ -92929,7 +92939,7 @@ async function saveConge() {
     statut: statut,
     motif: document.getElementById('cg-motif').value.trim(),
     _modifie: new Date().toISOString(),
-    created_at: APP.editingId ? undefined : new Date().toISOString()
+    created_at: (_cgExisting && _cgExisting.created_at) || new Date().toISOString()
   };
   if (APP.editingId) {
     var idx = (DATA.conges_rh||[]).findIndex(function(x){ return x.id === APP.editingId; });
@@ -93317,6 +93327,8 @@ function openPosteModal(id) {
 async function savePoste() {
   var intitule = document.getElementById('po-intitule').value.trim();
   if (!intitule) { toast('Intitulé du poste obligatoire.', 'error'); return; }
+  /* [FIX] created_at était mis à `undefined` en édition au lieu d'être préservé. */
+  var _poExisting = APP.editingId ? (DATA.postes_ouverts||[]).find(function(x){ return x.id === APP.editingId; }) : null;
   var p = {
     id: APP.editingId || 'po_' + Date.now(),
     intitule: intitule,
@@ -93327,7 +93339,7 @@ async function savePoste() {
     date_limite: document.getElementById('po-date-limite').value,
     statut: document.getElementById('po-statut').value,
     description: document.getElementById('po-desc').value.trim(),
-    created_at: APP.editingId ? undefined : new Date().toISOString()
+    created_at: (_poExisting && _poExisting.created_at) || new Date().toISOString()
   };
   if (APP.editingId) {
     var idx = (DATA.postes_ouverts||[]).findIndex(function(x){ return x.id === APP.editingId; });
@@ -93412,6 +93424,10 @@ async function saveCandidat() {
   var nom = document.getElementById('cand-nom').value.trim();
   var posteId = document.getElementById('cand-poste-id').value;
   if (!nom || !posteId) { toast('Nom et poste obligatoires.', 'error'); return; }
+  /* [FIX] created_at était mis à `undefined` en édition au lieu d'être
+     préservé (ex. simple correction de téléphone effaçant la date réelle
+     de la candidature — et l'ancienneté dans le pipeline avec elle). */
+  var _candExisting = APP.editingId ? (DATA.candidats_rh||[]).find(function(x){ return x.id === APP.editingId; }) : null;
   var c = {
     id: APP.editingId || 'cand_' + Date.now(),
     nom: nom,
@@ -93423,7 +93439,7 @@ async function saveCandidat() {
     date_entretien: document.getElementById('cand-entretien').value,
     pretention_salariale: parseFloat(document.getElementById('cand-pretention').value) || 0,
     notes: document.getElementById('cand-notes').value.trim(),
-    created_at: APP.editingId ? undefined : new Date().toISOString()
+    created_at: (_candExisting && _candExisting.created_at) || new Date().toISOString()
   };
   if (APP.editingId) {
     var idx = (DATA.candidats_rh||[]).findIndex(function(x){ return x.id === APP.editingId; });
@@ -93613,6 +93629,8 @@ async function saveFormation() {
   if (!titre) { toast('Titre de la formation obligatoire.', 'error'); return; }
   var selPart = document.getElementById('frm-participants');
   var participants = selPart ? Array.from(selPart.selectedOptions).map(function(o){ return o.value; }) : [];
+  /* [FIX] created_at était mis à `undefined` en édition au lieu d'être préservé. */
+  var _frmExisting = APP.editingId ? (DATA.formations_rh||[]).find(function(x){ return x.id === APP.editingId; }) : null;
   var frm = {
     id: APP.editingId || 'frm_' + Date.now(),
     titre: titre,
@@ -93627,7 +93645,7 @@ async function saveFormation() {
     statut: document.getElementById('frm-statut').value,
     participants: participants,
     objectifs: document.getElementById('frm-objectifs').value.trim(),
-    created_at: APP.editingId ? undefined : new Date().toISOString()
+    created_at: (_frmExisting && _frmExisting.created_at) || new Date().toISOString()
   };
   if (APP.editingId) {
     var idx = (DATA.formations_rh||[]).findIndex(function(x){ return x.id === APP.editingId; });
