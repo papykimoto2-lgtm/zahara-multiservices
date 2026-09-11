@@ -58219,14 +58219,28 @@ function genererDeclarationCNPS() {
   var cmuTot = Math.round(A.cmuS + A.cmuP);
   var total = cnpsSal + cnpsPatRetraite + cnpsAT + cnpsPF + cmuTot;
   var lim = new Date(now.getFullYear(), now.getMonth()+1, 15);
-  _declExtraFields = { montant_masse_brute: Math.round(A.brut), cnps_salarie: cnpsSal, cnps_patronal: cnpsPatRetraite, cnps_at: cnpsAT, cnps_pf: cnpsPF, cmu: cmuTot, nb_employes: actifs.length };
-  openDeclarationModal();
+  /* [FIX doublon] Régénérer rouvrait toujours un formulaire de création
+     vierge — aucun rapprochement avec une déclaration CNPS déjà existante
+     pour ce même mois/division. Un second clic (ou une régénération après
+     correction d'un bulletin) créait un enregistrement supplémentaire :
+     même mois compté deux fois dans le total annuel et dans le bordereau.
+     Même garde-fou que passerEcritureTVA() (liquidation TVA), qui détecte
+     déjà ce cas — CNPS/ITS ne l'avaient pas. On rouvre désormais la
+     déclaration existante en modification (montant recalculé, statut/
+     référence/date de dépôt conservés) plutôt que d'en créer une seconde ;
+     si elle est déjà déposée/payée, confirmation explicite avant d'écraser
+     un montant qui a une valeur légale. */
+  var existanteCnps = DATA.declarations.find(function(d){ return d.type==='CNPS' && d.periode===mois && d.division===divId; });
+  if (existanteCnps && (existanteCnps.statut==='deposee' || existanteCnps.statut==='payee')) {
+    if (!confirm('Une déclaration CNPS ' + mois + ' existe déjà pour cette division, statut « ' + existanteCnps.statut + ' ».\n\nRecalculer et écraser son montant ?')) return;
+  }
+  openDeclarationModal(existanteCnps ? existanteCnps.id : null);
   document.getElementById('d-division').value = divId;
   document.getElementById('d-type').value = 'CNPS';
   document.getElementById('d-periode').value = mois;
   document.getElementById('d-montant').value = total;
   document.getElementById('d-date-limite').value = lim.toISOString().slice(0,10);
-  toast('Déclaration CNPS pré-remplie pour ' + mois + ' — ' + _nomDivision(divId) + ' (' + actifs.length + ' salariés, hors consultants et non-déclarés) : ' + fmtF(total) + ' FCFA', 'info');
+  toast((existanteCnps ? 'Déclaration CNPS existante mise à jour pour ' : 'Déclaration CNPS pré-remplie pour ') + mois + ' — ' + _nomDivision(divId) + ' (' + actifs.length + ' salariés, hors consultants et non-déclarés) : ' + fmtF(total) + ' FCFA', 'info');
 }
 
 function genererDeclarationITS() {
@@ -58245,13 +58259,20 @@ function genererDeclarationITS() {
   });
   var lim = new Date(now.getFullYear(), now.getMonth()+1, 15);
   _declExtraFields = { montant_masse_brute: totBrutImp, nb_employes: actifs.length };
-  openDeclarationModal();
+  /* [FIX doublon] Même garde-fou que genererDeclarationCNPS() — voir son
+     commentaire. Sans lui, régénérer l'ITS d'un mois déjà déclaré créait
+     un second enregistrement au lieu de mettre à jour l'existant. */
+  var existanteIts = DATA.declarations.find(function(d){ return d.type==='ITS' && d.periode===mois && d.division===divId; });
+  if (existanteIts && (existanteIts.statut==='deposee' || existanteIts.statut==='payee')) {
+    if (!confirm('Une déclaration ITS ' + mois + ' existe déjà pour cette division, statut « ' + existanteIts.statut + ' ».\n\nRecalculer et écraser son montant ?')) return;
+  }
+  openDeclarationModal(existanteIts ? existanteIts.id : null);
   document.getElementById('d-division').value = divId;
   document.getElementById('d-type').value = 'ITS';
   document.getElementById('d-periode').value = mois;
   document.getElementById('d-montant').value = totITS;
   document.getElementById('d-date-limite').value = lim.toISOString().slice(0,10);
-  toast('Déclaration ITS pré-remplie pour ' + _nomDivision(divId) + ' (' + actifs.length + ' salariés) : ' + fmtF(totITS) + ' FCFA', 'info');
+  toast((existanteIts ? 'Déclaration ITS existante mise à jour pour ' : 'Déclaration ITS pré-remplie pour ') + mois + ' — ' + _nomDivision(divId) + ' (' + actifs.length + ' salariés) : ' + fmtF(totITS) + ' FCFA', 'info');
 }
 
 function renderCNPSTable() {
