@@ -42753,79 +42753,53 @@ function buildGrandLivre() {
   var _itv = (typeof _glItv === 'function') ? _glItv() : { active: false };
   if (_itv.active) { return buildGrandLivreIntervalle(box, _itv); }
   var compte = document.getElementById('filter-gl-compte') ? document.getElementById('filter-gl-compte').value : '';
-  var year = document.getElementById('filter-annee-compta').value || new Date().getFullYear();
   if (!compte) { box.innerHTML = '<div style="color:var(--blanc-dim);font-size:13px;">Sélectionnez un compte.</div>'; return; }
-  var d1 = document.getElementById('filter-gl-date-debut') ? document.getElementById('filter-gl-date-debut').value : '';
-  var d2 = document.getElementById('filter-gl-date-fin') ? document.getElementById('filter-gl-date-fin').value : '';
-  if (d1 && d2 && d1 > d2) { var tmp = d1; d1 = d2; d2 = tmp; }
-  var periodeActive = !!(d1 || d2);
 
+  /* [Unification] Réutilise le moteur de collecte partagé avec le PDF et la
+     vue intervalle (_glCtx/_glCollecteUn) au lieu d'une logique dupliquée :
+     évite toute divergence future écran/PDF, et échappe désormais le
+     libellé/référence/contrepartie — l'ancienne version les insérait bruts
+     dans le HTML (faille XSS via le libellé libre d'une écriture manuelle,
+     déjà corrigée côté PDF mais pas ici). */
+  var ctx = _glCtx();
   var planEntry = APP.planComptable.find(function(c){ return c.code === compte; });
   var inclSous = (document.getElementById('gl-inclure-sous')||{}).checked !== false;
-  var matchCpt = function(l){ return l.compte === compte || (inclSous && String(l.compte||'').indexOf(compte) === 0); };
+  var r = _glCollecteUn(compte, inclSous, ctx);
 
-  var divF = _comptaDivisionFilter();
-
-  /* Solde d'ouverture = tous les mouvements antérieurs à la date de début (report à-nouveau implicite) */
-  var soldeOuverture = 0;
-  if (periodeActive && d1) {
-    DATA.ecritures.filter(function(e){ return e.date && e.date < d1 && (!divF || e.division === divF); }).forEach(function(e){
-      ecrLignes(e).filter(matchCpt).forEach(function(l){
-        soldeOuverture += (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant)||0);
-      });
-    });
-  }
-
-  var mvts = [];
-  DATA.ecritures.filter(function(e){
-    if (divF && e.division !== divF) return false;
-    if (periodeActive) return (!d1 || (e.date && e.date >= d1)) && (!d2 || (e.date && e.date <= d2));
-    return !year || (e.date && e.date.startsWith(year));
-  }).forEach(function(e){
-    var lignes = ecrLignes(e);
-    var ligneCompte = lignes.filter(matchCpt);
-    if (!ligneCompte.length) return;
-    var contreparties = lignes.filter(function(l){ return !matchCpt(l); }).map(function(l){ return l.compte; }).join(', ');
-    ligneCompte.forEach(function(l){
-      var lib = (l.libelle||e.libelle) + (inclSous && l.compte !== compte ? ' <span style="font-size:9px;color:var(--or);">['+l.compte+']</span>' : '');
-      mvts.push({ date:e.date, ref:e.ref, libelle:lib, contrepartie:contreparties, sens:l.sens, montant:parseFloat(l.montant)||0, multi: lignes.length>2 });
-    });
-  });
-  mvts.sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
-
-  var solde = soldeOuverture;
+  var solde = r.ouv;
   var totD = 0, totC = 0;
-  var ligneOuverture = periodeActive ? ('<tr style="font-style:italic;color:var(--blanc-dim);"><td colspan="6">Solde d\'ouverture au ' + dateShort(d1) + '</td><td style="text-align:right;font-weight:600;color:' + (solde>=0?'var(--blanc)':'var(--rouge)') + ';">' + fmtF(solde) + '</td></tr>') : '';
-  var rows = mvts.map(function(m) {
+  var ligneOuverture = ctx.periodeActive ? ('<tr style="font-style:italic;color:var(--blanc-dim);"><td colspan="6">Solde d\'ouverture au ' + dateShort(ctx.d1) + '</td><td style="text-align:right;font-weight:600;color:' + (solde>=0?'var(--blanc)':'var(--rouge)') + ';">' + fmtF(solde) + '</td></tr>') : '';
+  var rows = r.mvts.map(function(m) {
     var d = m.sens === 'D' ? m.montant : 0;
     var c = m.sens === 'D' ? 0 : m.montant;
     totD += d; totC += c;
     solde += d - c;
+    var lib = escHtml(m.libelle) + (inclSous && m.sous !== compte ? ' <span style="font-size:9px;color:var(--or);">['+escHtml(m.sous)+']</span>' : '');
     return '<tr>'
       + '<td>' + dateShort(m.date) + '</td>'
-      + '<td style="font-size:11px;font-family:monospace;color:var(--bleu);">' + (m.ref||'—') + '</td>'
-      + '<td>' + m.libelle + (m.multi ? ' <span style="font-size:9px;color:var(--or);">multi</span>' : '') + '</td>'
-      + '<td style="font-size:11px;color:var(--blanc-dim);">' + (m.contrepartie||'—') + '</td>'
+      + '<td style="font-size:11px;font-family:monospace;color:var(--bleu);">' + escHtml(m.ref||'—') + '</td>'
+      + '<td>' + lib + (m.multi ? ' <span style="font-size:9px;color:var(--or);">multi</span>' : '') + '</td>'
+      + '<td style="font-size:11px;color:var(--blanc-dim);">' + escHtml(m.contrepartie||'—') + '</td>'
       + '<td style="text-align:right;color:var(--rouge);font-weight:' + (d?'600':'400') + ';">' + (d ? fmtF(d) : '—') + '</td>'
       + '<td style="text-align:right;color:var(--vert);font-weight:' + (c?'600':'400') + ';">' + (c ? fmtF(c) : '—') + '</td>'
       + '<td style="text-align:right;font-weight:600;color:' + (solde >= 0 ? 'var(--blanc)' : 'var(--rouge)') + ';">' + fmtF(solde) + '</td>'
       + '</tr>';
   }).join('');
 
-  var periodeLabel = periodeActive ? ('Période du ' + (d1?dateShort(d1):'…') + ' au ' + (d2?dateShort(d2):'…')) : ('Exercice ' + year);
-  periodeLabel += divF ? (' — Division : ' + _nomDivision(divF)) : '';
+  var periodeLabel = ctx.periodeActive ? ('Période du ' + (ctx.d1?dateShort(ctx.d1):'…') + ' au ' + (ctx.d2?dateShort(ctx.d2):'…')) : ('Exercice ' + ctx.year);
+  periodeLabel += ctx.divF ? (' — Division : ' + _nomDivision(ctx.divF)) : '';
   box.innerHTML = '<div style="margin-bottom:14px;">'
-    + '<div style="font-size:16px;font-weight:700;color:var(--or);">Compte ' + compte + ' — ' + (planEntry ? planEntry.label : '') + (inclSous && compteEstParent(compte) ? ' <span style="font-size:11px;color:var(--blanc-dim);">(regroupement — sous-comptes inclus)</span>' : '') + '</div>'
-    + '<div style="font-size:12px;color:var(--blanc-dim);">Grand Livre — ' + periodeLabel + ' — ' + mvts.length + ' mouvement(s)</div>'
+    + '<div style="font-size:16px;font-weight:700;color:var(--or);">Compte ' + escHtml(compte) + ' — ' + escHtml(planEntry ? planEntry.label : '') + (inclSous && compteEstParent(compte) ? ' <span style="font-size:11px;color:var(--blanc-dim);">(regroupement — sous-comptes inclus)</span>' : '') + '</div>'
+    + '<div style="font-size:12px;color:var(--blanc-dim);">Grand Livre — ' + periodeLabel + ' — ' + r.mvts.length + ' mouvement(s)</div>'
     + '</div>'
     + '<div class="table-wrap"><table><thead><tr>'
     + '<th>Date</th><th>N° Pièce</th><th>Libellé</th><th>Contrepartie</th>'
     + '<th style="text-align:right;color:var(--rouge);">Débit</th><th style="text-align:right;color:var(--vert);">Crédit</th><th style="text-align:right;">Solde cumulé</th>'
     + '</tr></thead><tbody>'
     + ligneOuverture
-    + (rows || (periodeActive ? '' : '<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:20px;">Aucun mouvement pour ce compte</td></tr>'))
+    + (rows || (ctx.periodeActive ? '' : '<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:20px;">Aucun mouvement pour ce compte</td></tr>'))
     + '<tr style="font-weight:700;border-top:2px solid var(--gris-bord);">'
-    + '<td colspan="4">TOTAUX' + (periodeActive ? ' DE LA PÉRIODE' : '') + '</td>'
+    + '<td colspan="4">TOTAUX' + (ctx.periodeActive ? ' DE LA PÉRIODE' : '') + '</td>'
     + '<td style="text-align:right;color:var(--rouge);">' + fmtF(totD) + '</td>'
     + '<td style="text-align:right;color:var(--vert);">' + fmtF(totC) + '</td>'
     + '<td style="text-align:right;color:' + (solde >= 0 ? 'var(--blanc)' : 'var(--rouge)') + ';font-weight:700;">' + fmtF(solde) + '</td>'
@@ -68120,30 +68094,36 @@ function paFillSelects(){
 function paCalculerAlertes(){
   var alertes = [];
   var t = today();
-  var dans30j = new Date(); dans30j.setDate(dans30j.getDate()+30);
-  var dans30jStr = dans30j.toISOString().slice(0,10);
+  var p = DATA.params||{};
+  var joursAssurance = parseInt(p.parcauto_alerte_assurance_jours,10) || 30;
+  var joursVisite     = parseInt(p.parcauto_alerte_visite_jours,10) || 30;
+  var seuilKm          = parseInt(p.parcauto_seuil_entretien_km,10) || 500;
+  var dansJours = function(n){ var d = new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+  var seuilAssuranceStr = dansJours(joursAssurance);
+  var seuilVisiteStr    = dansJours(joursVisite);
+  var seuilVidangeStr   = dansJours(Math.max(joursAssurance, joursVisite));
 
   (DATA.vehicules||[]).filter(function(v){ return v.statut!=='vendu'; }).forEach(function(v){
     var label = v.immatriculation || 'Véhicule sans plaque';
     if (v.assurance_fin) {
       if (v.assurance_fin < t) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — assurance expirée depuis le '+dateShort(v.assurance_fin) });
-      else if (v.assurance_fin <= dans30jStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — assurance expire le '+dateShort(v.assurance_fin) });
+      else if (v.assurance_fin <= seuilAssuranceStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — assurance expire le '+dateShort(v.assurance_fin) });
     }
     if (v.visite_technique_expiration) {
       if (v.visite_technique_expiration < t) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — visite technique expirée depuis le '+dateShort(v.visite_technique_expiration) });
-      else if (v.visite_technique_expiration <= dans30jStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — visite technique expire le '+dateShort(v.visite_technique_expiration) });
+      else if (v.visite_technique_expiration <= seuilVisiteStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — visite technique expire le '+dateShort(v.visite_technique_expiration) });
     }
-    /* Vidange due par km : dernier entretien de type vidange + son seuil km */
+    /* Vidange due par km : dernier entretien de type vidange + son seuil km (anticipation paramétrable) */
     var derniereVidange = (DATA.vehicule_entretiens||[]).filter(function(e){ return e.vehicule_id===v.id && e.type==='vidange'; })
       .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); })[0];
     if (derniereVidange && derniereVidange.prochaine_echeance_km && v.km_actuel) {
       var ecart = derniereVidange.prochaine_echeance_km - v.km_actuel;
       if (ecart <= 0) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — vidange dépassée de '+Math.abs(ecart)+' km' });
-      else if (ecart <= 500) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — vidange due dans '+ecart+' km' });
+      else if (ecart <= seuilKm) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — vidange due dans '+ecart+' km' });
     }
     if (derniereVidange && derniereVidange.prochaine_echeance_date) {
       if (derniereVidange.prochaine_echeance_date < t) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — vidange (date) dépassée depuis le '+dateShort(derniereVidange.prochaine_echeance_date) });
-      else if (derniereVidange.prochaine_echeance_date <= dans30jStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — vidange (date) prévue le '+dateShort(derniereVidange.prochaine_echeance_date) });
+      else if (derniereVidange.prochaine_echeance_date <= seuilVidangeStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — vidange (date) prévue le '+dateShort(derniereVidange.prochaine_echeance_date) });
     }
   });
   return alertes;
@@ -84104,31 +84084,67 @@ function etatBalance() {
   var d1 = document.getElementById('filter-balance-date-debut') ? document.getElementById('filter-balance-date-debut').value : '';
   var d2 = document.getElementById('filter-balance-date-fin') ? document.getElementById('filter-balance-date-fin').value : '';
   if (d1 && d2 && d1 > d2) { var tmp = d1; d1 = d2; d2 = tmp; }
+  /* [FIX] Alignement sur buildBalance() (écran) et etatBilan() — trois défauts
+     déjà corrigés ailleurs dans ce module mais jamais portés ici :
+     1) schéma 2 lignes obsolète (compte_debit/compte_credit/montant) au lieu
+        de ecrLignes() → toute écriture à N lignes (dotations, paie, TVA…)
+        était purement absente du PDF imprimé ;
+     2) aucun filtre de division → « Imprimer Balance » pour une entité
+        précise imprimait en réalité le cumul de toutes les divisions,
+        même défaut déjà corrigé sur etatBilan() (voir plus bas) ;
+     3) totaux cumulés en itérant le plan comptable « courant » au lieu des
+        mouvements réels → tout compte mouvementé hors de cette liste
+        curatée contribuait pour zéro aux totaux imprimés — un document
+        officiel (banque, auditeur) pouvait donc être faux. */
+  var divF = (typeof _comptaDivisionFilter === 'function') ? _comptaDivisionFilter() : '';
   var comptesMvt = {};
   DATA.ecritures.filter(function(e){
+    if (divF && e.division !== divF) return false;
     if (d1 || d2) return (!d1 || (e.date && e.date >= d1)) && (!d2 || (e.date && e.date <= d2));
     return !year || (e.date && e.date.startsWith(year));
   }).forEach(function(e){
-    var cd = e.compte_debit || e.compte, cc = e.compte_credit;
-    if (!comptesMvt[cd]) comptesMvt[cd] = { debit:0, credit:0 };
-    comptesMvt[cd].debit += e.montant;
-    if (cc) { if (!comptesMvt[cc]) comptesMvt[cc] = { debit:0, credit:0 }; comptesMvt[cc].credit += e.montant; }
+    ecrLignes(e).forEach(function(l){
+      if (!l.compte) return;
+      if (!comptesMvt[l.compte]) comptesMvt[l.compte] = { debit:0, credit:0 };
+      if (l.sens === 'D') comptesMvt[l.compte].debit += (parseFloat(l.montant)||0);
+      else comptesMvt[l.compte].credit += (parseFloat(l.montant)||0);
+    });
   });
   var plan = APP.planComptable.filter(function(c){
     if (classeF && c.classe !== classeF) return false;
     if (mvtOnly && !comptesMvt[c.code]) return false;
     return true;
+  }).sort(function(a,b){ return String(a.code).localeCompare(String(b.code)); });
+
+  var tMD = 0, tMC = 0, tSD = 0, tSC = 0, _horsPlanCodes = [];
+  Object.keys(comptesMvt).forEach(function(code){
+    if (classeF && String(code).charAt(0) !== classeF) return;
+    var m = comptesMvt[code];
+    tMD += m.debit; tMC += m.credit;
+    tSD += Math.max(0, m.debit - m.credit);
+    tSC += Math.max(0, m.credit - m.debit);
+    if (!APP.planComptable.some(function(c){ return c.code === code; })) _horsPlanCodes.push(code);
   });
-  var tMD = 0, tMC = 0, tSD = 0, tSC = 0;
+
   var rows = plan.map(function(c){
     var m = comptesMvt[c.code] || { debit:0, credit:0 };
     var sd = Math.max(0, m.debit - m.credit), sc = Math.max(0, m.credit - m.debit);
-    tMD += m.debit; tMC += m.credit; tSD += sd; tSC += sc;
     return '<tr><td>' + escHtml(c.code) + '</td><td>' + escHtml(c.label || '') + '</td>'
-      + '<td style="text-align:center;">' + c.classe + '</td>'
+      + '<td style="text-align:center;">' + escHtml(c.classe) + '</td>'
       + '<td class="num">' + (m.debit ? fmtF(m.debit) : '—') + '</td><td class="num">' + (m.credit ? fmtF(m.credit) : '—') + '</td>'
       + '<td class="num">' + (sd ? fmtF(sd) : '—') + '</td><td class="num">' + (sc ? fmtF(sc) : '—') + '</td></tr>';
   }).join('');
+  /* Comptes mouvementés absents du plan comptable : comptés dans les
+     totaux ci-dessus, ils doivent donc rester visibles et identifiables. */
+  if (_horsPlanCodes.length) {
+    rows += _horsPlanCodes.sort().map(function(code){
+      var m = comptesMvt[code];
+      var sd = Math.max(0, m.debit - m.credit), sc = Math.max(0, m.credit - m.debit);
+      return '<tr><td>' + escHtml(code) + '</td><td>⚠ Compte hors plan comptable</td><td style="text-align:center;">' + escHtml(String(code).charAt(0)) + '</td>'
+        + '<td class="num">' + (m.debit ? fmtF(m.debit) : '—') + '</td><td class="num">' + (m.credit ? fmtF(m.credit) : '—') + '</td>'
+        + '<td class="num">' + (sd ? fmtF(sd) : '—') + '</td><td class="num">' + (sc ? fmtF(sc) : '—') + '</td></tr>';
+    }).join('');
+  }
   var equ = (Math.abs(tMD - tMC) < 1 && tMD > 0) ? '✔ Balance équilibrée — Débit = Crédit = ' + fmtF(tMD) + ' FCFA'
     : (tMD > 0 ? '⚠ Balance déséquilibrée — Écart : ' + fmtF(Math.abs(tMD - tMC)) + ' FCFA' : '');
   var contenu = '<table><thead><tr><th>Compte</th><th>Intitulé</th><th style="text-align:center;">Cl.</th>'
@@ -84140,6 +84156,7 @@ function etatBalance() {
   var sousTitre = (d1 || d2)
     ? ('Période du ' + (d1 ? dateShort(d1) : '…') + ' au ' + (d2 ? dateShort(d2) : '…') + ' — SYSCOHADA')
     : ('Exercice ' + year + ' — SYSCOHADA');
+  sousTitre += divF ? (' — Division : ' + _nomDivision(divF)) : '';
   genererEtatPDF({ titre:'Balance générale des comptes', sousTitre: sousTitre,
     orientation:'paysage', couleur:'#1D4ED8', contenu:contenu });
 }
