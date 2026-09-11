@@ -43765,9 +43765,102 @@ async function saveWorkflowParams() {
     var e = document.getElementById('wf-'+k);
     if (e) DATA.params = Object.assign(DATA.params||{}, { ['wf_'+k]: e.checked });
   });
+  var gv = function(id){ var e=document.getElementById(id); return e?parseFloat(e.value)||0:0; };
+  DATA.params = Object.assign(DATA.params||{}, {
+    workflow_seuil_n1:  gv('param-workflow-seuil-n1')  || 1000000,
+    workflow_seuil_n2:  gv('param-workflow-seuil-n2')  || 5000000,
+    workflow_seuil_pdg: gv('param-workflow-seuil-pdg') || 20000000,
+  });
   await dbPut('params', DATA.params);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
   toast('Workflow enregistré.', 'success');
+}
+
+/* Paramètres des modules métier ajoutés lors de la revue de couverture du Paramétrage
+   (LBCFT, Trésorerie/Caisse, Foncier, Juridique, CRM, Locatif, Copropriété, Parc auto,
+   Budget, DQE, Débourse, Stock/Achats, Messagerie/Calendrier, Diaspora). */
+async function saveModulesAvancesParams() {
+  var gv  = function(id){ var e=document.getElementById(id); return e?e.value:''; };
+  var gvn = function(id){ var e=document.getElementById(id); return e?parseFloat(e.value)||0:0; };
+  var gvc = function(id){ var e=document.getElementById(id); return e?e.checked:false; };
+  DATA.params = Object.assign(DATA.params||{}, {
+    lbcft_seuil_suspect:        gvn('param-lbcft-seuil-suspect')       || 5000000,
+    lbcft_seuil_id_renforcee:   gvn('param-lbcft-seuil-id-renforcee')  || 2500000,
+    lbcft_revue_kyc_mois:       gvn('param-lbcft-revue-kyc-mois')      || 12,
+    lbcft_conservation_annees:  gvn('param-lbcft-conservation-annees') || 10,
+    lbcft_responsable:          gv('param-lbcft-responsable'),
+    lbcft_email_centif:         gv('param-lbcft-email-centif'),
+    lbcft_controle_pep:         gvc('param-lbcft-controle-pep'),
+
+    treso_plafond_caisse:       gvn('param-treso-plafond-caisse')      || 2000000,
+    treso_plafond_especes:      gvn('param-treso-plafond-especes')     || 5000000,
+    treso_seuil_alerte_solde:   gvn('param-treso-seuil-alerte-solde')  || 500000,
+    treso_delai_rapprochement:  gvn('param-treso-delai-rapprochement') || 5,
+    treso_devise_ref:           gv('param-treso-devise-ref') || 'XOF',
+    treso_double_validation:    gvc('param-treso-double-validation'),
+
+    budget_methode:              gv('param-budget-methode') || 'exercice_fixe',
+    budget_devise:                gv('param-budget-devise') || 'XOF',
+    budget_seuil_depassement_pct: gvn('param-budget-seuil-depassement-pct') || 10,
+    budget_validation_montant:    gvn('param-budget-validation-montant')    || 5000000,
+
+    dqe_marge_defaut_pct: gvn('param-dqe-marge-defaut-pct') || 15,
+    dqe_coeff_aleas_pct:  gvn('param-dqe-coeff-aleas-pct')  || 5,
+    dqe_tva_pct:          gvn('param-dqe-tva-pct')          || 18,
+    dqe_validite_jours:   gvn('param-dqe-validite-jours')   || 30,
+
+    debourse_seuil_validation: gvn('param-debourse-seuil-validation') || 1000000,
+    debourse_compte_defaut:    gv('param-debourse-compte-defaut'),
+    debourse_circuit:          gv('param-debourse-circuit') || 'chef_dg',
+
+    stock_seuil_min_alerte:      gvn('param-stock-seuil-min-alerte') || 20,
+    stock_methode_valorisation:  gv('param-stock-methode-valorisation') || 'CUMP',
+    achats_delai_paiement_jours: gvn('param-achats-delai-paiement-jours') || 30,
+    achats_seuil_validation_bc:  gvn('param-achats-seuil-validation-bc')  || 500000,
+
+    foncier_alerte_titre_jours: gvn('param-foncier-alerte-titre-jours') || 60,
+    foncier_delai_instruction:  gvn('param-foncier-delai-instruction')  || 30,
+    foncier_taux_redevance:     gvn('param-foncier-taux-redevance')     || 0,
+    foncier_registre_ref:       gv('param-foncier-registre-ref'),
+
+    juridique_alerte_echeance_jours: gvn('param-juridique-alerte-echeance-jours') || 30,
+    juridique_prescription_annees:   gvn('param-juridique-prescription-annees')   || 5,
+    juridique_cabinet:               gv('param-juridique-cabinet'),
+    juridique_numerotation:          gv('param-juridique-numerotation'),
+
+    locatif_indexation_pct:      gvn('param-locatif-indexation-pct')      || 3,
+    locatif_preavis_jours:       gvn('param-locatif-preavis-jours')       || 90,
+    locatif_penalite_retard_pct: gvn('param-locatif-penalite-retard-pct') || 5,
+    locatif_depot_garantie_mois: gvn('param-locatif-depot-garantie-mois') || 2,
+    locatif_jour_echeance:       gvn('param-locatif-jour-echeance')       || 5,
+
+    copro_frequence_charges:    gv('param-copro-frequence-charges') || 'trimestrielle',
+    copro_taux_interet_retard:  gvn('param-copro-taux-interet-retard') || 1,
+    copro_quorum_ag:            gvn('param-copro-quorum-ag') || 50,
+    copro_fonds_reserve_pct:    gvn('param-copro-fonds-reserve-pct') || 5,
+
+    parcauto_alerte_visite_jours:    gvn('param-parcauto-alerte-visite-jours')    || 30,
+    parcauto_alerte_assurance_jours: gvn('param-parcauto-alerte-assurance-jours') || 30,
+    parcauto_seuil_entretien_km:     gvn('param-parcauto-seuil-entretien-km')     || 500,
+    parcauto_plafond_carburant:      gvn('param-parcauto-plafond-carburant')      || 150000,
+
+    crm_delai_relance_prospect: gvn('param-crm-delai-relance-prospect') || 3,
+    crm_score_min_qualif:       gvn('param-crm-score-min-qualif')       || 50,
+    crm_source_defaut:          gv('param-crm-source-defaut') || 'site_web',
+    crm_territoires:            gv('param-crm-territoires'),
+
+    agenda_rappel_minutes: gvn('param-agenda-rappel-minutes') || 30,
+    agenda_heure_debut:    gv('param-agenda-heure-debut') || '08:00',
+    agenda_heure_fin:      gv('param-agenda-heure-fin') || '18:00',
+    agenda_signature:      gv('param-agenda-signature'),
+
+    diaspo_devise:                 gv('param-diaspo-devise') || 'EUR',
+    diaspo_taux_change_ref:        gvn('param-diaspo-taux-change-ref') || 655.957,
+    diaspo_canal:                  gv('param-diaspo-canal') || 'whatsapp',
+    diaspo_delai_traitement_jours: gvn('param-diaspo-delai-traitement-jours') || 15,
+  });
+  await dbPut('params', DATA.params);
+  if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
 }
 
 async function saveParams() {
@@ -44015,6 +44108,8 @@ async function saveAllParams() {
   await saveParams();
   await saveObjectifs();
   await saveAlerteSeuils();
+  await saveWorkflowParams();
+  await saveModulesAvancesParams();
   toast('✅ Tous les paramètres enregistrés.','success');
 }
 
@@ -44097,6 +44192,72 @@ function loadParamFields() {
   sv('param-seuil-rapport',p.seuil_rapport||14);
   sv('param-seuil-chantier',p.seuil_chantier||30);
   sv('param-seuil-provision',p.seuil_provision||5);
+  sv('param-workflow-seuil-n1',p.workflow_seuil_n1||1000000);
+  sv('param-workflow-seuil-n2',p.workflow_seuil_n2||5000000);
+  sv('param-workflow-seuil-pdg',p.workflow_seuil_pdg||20000000);
+  sv('param-lbcft-seuil-suspect',p.lbcft_seuil_suspect||5000000);
+  sv('param-lbcft-seuil-id-renforcee',p.lbcft_seuil_id_renforcee||2500000);
+  sv('param-lbcft-revue-kyc-mois',p.lbcft_revue_kyc_mois||12);
+  sv('param-lbcft-conservation-annees',p.lbcft_conservation_annees||10);
+  sv('param-lbcft-responsable',p.lbcft_responsable);
+  sv('param-lbcft-email-centif',p.lbcft_email_centif);
+  var lbcftPepEl = document.getElementById('param-lbcft-controle-pep');
+  if (lbcftPepEl) lbcftPepEl.checked = p.lbcft_controle_pep !== false;
+  sv('param-treso-plafond-caisse',p.treso_plafond_caisse||2000000);
+  sv('param-treso-plafond-especes',p.treso_plafond_especes||5000000);
+  sv('param-treso-seuil-alerte-solde',p.treso_seuil_alerte_solde||500000);
+  sv('param-treso-delai-rapprochement',p.treso_delai_rapprochement||5);
+  sv('param-treso-devise-ref',p.treso_devise_ref||'XOF');
+  var tresoDvEl = document.getElementById('param-treso-double-validation');
+  if (tresoDvEl) tresoDvEl.checked = !!p.treso_double_validation;
+  sv('param-budget-methode',p.budget_methode||'exercice_fixe');
+  sv('param-budget-devise',p.budget_devise||'XOF');
+  sv('param-budget-seuil-depassement-pct',p.budget_seuil_depassement_pct||10);
+  sv('param-budget-validation-montant',p.budget_validation_montant||5000000);
+  sv('param-dqe-marge-defaut-pct',p.dqe_marge_defaut_pct||15);
+  sv('param-dqe-coeff-aleas-pct',p.dqe_coeff_aleas_pct||5);
+  sv('param-dqe-tva-pct',p.dqe_tva_pct||18);
+  sv('param-dqe-validite-jours',p.dqe_validite_jours||30);
+  sv('param-debourse-seuil-validation',p.debourse_seuil_validation||1000000);
+  sv('param-debourse-compte-defaut',p.debourse_compte_defaut);
+  sv('param-debourse-circuit',p.debourse_circuit||'chef_dg');
+  sv('param-stock-seuil-min-alerte',p.stock_seuil_min_alerte||20);
+  sv('param-stock-methode-valorisation',p.stock_methode_valorisation||'CUMP');
+  sv('param-achats-delai-paiement-jours',p.achats_delai_paiement_jours||30);
+  sv('param-achats-seuil-validation-bc',p.achats_seuil_validation_bc||500000);
+  sv('param-foncier-alerte-titre-jours',p.foncier_alerte_titre_jours||60);
+  sv('param-foncier-delai-instruction',p.foncier_delai_instruction||30);
+  sv('param-foncier-taux-redevance',p.foncier_taux_redevance||0);
+  sv('param-foncier-registre-ref',p.foncier_registre_ref);
+  sv('param-juridique-alerte-echeance-jours',p.juridique_alerte_echeance_jours||30);
+  sv('param-juridique-prescription-annees',p.juridique_prescription_annees||5);
+  sv('param-juridique-cabinet',p.juridique_cabinet);
+  sv('param-juridique-numerotation',p.juridique_numerotation);
+  sv('param-locatif-indexation-pct',p.locatif_indexation_pct||3);
+  sv('param-locatif-preavis-jours',p.locatif_preavis_jours||90);
+  sv('param-locatif-penalite-retard-pct',p.locatif_penalite_retard_pct||5);
+  sv('param-locatif-depot-garantie-mois',p.locatif_depot_garantie_mois||2);
+  sv('param-locatif-jour-echeance',p.locatif_jour_echeance||5);
+  sv('param-copro-frequence-charges',p.copro_frequence_charges||'trimestrielle');
+  sv('param-copro-taux-interet-retard',p.copro_taux_interet_retard||1);
+  sv('param-copro-quorum-ag',p.copro_quorum_ag||50);
+  sv('param-copro-fonds-reserve-pct',p.copro_fonds_reserve_pct||5);
+  sv('param-parcauto-alerte-visite-jours',p.parcauto_alerte_visite_jours||30);
+  sv('param-parcauto-alerte-assurance-jours',p.parcauto_alerte_assurance_jours||30);
+  sv('param-parcauto-seuil-entretien-km',p.parcauto_seuil_entretien_km||500);
+  sv('param-parcauto-plafond-carburant',p.parcauto_plafond_carburant||150000);
+  sv('param-crm-delai-relance-prospect',p.crm_delai_relance_prospect||3);
+  sv('param-crm-score-min-qualif',p.crm_score_min_qualif||50);
+  sv('param-crm-source-defaut',p.crm_source_defaut||'site_web');
+  sv('param-crm-territoires',p.crm_territoires);
+  sv('param-agenda-rappel-minutes',p.agenda_rappel_minutes||30);
+  sv('param-agenda-heure-debut',p.agenda_heure_debut||'08:00');
+  sv('param-agenda-heure-fin',p.agenda_heure_fin||'18:00');
+  sv('param-agenda-signature',p.agenda_signature);
+  sv('param-diaspo-devise',p.diaspo_devise||'EUR');
+  sv('param-diaspo-taux-change-ref',p.diaspo_taux_change_ref||655.957);
+  sv('param-diaspo-canal',p.diaspo_canal||'whatsapp');
+  sv('param-diaspo-delai-traitement-jours',p.diaspo_delai_traitement_jours||15);
   getSBConfig();
   sv('param-sb-url', SB.url);
   sv('param-sb-key', SB.key);
