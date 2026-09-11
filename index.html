@@ -5814,6 +5814,35 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <button class="tab-btn" onclick="switchTab('params','backup');loadBackupParams()" title="Export, restauration et mise à zéro pour passage en production"><i>💾</i>Sauvegardes</button>
             </div>
           </div>
+          <div class="etape">
+            <div class="etape-hd"><span class="etape-num">8</span>Finance &amp; conformité</div>
+            <div class="etape-btns">
+              <button class="tab-btn" onclick="switchTab('params','lbcft')" title="Seuils de vigilance et déclaration CENTIF (blanchiment de capitaux)"><i>🛡️</i>LBCFT</button>
+              <button class="tab-btn" onclick="switchTab('params','tresorerie')" title="Plafonds caisse/espèces, devise, rapprochement bancaire"><i>💵</i>Trésorerie &amp; Caisse</button>
+              <button class="tab-btn" onclick="switchTab('params','budget')" title="Méthode budgétaire et seuils de dépassement"><i>📈</i>Budget</button>
+              <button class="tab-btn" onclick="switchTab('params','dqe')" title="Marge, aléas et validité des devis quantitatifs estimatifs"><i>🧮</i>DQE</button>
+              <button class="tab-btn" onclick="switchTab('params','debourse')" title="Seuils et circuit de validation des débours chantier"><i>🏗️</i>Débourse</button>
+              <button class="tab-btn" onclick="switchTab('params','stockachats')" title="Stock, achats et délais fournisseurs"><i>📦</i>Stock &amp; Achats</button>
+            </div>
+          </div>
+          <div class="etape">
+            <div class="etape-hd"><span class="etape-num">9</span>Patrimoine &amp; terrain</div>
+            <div class="etape-btns">
+              <button class="tab-btn" onclick="switchTab('params','foncier')" title="Alertes titres fonciers et délais d'instruction"><i>🗺️</i>Foncier</button>
+              <button class="tab-btn" onclick="switchTab('params','juridique')" title="Échéances contractuelles et prescription"><i>⚖️</i>Juridique</button>
+              <button class="tab-btn" onclick="switchTab('params','locatif')" title="Indexation, préavis et pénalités de loyer"><i>🏠</i>Locatif</button>
+              <button class="tab-btn" onclick="switchTab('params','copropriete')" title="Charges, quorum AG et fonds de réserve"><i>🏢</i>Copropriété</button>
+              <button class="tab-btn" onclick="switchTab('params','parcauto')" title="Alertes visite technique, assurance et entretien"><i>🚗</i>Parc auto</button>
+            </div>
+          </div>
+          <div class="etape">
+            <div class="etape-hd"><span class="etape-num">10</span>Relation client &amp; communication</div>
+            <div class="etape-btns">
+              <button class="tab-btn" onclick="switchTab('params','crm')" title="Relance prospects, score de qualification, territoires"><i>🎯</i>CRM</button>
+              <button class="tab-btn" onclick="switchTab('params','messagerie')" title="Rappels de rendez-vous et signature email"><i>📅</i>Messagerie &amp; Calendrier</button>
+              <button class="tab-btn" onclick="switchTab('params','diaspo')" title="Devise, taux de change et canal privilégié diaspora"><i>🌐</i>Diaspora</button>
+            </div>
+          </div>
         </div>
 
         <!-- Société -->
@@ -6881,6 +6910,16 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
 
         <!-- Workflow -->
         <div class="tab-pane" id="tab-params-workflow">
+          <div class="card" style="margin-bottom:16px;">
+            <div class="form-section-title">🔐 Seuils de validation hiérarchique par montant</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Validation N+1 au-delà de (FCFA)</label><input type="number" id="param-workflow-seuil-n1" class="form-control" value="1000000" min="0" step="50000"></div>
+              <div class="form-group"><label>Validation direction (N+2) au-delà de (FCFA)</label><input type="number" id="param-workflow-seuil-n2" class="form-control" value="5000000" min="0" step="100000"></div>
+              <div class="form-group"><label>Validation PDG au-delà de (FCFA)</label><input type="number" id="param-workflow-seuil-pdg" class="form-control" value="20000000" min="0" step="500000"></div>
+            </div>
+            <div class="alert alert-info" style="margin-top:12px;font-size:11px;">ℹ️ Ces seuils s'appliquent aux débours chantier, bons de commande et sorties de trésorerie soumis à circuit de validation.</div>
+            <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="saveWorkflowParams()">💾 Enregistrer</button>
+          </div>
           <div id="params-workflow-content">
             <div style="text-align:center;padding:30px;color:var(--dim);"><span class="spinner dark"></span> Chargement...</div>
           </div>
@@ -7618,6 +7657,249 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <div class="form-group"></div>
             </div>
             <div style="margin-top:14px;"><button class="btn btn-primary" onclick="saveComptesDefaut()">💾 Enregistrer les comptes par défaut</button></div>
+          </div>
+        </div>
+
+        <!-- LBCFT -->
+        <div class="tab-pane" id="tab-params-lbcft">
+          <div class="alert alert-info" style="margin-bottom:16px;">🛡️ Lutte contre le blanchiment de capitaux et le financement du terrorisme — conformité CENTIF / BCEAO. Ces seuils déclenchent les alertes de vigilance dans les modules Clients, Paiements et Trésorerie.</div>
+          <div class="card">
+            <div class="form-section-title">🛡️ Seuils de vigilance</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Seuil déclaration opération suspecte (FCFA)</label><input type="number" id="param-lbcft-seuil-suspect" class="form-control" value="5000000" min="0" step="100000"></div>
+              <div class="form-group"><label>Seuil identification client renforcée (FCFA)</label><input type="number" id="param-lbcft-seuil-id-renforcee" class="form-control" value="2500000" min="0" step="100000"></div>
+              <div class="form-group"><label>Fréquence de revue KYC (mois)</label><input type="number" id="param-lbcft-revue-kyc-mois" class="form-control" value="12" min="1"></div>
+              <div class="form-group"><label>Durée de conservation des documents (années)</label><input type="number" id="param-lbcft-conservation-annees" class="form-control" value="10" min="1"></div>
+              <div class="form-group"><label>Responsable LBCFT</label><input type="text" id="param-lbcft-responsable" class="form-control" placeholder="Nom du responsable conformité"></div>
+              <div class="form-group"><label>Email déclaration CENTIF</label><input type="email" id="param-lbcft-email-centif" class="form-control" placeholder="conformite@societe.ci"></div>
+              <div class="form-group span-2" style="display:flex;align-items:center;gap:10px;">
+                <input type="checkbox" id="param-lbcft-controle-pep" style="width:auto;"><label for="param-lbcft-controle-pep" style="margin:0;">Filtrage des personnes politiquement exposées (PEP) actif</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trésorerie & Caisse -->
+        <div class="tab-pane" id="tab-params-tresorerie">
+          <div class="card">
+            <div class="form-section-title">💵 Plafonds &amp; contrôle</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Plafond caisse journalier (FCFA)</label><input type="number" id="param-treso-plafond-caisse" class="form-control" value="2000000" min="0" step="50000"></div>
+              <div class="form-group"><label title="Réglementation BCEAO sur les paiements en espèces">Plafond paiement espèces (FCFA)</label><input type="number" id="param-treso-plafond-especes" class="form-control" value="5000000" min="0" step="50000"></div>
+              <div class="form-group"><label>Seuil alerte solde bas (FCFA)</label><input type="number" id="param-treso-seuil-alerte-solde" class="form-control" value="500000" min="0" step="50000"></div>
+              <div class="form-group"><label>Délai rapprochement bancaire (jours)</label><input type="number" id="param-treso-delai-rapprochement" class="form-control" value="5" min="1"></div>
+              <div class="form-group"><label>Devise de référence</label>
+                <select id="param-treso-devise-ref" class="form-control">
+                  <option value="XOF" selected>XOF (FCFA)</option>
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+              <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+                <input type="checkbox" id="param-treso-double-validation" style="width:auto;"><label for="param-treso-double-validation" style="margin:0;">Double validation obligatoire pour toute sortie de fonds</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Budget -->
+        <div class="tab-pane" id="tab-params-budget">
+          <div class="card">
+            <div class="form-section-title">📈 Méthode &amp; seuils budgétaires</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Méthode budgétaire</label>
+                <select id="param-budget-methode" class="form-control">
+                  <option value="exercice_fixe" selected>Exercice fixe</option>
+                  <option value="annuel_glissant">Annuel glissant</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Devise budget</label><input type="text" id="param-budget-devise" class="form-control" value="XOF"></div>
+              <div class="form-group"><label>Seuil alerte dépassement (%)</label><input type="number" id="param-budget-seuil-depassement-pct" class="form-control" value="10" min="0" max="100"></div>
+              <div class="form-group"><label>Validation direction obligatoire au-delà de (FCFA)</label><input type="number" id="param-budget-validation-montant" class="form-control" value="5000000" min="0" step="100000"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DQE -->
+        <div class="tab-pane" id="tab-params-dqe">
+          <div class="card">
+            <div class="form-section-title">🧮 Devis quantitatif estimatif</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Marge par défaut (%)</label><input type="number" id="param-dqe-marge-defaut-pct" class="form-control" value="15" min="0"></div>
+              <div class="form-group"><label>Coefficient aléas (%)</label><input type="number" id="param-dqe-coeff-aleas-pct" class="form-control" value="5" min="0"></div>
+              <div class="form-group"><label>TVA applicable (%)</label><input type="number" id="param-dqe-tva-pct" class="form-control" value="18" min="0"></div>
+              <div class="form-group"><label>Validité du devis (jours)</label><input type="number" id="param-dqe-validite-jours" class="form-control" value="30" min="1"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Débourse -->
+        <div class="tab-pane" id="tab-params-debourse">
+          <div class="card">
+            <div class="form-section-title">🏗️ Validation des débours chantier</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Seuil de validation débours (FCFA)</label><input type="number" id="param-debourse-seuil-validation" class="form-control" value="1000000" min="0" step="50000"></div>
+              <div class="form-group"><label>Compte comptable débours par défaut</label><input type="text" id="param-debourse-compte-defaut" class="form-control" list="dl-plan-comptable" placeholder="231"></div>
+              <div class="form-group span-2"><label>Circuit de validation</label>
+                <select id="param-debourse-circuit" class="form-control">
+                  <option value="chef_dg" selected>Chef de chantier → Direction Générale</option>
+                  <option value="chef_daf_dg">Chef de chantier → DAF → Direction Générale</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stock & Achats -->
+        <div class="tab-pane" id="tab-params-stockachats">
+          <div class="card">
+            <div class="form-section-title">📦 Stock, achats &amp; fournisseurs</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Seuil stock minimum d'alerte (%)</label><input type="number" id="param-stock-seuil-min-alerte" class="form-control" value="20" min="0" max="100"></div>
+              <div class="form-group"><label>Méthode de valorisation du stock</label>
+                <select id="param-stock-methode-valorisation" class="form-control">
+                  <option value="CUMP" selected>CUMP (coût unitaire moyen pondéré)</option>
+                  <option value="FIFO">FIFO (premier entré, premier sorti)</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Délai de paiement fournisseur par défaut (jours)</label><input type="number" id="param-achats-delai-paiement-jours" class="form-control" value="30" min="0"></div>
+              <div class="form-group"><label>Seuil validation bon de commande (FCFA)</label><input type="number" id="param-achats-seuil-validation-bc" class="form-control" value="500000" min="0" step="50000"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Foncier -->
+        <div class="tab-pane" id="tab-params-foncier">
+          <div class="card">
+            <div class="form-section-title">🗺️ Titres &amp; dossiers fonciers</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Alerte expiration titre foncier (jours avant)</label><input type="number" id="param-foncier-alerte-titre-jours" class="form-control" value="60" min="1"></div>
+              <div class="form-group"><label>Délai d'instruction dossier (jours)</label><input type="number" id="param-foncier-delai-instruction" class="form-control" value="30" min="1"></div>
+              <div class="form-group"><label>Taux redevance foncière par défaut (%)</label><input type="number" id="param-foncier-taux-redevance" class="form-control" value="0" min="0" step="0.1"></div>
+              <div class="form-group"><label>Référence registre / conservation foncière</label><input type="text" id="param-foncier-registre-ref" class="form-control" placeholder="Conservation foncière de..."></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Juridique -->
+        <div class="tab-pane" id="tab-params-juridique">
+          <div class="card">
+            <div class="form-section-title">⚖️ Contrats &amp; contentieux</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Alerte échéance contrat (jours avant)</label><input type="number" id="param-juridique-alerte-echeance-jours" class="form-control" value="30" min="1"></div>
+              <div class="form-group"><label>Délai de prescription par défaut (années)</label><input type="number" id="param-juridique-prescription-annees" class="form-control" value="5" min="1"></div>
+              <div class="form-group"><label>Cabinet d'avocat référent</label><input type="text" id="param-juridique-cabinet" class="form-control"></div>
+              <div class="form-group"><label>Format numérotation des dossiers</label><input type="text" id="param-juridique-numerotation" class="form-control" placeholder="JUR-{ANNEE}-{SEQ}"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Locatif -->
+        <div class="tab-pane" id="tab-params-locatif">
+          <div class="card">
+            <div class="form-section-title">🏠 Règles de gestion locative</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Indexation loyer annuelle (%)</label><input type="number" id="param-locatif-indexation-pct" class="form-control" value="3" min="0" step="0.1"></div>
+              <div class="form-group"><label>Préavis de résiliation (jours)</label><input type="number" id="param-locatif-preavis-jours" class="form-control" value="90" min="1"></div>
+              <div class="form-group"><label>Pénalité retard loyer (%)</label><input type="number" id="param-locatif-penalite-retard-pct" class="form-control" value="5" min="0"></div>
+              <div class="form-group"><label>Dépôt de garantie (mois de loyer)</label><input type="number" id="param-locatif-depot-garantie-mois" class="form-control" value="2" min="0"></div>
+              <div class="form-group"><label>Jour d'échéance loyer mensuel</label><input type="number" id="param-locatif-jour-echeance" class="form-control" value="5" min="1" max="28"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Copropriété -->
+        <div class="tab-pane" id="tab-params-copropriete">
+          <div class="card">
+            <div class="form-section-title">🏢 Charges &amp; assemblée générale</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Fréquence d'appel de charges</label>
+                <select id="param-copro-frequence-charges" class="form-control">
+                  <option value="mensuelle">Mensuelle</option>
+                  <option value="trimestrielle" selected>Trimestrielle</option>
+                  <option value="annuelle">Annuelle</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Taux d'intérêt retard charges (%/mois)</label><input type="number" id="param-copro-taux-interet-retard" class="form-control" value="1" min="0" step="0.1"></div>
+              <div class="form-group"><label>Quorum assemblée générale (%)</label><input type="number" id="param-copro-quorum-ag" class="form-control" value="50" min="1" max="100"></div>
+              <div class="form-group"><label>Fonds de réserve (% du budget)</label><input type="number" id="param-copro-fonds-reserve-pct" class="form-control" value="5" min="0" max="100"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parc auto -->
+        <div class="tab-pane" id="tab-params-parcauto">
+          <div class="card">
+            <div class="form-section-title">🚗 Maintenance &amp; conformité véhicules</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Alerte visite technique (jours avant)</label><input type="number" id="param-parcauto-alerte-visite-jours" class="form-control" value="30" min="1"></div>
+              <div class="form-group"><label>Alerte échéance assurance (jours avant)</label><input type="number" id="param-parcauto-alerte-assurance-jours" class="form-control" value="30" min="1"></div>
+              <div class="form-group"><label>Seuil kilométrage entretien</label><input type="number" id="param-parcauto-seuil-entretien-km" class="form-control" value="500" min="0" step="100"></div>
+              <div class="form-group"><label>Plafond carburant mensuel (FCFA / véhicule)</label><input type="number" id="param-parcauto-plafond-carburant" class="form-control" value="150000" min="0" step="10000"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CRM -->
+        <div class="tab-pane" id="tab-params-crm">
+          <div class="card">
+            <div class="form-section-title">🎯 Pilotage commercial</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Délai relance prospect (jours)</label><input type="number" id="param-crm-delai-relance-prospect" class="form-control" value="3" min="1"></div>
+              <div class="form-group"><label>Score minimum de qualification lead</label><input type="number" id="param-crm-score-min-qualif" class="form-control" value="50" min="0" max="100"></div>
+              <div class="form-group"><label>Source lead par défaut</label>
+                <select id="param-crm-source-defaut" class="form-control">
+                  <option value="site_web">Site web</option>
+                  <option value="walk_in">Walk-in</option>
+                  <option value="reference">Référence</option>
+                  <option value="reseaux_sociaux">Réseaux sociaux</option>
+                  <option value="salon">Salon / événement</option>
+                </select>
+              </div>
+              <div class="form-group span-2"><label>Zones / territoires commerciaux (un par ligne)</label>
+                <textarea class="form-control" id="param-crm-territoires" rows="3" placeholder="Cocody&#10;Yopougon&#10;Bassam"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Messagerie & Calendrier -->
+        <div class="tab-pane" id="tab-params-messagerie">
+          <div class="card">
+            <div class="form-section-title">📅 Rendez-vous &amp; communication</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Rappel rendez-vous (minutes avant)</label><input type="number" id="param-agenda-rappel-minutes" class="form-control" value="30" min="1"></div>
+              <div class="form-group"><label>Heure d'ouverture bureau</label><input type="time" id="param-agenda-heure-debut" class="form-control" value="08:00"></div>
+              <div class="form-group"><label>Heure de fermeture bureau</label><input type="time" id="param-agenda-heure-fin" class="form-control" value="18:00"></div>
+              <div class="form-group span-2"><label>Signature email par défaut</label>
+                <textarea class="form-control" id="param-agenda-signature" rows="3" placeholder="Cordialement,&#10;L'équipe commerciale"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Diaspora -->
+        <div class="tab-pane" id="tab-params-diaspo">
+          <div class="card">
+            <div class="form-section-title">🌐 Clientèle diaspora</div>
+            <div class="form-grid" style="margin-top:10px;">
+              <div class="form-group"><label>Devise de réception diaspora</label>
+                <select id="param-diaspo-devise" class="form-control">
+                  <option value="EUR" selected>EUR</option>
+                  <option value="USD">USD</option>
+                  <option value="XOF">XOF</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Taux de change référence (vers XOF)</label><input type="number" id="param-diaspo-taux-change-ref" class="form-control" value="655.957" min="0" step="0.001"></div>
+              <div class="form-group"><label>Canal de contact privilégié</label>
+                <select id="param-diaspo-canal" class="form-control">
+                  <option value="whatsapp" selected>WhatsApp</option>
+                  <option value="email">Email</option>
+                  <option value="telephone">Téléphone</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Délai de traitement dossier diaspora (jours)</label><input type="number" id="param-diaspo-delai-traitement-jours" class="form-control" value="15" min="1"></div>
+            </div>
           </div>
         </div>
 
