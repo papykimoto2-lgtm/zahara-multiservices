@@ -123498,9 +123498,16 @@ function caisseRenderDashboard(){
   var b = _cdBornes();
   var caissesFiltre = _cdCaissesDeDivision(CAISSE_DASH.division);
   var idsFiltre = caissesFiltre.map(function(c){ return c.id; });
-  var mvts = _cdMvtsPeriode(b);
-  var entrees = mvts.filter(function(m){ return m.type==='entree'; });
-  var sorties = mvts.filter(function(m){ return m.type==='sortie'; });
+  /* [FIX même défaut qu'incident 2026-09-10, Menko Agro — cf. brouillards
+     par session/période] Un mouvement en attente de validation (ou rejeté)
+     était quand même compté dans les totaux Entrées/Sorties du tableau de
+     bord — alors que caisseSoldeSession() (le calcul officiel) les exclut
+     tant qu'ils ne sont pas validés. Le tableau de bord surestimait donc
+     l'activité réelle de la caisse, potentiellement de façon significative
+     si des demandes restent longtemps en attente. */
+  var mvtsEffectifs = _cdMvtsPeriode(b).filter(function(m){ return !m.requiert_validation || m.valide === true; });
+  var entrees = mvtsEffectifs.filter(function(m){ return m.type==='entree'; });
+  var sorties = mvtsEffectifs.filter(function(m){ return m.type==='sortie'; });
   var totE = entrees.reduce(function(s,m){ return s+(parseFloat(m.montant)||0); },0);
   var totD = sorties.reduce(function(s,m){ return s+(parseFloat(m.montant)||0); },0);
 
@@ -123550,6 +123557,9 @@ function caisseRenderDashboard(){
   moisCles.forEach(function(mc){ parMois[mc.key] = { e:0, d:0 }; });
   (DATA.caisse_mouvements||[]).forEach(function(x){
     if (idsFiltre.indexOf(x.caisse_id) < 0) return;
+    /* Même correctif que ci-dessus : la courbe 12 mois ne doit pas non plus
+       compter les mouvements encore en attente de validation ou rejetés. */
+    if (x.requiert_validation && x.valide !== true) return;
     var key = (x.date||'').slice(0,7);
     var bucket = parMois[key];
     if (!bucket) return;   /* hors des 12 derniers mois affichés */
