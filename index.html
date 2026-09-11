@@ -25055,7 +25055,18 @@ function getSBConfig() {
 async function fetchUserFromCloud(login) {
   if (!SB.url || !SB.key || !navigator.onLine) return null;
   try {
-    var rows = await sbFetch('pi_users?login=eq.' + encodeURIComponent(login) + '&select=*&limit=1', 'GET');
+    /* [FIX connexion aléatoire] Sans ORDER BY, 'limit=1' renvoie une ligne au
+       choix de Postgres — non déterministe — dès qu'un même login existe en
+       double (plusieurs comptes créés par erreur pour le même identifiant,
+       cas rencontré en production). Résultat vécu : les MÊMES identifiants
+       étaient acceptés une fois et refusés la suivante, selon la ligne
+       renvoyée par hasard, chacune ayant potentiellement un mot de passe
+       différent. On prend désormais systématiquement le compte le plus
+       récemment modifié — cohérent avec la logique "cloud le plus récent
+       gagne" déjà appliquée juste après par doLogin(). Ne résout pas les
+       doublons existants (à nettoyer côté Paramètres → Utilisateurs), mais
+       rend le comportement stable au lieu d'aléatoire en attendant. */
+    var rows = await sbFetch('pi_users?login=eq.' + encodeURIComponent(login) + '&select=*&order=updated_at.desc.nullslast&limit=1', 'GET');
     return (rows && rows.length) ? rows[0] : null;
   } catch (e) { return null; }
 }
