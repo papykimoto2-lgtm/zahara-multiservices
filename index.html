@@ -16390,6 +16390,13 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <button class="tab-btn" onclick="switchTab('copropriete','ag')"><i>🗳️</i>Assemblées générales</button>
             </div>
           </div>
+          <div class="etape">
+            <div class="etape-hd"><span class="etape-num">5</span>Contrôle</div>
+            <div class="etape-btns">
+              <button class="tab-btn" onclick="switchTab('copropriete','etats');copRenderEtats()" title="Documents annuels destinés au commissaire aux comptes / à l'assemblée générale"><i>📊</i>États de synthèse</button>
+              <button class="tab-btn" onclick="switchTab('copropriete','rapportcac');copRenderRapportCAC()" title="Rapport annuel du commissaire aux comptes à l'assemblée générale"><i>📝</i>Rapport commissaire aux comptes</button>
+            </div>
+          </div>
         </div>
 
 
@@ -16463,6 +16470,80 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <button class="btn btn-primary btn-sm" onclick="copGenererFondsTravaux()">Générer et répartir aux lots</button>
           </div>
           <div id="cop-fonds-liste"></div>
+        </div>
+
+        <div class="tab-pane" id="tab-copropriete-etats">
+          <div class="alert alert-info">Documents de contrôle destinés au commissaire aux comptes et à l'assemblée générale — comptabilité d'engagement, opérations courantes séparées des travaux (AUDCIF).</div>
+          <div class="card" style="margin-bottom:14px;">
+            <div class="form-grid">
+              <div class="form-group"><label>Immeuble *</label><select id="cop-etat-immeuble" class="form-control" onchange="copRenderEtats()"></select></div>
+              <div class="form-group"><label>Exercice / période (vide = tout l'historique)</label><input type="text" id="cop-etat-exercice" class="form-control" placeholder="2027" oninput="copRenderEtats()"></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <h3>📗 Compte de gestion</h3>
+              <button class="btn btn-secondary btn-sm" onclick="etatCompteGestionCopro()">🖨️ PDF</button>
+            </div>
+            <div id="cop-etat-gestion"></div>
+          </div>
+
+          <div class="card" style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <h3>🏗️ État des travaux votés et non clôturés</h3>
+              <button class="btn btn-secondary btn-sm" onclick="etatTravauxNonCloturesCopro()">🖨️ PDF</button>
+            </div>
+            <div id="cop-etat-travaux"></div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <h3>📒 État des dettes et créances copropriétaires</h3>
+              <button class="btn btn-secondary btn-sm" onclick="etatDettesCreancesCopro()">🖨️ PDF</button>
+            </div>
+            <div id="cop-etat-dettes"></div>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-copropriete-rapportcac">
+          <div class="alert alert-info">Rapport annuel rendu par le commissaire aux comptes à l'assemblée générale : synthèse des vérifications, anomalies détectées, avis sur la régularité des comptes.</div>
+          <div class="card" style="margin-bottom:14px;">
+            <div class="form-grid">
+              <div class="form-group"><label>Immeuble *</label><select id="cac-immeuble" class="form-control" onchange="copRenderRapportCAC()"></select></div>
+              <div class="form-group"><label>Exercice contrôlé *</label><input type="text" id="cac-exercice" class="form-control" placeholder="2027" oninput="copRenderRapportCAC()"></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:14px;">
+            <h3 style="margin-bottom:10px;">🔍 Constats automatiques</h3>
+            <div id="cac-constats" style="font-size:12px;"></div>
+          </div>
+
+          <div class="card" style="margin-bottom:14px;">
+            <h3 style="margin-bottom:10px;">✍️ Rapport</h3>
+            <div class="form-grid">
+              <div class="form-group"><label>Commissaire aux comptes (nom)</label><input type="text" id="cac-nom" class="form-control"></div>
+              <div class="form-group"><label>Date du rapport</label><input type="date" id="cac-date" class="form-control"></div>
+              <div class="form-group span-2"><label>Avis sur la régularité des comptes</label>
+                <select id="cac-avis" class="form-control">
+                  <option value="sans_reserve">Certifié sans réserve</option>
+                  <option value="avec_reserves">Certifié avec réserves</option>
+                  <option value="refus">Refus de certifier</option>
+                </select>
+              </div>
+              <div class="form-group span-2"><label>Observations / réserves</label><textarea id="cac-observations" class="form-control" rows="5" placeholder="Détail des vérifications effectuées, réserves motivées le cas échéant..."></textarea></div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary btn-sm" onclick="copSaveRapportCAC()">💾 Enregistrer</button>
+              <button class="btn btn-secondary btn-sm" onclick="etatRapportCAC()">🖨️ PDF</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 style="margin-bottom:10px;">📚 Historique des rapports</h3>
+            <div id="cac-historique"></div>
+          </div>
         </div>
       </div>
 
@@ -23482,6 +23563,7 @@ var DATA = {
   appels_charges_copro: [],
   ag_copro: [],
   fonds_travaux_copro: [],
+  rapports_commissaire_copro: [],
   versements: [],
   programmes: [],
   lots: [],
@@ -23683,7 +23765,7 @@ var ALL_STORES = [
   'cessions_foncieres',
   /* v140 — Déclarations de versement (portail acquéreur foncier) */
   'declarations_versement_foncier',
-  'coproprietes','lots_copro','budgets_copro','appels_charges_copro','ag_copro','fonds_travaux_copro',
+  'coproprietes','lots_copro','budgets_copro','appels_charges_copro','ag_copro','fonds_travaux_copro','rapports_commissaire_copro',
   'demarcheurs','etats_lieux_bail','restitutions_caution',
   'relances_locatives',
   /* v117 */ 'lot_unites',
@@ -25692,6 +25774,7 @@ var SUPA_STORE_MAP = [
   ['pi_appels_charges_copro','appels_charges_copro'],
   ['pi_ag_copro','ag_copro'],
   ['pi_fonds_travaux_copro','fonds_travaux_copro'],
+  ['pi_rapports_commissaire_copro','rapports_commissaire_copro'],
   ['pi_lot_unites',       'lot_unites'],
   ['pi_eds_ouvrages',    'eds_ouvrages'],
   ['pi_eds_etudes',      'eds_etudes'],
@@ -25849,7 +25932,7 @@ function _libelleStore(store) {
     conceptions:'Conceptions/Études', plans_arch:'Plans architecturaux', nomenclatures:'Nomenclatures DQE',
     prix_unitaire:'Prix unitaires', devis_fournisseurs:'Devis fournisseurs', biens_amort:'Immobilisations',
     releves_bank:'Relevés bancaires', rapprochements:'Rapprochements', dossiersJuridiques:'Dossiers juridiques', docs_juridiques:'Documents juridiques',
-    custom_roles:'Rôles personnalisés', portail_messages:'Messages portail', portail_medias:'Médias portail', declarations_versement_foncier:'Déclarations de versement (foncier)', coproprietes:'Copropriétés', lots_copro:'Lots copropriété', budgets_copro:'Budgets copropriété', appels_charges_copro:'Appels de charges', ag_copro:'Assemblées générales', fonds_travaux_copro:'Fonds travaux', demarcheurs:'Démarcheurs', etats_lieux_bail:'États des lieux', restitutions_caution:'Restitutions de caution', relances_locatives:'Relances loyers impayés',
+    custom_roles:'Rôles personnalisés', portail_messages:'Messages portail', portail_medias:'Médias portail', declarations_versement_foncier:'Déclarations de versement (foncier)', coproprietes:'Copropriétés', lots_copro:'Lots copropriété', budgets_copro:'Budgets copropriété', appels_charges_copro:'Appels de charges', ag_copro:'Assemblées générales', fonds_travaux_copro:'Fonds travaux', rapports_commissaire_copro:'Rapports commissaire aux comptes', demarcheurs:'Démarcheurs', etats_lieux_bail:'États des lieux', restitutions_caution:'Restitutions de caution', relances_locatives:'Relances loyers impayés',
     visites_rdv:'Rendez-vous/Visites', visites_log:'Registre des visites', visites_blacklist:'Liste noire visites',
     logs_connexion:'Journaux de connexion', historique_actions:'Historique des actions', incidents:'Déclarations d\'incident',
     relances:'Relances CRM', itineraires:'Itinéraires', etapes_itineraire:'Étapes itinéraire', cr_visites:'Comptes-rendus visites', ordres_mission:'Ordres de mission',
@@ -44326,7 +44409,7 @@ var RESET_CATEGORIES = [
             'declarations_versement_foncier','sig_couches'],
     description:'Programmes, lots, terrains, parcelles, cessions, opérations et aménagement foncier, SIG' },
   { id:'copropriete', label:'Copropriété & Syndic', icon:'🏢', color:'#0EA5E9',
-    stores:['coproprietes','lots_copro','budgets_copro','appels_charges_copro','ag_copro','fonds_travaux_copro'],
+    stores:['coproprietes','lots_copro','budgets_copro','appels_charges_copro','ag_copro','fonds_travaux_copro','rapports_commissaire_copro'],
     description:'Immeubles en copropriété, lots/tantièmes, budgets, appels de charges, AG, fonds travaux' },
   { id:'partenaires_lot', label:'Partenaires Lotissement', icon:'🤝', color:'#1a6b3a',
     stores:['partenaires_lot','dossiers_lot','rapports_lot'],
@@ -44403,7 +44486,7 @@ var STORE_LABELS = {
   conv_agrement:'Conventions d\u2019agrément', previsionnels:'Prévisionnels / business plans',
   amenageurs:'Aménageurs', conventions_amenagement:'Conventions d\u2019aménagement',
   situations_amenagement:'Situations d\u2019aménagement', avenants_amenagement:'Avenants d\u2019aménagement',
-  declarations_versement_foncier:'Déclarations de versement foncier', coproprietes:'Copropriétés', lots_copro:'Lots copropriété', budgets_copro:'Budgets copropriété', appels_charges_copro:'Appels de charges', ag_copro:'Assemblées générales', fonds_travaux_copro:'Fonds travaux', demarcheurs:'Démarcheurs', etats_lieux_bail:'États des lieux', restitutions_caution:'Restitutions de caution', relances_locatives:'Relances loyers impayés', sig_couches:'Couches SIG / cartographie',
+  declarations_versement_foncier:'Déclarations de versement foncier', coproprietes:'Copropriétés', lots_copro:'Lots copropriété', budgets_copro:'Budgets copropriété', appels_charges_copro:'Appels de charges', ag_copro:'Assemblées générales', fonds_travaux_copro:'Fonds travaux', rapports_commissaire_copro:'Rapports commissaire aux comptes', demarcheurs:'Démarcheurs', etats_lieux_bail:'États des lieux', restitutions_caution:'Restitutions de caution', relances_locatives:'Relances loyers impayés', sig_couches:'Couches SIG / cartographie',
   /* Partenaires lotissement */
   partenaires_lot:'Partenaires lotissement', dossiers_lot:'Dossiers de lotissement',
   rapports_lot:'Rapports d\u2019avancement lotissement',
@@ -72495,6 +72578,307 @@ function copRenderKPIs(){
   el.innerHTML = kpi('Immeubles', nbIm) + kpi('Lots', nbLots) + kpi('Charges appelées', fcfa(totAppele)) + kpi('Charges encaissées', fcfa(totRegle));
 }
 
+/* Rafraîchit TOUS les onglets Copropriété d'un coup — usage réservé au temps
+   réel (_rtRefreshPage), distinct de coproEnter() (arrivée sur la page :
+   immeubles + KPIs seulement, chaque autre onglet se rend à la demande via
+   coproSwitchTab()) et de coproSwitchTab() (un seul onglet à la fois). Sans
+   cette fonction, une donnée modifiée par un autre poste (appel de charges,
+   AG, fonds travaux…) était bien reçue et appliquée à DATA en arrière-plan,
+   mais n'apparaissait jamais à l'écran si la page Copropriété était déjà
+   ouverte — jusqu'à un changement d'onglet ou un rechargement complet. Nom
+   volontairement différent de coproEnter()/coproSwitchTab() pour ne pas
+   laisser croire que l'un remplace l'autre. */
+function copRafraichirTout(){
+  copFillSelects();
+  copRenderKPIs();
+  copRenderImmeubles();
+  copRenderBudgets();
+  copRenderAppels();
+  copRenderAG();
+  copRenderFonds();
+  if (typeof copRenderEtats === 'function') copRenderEtats();
+  if (typeof copRenderRapportCAC === 'function') copRenderRapportCAC();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ÉTATS DE SYNTHÈSE COPROPRIÉTÉ — documents annuels de contrôle destinés
+   au commissaire aux comptes et à l'assemblée générale. Comptabilité
+   d'engagement AUDCIF : opérations courantes et travaux strictement
+   séparées, jamais fongibles (fonds travaux = compte 165, non 706).
+   ═══════════════════════════════════════════════════════════════════════ */
+function copEtatsInitSelects(){
+  var sel=document.getElementById('cop-etat-immeuble');
+  if (sel && !sel.options.length) {
+    sel.innerHTML=(DATA.coproprietes||[]).map(function(c){ return '<option value="'+escHtml(c.id)+'">'+escHtml(c.nom)+'</option>'; }).join('');
+  }
+}
+function copRenderEtats(){
+  copEtatsInitSelects();
+  var coproId=(document.getElementById('cop-etat-immeuble')||{}).value||'';
+  var exercice=((document.getElementById('cop-etat-exercice')||{}).value||'').trim();
+  var box1=document.getElementById('cop-etat-gestion'), box2=document.getElementById('cop-etat-travaux'), box3=document.getElementById('cop-etat-dettes');
+  if (!coproId) {
+    var msg='<div class="alert alert-info" style="font-size:12px;">Sélectionnez un immeuble ci-dessus.</div>';
+    if(box1) box1.innerHTML=msg; if(box2) box2.innerHTML=msg; if(box3) box3.innerHTML=msg;
+    return;
+  }
+  if (box1) box1.innerHTML=copRenderCompteGestionHTML(copCompteGestion(coproId, exercice));
+  if (box2) box2.innerHTML=copRenderTravauxHTML(copTravauxNonClotures(coproId));
+  if (box3) box3.innerHTML=copRenderDettesHTML(copDettesCreances(coproId));
+}
+
+/* Compte de gestion : ce qui a été voté (budget), appelé et encaissé — courant
+   et travaux strictement séparés. Si l'immeuble est rattaché à une division
+   dédiée (champ optionnel de la fiche immeuble), ajoute le résultat réel
+   comptabilisé sur cette division (produits classe 7 − charges classe 6) :
+   sans ce rattachement, rien ne permet d'isoler les dépenses réelles d'UN
+   immeuble dans une comptabilité mutualisée entre plusieurs copropriétés —
+   on l'indique alors explicitement plutôt que d'afficher un chiffre faux. */
+function copCompteGestion(coproId, exercice){
+  var im=(DATA.coproprietes||[]).find(function(c){ return c.id===coproId; })||{};
+  var matchPeriode=function(p){ return !exercice || String(p||'').indexOf(exercice)!==-1; };
+  var appels=(DATA.appels_charges_copro||[]).filter(function(a){ return a.copropriete_id===coproId && matchPeriode(a.periode); });
+  var fonds=(DATA.fonds_travaux_copro||[]).filter(function(f){ return f.copropriete_id===coproId && matchPeriode(f.periode); });
+  var budgets=(DATA.budgets_copro||[]).filter(function(b){ return b.copropriete_id===coproId && (!exercice || String(b.exercice||'')===exercice); });
+  var sumRegle=function(list){ return list.reduce(function(s,x){ return s+(x.lignes||[]).reduce(function(ss,l){ return ss+(parseFloat(l.regle)||0); },0); },0); };
+  var courant={ budgetVote: budgets.reduce(function(s,b){ return s+(b.montant_total||0); },0),
+    appele: appels.reduce(function(s,a){ return s+(parseFloat(a.montant_total)||0); },0), regle: sumRegle(appels), nbAppels: appels.length };
+  courant.reste = Math.max(0, courant.appele - courant.regle);
+  var travaux={ appele: fonds.reduce(function(s,f){ return s+(parseFloat(f.cotisation_totale)||0); },0), regle: sumRegle(fonds), nbAppels: fonds.length };
+  travaux.reste = Math.max(0, travaux.appele - travaux.regle);
+  var reel=null;
+  if (im.division_id) {
+    var produits=0, charges=0;
+    (DATA.ecritures||[]).filter(function(e){ return e.division===im.division_id && (!exercice || (e.date||'').indexOf(exercice)===0); })
+      .forEach(function(e){
+        ecrLignes(e).forEach(function(l){
+          if (!l.compte) return;
+          var cl=String(l.compte).charAt(0), mt=parseFloat(l.montant)||0;
+          if (cl==='7') produits += (l.sens==='C'?1:-1)*mt;
+          if (cl==='6') charges  += (l.sens==='D'?1:-1)*mt;
+        });
+      });
+    reel={ produits:produits, charges:charges, resultat:produits-charges };
+  }
+  return { immeuble:im, exercice: exercice||"(tout l'historique)", courant:courant, travaux:travaux, reel:reel };
+}
+function copRenderCompteGestionHTML(g){
+  var ligne=function(l,a,b,c){ return '<tr><td>'+l+'</td><td style="text-align:right;">'+a+'</td><td style="text-align:right;">'+b+'</td><td style="text-align:right;">'+c+'</td></tr>'; };
+  var html='<div style="font-size:12px;color:#6B6B9A;margin-bottom:10px;">'+escHtml(g.immeuble.nom||'—')+' — Exercice '+escHtml(g.exercice)+'</div>'
+    +'<div class="table-wrap"><table><thead><tr><th></th><th style="text-align:right;">Voté / Appelé</th><th style="text-align:right;">Encaissé</th><th style="text-align:right;">Reste dû</th></tr></thead><tbody>'
+    +ligne('<strong>Compte de gestion GÉNÉRAL (opérations courantes)</strong>', fcfa(g.courant.appele), fcfa(g.courant.regle), fcfa(g.courant.reste))
+    +ligne('<span style="font-size:11px;color:#6B6B9A;">dont budget voté en AG</span>', fcfa(g.courant.budgetVote), '', '')
+    +ligne('<strong>Compte de gestion TRAVAUX (fonds travaux — cpte 165)</strong>', fcfa(g.travaux.appele), fcfa(g.travaux.regle), fcfa(g.travaux.reste))
+    +'</tbody></table></div>';
+  if (g.reel) {
+    html+='<div style="margin-top:12px;font-size:12px;"><strong>Résultat comptable réel</strong> (division dédiée à cet immeuble) : produits '+fcfa(g.reel.produits)+' — charges '+fcfa(g.reel.charges)
+      +' = <strong style="color:'+(g.reel.resultat>=0?'#16a34a':'#dc2626')+';">'+fcfa(g.reel.resultat)+'</strong></div>';
+  } else {
+    html+='<div class="alert alert-info" style="margin-top:12px;font-size:11px;">ℹ️ Cet immeuble n\'est rattaché à aucune division dédiée : les dépenses réelles (factures fournisseurs) ne peuvent pas être isolées de celles des autres copropriétés dans une comptabilité mutualisée. Seuls les montants appelés/encaissés figurent ci-dessus. Rattachez l\'immeuble à une division (fiche immeuble) pour activer le résultat comptable réel.</div>';
+  }
+  return html;
+}
+function etatCompteGestionCopro(){
+  var coproId=(document.getElementById('cop-etat-immeuble')||{}).value||'';
+  if(!coproId){ toast('Sélectionnez un immeuble.','error'); return; }
+  var exercice=((document.getElementById('cop-etat-exercice')||{}).value||'').trim();
+  var g=copCompteGestion(coproId, exercice);
+  genererEtatPDF({ titre:'Compte de gestion — '+g.immeuble.nom, sousTitre:'Exercice '+g.exercice, couleur:'#1D4ED8', contenu:copRenderCompteGestionHTML(g) });
+}
+
+/* État des travaux votés et non clôturés : appels au fonds travaux dont le
+   solde n'est pas intégralement encaissé — suivi des engagements pluriannuels. */
+function copTravauxNonClotures(coproId){
+  return (DATA.fonds_travaux_copro||[]).filter(function(f){ return !coproId || f.copropriete_id===coproId; })
+    .map(function(f){
+      var regle=(f.lignes||[]).reduce(function(s,l){ return s+(parseFloat(l.regle)||0); },0);
+      var im=(DATA.coproprietes||[]).find(function(c){ return c.id===f.copropriete_id; })||{};
+      return { fonds:f, immeuble:im, appele:f.cotisation_totale||0, regle:regle, reste:Math.max(0,(f.cotisation_totale||0)-regle),
+        pct: f.cotisation_totale ? Math.round(regle/f.cotisation_totale*100) : 0 };
+    })
+    .filter(function(x){ return x.reste > 0; })
+    .sort(function(a,b){ return (a.fonds.periode||'').localeCompare(b.fonds.periode||''); });
+}
+function copRenderTravauxHTML(list){
+  if (!list.length) return '<div class="alert alert-success" style="font-size:12px;">✅ Aucun fonds travaux en cours — tous les appels sont intégralement clôturés.</div>';
+  var rows=list.map(function(x){
+    return '<tr><td>'+escHtml(x.immeuble.nom||'—')+'</td><td>'+escHtml(x.fonds.periode||'')+'</td>'
+      +'<td style="text-align:right;">'+fcfa(x.appele)+'</td><td style="text-align:right;">'+fcfa(x.regle)+'</td>'
+      +'<td style="text-align:right;color:#dc2626;font-weight:700;">'+fcfa(x.reste)+'</td><td style="text-align:center;">'+x.pct+'%</td></tr>';
+  }).join('');
+  return '<div class="table-wrap"><table><thead><tr><th>Immeuble</th><th>Période</th><th style="text-align:right;">Cotisation votée</th><th style="text-align:right;">Encaissé</th><th style="text-align:right;">Reste à recouvrer</th><th>Avancement</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function etatTravauxNonCloturesCopro(){
+  var coproId=(document.getElementById('cop-etat-immeuble')||{}).value||'';
+  var im=(DATA.coproprietes||[]).find(function(c){ return c.id===coproId; });
+  genererEtatPDF({ titre:'État des travaux votés et non clôturés', sousTitre: im?im.nom:'Toutes copropriétés', orientation:'paysage', couleur:'#1D4ED8', contenu:copRenderTravauxHTML(copTravauxNonClotures(coproId)) });
+}
+
+/* État des dettes et créances : pour chaque lot, cumule tout ce qui a été
+   appelé (charges courantes + fonds travaux) moins tout ce qui a été réglé —
+   situation des impayés et des sommes à recevoir par copropriétaire. */
+function copDettesCreances(coproId){
+  var lots=(DATA.lots_copro||[]).filter(function(l){ return !coproId || l.copropriete_id===coproId; });
+  return lots.map(function(l){
+    var appeleCourant=0, regleCourant=0, appeleTravaux=0, regleTravaux=0;
+    (DATA.appels_charges_copro||[]).forEach(function(a){
+      (a.lignes||[]).forEach(function(x){ if (x.lot_id===l.id) { appeleCourant+=parseFloat(x.montant)||0; regleCourant+=parseFloat(x.regle)||0; } });
+    });
+    (DATA.fonds_travaux_copro||[]).forEach(function(f){
+      (f.lignes||[]).forEach(function(x){ if (x.lot_id===l.id) { appeleTravaux+=parseFloat(x.montant)||0; regleTravaux+=parseFloat(x.regle)||0; } });
+    });
+    return { lot:l, appele:appeleCourant+appeleTravaux, regle:regleCourant+regleTravaux, solde:(appeleCourant+appeleTravaux)-(regleCourant+regleTravaux) };
+  }).filter(function(x){ return x.appele>0; }).sort(function(a,b){ return b.solde-a.solde; });
+}
+function copRenderDettesHTML(list){
+  if (!list.length) return '<div class="alert alert-info" style="font-size:12px;">Aucun appel de charges émis pour l\'instant.</div>';
+  var totDu=0, totAvance=0;
+  var rows=list.map(function(x){
+    if (x.solde>0) totDu+=x.solde; else totAvance+=-x.solde;
+    var lib = x.solde>0 ? ('<span style="color:#dc2626;font-weight:700;">'+fcfa(x.solde)+' dû</span>')
+            : x.solde<0 ? ('<span style="color:#16a34a;">'+fcfa(-x.solde)+' trop-perçu</span>')
+            : '<span style="color:#6B6B9A;">Soldé</span>';
+    return '<tr><td>'+escHtml(x.lot.numero||'')+'</td><td>'+escHtml(x.lot.proprietaire_nom||'—')+'</td>'
+      +'<td style="text-align:right;">'+fcfa(x.appele)+'</td><td style="text-align:right;">'+fcfa(x.regle)+'</td>'
+      +'<td style="text-align:right;">'+lib+'</td></tr>';
+  }).join('');
+  return '<div class="table-wrap"><table><thead><tr><th>Lot</th><th>Copropriétaire</th><th style="text-align:right;">Total appelé</th><th style="text-align:right;">Total réglé</th><th style="text-align:right;">Situation</th></tr></thead><tbody>'+rows
+    +'<tr style="font-weight:700;border-top:2px solid #ddd;"><td colspan="4">TOTAUX</td><td style="text-align:right;">Dettes : '+fcfa(totDu)+' · Trop-perçus : '+fcfa(totAvance)+'</td></tr>'
+    +'</tbody></table></div>';
+}
+function etatDettesCreancesCopro(){
+  var coproId=(document.getElementById('cop-etat-immeuble')||{}).value||'';
+  if(!coproId){ toast('Sélectionnez un immeuble.','error'); return; }
+  var im=(DATA.coproprietes||[]).find(function(c){ return c.id===coproId; })||{};
+  genererEtatPDF({ titre:'État des dettes et créances copropriétaires', sousTitre: im.nom||'', orientation:'paysage', couleur:'#1D4ED8', contenu:copRenderDettesHTML(copDettesCreances(coproId)) });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   RAPPORT ANNUEL DU COMMISSAIRE AUX COMPTES À L'ASSEMBLÉE GÉNÉRALE
+   Synthèse des vérifications, anomalies détectées, avis sur la régularité
+   des comptes. Les constats automatiques appuient le contrôle mais ne
+   remplacent jamais le jugement professionnel du commissaire — les
+   vérifications documentaires (pièces justificatives, factures) restent
+   de son seul ressort.
+   ═══════════════════════════════════════════════════════════════════════ */
+function copConstatsCommissaire(coproId, exercice){
+  var constats=[];
+  var lots=(DATA.lots_copro||[]).filter(function(l){ return l.copropriete_id===coproId; });
+  var sumT=copSumTantiemes(coproId);
+  if (lots.length && sumT!==10000) {
+    constats.push({ niveau:'alerte', texte:'Tantièmes des lots saisis ('+sumT+' / 10000) ne totalisent pas 10 000 — vérifier la répartition avant toute clôture.' });
+  } else if (lots.length) {
+    constats.push({ niveau:'ok', texte:'Tantièmes cohérents : '+sumT+' / 10000 sur '+lots.length+' lot(s).' });
+  }
+  var g=copCompteGestion(coproId, exercice);
+  if (g.courant.reste > 0) {
+    constats.push({ niveau:'alerte', texte:'Charges courantes appelées non intégralement recouvrées : '+fcfa(g.courant.reste)+' restant dû sur '+fcfa(g.courant.appele)+' appelé.' });
+  } else if (g.courant.appele > 0) {
+    constats.push({ niveau:'ok', texte:'Charges courantes intégralement recouvrées ('+fcfa(g.courant.appele)+').' });
+  }
+  var travaux=copTravauxNonClotures(coproId).filter(function(x){ return !exercice || String(x.fonds.periode||'').indexOf(exercice)!==-1; });
+  if (travaux.length) {
+    var resteT=travaux.reduce(function(s,x){ return s+x.reste; },0);
+    constats.push({ niveau:'alerte', texte: travaux.length+' appel(s) au fonds travaux non clôturé(s) — '+fcfa(resteT)+' restant à recouvrer.' });
+  }
+  var dettes=copDettesCreances(coproId).filter(function(x){ return x.solde>0; });
+  if (dettes.length) {
+    var totDu=dettes.reduce(function(s,x){ return s+x.solde; },0);
+    constats.push({ niveau:'alerte', texte: dettes.length+' copropriétaire(s) en situation débitrice — '+fcfa(totDu)+' d\'impayés cumulés.' });
+  } else {
+    constats.push({ niveau:'ok', texte:'Aucun copropriétaire en situation débitrice.' });
+  }
+  var agExercice=(DATA.ag_copro||[]).filter(function(a){ return a.copropriete_id===coproId && (!exercice || (a.date||'').indexOf(exercice)===0); });
+  if (!agExercice.length) {
+    constats.push({ niveau:'alerte', texte:'Aucune assemblée générale enregistrée pour '+(exercice||'cet exercice')+' — vérifier si l\'AG annuelle a bien été tenue.' });
+  } else {
+    constats.push({ niveau:'ok', texte: agExercice.length+' assemblée(s) générale(s) tenue(s) sur la période.' });
+  }
+  var budgets=(DATA.budgets_copro||[]).filter(function(b){ return b.copropriete_id===coproId && (!exercice || String(b.exercice||'')===exercice); });
+  if (!budgets.length) {
+    constats.push({ niveau:'alerte', texte:'Aucun budget prévisionnel voté retrouvé pour '+(exercice||'cet exercice')+'.' });
+  }
+  return constats;
+}
+function copRenderConstatsHTML(constats){
+  if (!constats.length) return '<div class="alert alert-info" style="font-size:12px;">Sélectionnez un immeuble et un exercice.</div>';
+  return constats.map(function(c){
+    return '<div style="padding:6px 0;border-bottom:1px solid #eee;">'+(c.niveau==='alerte'?'🔴 ':'🟢 ')+escHtml(c.texte)+'</div>';
+  }).join('');
+}
+function copRenderRapportCAC(){
+  var sel=document.getElementById('cac-immeuble');
+  if (sel && !sel.options.length) {
+    sel.innerHTML=(DATA.coproprietes||[]).map(function(c){ return '<option value="'+escHtml(c.id)+'">'+escHtml(c.nom)+'</option>'; }).join('');
+  }
+  var dateEl=document.getElementById('cac-date');
+  if (dateEl && !dateEl.value) dateEl.value=today();
+  var coproId=(sel||{}).value||'';
+  var exercice=((document.getElementById('cac-exercice')||{}).value||'').trim();
+  var box=document.getElementById('cac-constats');
+  if (box) box.innerHTML = coproId ? copRenderConstatsHTML(copConstatsCommissaire(coproId, exercice)) : '<div class="alert alert-info" style="font-size:12px;">Sélectionnez un immeuble.</div>';
+  copRenderHistoriqueCAC(coproId);
+}
+function copRenderHistoriqueCAC(coproId){
+  var box=document.getElementById('cac-historique'); if(!box) return;
+  var list=(DATA.rapports_commissaire_copro||[]).filter(function(r){ return !coproId || r.copropriete_id===coproId; })
+    .slice().sort(function(a,b){ return (b.date_rapport||'').localeCompare(a.date_rapport||''); });
+  if (!list.length) { box.innerHTML='<div style="font-size:12px;color:#6B6B9A;">Aucun rapport enregistré pour l\'instant.</div>'; return; }
+  var avisLabel={ sans_reserve:'✅ Sans réserve', avec_reserves:'⚠️ Avec réserves', refus:'⛔ Refus de certifier' };
+  box.innerHTML=list.map(function(r){
+    return '<div style="padding:8px 0;border-bottom:1px solid #eee;font-size:12px;">'
+      +'<strong>Exercice '+escHtml(r.exercice||'—')+'</strong> — '+dateShort(r.date_rapport)+' — '+escHtml(r.commissaire_nom||'—')
+      +' — '+(avisLabel[r.avis]||escHtml(r.avis))+'</div>';
+  }).join('');
+}
+/* Rédiger et enregistrer son propre rapport reste la mission même du
+   commissaire : la restriction en lecture seule de son rôle porte sur les
+   DONNÉES comptables (il ne doit jamais pouvoir modifier une écriture, un
+   appel de charges…), pas sur le document qu'il produit lui-même. On
+   autorise donc la sauvegarde à quiconque peut consulter le module
+   Copropriété, sans passer par exigerDroit('Copropriete','c',...) qui
+   bloquerait à tort son propre rôle (droits volontairement fermés — voir
+   SYSTEM_ROLES.commissaire). */
+function peutRedigerRapportCAC(){
+  if (!APP.currentUser) return false;
+  var r=(typeof getAllRoles==='function') ? getAllRoles()[APP.currentUser.role] : null;
+  return !!(r && r.permissions && r.permissions['Copropriete']);
+}
+async function copSaveRapportCAC(){
+  if (!peutRedigerRapportCAC()) { toast('🔒 Votre profil ne permet pas de rédiger ce rapport.','error'); return; }
+  var coproId=(document.getElementById('cac-immeuble')||{}).value||'';
+  var exercice=((document.getElementById('cac-exercice')||{}).value||'').trim();
+  if (!coproId){ toast('Choisissez un immeuble.','error'); return; }
+  if (!exercice){ toast('Indiquez l\'exercice contrôlé.','error'); return; }
+  var rap={ id: uid(), copropriete_id: coproId, exercice: exercice,
+    commissaire_nom: ((document.getElementById('cac-nom')||{}).value||'').trim(),
+    date_rapport: (document.getElementById('cac-date')||{}).value || today(),
+    avis: (document.getElementById('cac-avis')||{}).value||'sans_reserve',
+    observations: ((document.getElementById('cac-observations')||{}).value||'').trim(),
+    constats: copConstatsCommissaire(coproId, exercice),
+    created_at: new Date().toISOString() };
+  DATA.rapports_commissaire_copro.push(rap);
+  await dbPut('rapports_commissaire_copro', rap);
+  if (typeof syncToSupabase==='function') syncToSupabase('pi_rapports_commissaire_copro', rap);
+  toast('✅ Rapport enregistré.','success');
+  copRenderHistoriqueCAC(coproId);
+}
+function etatRapportCAC(){
+  var coproId=(document.getElementById('cac-immeuble')||{}).value||'';
+  if(!coproId){ toast('Sélectionnez un immeuble.','error'); return; }
+  var exercice=((document.getElementById('cac-exercice')||{}).value||'').trim();
+  var im=(DATA.coproprietes||[]).find(function(c){ return c.id===coproId; })||{};
+  var avisLabel={ sans_reserve:'Certifié sans réserve', avec_reserves:'Certifié avec réserves', refus:'Refus de certifier' };
+  var avis=(document.getElementById('cac-avis')||{}).value||'sans_reserve';
+  var nom=((document.getElementById('cac-nom')||{}).value||'').trim();
+  var obs=((document.getElementById('cac-observations')||{}).value||'').trim();
+  var contenu = '<div style="margin-bottom:12px;font-size:12px;">Commissaire aux comptes : <strong>'+escHtml(nom||'—')+'</strong></div>'
+    + '<h4 style="margin:14px 0 8px;">Constats</h4>' + copRenderConstatsHTML(copConstatsCommissaire(coproId, exercice))
+    + '<h4 style="margin:18px 0 8px;">Avis sur la régularité des comptes</h4><p style="font-weight:700;">'+escHtml(avisLabel[avis]||avis)+'</p>'
+    + (obs ? ('<h4 style="margin:18px 0 8px;">Observations</h4><p style="white-space:pre-wrap;">'+escHtml(obs)+'</p>') : '');
+  genererEtatPDF({ titre:'Rapport du commissaire aux comptes', sousTitre: im.nom+' — Exercice '+(exercice||'—'), couleur:'#1D4ED8', contenu:contenu });
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    GESTION LOCATIVE — Démarcheurs, États des lieux, Restitution caution
    ═══════════════════════════════════════════════════════════════════════ */
@@ -76403,7 +76787,17 @@ var RT_PAGE_REFRESH = {
      partielles vu les dépendances croisées entre onglets (ex. le km d'un
      véhicule est mis à jour par carburant ET par les courses). */
   vehicules:['paEnter'], vehicule_carburant:['paEnter'], vehicule_entretiens:['paEnter'],
-  vehicule_affectations:['paEnter'], vehicule_courses:['paEnter']
+  vehicule_affectations:['paEnter'], vehicule_courses:['paEnter'],
+  /* ── Copropriété — même défaut que Parc Auto ci-dessus avant son correctif :
+     les 7 stores du module (immeubles, lots, budgets, appels de charges, AG,
+     fonds travaux, rapports commissaire aux comptes) étaient absents d'ici,
+     donc jamais rafraîchis à l'écran en temps réel malgré une réception
+     correcte côté DATA. Un seul point d'entrée (copRafraichirTout), pour les
+     mêmes raisons de dépendances croisées entre onglets (KPI agrégeant
+     plusieurs stores à la fois). */
+  coproprietes:['copRafraichirTout'], lots_copro:['copRafraichirTout'], budgets_copro:['copRafraichirTout'],
+  appels_charges_copro:['copRafraichirTout'], ag_copro:['copRafraichirTout'], fonds_travaux_copro:['copRafraichirTout'],
+  rapports_commissaire_copro:['copRafraichirTout']
 };
 
 /* MAP store → data-page pour détecter la page active */
@@ -76422,7 +76816,10 @@ var RT_STORE_PAGE = {
   reunions_direction:'reunion-direction', actions_reunion:'reunion-direction',
   cessions_foncieres:'foncier',
   vehicules:'parc-auto', vehicule_carburant:'parc-auto', vehicule_entretiens:'parc-auto',
-  vehicule_affectations:'parc-auto', vehicule_courses:'parc-auto'
+  vehicule_affectations:'parc-auto', vehicule_courses:'parc-auto',
+  coproprietes:'copropriete', lots_copro:'copropriete', budgets_copro:'copropriete',
+  appels_charges_copro:'copropriete', ag_copro:'copropriete', fonds_travaux_copro:'copropriete',
+  rapports_commissaire_copro:'copropriete'
 };
 
 var RT_COLLAB_STORES = ['messages','conversations','evenements_calendrier','reunions_direction','actions_reunion'];
