@@ -35706,7 +35706,25 @@ async function saveLot() {
   };
   if (APP.editingId) {
     var existing = DATA.lots.find(function(l) { return l.id === id; });
-    if (existing) { lot.created_at = existing.created_at; lot.client_id = existing.client_id; }
+    if (existing) {
+      /* [FIX] Remplacement intégral de l'objet lot au lieu d'une fusion : tout
+         champ non couvert par ce formulaire (date_reservation, historique_statuts,
+         coordonnées SIG lat/lng, liaison convention d'aménagement…) était
+         silencieusement perdu à chaque modification du lot, même une simple
+         correction de surface ou de numéro. On fusionne désormais sur l'objet
+         existant : le formulaire ne modifie que les champs qu'il porte
+         réellement. */
+      lot = Object.assign({}, existing, lot);
+      lot.created_at = existing.created_at;
+      if (lot.statut === 'disponible') {
+        /* Passage explicite à « disponible » (ex. libération d'une réservation
+           expirée) : détache le dossier lié, comme à chaque autre point de
+           libération du lot dans l'app — sinon un souscripteur fantôme reste
+           accroché à un lot redevenu commercialisable. */
+        lot.client_id = null;
+        lot.date_reservation = '';
+      }
+    }
     var idx = DATA.lots.findIndex(function(l) { return l.id === id; });
     if (idx >= 0) DATA.lots[idx] = lot;
   } else {
