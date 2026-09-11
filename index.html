@@ -44916,7 +44916,7 @@ var ALL_MODULES = [
   'Filiere Fonciere','Acquisition & Amenagement Foncier','Marches Amenagement VRD','Etude de Prix & Debourse',
   'Achats & Commandes','Stock Materiaux','Validations','Reception & Livraison',
   'Portail','Portail Apporteur','Bilan de Promotion','Partenaires Lotissement',
-  'Gestion Locative','Investisseurs Diaspora','Conformite LBC-FT','Parc Auto','Budget'
+  'Gestion Locative','Investisseurs Diaspora','Conformite LBC-FT','Parc Auto','Budget','Copropriete'
 ];
 
 // ── Rôles système (non modifiables, non supprimables) ────────────────────────
@@ -44936,7 +44936,7 @@ var SYSTEM_ROLES = {
     permissions: Object.fromEntries(ALL_MODULES.map(function(m){
       return [m, ['Tableau de bord','Accueil','DQE & Cout de revient','Souscripteurs','Paiements',
                   'Relances','Comptabilite','Tresorerie','Caisse','Budget','Paie','Declarations & Teledeclaration','Journaliers & Temporaires','Messagerie',
-                  'Gestion Locative','Investisseurs Diaspora'].includes(m)]; })) },
+                  'Gestion Locative','Investisseurs Diaspora','Copropriete'].includes(m)]; })) },
   commercial: { id:'commercial', label:'Commercial',     icon:'🎯', level:1, system:true,
     /* [Retrait droit de suppression] Même principe — un commercial corrige
        ou annule, ne supprime jamais un souscripteur/lead/lot directement. */
@@ -44960,6 +44960,20 @@ var SYSTEM_ROLES = {
     droits: { Caisse: 'cm' },
     permissions: Object.fromEntries(ALL_MODULES.map(function(m){
       return [m, ['Caisse','Messagerie','Comptabilite'].includes(m)]; })) },
+  /* Commissaire aux comptes / auditeur externe : consultation exclusivement.
+     Périmètre = les données financières nécessaires à sa mission (grand
+     livre, balance, bilan, clôture & FEC, trésorerie, caisse, budget,
+     copropriété) — jamais les lots, la RH, les données personnelles des
+     copropriétaires/souscripteurs en dehors de ce qui apparaît déjà dans
+     les pièces comptables. droits explicitement fermés (chaîne vide) sur
+     chaque module visible : un module absent de `droits` est traité comme
+     "non restreint" par userPeut() (accès complet par défaut) — le
+     laisser vide par erreur donnerait à ce rôle un accès en écriture. */
+  commissaire: { id:'commissaire', label:'Commissaire aux comptes', icon:'🕵️', level:1, system:true,
+    peut_supprimer: false,
+    droits: { Comptabilite:'', Tresorerie:'', Caisse:'', Budget:'', Copropriete:'' },
+    permissions: Object.fromEntries(ALL_MODULES.map(function(m){
+      return [m, ['Tableau de bord','Accueil','Comptabilite','Tresorerie','Caisse','Budget','Copropriete'].includes(m)]; })) },
 };
 
 /* Instantané des rôles système AVANT toute surcharge. loadCustomRoles() mutait
@@ -45049,7 +45063,7 @@ var PAGE_MODULE = {
   clients:'Souscripteurs', lots:'Lots & Reservations', programmes:'Programmes',
   locatif:'Gestion Locative', diaspo:'Investisseurs Diaspora',
   'parc-auto':'Parc Auto',
-  budget:'Budget'
+  budget:'Budget', copropriete:'Copropriete'
 };
 var ACTIONS_LIB = { c:'Créer', m:'Modifier', s:'Supprimer', v:'Valider' };
 /* Rattachement des stores sensibles à leur module, pour appliquer les droits
@@ -45077,9 +45091,29 @@ var STORE_MODULE = {
   af_agents:'Acquisition & Amenagement Foncier',
   af_relances:'Acquisition & Amenagement Foncier',
   parcelles:'Foncier', terrains:'Foncier',
-  conges_rh:'Conges', mobilites_rh:'Paie', documents:'Documents',
+  /* [FIX] 'Conges' ne correspond à AUCUNE entrée de ALL_MODULES (le module
+     réel s'appelle 'Conges RH') — userPeut() traite donc toute écriture sur
+     conges_rh comme "non restreinte" quel que soit le droit configuré :
+     protection présente en apparence, inopérante en pratique. candidats_rh,
+     postes_ouverts et formations_rh n'avaient quant à eux AUCUNE entrée —
+     même trou que Copropriété/Gestion Locative (voir commits précédents). */
+  conges_rh:'Conges RH', candidats_rh:'Recrutement', postes_ouverts:'Recrutement', formations_rh:'Formations',
+  mobilites_rh:'Paie', documents:'Documents',
   vehicules:'Parc Auto', vehicule_carburant:'Parc Auto', vehicule_entretiens:'Parc Auto', vehicule_affectations:'Parc Auto', vehicule_courses:'Parc Auto',
-  caisse_budgets:'Budget', fiches_engagement_depense:'Budget', transferts_budgetaires:'Budget'
+  caisse_budgets:'Budget', fiches_engagement_depense:'Budget', transferts_budgetaires:'Budget',
+  coproprietes:'Copropriete', lots_copro:'Copropriete', budgets_copro:'Copropriete',
+  appels_charges_copro:'Copropriete', ag_copro:'Copropriete', fonds_travaux_copro:'Copropriete', rapports_commissaire_copro:'Copropriete',
+  /* [FIX] Même trou que Copropriété (cf. commit précédent) : les stores propres
+     à Gestion Locative n'étaient rattachés à AUCUN module — baux, quittances
+     (encaissements de loyer ET reversements aux propriétaires y transitent
+     tous deux, cf. locSaveEncaissement/locSaveReversement), propriétaires
+     bailleurs, relances locatives, biens mis en location, démarcheurs, états
+     des lieux, restitutions de caution. N'importe quel utilisateur connecté
+     pouvait donc créer/modifier ces enregistrements — y compris les
+     mouvements d'argent (encaissement, reversement) — quel que soit son rôle. */
+  baux:'Gestion Locative', quittances:'Gestion Locative', proprietaires_bailleurs:'Gestion Locative',
+  relances_locatives:'Gestion Locative', biens_locatifs:'Gestion Locative', demarcheurs:'Gestion Locative',
+  etats_lieux_bail:'Gestion Locative', restitutions_caution:'Gestion Locative'
 };
 function userPeut(module, action) {
   if (!APP.currentUser) return false;
@@ -72148,6 +72182,7 @@ function copSumTantiemes(coproId){
 }
 
 async function copCreerImmeuble(){
+  if (!exigerDroit('Copropriete', 'c', 'un immeuble en copropriété')) return;
   var nom=((document.getElementById('cop-im-nom')||{}).value||'').trim();
   if(!nom){ toast('Indiquez le nom de la résidence.','error'); return; }
   var im={ id:uid(), nom:nom, adresse:((document.getElementById('cop-im-adresse')||{}).value||'').trim(),
@@ -72198,6 +72233,7 @@ function copRenderImmeubles(){
 }
 
 async function copAjouterLot(coproId){
+  if (!exigerDroit('Copropriete', 'c', 'un lot de copropriété')) return;
   var num=((document.getElementById('cop-lot-num-'+coproId)||{}).value||'').trim();
   if(!num){ toast('Indiquez le numéro de lot.','error'); return; }
   var contact=((document.getElementById('cop-lot-contact-'+coproId)||{}).value||'').trim();
@@ -72239,6 +72275,7 @@ async function genererCodeCoproprietaire(lotId){
 }
 
 async function copSupprimerLot(id){
+  if (!exigerDroit('Copropriete', 's', 'un lot de copropriété')) return;
   if(!confirm('Supprimer ce lot ?')) return;
   DATA.lots_copro=(DATA.lots_copro||[]).filter(function(l){ return l.id!==id; });
   if(typeof deleteRecord==='function') await deleteRecord('lots_copro', id);
@@ -72247,6 +72284,7 @@ async function copSupprimerLot(id){
 }
 
 async function copSupprimerImmeuble(id){
+  if (!exigerDroit('Copropriete', 's', 'un immeuble en copropriété')) return;
   var lots=(DATA.lots_copro||[]).filter(function(l){ return l.copropriete_id===id; });
   if(!confirm(lots.length?('Cet immeuble a '+lots.length+' lot(s). Supprimer quand même ?'):'Supprimer cet immeuble ?')) return;
   DATA.coproprietes=(DATA.coproprietes||[]).filter(function(c){ return c.id!==id; });
@@ -72263,6 +72301,7 @@ function _copParsePostes(txt){
   }).filter(Boolean);
 }
 async function copCreerBudget(){
+  if (!exigerDroit('Copropriete', 'c', 'un budget de copropriété')) return;
   var coproId=(document.getElementById('cop-bud-immeuble')||{}).value;
   if(!coproId){ toast('Choisissez un immeuble.','error'); return; }
   var postes=_copParsePostes((document.getElementById('cop-bud-postes')||{}).value);
@@ -72297,6 +72336,7 @@ function copMajMontantAppel(){
 
 /* ── Appels de charges ── */
 async function copGenererAppel(){
+  if (!exigerDroit('Copropriete', 'c', 'un appel de charges')) return;
   var budId=(document.getElementById('cop-ap-budget')||{}).value;
   var periode=((document.getElementById('cop-ap-periode')||{}).value||'').trim();
   var montant=parseFloat((document.getElementById('cop-ap-montant')||{}).value)||0;
@@ -72356,6 +72396,7 @@ function copRenderAppels(){
   }).join('');
 }
 async function copReglerLigne(appelId, idx){
+  if (!exigerDroit('Copropriete', 'm', 'un règlement de charges')) return;
   var a=(DATA.appels_charges_copro||[]).find(function(x){ return x.id===appelId; }); if(!a) return;
   var l=a.lignes[idx]; if(!l) return;
   var solde=Math.max(0,(l.montant||0)-(l.regle||0));
@@ -72371,6 +72412,7 @@ async function copReglerLigne(appelId, idx){
 
 /* ── Assemblées générales ── */
 async function copCreerAG(){
+  if (!exigerDroit('Copropriete', 'c', 'une assemblée générale')) return;
   var coproId=(document.getElementById('cop-ag-immeuble')||{}).value;
   var date=(document.getElementById('cop-ag-date')||{}).value;
   if(!coproId){ toast('Choisissez un immeuble.','error'); return; }
@@ -72400,6 +72442,7 @@ function copRenderAG(){
 
 /* ── Fonds travaux ── */
 async function copGenererFondsTravaux(){
+  if (!exigerDroit('Copropriete', 'c', 'un appel au fonds travaux')) return;
   var coproId=(document.getElementById('cop-ft-immeuble')||{}).value;
   var periode=((document.getElementById('cop-ft-periode')||{}).value||'').trim();
   var montant=parseFloat((document.getElementById('cop-ft-montant')||{}).value)||0;
@@ -90717,7 +90760,7 @@ var PAGE_MODULE_MAP = {
   'rh-cockpit':         'RH Employes',
   'audit-integrite':    'Parametres',
   'locatif':            'Gestion Locative',
-  'copropriete':        'Gestion Locative',
+  'copropriete':        'Copropriete',
   'diaspo':             'Investisseurs Diaspora',
   'lbcft':              'Conformite LBC-FT',
   'parc-auto':          'Parc Auto',
