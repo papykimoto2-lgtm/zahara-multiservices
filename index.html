@@ -3716,6 +3716,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <button class="tab-btn" onclick="switchTab('compta','resultat')" title="Compte de résultat"><i>📊</i>Compte de résultat</button>
               <button class="tab-btn" onclick="switchTab('compta','tresorerie')" title="Situation et prévisions de trésorerie"><i>💵</i>Trésorerie</button>
               <button class="tab-btn" onclick="switchTab('compta','analytique');buildAnalytique()" title="Ventilation par programme et par division"><i>🧮</i>Analytique</button>
+              <button class="tab-btn" onclick="switchTab('compta','intragroupe');_intragRender()" title="Registre détaillé des flux inter-divisions et des conventions réglementées — dossier commissaire aux comptes"><i>🏛️</i>Relations intragroupe</button>
               <button class="tab-btn" onclick="switchTab('compta','periodique')" title="États sur période libre"><i>📅</i>État périodique</button>
               <button class="tab-btn" onclick="ouvrirCutoff()" title="Charges et produits constatés d'avance, factures non parvenues, factures à établir"><i>📆</i>Régularisations</button>
               <button class="tab-btn" onclick="ouvrirDeclarationTVA()" title="Déclaration mensuelle de TVA — collectée, déductible, prorata, liquidation"><i>🧾</i>TVA</button>
@@ -4679,6 +4680,19 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </div>
 
         </div><!-- fin tab-compta-rapprochement -->
+
+        <!-- Relations intragroupe : flux détaillés, conventions réglementées, export CAC -->
+        <div class="tab-pane" id="tab-compta-intragroupe">
+          <div class="tab-nav" style="margin-bottom:10px;">
+            <button class="tab-btn active" onclick="switchTab('intragroupe','flux')">🔗 Registre des flux</button>
+            <button class="tab-btn" onclick="switchTab('intragroupe','conventions')">📜 Conventions réglementées</button>
+            <button class="tab-btn" onclick="switchTab('intragroupe','export')">📤 Export CAC</button>
+          </div>
+          <div class="tab-pane active" id="tab-intragroupe-flux"></div>
+          <div class="tab-pane" id="tab-intragroupe-conventions"></div>
+          <div class="tab-pane" id="tab-intragroupe-export"></div>
+        </div>
+        <!-- fin tab-compta-intragroupe -->
 
         <!-- Clôture & FEC -->
         <div class="tab-pane" id="tab-compta-cloture">
@@ -23675,14 +23689,26 @@ var DATA = {
      division/compte, validé par le DG, décrémenté par les Demandes d'Achat
      validées, avec transferts de ligne à ligne */
   fiches_engagement_depense: [],
-  transferts_budgetaires: []
+  transferts_budgetaires: [],
+  /* v152 — Demandes de versement du portail souscripteur */
+  demandes_paiement: [],
+  /* v153 — Registre des conventions réglementées (AUSCGIE art. 438+) */
+  conventions_reglementees: []
 };
 
 /* ──────────────────────────────────────────────────────
    INDEXEDDB
 ────────────────────────────────────────────────────── */
 var DB_NAME = 'ImmoSuiteDB';
-var DB_VERSION = 151; /* v151: DEUX bugs corrigés, même famille que les précédents.
+var DB_VERSION = 153; /* v153: store 'conventions_reglementees' — registre des conventions
+                          réglementées intra-groupe (AUSCGIE art. 438+), pièce exigée par le
+                          commissaire aux comptes ; n'existait pas du tout auparavant.
+                          v152: store 'demandes_paiement' (portail souscripteur) n'existait ni
+                          dans ALL_STORES ni dans SUPA_STORE_MAP — la fonction qui les crée ne
+                          faisait qu'un push en mémoire, sans dbPut ni syncToSupabase : la
+                          demande affichée comme "enregistrée" au souscripteur disparaissait au
+                          premier rechargement de page. Migrations additives, aucune perte.
+                          v151: DEUX bugs corrigés, même famille que les précédents.
                           (1) allKeys (loadAllData, relecture au démarrage) n'incluait pas
                           'sfc_liste','sfc_criblages','sfc_centif','lbc_cappi','lbc_conformx',
                           'lbc_artci' — écrits en base mais jamais rechargés à l'ouverture :
@@ -23825,7 +23851,15 @@ var ALL_STORES = [
   /* v146 — Suivi budgétaire caisse */
   'caisse_budgets',
   /* v147 — Circuit budgétaire : DA + transferts */
-  'fiches_engagement_depense', 'transferts_budgetaires'
+  'fiches_engagement_depense', 'transferts_budgetaires',
+  /* [FIX] Demandes de versement du portail souscripteur — n'était même pas
+     déclaré comme store : la fonction qui les crée ne persistait qu'en
+     mémoire (aucun dbPut), donc jamais rechargé ni synchronisé. */
+  'demandes_paiement',
+  /* v153 — Relations Intragroupe : registre des conventions réglementées
+     (AUSCGIE art. 438 et suivants) entre divisions/parties liées, exigible
+     par le commissaire aux comptes (rapport spécial). */
+  'conventions_reglementees'
 ];
 
 function initDB() {
@@ -25705,6 +25739,8 @@ function _filtrerFantomes(table, store, ids) {
 /* Correspondance table Supabase ↔ store local (IndexedDB / DATA) */
 var SUPA_STORE_MAP = [
   ['pi_incidents',            'incidents'],
+  ['pi_demandes_paiement', 'demandes_paiement'],
+  ['pi_conventions_reglementees', 'conventions_reglementees'],
   ['pi_lbc_cappi',        'lbc_cappi'],
   ['pi_lbc_conformx',     'lbc_conformx'],
   ['pi_lbc_artci',        'lbc_artci'],
@@ -40129,6 +40165,395 @@ function genererConsolidation() {
   if (w) { w.document.write(html); w.document.close(); }
   else toast('Autorisez les fenêtres pop-up.', 'error');
 }
+/* ══════════════════════════════════════════════════════════════════════
+   RELATIONS INTRAGROUPE — registre détaillé des flux inter-divisions et
+   registre des conventions réglementées (AUSCGIE art. 438 et suivants).
+   Le contrôle « Périmètre groupe » ci-dessus n'élimine que des SOLDES
+   annuels agrégés par entité ; en cas d'écart, il ne dit ni quelle
+   opération ni quelle pièce en est la cause — c'est exactement ce que le
+   commissaire aux comptes demande pour son rapport spécial. Ce module
+   descend au niveau de la transaction et tient le registre légal des
+   conventions entre parties liées.
+════════════════════════════════════════════════════════════════════════ */
+var _intragAnnee = '';
+var _intragDiv = '';
+var _intragCompte = '';
+var _intragTerme = '';
+var _intragConvTerme = '';
+var _intragConvStatut = '';
+
+var CONV_REG_TYPES = {
+  convention_tresorerie: 'Convention de trésorerie',
+  pret_avance: 'Prêt / avance de fonds',
+  prestation_services: 'Prestation de services',
+  garantie_aval: 'Garantie / aval',
+  cession_actif: "Cession d'actif",
+  autre: 'Autre convention'
+};
+
+function _intragAnnees() {
+  var set = {};
+  (DATA.ecritures || []).forEach(function(e){ if (e.date) set[e.date.slice(0,4)] = true; });
+  var arr = Object.keys(set).sort().reverse();
+  if (!arr.length) arr = [String(new Date().getFullYear())];
+  return arr;
+}
+
+/* Toutes les lignes d'écriture touchant un compte de liaison intra-groupe
+   (préfixes configurés via 🏛️ Périmètre groupe), pour une année donnée. */
+function _intragFlux(annee) {
+  var cfg = _consoCfg();
+  var out = [];
+  (DATA.ecritures || []).forEach(function(e){
+    if (!e.date || e.date.slice(0,4) !== String(annee)) return;
+    ecrLignes(e).forEach(function(l){
+      if (!l.compte) return;
+      if (!cfg.liaison.some(function(p){ return String(l.compte).indexOf(p) === 0; })) return;
+      out.push({
+        date: e.date, division: e.division || '', journal: e.journal || '',
+        piece: e.piece || e.ref || '', libelle: e.libelle || l.libelle || '',
+        compte: l.compte, sens: l.sens, montant: parseFloat(l.montant) || 0,
+        ecritureId: e.id
+      });
+    });
+  });
+  return out.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+}
+
+function _intragFluxFiltres(annee) {
+  var list = _intragFlux(annee);
+  if (_intragDiv) list = list.filter(function(x){ return x.division === _intragDiv; });
+  if (_intragCompte) list = list.filter(function(x){ return String(x.compte).indexOf(_intragCompte) === 0; });
+  if (_intragTerme) {
+    var t = sfcNormalise(_intragTerme);
+    list = list.filter(function(x){ return sfcNormalise([x.piece, x.libelle, x.journal].join(' ')).indexOf(t) !== -1; });
+  }
+  return list;
+}
+
+/* Matrice de réciprocité : solde net (Débit-Crédit) par compte de liaison
+   × division, sur l'année. Le total d'une ligne doit être proche de 0 —
+   un écart signale une opération enregistrée d'un seul côté (transaction
+   miroir manquante chez la division contrepartie). Plus fin que le
+   contrôle existant de « Périmètre groupe », qui ne teste qu'un solde
+   annuel unique par entité, tous comptes de liaison confondus. */
+function _intragMatrice(annee) {
+  var flux = _intragFlux(annee);
+  var divs = _consoDivisions();
+  var comptes = {};
+  flux.forEach(function(x){
+    if (!comptes[x.compte]) comptes[x.compte] = {};
+    comptes[x.compte][x.division] = (comptes[x.compte][x.division] || 0) + (x.sens === 'D' ? x.montant : -x.montant);
+  });
+  var lignes = Object.keys(comptes).sort().map(function(compte){
+    var parDiv = comptes[compte], total = 0;
+    divs.forEach(function(d){ total += parDiv[d.id] || 0; });
+    return { compte: compte, parDiv: parDiv, total: total };
+  });
+  return { divs: divs, lignes: lignes };
+}
+
+function _intragRender() {
+  if (!_intragAnnee) _intragAnnee = _intragAnnees()[0];
+  _intragRenderFlux();
+  _intragRenderConventions();
+  _intragRenderExport();
+}
+function _intragSetAnnee() { _intragAnnee = (document.getElementById('intrag-annee')||{}).value || _intragAnnee; _intragRenderFlux(); _intragRenderExport(); }
+function _intragSetDiv()   { _intragDiv = (document.getElementById('intrag-div')||{}).value || ''; _intragRenderFlux(); }
+function _intragSetCompte(){ _intragCompte = (document.getElementById('intrag-compte')||{}).value || ''; _intragRenderFlux(); }
+function _intragSetTerme() { _intragTerme = (document.getElementById('intrag-recherche')||{}).value || ''; _intragRenderFlux(); }
+
+function _intragRenderFlux() {
+  var el = document.getElementById('tab-intragroupe-flux');
+  if (!el) return;
+  if (!_intragAnnee) _intragAnnee = _intragAnnees()[0];
+  var annees = _intragAnnees(), divs = _consoDivisions();
+  var flux = _intragFluxFiltres(_intragAnnee);
+  var mat = _intragMatrice(_intragAnnee);
+
+  var filtres = '<div class="card" style="margin-bottom:10px;"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+    + '<select class="filter-select" id="intrag-annee" onchange="_intragSetAnnee()">'
+    + annees.map(function(a){ return '<option value="' + a + '"' + (a === _intragAnnee ? ' selected' : '') + '>' + a + '</option>'; }).join('')
+    + '</select>'
+    + '<select class="filter-select" id="intrag-div" onchange="_intragSetDiv()"><option value="">Toutes divisions</option>'
+    + divs.map(function(d){ return '<option value="' + d.id + '"' + (d.id === _intragDiv ? ' selected' : '') + '>' + escHtml(d.nom) + '</option>'; }).join('')
+    + '</select>'
+    + '<input type="text" class="form-control" id="intrag-compte" placeholder="Compte (préfixe)" value="' + escHtml(_intragCompte) + '" oninput="_debInput(\'_intragSetCompte\')" style="width:140px;">'
+    + '<input type="text" class="search-input" id="intrag-recherche" placeholder="🔍 Pièce, libellé, journal..." value="' + escHtml(_intragTerme) + '" oninput="_debInput(\'_intragSetTerme\')" style="min-width:200px;">'
+    + '<button class="btn btn-secondary btn-sm" onclick="_intragExportCSV()">⬇ CSV</button>'
+    + '<button class="btn btn-secondary btn-sm" onclick="_intragExportPDF()">🖨️ PDF</button>'
+    + '</div><div style="font-size:11px;color:var(--blanc-dim);margin-top:6px;">Comptes de liaison surveillés : ' + escHtml(_consoCfg().liaison.join(', ')) + ' — configurables via 🏛️ Périmètre groupe.</div></div>';
+
+  var rowsHtml = flux.slice(0, 500).map(function(x){
+    return '<tr><td>' + dateShort(x.date) + '</td><td>' + escHtml(_nomDivision(x.division)) + '</td><td>' + escHtml(x.journal) + '</td>'
+      + '<td style="font-family:monospace;font-size:10.5px;">' + escHtml(x.piece || '—') + '</td>'
+      + '<td style="font-family:monospace;">' + escHtml(x.compte) + '</td>'
+      + '<td>' + escHtml(x.libelle) + '</td>'
+      + '<td class="num">' + (x.sens === 'D' ? fmtF(x.montant) : '') + '</td>'
+      + '<td class="num">' + (x.sens === 'C' ? fmtF(x.montant) : '') + '</td></tr>';
+  }).join('');
+  var tbl = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Division</th><th>Journal</th><th>Pièce</th><th>Compte</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead><tbody>'
+    + (rowsHtml || '<tr><td colspan="8" style="text-align:center;color:var(--blanc-dim);">Aucun flux sur les comptes de liaison pour ces critères.</td></tr>')
+    + '</tbody></table></div>'
+    + (flux.length > 500 ? '<div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">Affichage limité aux 500 premières lignes sur ' + flux.length + ' — affinez les filtres ou exportez en CSV.</div>' : '');
+
+  var matriceHtml = '';
+  if (mat.lignes.length) {
+    var thMat = '<tr><th>Compte</th>' + mat.divs.map(function(d){ return '<th class="num">' + escHtml(d.nom) + '</th>'; }).join('') + '<th class="num">Écart</th></tr>';
+    var totLigne = {}; mat.divs.forEach(function(d){ totLigne[d.id] = 0; });
+    var rowsMat = mat.lignes.map(function(l){
+      var ko = Math.abs(l.total) >= 1;
+      mat.divs.forEach(function(d){ totLigne[d.id] += l.parDiv[d.id] || 0; });
+      return '<tr' + (ko ? ' style="background:rgba(220,38,38,.12);"' : '') + '><td style="font-family:monospace;">' + escHtml(l.compte) + '</td>'
+        + mat.divs.map(function(d){ var v = l.parDiv[d.id] || 0; return '<td class="num">' + (v ? fmtF(v) : '—') + '</td>'; }).join('')
+        + '<td class="num" style="font-weight:700;' + (ko ? 'color:#dc2626;' : '') + '">' + fmtF(l.total) + (ko ? ' ⚠️' : ' ✔️') + '</td></tr>';
+    }).join('');
+    var totGeneral = mat.lignes.reduce(function(a,l){ return a + l.total; }, 0);
+    rowsMat += '<tr class="total"><td>TOTAL</td>' + mat.divs.map(function(d){ return '<td class="num">' + fmtF(totLigne[d.id]) + '</td>'; }).join('') + '<td class="num">' + fmtF(totGeneral) + '</td></tr>';
+    matriceHtml = '<h4 style="margin:16px 0 8px;">Réciprocité par compte de liaison — exercice ' + _intragAnnee + '</h4>'
+      + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:6px;">Solde net (Débit − Crédit) par division. Une ligne dont l\'écart n\'est pas nul signale une opération enregistrée d\'un seul côté — la division contrepartie doit être relancée pour comptabiliser sa transaction miroir.</div>'
+      + '<div class="table-wrap"><table><thead>' + thMat + '</thead><tbody>' + rowsMat + '</tbody></table></div>';
+  }
+
+  el.innerHTML = filtres + tbl + matriceHtml;
+}
+
+function _intragExportCSV() {
+  var flux = _intragFluxFiltres(_intragAnnee);
+  var rows = ['Date,Division,Journal,Piece,Compte,Sens,Montant,Libelle'];
+  flux.forEach(function(x){
+    rows.push([x.date, _nomDivision(x.division), x.journal, x.piece, x.compte, x.sens, x.montant, (x.libelle || '').replace(/,/g, ';')].join(','));
+  });
+  var blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'flux_intragroupe_' + _intragAnnee + '.csv';
+  a.click();
+  toast('Export CSV téléchargé.', 'success');
+}
+
+function _intragExportPDF() {
+  var flux = _intragFluxFiltres(_intragAnnee);
+  var mat = _intragMatrice(_intragAnnee);
+  var rows = flux.map(function(x){
+    return '<tr><td>' + dateShort(x.date) + '</td><td>' + escHtml(_nomDivision(x.division)) + '</td><td>' + escHtml(x.journal) + '</td>'
+      + '<td>' + escHtml(x.piece || '—') + '</td><td>' + escHtml(x.compte) + '</td><td>' + escHtml(x.libelle) + '</td>'
+      + '<td class="num">' + (x.sens === 'D' ? fmtF(x.montant) : '') + '</td><td class="num">' + (x.sens === 'C' ? fmtF(x.montant) : '') + '</td></tr>';
+  }).join('');
+  var thMat = '<tr><th>Compte</th>' + mat.divs.map(function(d){ return '<th class="num">' + escHtml(d.nom) + '</th>'; }).join('') + '<th class="num">Écart</th></tr>';
+  var rowsMat = mat.lignes.map(function(l){
+    var ko = Math.abs(l.total) >= 1;
+    return '<tr' + (ko ? ' style="color:#b91c1c;font-weight:700;"' : '') + '><td>' + escHtml(l.compte) + '</td>'
+      + mat.divs.map(function(d){ return '<td class="num">' + fmtF(l.parDiv[d.id] || 0) + '</td>'; }).join('')
+      + '<td class="num">' + fmtF(l.total) + (ko ? ' ⚠' : ' ✔') + '</td></tr>';
+  }).join('');
+  var contenu = '<h3>Registre détaillé des flux intra-groupe</h3>'
+    + '<table><thead><tr><th>Date</th><th>Division</th><th>Journal</th><th>Pièce</th><th>Compte</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead><tbody>'
+    + (rows || '<tr><td colspan="8">Aucun flux.</td></tr>') + '</tbody></table>'
+    + '<h3>Matrice de réciprocité par compte de liaison</h3>'
+    + '<table><thead>' + thMat + '</thead><tbody>' + rowsMat + '</tbody></table>'
+    + '<p style="font-size:10px;color:#555;margin-top:10px;">Comptes de liaison surveillés : ' + escHtml(_consoCfg().liaison.join(', ')) + '. Une ligne de la matrice dont l\'écart n\'est pas nul correspond à une transaction enregistrée par une seule des deux divisions concernées (transaction miroir manquante).</p>';
+  genererEtatPDF({ titre: 'Relations intragroupe — registre des flux', sousTitre: 'Exercice ' + _intragAnnee + ' — SYSCOHADA', orientation: 'paysage', couleur: '#B87333', contenu: contenu });
+}
+
+/* ── Registre des conventions réglementées (AUSCGIE art. 438 et suivants) ── */
+function _intragConvListe() {
+  var list = (DATA.conventions_reglementees || []).slice();
+  if (_intragConvStatut) list = list.filter(function(c){ return (c.statut || 'active') === _intragConvStatut; });
+  if (_intragConvTerme) {
+    var t = sfcNormalise(_intragConvTerme);
+    list = list.filter(function(c){
+      return sfcNormalise([c.objet, _nomDivision(c.division_a), c.division_b === '__tiers__' ? c.tiers_lie : _nomDivision(c.division_b)].filter(Boolean).join(' ')).indexOf(t) !== -1;
+    });
+  }
+  return list.sort(function(a,b){ return (b.date_signature || '').localeCompare(a.date_signature || ''); });
+}
+function _intragConvSetTerme()  { _intragConvTerme = (document.getElementById('intrag-conv-recherche')||{}).value || ''; _intragRenderConventions(); }
+function _intragConvSetStatut() { _intragConvStatut = (document.getElementById('intrag-conv-statut')||{}).value || ''; _intragRenderConventions(); }
+
+function _intragRenderConventions() {
+  var el = document.getElementById('tab-intragroupe-conventions');
+  if (!el) return;
+  var list = _intragConvListe();
+  var filtres = '<div class="card" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">'
+    + '<div><strong>Registre des conventions réglementées</strong><div style="font-size:11.5px;color:var(--blanc-dim);">Conventions entre divisions du groupe, ou avec un dirigeant/tiers lié — AUSCGIE art. 438 et suivants. Soumises à autorisation du conseil d\'administration et au rapport spécial du commissaire aux comptes.</div></div>'
+    + '<button class="btn btn-primary btn-sm" onclick="ouvrirConventionReglementee()">+ Convention</button></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">'
+    + '<select class="filter-select" id="intrag-conv-statut" onchange="_intragConvSetStatut()"><option value="">Tous statuts</option>'
+    + '<option value="active"' + (_intragConvStatut === 'active' ? ' selected' : '') + '>Active</option>'
+    + '<option value="terminee"' + (_intragConvStatut === 'terminee' ? ' selected' : '') + '>Terminée</option>'
+    + '<option value="annulee"' + (_intragConvStatut === 'annulee' ? ' selected' : '') + '>Annulée</option></select>'
+    + '<input type="text" class="search-input" id="intrag-conv-recherche" placeholder="🔍 Objet, division, tiers..." value="' + escHtml(_intragConvTerme) + '" oninput="_debInput(\'_intragConvSetTerme\')" style="min-width:220px;"></div></div>';
+
+  var rows = list.map(function(c){
+    var partie = escHtml(_nomDivision(c.division_a)) + ' ↔ ' + (c.division_b === '__tiers__' ? escHtml(c.tiers_lie || 'Tiers lié') : escHtml(_nomDivision(c.division_b)));
+    var statutBadge = c.statut === 'annulee' ? '<span style="color:#dc2626;">Annulée</span>'
+      : c.statut === 'terminee' ? '<span style="color:#6b7280;">Terminée</span>' : '<span style="color:#0a7a3d;">Active</span>';
+    return '<tr><td>' + escHtml(CONV_REG_TYPES[c.type] || c.type) + '</td><td>' + partie + '</td>'
+      + '<td>' + dateShort(c.date_signature) + '</td><td class="num">' + (c.montant ? fmtF(c.montant) : '—') + '</td>'
+      + '<td>' + escHtml(c.objet || '') + '</td>'
+      + '<td style="text-align:center;">' + (c.approuvee_ca ? ('✔️ ' + (c.date_approbation_ca ? dateShort(c.date_approbation_ca) : '')) : '⚠️ non') + '</td>'
+      + '<td>' + statutBadge + '</td>'
+      + '<td><button class="btn btn-secondary btn-sm" onclick="ouvrirConventionReglementee(\'' + c.id + '\')">✏️</button></td></tr>';
+  }).join('');
+
+  el.innerHTML = filtres + '<div class="table-wrap"><table><thead><tr><th>Type</th><th>Parties</th><th>Date</th><th class="num">Montant</th><th>Objet</th><th>Approb. CA</th><th>Statut</th><th></th></tr></thead><tbody>'
+    + (rows || '<tr><td colspan="8" style="text-align:center;color:var(--blanc-dim);">Aucune convention enregistrée.</td></tr>') + '</tbody></table></div>';
+}
+
+function ouvrirConventionReglementee(id) {
+  var c = id ? (DATA.conventions_reglementees || []).find(function(x){ return x.id === id; }) : null;
+  var divs = _consoDivisions();
+  var optDiv = function(sel){
+    return '<option value="">—</option>' + divs.map(function(d){ return '<option value="' + d.id + '"' + (sel === d.id ? ' selected' : '') + '>' + escHtml(d.nom) + '</option>'; }).join('')
+      + '<option value="__tiers__"' + (sel === '__tiers__' ? ' selected' : '') + '>Tiers lié (hors groupe)</option>';
+  };
+  var optType = Object.keys(CONV_REG_TYPES).map(function(k){ return '<option value="' + k + '"' + (c && c.type === k ? ' selected' : '') + '>' + CONV_REG_TYPES[k] + '</option>'; }).join('');
+
+  var el = document.getElementById('modal-conv-reglementee');
+  if (!el) { el = document.createElement('div'); el.className = 'modal-overlay'; el.id = 'modal-conv-reglementee'; document.body.appendChild(el); }
+  el.innerHTML = '<div class="modal"><div class="modal-header"><h3>📜 ' + (c ? 'Modifier' : 'Nouvelle') + ' convention réglementée</h3>'
+    + '<button class="btn btn-secondary btn-icon" onclick="document.getElementById(\'modal-conv-reglementee\').classList.remove(\'open\')">✕</button></div>'
+    + '<div class="modal-body">'
+    + '<input type="hidden" id="cr-id" value="' + (c ? c.id : '') + '">'
+    + '<div class="form-group"><label>Type de convention *</label><select class="form-control" id="cr-type">' + optType + '</select></div>'
+    + '<div style="display:flex;gap:10px;">'
+    + '<div class="form-group" style="flex:1;"><label>Division A *</label><select class="form-control" id="cr-div-a">' + optDiv(c ? c.division_a : '') + '</select></div>'
+    + '<div class="form-group" style="flex:1;"><label>Division B / Tiers lié *</label><select class="form-control" id="cr-div-b" onchange="document.getElementById(\'cr-tiers-wrap\').style.display=this.value===\'__tiers__\'?\'block\':\'none\';">' + optDiv(c ? c.division_b : '') + '</select></div>'
+    + '</div>'
+    + '<div class="form-group" id="cr-tiers-wrap" style="display:' + (c && c.division_b === '__tiers__' ? 'block' : 'none') + ';"><label>Nom du tiers lié (dirigeant, actionnaire, société liée hors groupe)</label><input type="text" class="form-control" id="cr-tiers" value="' + escHtml(c ? c.tiers_lie || '' : '') + '"></div>'
+    + '<div style="display:flex;gap:10px;">'
+    + '<div class="form-group" style="flex:1;"><label>Date de signature *</label><input type="date" class="form-control" id="cr-date" value="' + (c ? c.date_signature || '' : today()) + '"></div>'
+    + '<div class="form-group" style="flex:1;"><label>Montant (FCFA)</label><input type="number" class="form-control" id="cr-montant" value="' + (c ? c.montant || '' : '') + '"></div>'
+    + '</div>'
+    + '<div class="form-group"><label>Objet de la convention *</label><textarea class="form-control" id="cr-objet" rows="2">' + escHtml(c ? c.objet || '' : '') + '</textarea></div>'
+    + '<div style="display:flex;gap:10px;">'
+    + '<div class="form-group" style="flex:1;"><label>Durée / échéance</label><input type="text" class="form-control" id="cr-duree" value="' + escHtml(c ? c.duree || '' : '') + '" placeholder="ex : 12 mois, indéterminée..."></div>'
+    + '<div class="form-group" style="flex:1;"><label>Taux d\'intérêt éventuel</label><input type="text" class="form-control" id="cr-taux" value="' + escHtml(c ? c.taux || '' : '') + '" placeholder="ex : 5% / an"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:10px;align-items:end;">'
+    + '<div class="form-group" style="flex:1;"><label style="display:flex;gap:6px;align-items:center;cursor:pointer;"><input type="checkbox" id="cr-approuvee" ' + (c && c.approuvee_ca ? 'checked' : '') + '> Autorisée par le conseil d\'administration</label></div>'
+    + '<div class="form-group" style="flex:1;"><label>Date d\'approbation CA</label><input type="date" class="form-control" id="cr-date-approb" value="' + (c ? c.date_approbation_ca || '' : '') + '"></div>'
+    + '</div>'
+    + '<div class="form-group"><label>Statut</label><select class="form-control" id="cr-statut">'
+    + ['active','terminee','annulee'].map(function(s){ return '<option value="' + s + '"' + ((c ? c.statut === s : s === 'active') ? ' selected' : '') + '>' + (s === 'active' ? 'Active' : s === 'terminee' ? 'Terminée' : 'Annulée') + '</option>'; }).join('')
+    + '</select></div>'
+    + '<div class="form-group"><label>Notes</label><textarea class="form-control" id="cr-notes" rows="2">' + escHtml(c ? c.notes || '' : '') + '</textarea></div>'
+    + '</div>'
+    + '<div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById(\'modal-conv-reglementee\').classList.remove(\'open\')">Annuler</button>'
+    + '<button class="btn btn-primary" onclick="enregistrerConventionReglementee()">Enregistrer</button></div></div>';
+  el.classList.add('open');
+}
+
+async function enregistrerConventionReglementee() {
+  var g = function(id){ var e = document.getElementById(id); return e ? e.value : ''; };
+  var divA = g('cr-div-a'), divB = g('cr-div-b');
+  if (!divA || !divB) { toast('Les deux parties à la convention sont obligatoires.', 'error'); return; }
+  if (divB === '__tiers__' && !g('cr-tiers').trim()) { toast('Précisez le nom du tiers lié.', 'error'); return; }
+  if (!g('cr-date')) { toast('Date de signature obligatoire.', 'error'); return; }
+  if (!g('cr-objet').trim()) { toast('Objet de la convention obligatoire.', 'error'); return; }
+
+  var id = g('cr-id') || uid();
+  var existant = (DATA.conventions_reglementees || []).find(function(x){ return x.id === id; }) || {};
+  var c = Object.assign({}, existant, {
+    id: id,
+    type: g('cr-type'),
+    division_a: divA,
+    division_b: divB,
+    tiers_lie: divB === '__tiers__' ? g('cr-tiers').trim() : '',
+    date_signature: g('cr-date'),
+    montant: parseFloat(g('cr-montant')) || 0,
+    objet: g('cr-objet').trim(),
+    duree: g('cr-duree').trim(),
+    taux: g('cr-taux').trim(),
+    approuvee_ca: !!(document.getElementById('cr-approuvee')||{}).checked,
+    date_approbation_ca: g('cr-date-approb'),
+    statut: g('cr-statut'),
+    notes: g('cr-notes').trim(),
+    cree_le: existant.cree_le || new Date().toISOString()
+  });
+  await _locSave('conventions_reglementees', c, 'pi_conventions_reglementees');
+  document.getElementById('modal-conv-reglementee').classList.remove('open');
+  _intragRenderConventions();
+  toast('Convention réglementée enregistrée.', 'success');
+}
+
+/* ── Export CAC : dossier combiné flux + conventions, pour l'exercice ── */
+function _intragRenderExport() {
+  var el = document.getElementById('tab-intragroupe-export');
+  if (!el) return;
+  var annees = _intragAnnees();
+  el.innerHTML = '<div class="card">'
+    + '<strong>📤 État des transactions intragroupe — dossier commissaire aux comptes</strong>'
+    + '<div style="font-size:11.5px;color:var(--blanc-dim);margin:6px 0 12px;">Document unique combinant le registre détaillé des flux sur comptes de liaison et le registre des conventions réglementées, prêt à remettre au CAC pour son rapport spécial (AUSCGIE art. 440).</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+    + '<select class="filter-select" id="intrag-export-annee">' + annees.map(function(a){ return '<option value="' + a + '"' + (a === _intragAnnee ? ' selected' : '') + '>Exercice ' + a + '</option>'; }).join('') + '</select>'
+    + '<button class="btn btn-primary btn-sm" onclick="_intragExportCACPdf()">🖨️ Générer le dossier PDF</button>'
+    + '<button class="btn btn-secondary btn-sm" onclick="_intragExportCACCsv()">⬇ Export CSV combiné</button>'
+    + '</div></div>';
+}
+
+function _intragExportCACPdf() {
+  var annee = (document.getElementById('intrag-export-annee')||{}).value || _intragAnnee;
+  var flux = _intragFlux(annee);
+  var mat = _intragMatrice(annee);
+  var conventions = (DATA.conventions_reglementees || []).filter(function(c){ return (c.date_signature || '').slice(0,4) <= annee; });
+
+  var rowsFlux = flux.map(function(x){
+    return '<tr><td>' + dateShort(x.date) + '</td><td>' + escHtml(_nomDivision(x.division)) + '</td>'
+      + '<td>' + escHtml(x.piece || '—') + '</td><td>' + escHtml(x.compte) + '</td><td>' + escHtml(x.libelle) + '</td>'
+      + '<td class="num">' + (x.sens === 'D' ? fmtF(x.montant) : '') + '</td><td class="num">' + (x.sens === 'C' ? fmtF(x.montant) : '') + '</td></tr>';
+  }).join('');
+  var thMat = '<tr><th>Compte</th>' + mat.divs.map(function(d){ return '<th class="num">' + escHtml(d.nom) + '</th>'; }).join('') + '<th class="num">Écart</th></tr>';
+  var rowsMat = mat.lignes.map(function(l){
+    var ko = Math.abs(l.total) >= 1;
+    return '<tr' + (ko ? ' style="color:#b91c1c;font-weight:700;"' : '') + '><td>' + escHtml(l.compte) + '</td>'
+      + mat.divs.map(function(d){ return '<td class="num">' + fmtF(l.parDiv[d.id] || 0) + '</td>'; }).join('')
+      + '<td class="num">' + fmtF(l.total) + (ko ? ' ⚠' : ' ✔') + '</td></tr>';
+  }).join('');
+  var rowsConv = conventions.map(function(c){
+    var partie = escHtml(_nomDivision(c.division_a)) + ' ↔ ' + (c.division_b === '__tiers__' ? escHtml(c.tiers_lie || 'Tiers lié') : escHtml(_nomDivision(c.division_b)));
+    return '<tr><td>' + escHtml(CONV_REG_TYPES[c.type] || c.type) + '</td><td>' + partie + '</td><td>' + dateShort(c.date_signature) + '</td>'
+      + '<td class="num">' + (c.montant ? fmtF(c.montant) : '—') + '</td><td>' + escHtml(c.objet || '') + '</td>'
+      + '<td>' + (c.approuvee_ca ? ('✔ CA du ' + dateShort(c.date_approbation_ca)) : '⚠ non autorisée') + '</td></tr>';
+  }).join('');
+
+  var comptesKo = mat.lignes.filter(function(l){ return Math.abs(l.total) >= 1; });
+  var alerte = comptesKo.length
+    ? '<p style="color:#b91c1c;font-weight:700;">⚠ ' + comptesKo.length + ' compte(s) de liaison présentent un écart de réciprocité non nul — voir matrice ci-dessous.</p>'
+    : '<p style="color:#0a7a3d;font-weight:700;">✔ Aucun écart de réciprocité détecté sur les comptes de liaison intra-groupe.</p>';
+
+  var contenu = '<h3>1. Registre détaillé des flux intra-groupe (comptes de liaison : ' + escHtml(_consoCfg().liaison.join(', ')) + ')</h3>'
+    + alerte
+    + '<table><thead><tr><th>Date</th><th>Division</th><th>Pièce</th><th>Compte</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead><tbody>'
+    + (rowsFlux || '<tr><td colspan="7">Aucun flux.</td></tr>') + '</tbody></table>'
+    + '<h3>2. Matrice de réciprocité par compte de liaison</h3>'
+    + '<table><thead>' + thMat + '</thead><tbody>' + rowsMat + '</tbody></table>'
+    + '<h3>3. Registre des conventions réglementées (AUSCGIE art. 438 et suivants)</h3>'
+    + '<table><thead><tr><th>Type</th><th>Parties</th><th>Date</th><th class="num">Montant</th><th>Objet</th><th>Approbation CA</th></tr></thead><tbody>'
+    + (rowsConv || '<tr><td colspan="6">Aucune convention réglementée enregistrée.</td></tr>') + '</tbody></table>';
+
+  genererEtatPDF({ titre: 'État des transactions intragroupe', sousTitre: 'Dossier commissaire aux comptes — Exercice ' + annee + ' — SYSCOHADA', orientation: 'paysage', couleur: '#B87333', contenu: contenu, reference: 'CAC-' + annee });
+}
+
+function _intragExportCACCsv() {
+  var annee = (document.getElementById('intrag-export-annee')||{}).value || _intragAnnee;
+  var flux = _intragFlux(annee);
+  var conventions = DATA.conventions_reglementees || [];
+  var rows = ['=== FLUX INTRAGROUPE ===', 'Date,Division,Journal,Piece,Compte,Sens,Montant,Libelle'];
+  flux.forEach(function(x){ rows.push([x.date, _nomDivision(x.division), x.journal, x.piece, x.compte, x.sens, x.montant, (x.libelle || '').replace(/,/g, ';')].join(',')); });
+  rows.push(''); rows.push('=== CONVENTIONS REGLEMENTEES ===');
+  rows.push('Type,DivisionA,DivisionB_Tiers,Date,Montant,Objet,ApprouveeCA,Statut');
+  conventions.forEach(function(c){
+    rows.push([CONV_REG_TYPES[c.type] || c.type, _nomDivision(c.division_a), c.division_b === '__tiers__' ? c.tiers_lie : _nomDivision(c.division_b), c.date_signature, c.montant, (c.objet || '').replace(/,/g, ';'), c.approuvee_ca ? 'Oui' : 'Non', c.statut].join(','));
+  });
+  var blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'dossier_cac_intragroupe_' + annee + '.csv';
+  a.click();
+  toast('Export CSV téléchargé.', 'success');
+}
+
 
 /* ══════════════════════════════════════════════════════════════════════
    NOTES ANNEXES SYSCOHADA — états annexés au bilan, au compte de résultat
