@@ -69002,51 +69002,12 @@ function _tresoInfoEcriture(e, compte) {
 }
 
 /* Rafraîchit la vue de rapprochement quand la période ou le compte change
-   (sans relancer le matching automatique — voir rapprochAuto pour ça). */
+   (sans relancer le matching automatique — voir rapprochAutoScore pour ça). */
 function loadRapprochement() {
   if (typeof populateComptesTresorerieSelects === 'function') populateComptesTresorerieSelects();
   buildRapprochement();
   buildRapprochKPIs();
   renderReleveTable();
-}
-
-function rapprochAuto() {
-  var mois = (document.getElementById('rapproch-periode')||{}).value||'';
-  var compte = (document.getElementById('rapproch-compte')||{}).value||'';
-  var releves = DATA.releves_bank.filter(function(r){ return !r.rapproche && (!mois||r.mois===mois); });
-  var ecritures = getEcrituresBanque(mois, compte).filter(function(e){ return !e._rapproche; });
-
-  var matched = 0;
-  releves.forEach(function(r) {
-    var montantR = r.credit > 0 ? r.credit : r.debit;
-    // Try to find matching écriture by amount ±100 FCFA and date ±5 days
-    var rDate = new Date(r.date);
-    var match = ecritures.find(function(e) {
-      var montantE = e._tresoMontant;
-      var eDate = new Date(e.date||'');
-      var dayDiff = Math.abs((rDate - eDate) / (1000*60*60*24));
-      var amountDiff = Math.abs(montantE - montantR);
-      // Check reference match
-      var refMatch = r.ref && e.ref && (r.ref.includes(e.ref) || e.ref.includes(r.ref));
-      return amountDiff <= 100 && dayDiff <= 5 && !e._rapproche;
-    });
-
-    if (match) {
-      r.rapproche = true;
-      r.ecriture_id = match.id;
-      match._rapproche = true;
-      matched++;
-      dbPut('releves_bank', r);
-    }
-  });
-
-  // Clean temp flag
-  ecritures.forEach(function(e){ delete e._rapproche; });
-
-  buildRapprochement();
-  buildRapprochKPIs();
-  renderReleveTable();
-  toast('⚡ Rapprochement automatique : '+matched+' ligne(s) rapprochée(s).','success');
 }
 
 /* Remplit dynamiquement les sélecteurs de compte bancaire (relevé + filtre de
@@ -69111,8 +69072,8 @@ function buildRapprochement() {
       totDebitR+=r.debit||0; totCreditR+=r.credit||0;
       return '<tr>'
         +'<td style="font-size:12px;">'+r.date+'</td>'
-        +'<td style="font-family:monospace;font-size:10px;color:var(--bleu);">'+r.ref+'</td>'
-        +'<td style="font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.libelle+'</td>'
+        +'<td style="font-family:monospace;font-size:10px;color:var(--bleu);">'+escHtml(r.ref||'')+'</td>'
+        +'<td style="font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(r.libelle||'')+'</td>'
         +'<td style="text-align:right;color:var(--rouge);">'+(r.debit>0?fmtF(r.debit):'—')+'</td>'
         +'<td style="text-align:right;color:var(--vert);">'+(r.credit>0?fmtF(r.credit):'—')+'</td>'
         +'<td><span class="badge '+(r.rapproche?'badge-vert':'badge-or')+'">'+(r.rapproche?'✅':'⏳')+'</span></td>'
