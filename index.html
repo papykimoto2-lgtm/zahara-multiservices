@@ -97247,7 +97247,12 @@ function brnRender() {
   else {
     tb.innerHTML = _brnList.map(function(b,i){
       return '<tr>'
-        + '<td><input class="form-control" style="width:70px" value="'+(b.nom||'').replace(/"/g,'&quot;')+'" oninput="_brnList['+i+'].nom=this.value"></td>'
+        /* [Fix XSS] Le nom de borne vient d'un import CSV/DXF sans aucune
+           validation de contenu — un fichier forgé cassait l'attribut
+           value="…" avec un simple remplacement du guillemet, les chevrons
+           n'étaient pas échappés. afEsc() échappe & < > " en une passe,
+           cohérent avec le reste du fichier. */
+        + '<td><input class="form-control" style="width:70px" value="'+afEsc(b.nom||'')+'" oninput="_brnList['+i+'].nom=this.value"></td>'
         + '<td><input type="number" step="0.001" class="form-control" style="text-align:right" value="'+(b.x||0)+'" oninput="_brnList['+i+'].x=parseFloat(this.value)||0;brnRenderPlan()"></td>'
         + '<td><input type="number" step="0.001" class="form-control" style="text-align:right" value="'+(b.y||0)+'" oninput="_brnList['+i+'].y=parseFloat(this.value)||0;brnRenderPlan()"></td>'
         + '<td><input type="number" step="0.01" class="form-control" style="text-align:right;width:80px" value="'+(b.z||0)+'" oninput="_brnList['+i+'].z=parseFloat(this.value)||0;if(_brnShowContours)brnRenderPlan()"></td>'
@@ -97312,8 +97317,11 @@ function brnRenderPlan() {
   var poly = pts.map(function(p){ return px(p.x)+','+py(p.y); }).join(' ');
   var contourSvg = (typeof _brnShowContours!=='undefined' && _brnShowContours) ? _brnContourSvg(px,py,minX,maxX,minY,maxY) : '';
   var marks = pts.map(function(p){
+    /* [Fix XSS] p.nom vient d'un import CSV/DXF non validé — inséré brut,
+       il pouvait rompre le balisage SVG (injecté via innerHTML) et exécuter
+       du code arbitraire selon le contenu du nom importé. */
     return '<circle cx="'+px(p.x).toFixed(1)+'" cy="'+py(p.y).toFixed(1)+'" r="3" fill="#1A6B3A"/>'
-      + '<text x="'+(px(p.x)+5).toFixed(1)+'" y="'+(py(p.y)-4).toFixed(1)+'" font-size="9" fill="#333">'+(p.nom||'')+'</text>';
+      + '<text x="'+(px(p.x)+5).toFixed(1)+'" y="'+(py(p.y)-4).toFixed(1)+'" font-size="9" fill="#333">'+escHtml(p.nom||'')+'</text>';
   }).join('');
   var a = brnArea();
   box.innerHTML = '<svg width="'+W+'" height="'+H+'" style="max-width:100%;background:#fff;border:1px solid #ddd;border-radius:6px;">'
@@ -97333,8 +97341,11 @@ function brnPrintPlan() {
   var cont = (document.getElementById('parc-contenance')||{}).value || '';
   var geo = (document.getElementById('parc-geometre')||{}).value || '';
   var soc = (DATA.params && DATA.params.societe) || 'ImmoSuite ERP';
+  /* [Fix XSS] b.nom vient d'un import CSV/DXF non validé et atterrit ici dans
+     un document.write() — un nom contenant une balise de script se serait
+     exécuté directement à l'impression du plan de bornage. */
   var rows = _brnList.map(function(b){
-    return '<tr><td>'+(b.nom||'')+'</td><td style="text-align:right;">'+(b.x||0)+'</td><td style="text-align:right;">'+(b.y||0)+'</td><td style="text-align:right;">'+(b.z||0)+'</td><td style="text-align:right;">'+(b.angle||0)+'</td><td style="text-align:right;">'+(b.distance||0)+'</td></tr>';
+    return '<tr><td>'+escHtml(b.nom||'')+'</td><td style="text-align:right;">'+(b.x||0)+'</td><td style="text-align:right;">'+(b.y||0)+'</td><td style="text-align:right;">'+(b.z||0)+'</td><td style="text-align:right;">'+(b.angle||0)+'</td><td style="text-align:right;">'+(b.distance||0)+'</td></tr>';
   }).join('');
   var a = brnArea();
   var w = window.open('','','width=800,height=850');
