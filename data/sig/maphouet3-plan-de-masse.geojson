@@ -1,0 +1,3619 @@
+{
+ "type": "FeatureCollection",
+ "name": "MAPHOUET 3 — plan de masse",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-PERIMETRE",
+    "name": "MAPHOUET 3 — périmètre îlot",
+    "categorie": "perimetre",
+    "surface_m2": 23810,
+    "statut": "acquis",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96115501,
+       5.47113198
+      ],
+      [
+       -3.96074894,
+       5.47034956
+      ],
+      [
+       -3.96261115,
+       5.4693589
+      ],
+      [
+       -3.96270443,
+       5.46939458
+      ],
+      [
+       -3.96300916,
+       5.47022193
+      ],
+      [
+       -3.96115501,
+       5.47113198
+      ],
+      [
+       -3.96115501,
+       5.47113198
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L001",
+    "name": "Lot 1",
+    "categorie": "lot",
+    "numero": "1",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 225.2,
+    "ecart_pct": 12.6,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96287471,
+       5.47028792
+      ],
+      [
+       -3.96300916,
+       5.47022193
+      ],
+      [
+       -3.96296914,
+       5.47011326
+      ],
+      [
+       -3.96282942,
+       5.47016494
+      ],
+      [
+       -3.96287471,
+       5.47028792
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L002",
+    "name": "Lot 2",
+    "categorie": "lot",
+    "numero": "2",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 236.9,
+    "ecart_pct": 18.5,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96269816,
+       5.47021349
+      ],
+      [
+       -3.96274841,
+       5.47034991
+      ],
+      [
+       -3.96287471,
+       5.47028792
+      ],
+      [
+       -3.96282942,
+       5.47016494
+      ],
+      [
+       -3.96269816,
+       5.47021349
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L003",
+    "name": "Lot 3",
+    "categorie": "lot",
+    "numero": "3",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 209.6,
+    "ecart_pct": 4.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96283365,
+       5.47016338
+      ],
+      [
+       -3.96296914,
+       5.47011326
+      ],
+      [
+       -3.96292819,
+       5.4700021
+      ],
+      [
+       -3.96279271,
+       5.47005221
+      ],
+      [
+       -3.96283365,
+       5.47016338
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L004",
+    "name": "Lot 4",
+    "categorie": "lot",
+    "numero": "4",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 209.6,
+    "ecart_pct": 4.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96265722,
+       5.47010233
+      ],
+      [
+       -3.96269816,
+       5.47021349
+      ],
+      [
+       -3.96283365,
+       5.47016338
+      ],
+      [
+       -3.96279271,
+       5.47005221
+      ],
+      [
+       -3.96265722,
+       5.47010233
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L005",
+    "name": "Lot 5",
+    "categorie": "lot",
+    "numero": "5",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 201.6,
+    "ecart_pct": 0.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96279271,
+       5.47005221
+      ],
+      [
+       -3.96292819,
+       5.4700021
+      ],
+      [
+       -3.96288881,
+       5.46989518
+      ],
+      [
+       -3.96275332,
+       5.46994529
+      ],
+      [
+       -3.96279271,
+       5.47005221
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L006",
+    "name": "Lot 6",
+    "categorie": "lot",
+    "numero": "6",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 201.6,
+    "ecart_pct": 0.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96261784,
+       5.46999541
+      ],
+      [
+       -3.96265722,
+       5.47010233
+      ],
+      [
+       -3.96279271,
+       5.47005221
+      ],
+      [
+       -3.96275332,
+       5.46994529
+      ],
+      [
+       -3.96261784,
+       5.46999541
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L007",
+    "name": "Lot 7",
+    "categorie": "lot",
+    "numero": "7",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 205.6,
+    "ecart_pct": 2.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96275332,
+       5.46994529
+      ],
+      [
+       -3.96288881,
+       5.46989518
+      ],
+      [
+       -3.96284865,
+       5.46978614
+      ],
+      [
+       -3.96271316,
+       5.46983625
+      ],
+      [
+       -3.96275332,
+       5.46994529
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L008",
+    "name": "Lot 8",
+    "categorie": "lot",
+    "numero": "8",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 205.6,
+    "ecart_pct": 2.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96257768,
+       5.46988637
+      ],
+      [
+       -3.96261784,
+       5.46999541
+      ],
+      [
+       -3.96275332,
+       5.46994529
+      ],
+      [
+       -3.96271316,
+       5.46983625
+      ],
+      [
+       -3.96257768,
+       5.46988637
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L009",
+    "name": "Lot 9",
+    "categorie": "lot",
+    "numero": "9",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 201.6,
+    "ecart_pct": 0.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96271316,
+       5.46983625
+      ],
+      [
+       -3.96284865,
+       5.46978614
+      ],
+      [
+       -3.96280927,
+       5.46967922
+      ],
+      [
+       -3.96267378,
+       5.46972933
+      ],
+      [
+       -3.96271316,
+       5.46983625
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L010",
+    "name": "Lot 10",
+    "categorie": "lot",
+    "numero": "10",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 201.6,
+    "ecart_pct": 0.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96253829,
+       5.46977945
+      ],
+      [
+       -3.96257768,
+       5.46988637
+      ],
+      [
+       -3.96271316,
+       5.46983625
+      ],
+      [
+       -3.96267378,
+       5.46972933
+      ],
+      [
+       -3.96253829,
+       5.46977945
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L011",
+    "name": "Lot 11",
+    "categorie": "lot",
+    "numero": "11",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 201.6,
+    "ecart_pct": 0.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96267378,
+       5.46972933
+      ],
+      [
+       -3.96280927,
+       5.46967922
+      ],
+      [
+       -3.96276989,
+       5.4695723
+      ],
+      [
+       -3.9626344,
+       5.46962242
+      ],
+      [
+       -3.96267378,
+       5.46972933
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L012",
+    "name": "Lot 12",
+    "categorie": "lot",
+    "numero": "12",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 201.6,
+    "ecart_pct": 0.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96249891,
+       5.46967253
+      ],
+      [
+       -3.96253829,
+       5.46977945
+      ],
+      [
+       -3.96267378,
+       5.46972933
+      ],
+      [
+       -3.9626344,
+       5.46962242
+      ],
+      [
+       -3.96249891,
+       5.46967253
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L013",
+    "name": "Lot 13",
+    "categorie": "lot",
+    "numero": "13",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 201.6,
+    "ecart_pct": 0.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.9626344,
+       5.46962242
+      ],
+      [
+       -3.96276989,
+       5.4695723
+      ],
+      [
+       -3.9627305,
+       5.46946538
+      ],
+      [
+       -3.96259502,
+       5.4695155
+      ],
+      [
+       -3.9626344,
+       5.46962242
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L014",
+    "name": "Lot 14",
+    "categorie": "lot",
+    "numero": "14",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 201.6,
+    "ecart_pct": 0.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96245953,
+       5.46956561
+      ],
+      [
+       -3.96249891,
+       5.46967253
+      ],
+      [
+       -3.9626344,
+       5.46962242
+      ],
+      [
+       -3.96259502,
+       5.4695155
+      ],
+      [
+       -3.96245953,
+       5.46956561
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L015",
+    "name": "Lot 15",
+    "categorie": "lot",
+    "numero": "15",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 215.7,
+    "ecart_pct": 7.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96259502,
+       5.4695155
+      ],
+      [
+       -3.9627305,
+       5.46946538
+      ],
+      [
+       -3.96270443,
+       5.46939458
+      ],
+      [
+       -3.96261115,
+       5.4693589
+      ],
+      [
+       -3.96254943,
+       5.46939173
+      ],
+      [
+       -3.96259502,
+       5.4695155
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L016",
+    "name": "Lot 16",
+    "categorie": "lot",
+    "numero": "16",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 216,
+    "ecart_pct": 8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96242071,
+       5.46946021
+      ],
+      [
+       -3.96245953,
+       5.46956561
+      ],
+      [
+       -3.96259502,
+       5.4695155
+      ],
+      [
+       -3.96254943,
+       5.46939173
+      ],
+      [
+       -3.96242071,
+       5.46946021
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L017",
+    "name": "Lot 17",
+    "categorie": "lot",
+    "numero": "17",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 197.7,
+    "ecart_pct": 1.2,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96255769,
+       5.47039316
+      ],
+      [
+       -3.96265122,
+       5.47034726
+      ],
+      [
+       -3.96260095,
+       5.47021078
+      ],
+      [
+       -3.96249416,
+       5.47026319
+      ],
+      [
+       -3.96255769,
+       5.47039316
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L018",
+    "name": "Lot 18",
+    "categorie": "lot",
+    "numero": "18",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 196,
+    "ecart_pct": 2,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96245839,
+       5.4704419
+      ],
+      [
+       -3.96255769,
+       5.47039316
+      ],
+      [
+       -3.96249416,
+       5.47026319
+      ],
+      [
+       -3.96239486,
+       5.47031193
+      ],
+      [
+       -3.96245839,
+       5.4704419
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L019",
+    "name": "Lot 19",
+    "categorie": "lot",
+    "numero": "19",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96235706,
+       5.47049163
+      ],
+      [
+       -3.96245839,
+       5.4704419
+      ],
+      [
+       -3.96239486,
+       5.47031193
+      ],
+      [
+       -3.96229353,
+       5.47036166
+      ],
+      [
+       -3.96235706,
+       5.47049163
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L020",
+    "name": "Lot 20",
+    "categorie": "lot",
+    "numero": "20",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96225573,
+       5.47054137
+      ],
+      [
+       -3.96235706,
+       5.47049163
+      ],
+      [
+       -3.96229353,
+       5.47036166
+      ],
+      [
+       -3.96219221,
+       5.4704114
+      ],
+      [
+       -3.96225573,
+       5.47054137
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L021",
+    "name": "Lot 21",
+    "categorie": "lot",
+    "numero": "21",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.9621544,
+       5.4705911
+      ],
+      [
+       -3.96225573,
+       5.47054137
+      ],
+      [
+       -3.96219221,
+       5.4704114
+      ],
+      [
+       -3.96209088,
+       5.47046113
+      ],
+      [
+       -3.9621544,
+       5.4705911
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L022",
+    "name": "Lot 22",
+    "categorie": "lot",
+    "numero": "22",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96205308,
+       5.47064083
+      ],
+      [
+       -3.9621544,
+       5.4705911
+      ],
+      [
+       -3.96209088,
+       5.47046113
+      ],
+      [
+       -3.96198955,
+       5.47051086
+      ],
+      [
+       -3.96205308,
+       5.47064083
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L023",
+    "name": "Lot 23",
+    "categorie": "lot",
+    "numero": "23",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96195175,
+       5.47069057
+      ],
+      [
+       -3.96205308,
+       5.47064083
+      ],
+      [
+       -3.96198955,
+       5.47051086
+      ],
+      [
+       -3.96188822,
+       5.4705606
+      ],
+      [
+       -3.96195175,
+       5.47069057
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L024",
+    "name": "Lot 24",
+    "categorie": "lot",
+    "numero": "24",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96185042,
+       5.4707403
+      ],
+      [
+       -3.96195175,
+       5.47069057
+      ],
+      [
+       -3.96188822,
+       5.4705606
+      ],
+      [
+       -3.9617869,
+       5.47061033
+      ],
+      [
+       -3.96185042,
+       5.4707403
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L025",
+    "name": "Lot 25",
+    "categorie": "lot",
+    "numero": "25",
+    "numero_deduit": true,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96144511,
+       5.47093923
+      ],
+      [
+       -3.96154644,
+       5.4708895
+      ],
+      [
+       -3.96148291,
+       5.47075953
+      ],
+      [
+       -3.96138158,
+       5.47080926
+      ],
+      [
+       -3.96144511,
+       5.47093923
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L026",
+    "name": "Lot 26",
+    "categorie": "lot",
+    "numero": "26",
+    "numero_deduit": true,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": null,
+    "surface_calc": 200,
+    "ecart_pct": null,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96154644,
+       5.4708895
+      ],
+      [
+       -3.96164777,
+       5.47083977
+      ],
+      [
+       -3.96158424,
+       5.4707098
+      ],
+      [
+       -3.96148291,
+       5.47075953
+      ],
+      [
+       -3.96154644,
+       5.4708895
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L027",
+    "name": "Lot 27",
+    "categorie": "lot",
+    "numero": "27",
+    "numero_deduit": true,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": null,
+    "surface_calc": 200,
+    "ecart_pct": null,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96164777,
+       5.47083977
+      ],
+      [
+       -3.96174909,
+       5.47079003
+      ],
+      [
+       -3.96168557,
+       5.47066006
+      ],
+      [
+       -3.96158424,
+       5.4707098
+      ],
+      [
+       -3.96164777,
+       5.47083977
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L028",
+    "name": "Lot 28",
+    "categorie": "lot",
+    "numero": "28",
+    "numero_deduit": true,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96174909,
+       5.47079003
+      ],
+      [
+       -3.96185042,
+       5.4707403
+      ],
+      [
+       -3.9617869,
+       5.47061033
+      ],
+      [
+       -3.96168557,
+       5.47066006
+      ],
+      [
+       -3.96174909,
+       5.47079003
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L029",
+    "name": "Lot 29",
+    "categorie": "lot",
+    "numero": "29",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200.7,
+    "ecart_pct": 0.3,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.961345,
+       5.47098837
+      ],
+      [
+       -3.96144511,
+       5.47093923
+      ],
+      [
+       -3.96138158,
+       5.47080926
+      ],
+      [
+       -3.96127834,
+       5.47085994
+      ],
+      [
+       -3.961345,
+       5.47098837
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L030",
+    "name": "Lot 30",
+    "categorie": "lot",
+    "numero": "30",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 188.5,
+    "ecart_pct": 5.7,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96238687,
+       5.46990833
+      ],
+      [
+       -3.96247273,
+       5.46986265
+      ],
+      [
+       -3.96242226,
+       5.46972565
+      ],
+      [
+       -3.96232023,
+       5.46977993
+      ],
+      [
+       -3.96238687,
+       5.46990833
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L031",
+    "name": "Lot 31",
+    "categorie": "lot",
+    "numero": "31",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96228721,
+       5.46996134
+      ],
+      [
+       -3.96238687,
+       5.46990833
+      ],
+      [
+       -3.96232023,
+       5.46977993
+      ],
+      [
+       -3.96222057,
+       5.46983294
+      ],
+      [
+       -3.96228721,
+       5.46996134
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L032",
+    "name": "Lot 32",
+    "categorie": "lot",
+    "numero": "32",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96218756,
+       5.47001436
+      ],
+      [
+       -3.96228721,
+       5.46996134
+      ],
+      [
+       -3.96222057,
+       5.46983294
+      ],
+      [
+       -3.96212092,
+       5.46988596
+      ],
+      [
+       -3.96218756,
+       5.47001436
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L033",
+    "name": "Lot 33",
+    "categorie": "lot",
+    "numero": "33",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.9620879,
+       5.47006737
+      ],
+      [
+       -3.96218756,
+       5.47001436
+      ],
+      [
+       -3.96212092,
+       5.46988596
+      ],
+      [
+       -3.96202126,
+       5.46993897
+      ],
+      [
+       -3.9620879,
+       5.47006737
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L034",
+    "name": "Lot 34",
+    "categorie": "lot",
+    "numero": "34",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 221,
+    "ecart_pct": 10.5,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96206778,
+       5.47039189
+      ],
+      [
+       -3.96215318,
+       5.47034998
+      ],
+      [
+       -3.96206576,
+       5.47018155
+      ],
+      [
+       -3.9619804,
+       5.47022696
+      ],
+      [
+       -3.96206778,
+       5.47039189
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L035",
+    "name": "Lot 35",
+    "categorie": "lot",
+    "numero": "35",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 223.6,
+    "ecart_pct": 11.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96197916,
+       5.47043539
+      ],
+      [
+       -3.96206778,
+       5.47039189
+      ],
+      [
+       -3.9619804,
+       5.47022696
+      ],
+      [
+       -3.96189329,
+       5.4702733
+      ],
+      [
+       -3.96197916,
+       5.47043539
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L036",
+    "name": "Lot 36",
+    "categorie": "lot",
+    "numero": "36",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 210,
+    "surface_dxf": null,
+    "surface_calc": 210.3,
+    "ecart_pct": null,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.9618937,
+       5.47047733
+      ],
+      [
+       -3.96197916,
+       5.47043539
+      ],
+      [
+       -3.96189329,
+       5.4702733
+      ],
+      [
+       -3.96181063,
+       5.47031727
+      ],
+      [
+       -3.9618937,
+       5.47047733
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L037",
+    "name": "Lot 37",
+    "categorie": "lot",
+    "numero": "37",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 208,
+    "ecart_pct": 4,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.9619382,
+       5.47024941
+      ],
+      [
+       -3.96206576,
+       5.47018155
+      ],
+      [
+       -3.96201162,
+       5.47007722
+      ],
+      [
+       -3.96188405,
+       5.47014509
+      ],
+      [
+       -3.9619382,
+       5.47024941
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L038",
+    "name": "Lot 38",
+    "categorie": "lot",
+    "numero": "38",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 208,
+    "ecart_pct": 4,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96181063,
+       5.47031727
+      ],
+      [
+       -3.9619382,
+       5.47024941
+      ],
+      [
+       -3.96188405,
+       5.47014509
+      ],
+      [
+       -3.96175649,
+       5.47021295
+      ],
+      [
+       -3.96181063,
+       5.47031727
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L039",
+    "name": "Lot 39",
+    "categorie": "lot",
+    "numero": "39",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 208,
+    "ecart_pct": 4,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96188405,
+       5.47014509
+      ],
+      [
+       -3.96201162,
+       5.47007722
+      ],
+      [
+       -3.96195748,
+       5.4699729
+      ],
+      [
+       -3.96182991,
+       5.47004076
+      ],
+      [
+       -3.96188405,
+       5.47014509
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L040",
+    "name": "Lot 40",
+    "categorie": "lot",
+    "numero": "40",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 208,
+    "ecart_pct": 4,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96175649,
+       5.47021295
+      ],
+      [
+       -3.96188405,
+       5.47014509
+      ],
+      [
+       -3.96182991,
+       5.47004076
+      ],
+      [
+       -3.96170235,
+       5.47010863
+      ],
+      [
+       -3.96175649,
+       5.47021295
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L041",
+    "name": "Lot 41",
+    "categorie": "lot",
+    "numero": "41",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 210.3,
+    "ecart_pct": 5.2,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96174209,
+       5.47055175
+      ],
+      [
+       -3.96182883,
+       5.47050917
+      ],
+      [
+       -3.96174685,
+       5.4703512
+      ],
+      [
+       -3.96166025,
+       5.47039727
+      ],
+      [
+       -3.96174209,
+       5.47055175
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L042",
+    "name": "Lot 42",
+    "categorie": "lot",
+    "numero": "42",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 201.9,
+    "ecart_pct": 0.9,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96165665,
+       5.47059368
+      ],
+      [
+       -3.96174209,
+       5.47055175
+      ],
+      [
+       -3.96166025,
+       5.47039727
+      ],
+      [
+       -3.96157626,
+       5.47044195
+      ],
+      [
+       -3.96165665,
+       5.47059368
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L043",
+    "name": "Lot 43",
+    "categorie": "lot",
+    "numero": "43",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 201,
+    "ecart_pct": 0.5,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96156936,
+       5.47063653
+      ],
+      [
+       -3.96165665,
+       5.47059368
+      ],
+      [
+       -3.96157626,
+       5.47044195
+      ],
+      [
+       -3.96149172,
+       5.47048693
+      ],
+      [
+       -3.96156936,
+       5.47063653
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L044",
+    "name": "Lot 44",
+    "categorie": "lot",
+    "numero": "44",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 208,
+    "ecart_pct": 4,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96161928,
+       5.47041906
+      ],
+      [
+       -3.96174685,
+       5.4703512
+      ],
+      [
+       -3.96169271,
+       5.47024688
+      ],
+      [
+       -3.96156514,
+       5.47031474
+      ],
+      [
+       -3.96161928,
+       5.47041906
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L045",
+    "name": "Lot 45",
+    "categorie": "lot",
+    "numero": "45",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 208,
+    "ecart_pct": 4,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96149172,
+       5.47048693
+      ],
+      [
+       -3.96161928,
+       5.47041906
+      ],
+      [
+       -3.96156514,
+       5.47031474
+      ],
+      [
+       -3.96143758,
+       5.4703826
+      ],
+      [
+       -3.96149172,
+       5.47048693
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L046",
+    "name": "Lot 46",
+    "categorie": "lot",
+    "numero": "46",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 208,
+    "ecart_pct": 4,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96156514,
+       5.47031474
+      ],
+      [
+       -3.96169271,
+       5.47024688
+      ],
+      [
+       -3.96163856,
+       5.47014256
+      ],
+      [
+       -3.961511,
+       5.47021042
+      ],
+      [
+       -3.96156514,
+       5.47031474
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L047",
+    "name": "Lot 47",
+    "categorie": "lot",
+    "numero": "47",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 208,
+    "ecart_pct": 4,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96143758,
+       5.4703826
+      ],
+      [
+       -3.96156514,
+       5.47031474
+      ],
+      [
+       -3.961511,
+       5.47021042
+      ],
+      [
+       -3.96138343,
+       5.47027828
+      ],
+      [
+       -3.96143758,
+       5.4703826
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L048",
+    "name": "Lot 48",
+    "categorie": "lot",
+    "numero": "48",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 201.1,
+    "ecart_pct": 0.5,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96142028,
+       5.4707097
+      ],
+      [
+       -3.96150449,
+       5.47066836
+      ],
+      [
+       -3.96142377,
+       5.47051283
+      ],
+      [
+       -3.96133968,
+       5.47055756
+      ],
+      [
+       -3.96142028,
+       5.4707097
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L049",
+    "name": "Lot 49",
+    "categorie": "lot",
+    "numero": "49",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 202,
+    "ecart_pct": 1,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96133347,
+       5.4707523
+      ],
+      [
+       -3.96142028,
+       5.4707097
+      ],
+      [
+       -3.96133968,
+       5.47055756
+      ],
+      [
+       -3.96125435,
+       5.47060296
+      ],
+      [
+       -3.96133347,
+       5.4707523
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L050",
+    "name": "Lot 50",
+    "categorie": "lot",
+    "numero": "50",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200.5,
+    "ecart_pct": 0.3,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96124501,
+       5.47079572
+      ],
+      [
+       -3.96133347,
+       5.4707523
+      ],
+      [
+       -3.96125435,
+       5.47060296
+      ],
+      [
+       -3.96116864,
+       5.47064856
+      ],
+      [
+       -3.96124501,
+       5.47079572
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L051",
+    "name": "Lot 51",
+    "categorie": "lot",
+    "numero": "51",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.9612962,
+       5.47058069
+      ],
+      [
+       -3.96142377,
+       5.47051283
+      ],
+      [
+       -3.96137171,
+       5.47041252
+      ],
+      [
+       -3.96124414,
+       5.47048038
+      ],
+      [
+       -3.9612962,
+       5.47058069
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L052",
+    "name": "Lot 52",
+    "categorie": "lot",
+    "numero": "52",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96116864,
+       5.47064856
+      ],
+      [
+       -3.9612962,
+       5.47058069
+      ],
+      [
+       -3.96124414,
+       5.47048038
+      ],
+      [
+       -3.96111658,
+       5.47054825
+      ],
+      [
+       -3.96116864,
+       5.47064856
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L053",
+    "name": "Lot 53",
+    "categorie": "lot",
+    "numero": "53",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96124414,
+       5.47048038
+      ],
+      [
+       -3.96137171,
+       5.47041252
+      ],
+      [
+       -3.96131965,
+       5.47031221
+      ],
+      [
+       -3.96119208,
+       5.47038007
+      ],
+      [
+       -3.96124414,
+       5.47048038
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L054",
+    "name": "Lot 54",
+    "categorie": "lot",
+    "numero": "54",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96111658,
+       5.47054825
+      ],
+      [
+       -3.96124414,
+       5.47048038
+      ],
+      [
+       -3.96119208,
+       5.47038007
+      ],
+      [
+       -3.96106452,
+       5.47044793
+      ],
+      [
+       -3.96111658,
+       5.47054825
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L055",
+    "name": "Lot 55",
+    "categorie": "lot",
+    "numero": "55",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 232.3,
+    "ecart_pct": 16.1,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96115501,
+       5.47113198
+      ],
+      [
+       -3.96128474,
+       5.4710683
+      ],
+      [
+       -3.96122347,
+       5.47095024
+      ],
+      [
+       -3.96109534,
+       5.47101702
+      ],
+      [
+       -3.96115501,
+       5.47113198
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L056",
+    "name": "Lot 56",
+    "categorie": "lot",
+    "numero": "56",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 216,
+    "ecart_pct": 8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96109534,
+       5.47101702
+      ],
+      [
+       -3.96122347,
+       5.47095024
+      ],
+      [
+       -3.96116725,
+       5.47084192
+      ],
+      [
+       -3.96103912,
+       5.47090869
+      ],
+      [
+       -3.96109534,
+       5.47101702
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L057",
+    "name": "Lot 57",
+    "categorie": "lot",
+    "numero": "57",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 216,
+    "ecart_pct": 8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96103912,
+       5.47090869
+      ],
+      [
+       -3.96116725,
+       5.47084192
+      ],
+      [
+       -3.96111103,
+       5.47073359
+      ],
+      [
+       -3.9609829,
+       5.47080036
+      ],
+      [
+       -3.96103912,
+       5.47090869
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L058",
+    "name": "Lot 58",
+    "categorie": "lot",
+    "numero": "58",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 216,
+    "ecart_pct": 8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.9609829,
+       5.47080036
+      ],
+      [
+       -3.96111103,
+       5.47073359
+      ],
+      [
+       -3.96105481,
+       5.47062526
+      ],
+      [
+       -3.96092668,
+       5.47069204
+      ],
+      [
+       -3.9609829,
+       5.47080036
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L059",
+    "name": "Lot 59",
+    "categorie": "lot",
+    "numero": "59",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 214.5,
+    "ecart_pct": 7.2,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96092668,
+       5.47069204
+      ],
+      [
+       -3.96105481,
+       5.47062526
+      ],
+      [
+       -3.96099938,
+       5.47051846
+      ],
+      [
+       -3.96087047,
+       5.47058373
+      ],
+      [
+       -3.96092668,
+       5.47069204
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L060",
+    "name": "Lot 60",
+    "categorie": "lot",
+    "numero": "60",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 216,
+    "ecart_pct": 8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96087047,
+       5.47058373
+      ],
+      [
+       -3.96099938,
+       5.47051846
+      ],
+      [
+       -3.96094316,
+       5.47041013
+      ],
+      [
+       -3.96081424,
+       5.47047538
+      ],
+      [
+       -3.96087047,
+       5.47058373
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L061",
+    "name": "Lot 61",
+    "categorie": "lot",
+    "numero": "61",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 199.5,
+    "ecart_pct": 0.2,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96093349,
+       5.47041502
+      ],
+      [
+       -3.96094316,
+       5.47041013
+      ],
+      [
+       -3.96094314,
+       5.4704101
+      ],
+      [
+       -3.961033,
+       5.4703623
+      ],
+      [
+       -3.96096528,
+       5.47023447
+      ],
+      [
+       -3.96086586,
+       5.47028736
+      ],
+      [
+       -3.96093349,
+       5.47041502
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L062",
+    "name": "Lot 62",
+    "categorie": "lot",
+    "numero": "62",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 233.2,
+    "ecart_pct": 16.6,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96081424,
+       5.47047538
+      ],
+      [
+       -3.96093349,
+       5.47041502
+      ],
+      [
+       -3.96086586,
+       5.47028736
+      ],
+      [
+       -3.96074894,
+       5.47034956
+      ],
+      [
+       -3.96081424,
+       5.47047538
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L063",
+    "name": "Lot 63",
+    "categorie": "lot",
+    "numero": "63",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 220.8,
+    "ecart_pct": 10.4,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.961033,
+       5.4703623
+      ],
+      [
+       -3.96114302,
+       5.47030377
+      ],
+      [
+       -3.9610753,
+       5.47017594
+      ],
+      [
+       -3.96096528,
+       5.47023447
+      ],
+      [
+       -3.961033,
+       5.4703623
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L064",
+    "name": "Lot 64",
+    "categorie": "lot",
+    "numero": "64",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 225.6,
+    "ecart_pct": 12.8,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96114302,
+       5.47030377
+      ],
+      [
+       -3.96125543,
+       5.47024397
+      ],
+      [
+       -3.96118771,
+       5.47011614
+      ],
+      [
+       -3.9610753,
+       5.47017594
+      ],
+      [
+       -3.96114302,
+       5.47030377
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L065",
+    "name": "Lot 65",
+    "categorie": "lot",
+    "numero": "65",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 230.4,
+    "ecart_pct": 15.2,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96125543,
+       5.47024397
+      ],
+      [
+       -3.96137024,
+       5.47018289
+      ],
+      [
+       -3.96130252,
+       5.47005506
+      ],
+      [
+       -3.96118771,
+       5.47011614
+      ],
+      [
+       -3.96125543,
+       5.47024397
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L066",
+    "name": "Lot 66",
+    "categorie": "lot",
+    "numero": "66",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96139415,
+       5.47017017
+      ],
+      [
+       -3.96149381,
+       5.47011715
+      ],
+      [
+       -3.96142609,
+       5.46998933
+      ],
+      [
+       -3.96132644,
+       5.47004234
+      ],
+      [
+       -3.96139415,
+       5.47017017
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L067",
+    "name": "Lot 67",
+    "categorie": "lot",
+    "numero": "67",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96149381,
+       5.47011715
+      ],
+      [
+       -3.96159347,
+       5.47006414
+      ],
+      [
+       -3.96152575,
+       5.46993631
+      ],
+      [
+       -3.96142609,
+       5.46998933
+      ],
+      [
+       -3.96149381,
+       5.47011715
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L068",
+    "name": "Lot 68",
+    "categorie": "lot",
+    "numero": "68",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96159347,
+       5.47006414
+      ],
+      [
+       -3.96169313,
+       5.47001112
+      ],
+      [
+       -3.96162541,
+       5.4698833
+      ],
+      [
+       -3.96152575,
+       5.46993631
+      ],
+      [
+       -3.96159347,
+       5.47006414
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L069",
+    "name": "Lot 69",
+    "categorie": "lot",
+    "numero": "69",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96169313,
+       5.47001112
+      ],
+      [
+       -3.96179278,
+       5.46995811
+      ],
+      [
+       -3.96172506,
+       5.46983028
+      ],
+      [
+       -3.96162541,
+       5.4698833
+      ],
+      [
+       -3.96169313,
+       5.47001112
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L070",
+    "name": "Lot 70",
+    "categorie": "lot",
+    "numero": "70",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96179278,
+       5.46995811
+      ],
+      [
+       -3.96189244,
+       5.46990509
+      ],
+      [
+       -3.96182472,
+       5.46977727
+      ],
+      [
+       -3.96172506,
+       5.46983028
+      ],
+      [
+       -3.96179278,
+       5.46995811
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L071",
+    "name": "Lot 71",
+    "categorie": "lot",
+    "numero": "71",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96189244,
+       5.46990509
+      ],
+      [
+       -3.9619921,
+       5.46985208
+      ],
+      [
+       -3.96192438,
+       5.46972425
+      ],
+      [
+       -3.96182472,
+       5.46977727
+      ],
+      [
+       -3.96189244,
+       5.46990509
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L072",
+    "name": "Lot 72",
+    "categorie": "lot",
+    "numero": "72",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.9619921,
+       5.46985208
+      ],
+      [
+       -3.96209175,
+       5.46979906
+      ],
+      [
+       -3.96202403,
+       5.46967124
+      ],
+      [
+       -3.96192438,
+       5.46972425
+      ],
+      [
+       -3.9619921,
+       5.46985208
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L073",
+    "name": "Lot 73",
+    "categorie": "lot",
+    "numero": "73",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96209175,
+       5.46979906
+      ],
+      [
+       -3.96219141,
+       5.46974605
+      ],
+      [
+       -3.96212369,
+       5.46961822
+      ],
+      [
+       -3.96202403,
+       5.46967124
+      ],
+      [
+       -3.96209175,
+       5.46979906
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L074",
+    "name": "Lot 74",
+    "categorie": "lot",
+    "numero": "74",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 200,
+    "ecart_pct": 0,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96219141,
+       5.46974605
+      ],
+      [
+       -3.96229107,
+       5.46969303
+      ],
+      [
+       -3.96222335,
+       5.4695652
+      ],
+      [
+       -3.96212369,
+       5.46961822
+      ],
+      [
+       -3.96219141,
+       5.46974605
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-L075",
+    "name": "Lot 75",
+    "categorie": "lot",
+    "numero": "75",
+    "numero_deduit": false,
+    "ilot": 1,
+    "surface_m2": 200,
+    "surface_dxf": 200,
+    "surface_calc": 217.3,
+    "ecart_pct": 8.7,
+    "statut": "disponible",
+    "systeme": "UTM 30N / WGS84",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96229107,
+       5.46969303
+      ],
+      [
+       -3.96239072,
+       5.46964002
+      ],
+      [
+       -3.96234026,
+       5.46950301
+      ],
+      [
+       -3.96222335,
+       5.4695652
+      ],
+      [
+       -3.96229107,
+       5.46969303
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-R1",
+    "name": "Réserve 1",
+    "categorie": "reserve",
+    "surface_m2": 1176,
+    "statut": "acquis",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96329719,
+       5.46878913
+      ],
+      [
+       -3.96278366,
+       5.46906231
+      ],
+      [
+       -3.96272817,
+       5.46904109
+      ],
+      [
+       -3.96263576,
+       5.46879019
+      ],
+      [
+       -3.96329719,
+       5.46878913
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-R2",
+    "name": "Réserve 2",
+    "categorie": "reserve",
+    "surface_m2": 5787,
+    "statut": "acquis",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96042489,
+       5.47031712
+      ],
+      [
+       -3.96257522,
+       5.4691732
+      ],
+      [
+       -3.96259945,
+       5.46910957
+      ],
+      [
+       -3.96248191,
+       5.46879044
+      ],
+      [
+       -3.96042489,
+       5.47031712
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-R3",
+    "name": "Réserve 3",
+    "categorie": "reserve",
+    "surface_m2": 12030,
+    "statut": "acquis",
+    "source": "MAPHOUET3_FORMAT_DXF.dxf"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -3.96368336,
+       5.46878851
+      ],
+      [
+       -3.96284674,
+       5.46923357
+      ],
+      [
+       -3.96282251,
+       5.46929721
+      ],
+      [
+       -3.96349785,
+       5.47113077
+      ],
+      [
+       -3.96368336,
+       5.46878851
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-A1",
+    "name": "ev+aj",
+    "categorie": "mention"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -3.96233957,
+     5.47021462
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-A2",
+    "name": "Bureau de",
+    "categorie": "mention"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -3.96253424,
+     5.47012692
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-A3",
+    "name": "syndique",
+    "categorie": "mention"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -3.96253682,
+     5.47009425
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ref": "MAPHOUET3-A4",
+    "name": "Terrain de sport",
+    "categorie": "mention"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -3.96248375,
+     5.46995737
+    ]
+   }
+  }
+ ]
+}
