@@ -3297,8 +3297,8 @@
     var couleur, glyphe;
     if(p.type==='programme'){ couleur='#0f4c81'; glyphe='🏗️'; }
     if(p.type==='operation'){ couleur=p.lotsDispo?'#7c3aed':'#94a3b8'; glyphe='🤝'; }
-    else if(p.type==='lot'){ couleur=p.statut.col; glyphe='📍'; }
-    else if(p.type==='parcelle'){ couleur=p.statut.col; glyphe='🗺️'; }
+    else if(p.type==='lot'){ couleur=(p.statut&&p.statut.col)||'#64748b'; glyphe='📍'; }
+    else if(p.type==='parcelle'){ couleur=(p.statut&&p.statut.col)||'#64748b'; glyphe='🗺️'; }
     else if(p.type==='alouer'){ couleur='#16a34a'; glyphe='🔑'; }
     else { couleur=occ?'#94a3b8':'#16a34a'; glyphe='🏠'; }
     return L.divIcon({
@@ -3567,8 +3567,15 @@
       /* La forme réelle d'une parcelle vaut mieux qu'un point : c'est elle
          qui dit si le terrain est constructible et comment il se découpe. */
       if(p.polygone){
-        var forme = L.polygon(p.polygone,{ color:p.statut.col, weight:2,
-          fillColor:p.statut.col, fillOpacity:.25 }).addTo(CARTE.couche).bindPopup(_mapPopup(p));
+        /* [FIX] Seules les parcelles passaient ici, et elles portent toutes
+           un statut. Depuis que l'emprise d'un programme est tracee elle
+           aussi, p.statut peut etre absent : la carte entiere s'arretait
+           alors sur « Cannot read properties of undefined (reading 'col') »
+           et plus aucun point ne s'affichait. */
+        var coulForme = (p.statut && p.statut.col) || (p.type==='programme' ? '#0f4c81' : '#64748b');
+        var forme = L.polygon(p.polygone,{ color:coulForme, weight:2,
+          fillColor:coulForme, fillOpacity:(p.type==='programme'?.10:.25),
+          dashArray:(p.type==='programme'?'6,4':null) }).addTo(CARTE.couche).bindPopup(_mapPopup(p));
         p.polygone.forEach(function(x){ bornes.push(x); });
         /* Un plan de masse compte des centaines de lots : une punaise sur
            chacun masquerait le trace et alourdirait la carte pour rien. La
@@ -3576,7 +3583,9 @@
         if (CARTE.etiquettes && p.nom) {
           forme.bindTooltip(esc(p.nom), { permanent:true, direction:'center', className:'carte-etiquette' });
         }
-        return;
+        /* Un programme conserve son marqueur : son emprise situe le
+           perimetre, le marqueur reste le point d'entree vers sa fiche. */
+        if (p.type !== 'programme') return;
       }
       if(p.flou){
         L.circle([p.lat,p.lng],{ radius:250, color:'#94a3b8', weight:1.5,
