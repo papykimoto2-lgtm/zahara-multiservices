@@ -68412,7 +68412,11 @@ async function lbAjouterPhotos(input){
     if(f.size>6*1024*1024){ toast('❌ '+f.name+' dépasse 6 Mo.','error'); continue; }
     var dataUrl=await new Promise(function(res){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.readAsDataURL(f); });
     var compressed=await _compressImage(dataUrl,1600,0.7);
-    _lbPhotos.push({ id:uid(), data:compressed, legende:f.name.replace(/\.[^.]+$/,'') });
+    /* [Mémoire] Voir pmAjouterPhotos : envoi au Storage, repli base64 hors ligne. */
+    var phId=uid(), phPath=null;
+    try { phPath = await pmUploadBlob(await _dataUrlToBlob(compressed), phId, 'bien'); } catch(ePh){ phPath = null; }
+    _lbPhotos.push(Object.assign({ id:phId, legende:f.name.replace(/\.[^.]+$/,'') },
+      phPath ? { path:phPath, bucket:PM_BUCKET, url:_pmPublicUrl(phPath) } : { data:compressed }));
   }
   input.value='';
   lbRenderPhotosGrid();
@@ -68426,7 +68430,7 @@ function lbRenderPhotosGrid(){
   if(!_lbPhotos.length){ el.innerHTML='<div style="grid-column:1/-1;color:var(--dim);font-size:12px;">Aucune photo pour le moment.</div>'; return; }
   el.innerHTML=_lbPhotos.map(function(p){
     return '<div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;border:1px solid var(--bord);">'
-      +'<img src="'+p.data+'" style="width:100%;height:100%;object-fit:cover;">'
+      +'<img src="'+(p.data||p.url)+'" style="width:100%;height:100%;object-fit:cover;">'
       +'<button class="btn btn-danger btn-sm btn-icon" style="position:absolute;top:4px;right:4px;padding:2px 6px;" onclick="lbSupprimerPhoto(\''+p.id+'\')" title="Supprimer">🗑️</button>'
       +'</div>';
   }).join('');
@@ -73550,6 +73554,13 @@ var PM_VIDEO_MAX_MO = 25;
    tel quel, sans jamais le matérialiser dans le tas JavaScript. C'est la
    différence entre quelques mégaoctets et plusieurs gigaoctets — voir le
    commentaire de pmAjouterVideoFichier. */
+/* Convertit un data URL en Blob via le décodeur natif du navigateur : aucune
+   chaîne binaire géante ne transite par le tas JavaScript, contrairement à
+   atob() suivi d'une boucle octet par octet (_b64ToBytes). */
+async function _dataUrlToBlob(dataUrl){
+  var r = await fetch(dataUrl);
+  return await r.blob();
+}
 async function pmUploadBlob(fichier, id, categorie){
   if (!SB.url || !SB.key) throw new Error('cloud non configuré');
   var ext = ((fichier.type||'').split('/')[1] || (fichier.name||'').split('.').pop() || 'bin').replace(/[^a-z0-9]/gi,'');
@@ -73660,7 +73671,14 @@ async function pmAjouterPhotos(input){
     if(f.size > 6*1024*1024){ toast('❌ '+f.name+' dépasse 6 Mo.','error'); continue; }
     var dataUrl = await new Promise(function(res){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.readAsDataURL(f); });
     var compressed = await _compressImage(dataUrl, 1600, 0.7);
-    var media = Object.assign({ id: uid(), type:'photo', categorie:cat, titre: titre || f.name.replace(/\.[^.]+$/,''), commentaire:(document.getElementById('pm-commentaire')||{}).value||'' }, pmRefCourant(), { data:compressed, mime:'image/jpeg', taille:Math.round(compressed.length*3/4), visible:true, date:new Date().toISOString() });
+    /* [Mémoire] La photo compressée part au Storage ; seul son URL est
+       conservé. Repli base64 si l'envoi échoue — indispensable au travail
+       hors ligne sur le terrain, la synchro différée reprendra l'envoi. */
+    var phId = uid(), phPath = null;
+    try { phPath = await pmUploadBlob(await _dataUrlToBlob(compressed), phId, cat); } catch(ePh){ phPath = null; }
+    var media = Object.assign({ id: phId, type:'photo', categorie:cat, titre: titre || f.name.replace(/\.[^.]+$/,''), commentaire:(document.getElementById('pm-commentaire')||{}).value||'' }, pmRefCourant(),
+      (phPath ? { path:phPath, bucket:PM_BUCKET, url:_pmPublicUrl(phPath) } : { data:compressed }),
+      { mime:'image/jpeg', taille:Math.round(compressed.length*3/4), visible:true, date:new Date().toISOString() });
     DATA.portail_medias.push(media);
     await dbPut('portail_medias', media);
     var _okPh = false;
@@ -73679,8 +73697,16 @@ async function pmAjouterDocument(input){
   var f = (input.files||[])[0];
   if(!f){ return; }
   if(f.size > 5*1024*1024){ toast('❌ Document trop lourd (max 5 Mo).','error'); input.value=''; return; }
-  var dataUrl = await new Promise(function(res){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.readAsDataURL(f); });
-  var media = Object.assign({ id: uid(), type:'document', categorie:'document', titre: titre || f.name, commentaire:(document.getElementById('pm-commentaire')||{}).value||'' }, pmRefCourant(), { data:dataUrl, mime:f.type||'application/pdf', nom:f.name, taille:f.size, visible:true, date:new Date().toISOString() });
+  /* [Mémoire] Le document part directement au Storage. Repli base64 conservé
+     si l'envoi échoue : contrairement à une vidéo, un PDF de 5 Mo tient sans
+     risque en local, et la synchronisation différée le reprendra. */
+  var docId = uid(), docPath = null;
+  try { docPath = await pmUploadBlob(f, docId, 'document'); } catch(e){ docPath = null; }
+  var docBase = { id: docId, type:'document', categorie:'document', titre: titre || f.name, commentaire:(document.getElementById('pm-commentaire')||{}).value||'' };
+  var docBin = docPath
+    ? { path:docPath, bucket:PM_BUCKET, url:_pmPublicUrl(docPath) }
+    : { data: await new Promise(function(res){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.readAsDataURL(f); }) };
+  var media = Object.assign(docBase, pmRefCourant(), docBin, { mime:f.type||'application/pdf', nom:f.name, taille:f.size, visible:true, date:new Date().toISOString() });
   DATA.portail_medias.push(media);
   await dbPut('portail_medias', media);
   /* [FIX] Même correctif — voir commentaire de pmAjouterPhotos ci-dessus. */
@@ -76156,7 +76182,7 @@ function renderPortalChantierTimeline() {
     var photoHtml = photos.length
       ? '<div style="margin-top:10px;"><div style="font-size:12px;font-weight:700;margin-bottom:6px;">📸 '+photos.length+' photo(s)</div>'
         + '<div class="portal-photos-grid">' + photos.map(function(p){
-            return '<div class="portal-photo-item"><img src="'+p.data+'" alt="'+escHtml(p.legende||'')+'" loading="lazy"><div class="portal-photo-label">'+escHtml(p.legende||'')+'</div></div>';
+            return '<div class="portal-photo-item"><img src="'+(p.data||p.url)+'" alt="'+escHtml(p.legende||'')+'" loading="lazy"><div class="portal-photo-label">'+escHtml(p.legende||'')+'</div></div>';
           }).join('') + '</div></div>' : '';
     var videoHtml = videos.length
       ? '<div style="margin-top:10px;"><div style="font-size:12px;font-weight:700;margin-bottom:6px;">🎬 '+videos.length+' vidéo(s)</div>' + videos.map(function(v){
@@ -81692,7 +81718,7 @@ function printRapportId(id){
   var ec=r.avancement-(r.avancement_prevu||r.avancement);
   /* [AUDIT FIX v17] Photos dans impression — récupérée lors de la fusion des deux
      versions dupliquées de printRapportId (2026-06-30) */
-  var photosHtml='';if(r.photos&&r.photos.length){photosHtml='<h3>\u{1F4F8} Photos de chantier ('+r.photos.length+')</h3><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0;">'+(r.photos.slice(0,9).map(function(p){return'<div style="text-align:center;"><img src="'+p.data+'" style="width:100%;max-height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd;"><div style="font-size:10px;color:#666;margin-top:2px;">'+p.legende+'</div></div>';}).join(''))+'</div>';}
+  var photosHtml='';if(r.photos&&r.photos.length){photosHtml='<h3>\u{1F4F8} Photos de chantier ('+r.photos.length+')</h3><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0;">'+(r.photos.slice(0,9).map(function(p){return'<div style="text-align:center;"><img src="'+(p.data||p.url)+'" style="width:100%;max-height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd;"><div style="font-size:10px;color:#666;margin-top:2px;">'+p.legende+'</div></div>';}).join(''))+'</div>';}
   var win=window.open('','','width=850,height=750');
   win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapport '+r.numero+'</title><style>body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#222;}h1{color:#1A6B3A;border-bottom:3px solid #1A6B3A;padding-bottom:8px;}h3{color:#444;margin:18px 0 8px;border-bottom:1px solid #eee;padding-bottom:5px;}table{border-collapse:collapse;width:100%;margin:8px 0;}td,th{border:1px solid #ccc;padding:7px 12px;}th{background:#E8F4EE;text-align:left;}.kpi{display:inline-block;background:#F3F4EF;border:1px solid #D4D9D1;border-radius:8px;padding:12px 20px;margin:6px;text-align:center;min-width:100px;}.kv{font-size:22px;font-weight:bold;color:#1A6B3A;}.kl{font-size:11px;color:#8A9E92;margin-top:3px;}.travaux{background:#F8F9F5;border:1px solid #D4D9D1;border-radius:4px;padding:12px;white-space:pre-line;font-size:12px;}.diff{background:#FDECEA;border-left:4px solid #C93535;padding:10px;border-radius:4px;}.sig{display:flex;justify-content:space-between;margin-top:50px;}.sb{border-top:1px solid #999;width:40%;padding-top:8px;font-size:12px;color:#666;}</style></head><body>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><div><strong style="font-size:18px;color:#1A6B3A;">'+societe+'</strong><br><span style="font-size:11px;color:#888;">Promoteur immobilier — Côte d\'Ivoire</span></div><div style="text-align:right;font-size:12px;"><strong>RAPPORT DE CHANTIER N° '+r.numero+'</strong></div></div>'
@@ -90867,7 +90893,7 @@ function planRenderVuesGrid() {
       miniGallery = '<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin-top:4px;">'
         + vues.slice(0,4).map(function(v,i){
             return v.type && v.type.startsWith('image/')
-              ? '<img src="'+v.data+'" style="width:22px;height:22px;object-fit:cover;border-radius:3px;cursor:pointer;" onclick="event.stopPropagation();planOuvrirLightboxAngle(\''+angle.id+'\','+i+')">'
+              ? '<img src="'+(v.data||v.url)+'" style="width:22px;height:22px;object-fit:cover;border-radius:3px;cursor:pointer;" onclick="event.stopPropagation();planOuvrirLightboxAngle(\''+angle.id+'\','+i+')">'
               : (planEstFichierCAO(v.nom) ? '<span style="font-size:14px;cursor:pointer;" title="'+escHtml(v.nom)+' — clic pour télécharger" onclick="event.stopPropagation();planTelechargerVue(\''+v.id+'\')">📐</span>' : '<span style="font-size:14px;">📄</span>');
           }).join('')
         + (vues.length > 4 ? '<span style="font-size:10px;color:var(--dim);">+'+( vues.length-4)+'</span>' : '')
@@ -91389,10 +91415,15 @@ function rchTraiterPhotos(files) {
     if (file.size > MAX) { toast('❌ '+file.name+' dépasse 5 Mo.','error'); return; }
     var reader = new FileReader();
     reader.onload = function(e) {
-      _compressImage(e.target.result, 1600, 0.7).then(function(compressed){
-        RCH_STATE.photos.push({
-          id: 'p_'+Date.now()+'_'+Math.random().toString(36).substr(2,4),
-          data: compressed,
+      _compressImage(e.target.result, 1600, 0.7).then(async function(compressed){
+        /* [Mémoire] La photo compressée part au Storage ; le rapport ne garde
+           que son URL au lieu d'embarquer le base64 dans sa ligne JSONB, qui
+           était repoussée en entier à chaque synchronisation. Repli base64 si
+           l'envoi échoue : ces photos se prennent souvent hors ligne. */
+        var phId = 'p_'+Date.now()+'_'+Math.random().toString(36).substr(2,4), phPath = null;
+        try { phPath = await pmUploadBlob(await _dataUrlToBlob(compressed), phId, 'chantier'); } catch(ePh){ phPath = null; }
+        RCH_STATE.photos.push(Object.assign({
+          id: phId,
           type: 'image/jpeg',
           nom: file.name,
           taille: Math.round((compressed.length * 3) / 4),   /* taille approx. compressée */
@@ -91400,7 +91431,7 @@ function rchTraiterPhotos(files) {
           legende: legDef || file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' '),
           visible: true, /* visible souscripteurs par défaut */
           date: new Date().toISOString().slice(0,10)
-        });
+        }, phPath ? { path:phPath, bucket:PM_BUCKET, url:_pmPublicUrl(phPath) } : { data: compressed }));
         loaded++;
         rchUpdateBadgePhotos();
         rchRenderPhotosGrid();
@@ -91573,7 +91604,7 @@ function rchGenererApercu() {
     photoHtml = '<div class="portal-photos-grid">'
       + photos.slice(0,9).map(function(p,i){
           return '<div class="portal-photo-item">'
-            +'<img src="'+p.data+'" alt="'+p.legende+'">'
+            +'<img src="'+(p.data||p.url)+'" alt="'+p.legende+'">'
             +'<div class="portal-photo-label">'+p.legende+'</div>'
             +'</div>';
         }).join('')
@@ -91822,7 +91853,7 @@ function portalRenderTravaux() {
           +'<div class="portal-photos-grid">'
           + photos.slice(0,8).map(function(p,i){
               return '<div class="portal-photo-item" onclick="portalOuvrirPhoto(\''+r.id+'\','+i+')">'
-                +'<img src="'+p.data+'" alt="'+p.legende+'" loading="lazy">'
+                +'<img src="'+(p.data||p.url)+'" alt="'+p.legende+'" loading="lazy">'
                 +'<div class="portal-photo-label">'+p.legende+'</div>'
                 +'</div>';
             }).join('')
@@ -91896,7 +91927,7 @@ function portalRenderTravaux() {
       galEl.style.gridTemplateColumns = 'repeat(auto-fill,minmax(110px,1fr))';
       galEl.innerHTML = toutesPhotos.slice(0,24).map(function(item,i){
         return '<div class="portal-photo-item" onclick="portalOuvrirGalerie('+i+')">'
-          +'<img src="'+item.photo.data+'" alt="'+item.photo.legende+'" loading="lazy">'
+          +'<img src="'+(item.photo.data||item.photo.url)+'" alt="'+item.photo.legende+'" loading="lazy">'
           +'<div class="portal-photo-label">'+item.photo.legende+'</div>'
           +'</div>';
       }).join('')
@@ -92388,7 +92419,7 @@ function msgRenderAttachPreview() {
     var icone = isImg ? '🖼️' : (f.type==='application/pdf'?'📕':'📎');
     var taille = f.taille>1048576?(f.taille/1048576).toFixed(1)+' Mo':Math.round(f.taille/1024)+' Ko';
     return '<div class="msg-attach-chip">'
-      +(isImg?'<img src="'+f.data+'" style="width:24px;height:24px;border-radius:3px;object-fit:cover;">':icone)
+      +(isImg?'<img src="'+(f.data||f.url)+'" style="width:24px;height:24px;border-radius:3px;object-fit:cover;">':icone)
       +'<span style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+msgEscape(f.nom)+'</span>'
       +'<span style="color:var(--dim);font-size:9px;">'+taille+'</span>'
       +'<span class="chip-del" onclick="msgRetirerFichier(\''+f.id+'\')">×</span>'
@@ -127453,7 +127484,11 @@ async function plrAjouterPhotos(input) {
     if (f.size > 6*1024*1024) { toast('❌ '+f.name+' dépasse 6 Mo.', 'error'); continue; }
     var dataUrl = await new Promise(function(res){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.readAsDataURL(f); });
     var compressed = await _compressImage(dataUrl, 1600, 0.7);
-    PLR_STATE.photos.push({ id:uid(), data:compressed, legende:f.name.replace(/\.[^.]+$/,''), visible:true });
+    /* [Mémoire] Voir pmAjouterPhotos : envoi au Storage, repli base64 hors ligne. */
+    var phId = uid(), phPath = null;
+    try { phPath = await pmUploadBlob(await _dataUrlToBlob(compressed), phId, 'lot'); } catch(ePh){ phPath = null; }
+    PLR_STATE.photos.push(Object.assign({ id:phId, legende:f.name.replace(/\.[^.]+$/,''), visible:true },
+      phPath ? { path:phPath, bucket:PM_BUCKET, url:_pmPublicUrl(phPath) } : { data:compressed }));
   }
   input.value = '';
   plrRenderPhotosGrid();
@@ -127462,7 +127497,7 @@ function plrRenderPhotosGrid() {
   var el = document.getElementById('plr-photos-grid');
   el.innerHTML = PLR_STATE.photos.map(function(p,i) {
     return '<div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;border:1px solid var(--bord);">'
-      + '<img src="'+p.data+'" style="width:100%;height:100%;object-fit:cover;">'
+      + '<img src="'+(p.data||p.url)+'" style="width:100%;height:100%;object-fit:cover;">'
       + '<button type="button" onclick="plrSupprimerPhoto('+i+')" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(224,82,82,.85);border:none;color:#fff;cursor:pointer;">✕</button>'
       + '</div>';
   }).join('');
@@ -127753,7 +127788,7 @@ function portplRenderAvancement() {
     var photoHtml = photos.length
       ? '<div style="margin-top:10px;"><div style="font-size:12px;font-weight:700;margin-bottom:6px;">📸 '+photos.length+' photo(s)</div>'
         + '<div class="portal-photos-grid">' + photos.map(function(ph){
-            return '<div class="portal-photo-item"><img src="'+ph.data+'" alt="'+escHtml(ph.legende||'')+'" loading="lazy"><div class="portal-photo-label">'+escHtml(ph.legende||'')+'</div></div>';
+            return '<div class="portal-photo-item"><img src="'+(ph.data||ph.url)+'" alt="'+escHtml(ph.legende||'')+'" loading="lazy"><div class="portal-photo-label">'+escHtml(ph.legende||'')+'</div></div>';
           }).join('') + '</div></div>' : '';
     var videoHtml = videos.length
       ? '<div style="margin-top:10px;">' + videos.map(function(v){
@@ -127966,7 +128001,7 @@ function portmandRenderBaux() {
   el.innerHTML = baux.map(function(b){
     var photosHtml = (b.photos&&b.photos.length)
       ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-top:8px;">'
-        + b.photos.map(function(p){ return '<img src="'+p.data+'" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--bord);">'; }).join('')
+        + b.photos.map(function(p){ return '<img src="'+(p.data||p.url)+'" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--bord);">'; }).join('')
         + '</div>' : '<div style="font-size:11px;color:var(--dim);margin-top:6px;">Aucune photo disponible.</div>';
     var mapHtml = (b.lat!=null&&b.lng!=null)
       ? '<div style="margin-top:8px;"><iframe src="https://maps.google.com/maps?q='+b.lat+','+b.lng+'&z=15&output=embed" style="width:100%;height:160px;border:0;border-radius:8px;" loading="lazy"></iframe>'
