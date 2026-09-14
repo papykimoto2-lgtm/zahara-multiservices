@@ -32015,7 +32015,7 @@ async function saveClient() {
     }
     for (var _ln = 0; _ln < _tousLotIdsChoisis.length; _ln++) {
       var lot = DATA.lots.find(function(l) { return l.id === _tousLotIdsChoisis[_ln]; });
-      if (lot) { lot.client_id = id; await dbPut('lots', lot); }
+      if (lot) { lot.client_id = id; await dbPut('lots', lot); if (typeof syncToSupabase === 'function') syncToSupabase('pi_lots', lot); }
     }
 
     await dbPut('clients', client);
