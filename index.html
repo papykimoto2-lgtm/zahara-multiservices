@@ -76162,7 +76162,7 @@ function renderPortalChantierTimeline() {
       ? '<div style="margin-top:10px;"><div style="font-size:12px;font-weight:700;margin-bottom:6px;">🎬 '+videos.length+' vidéo(s)</div>' + videos.map(function(v){
           if (v.provider==='youtube') return '<div style="margin-bottom:10px;"><iframe width="100%" height="280" style="border:none;border-radius:8px;max-width:560px;display:block;" src="https://www.youtube.com/embed/'+v.video_id+'" allowfullscreen></iframe></div>';
           if (v.provider==='vimeo') return '<div style="margin-bottom:10px;"><iframe width="100%" height="280" style="border:none;border-radius:8px;max-width:560px;display:block;" src="https://player.vimeo.com/video/'+v.video_id+'" allowfullscreen></iframe></div>';
-          if (v.provider==='upload') return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:400px;" src="'+v.data+'"></video></div>';
+          if (v.provider==='upload') return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:400px;" src="'+(v.data||v.url)+'"></video></div>';
           return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:400px;" src="'+v.url+'"></video></div>';
         }).join('') + '</div>' : '';
     if (!photoHtml && !videoHtml) return '';
@@ -91310,12 +91310,19 @@ async function rchAjouterVideoFichier(input){
   if (!f) return;
   if (f.type.indexOf('video/')!==0) { toast('❌ Fichier non reconnu comme vidéo.','error'); input.value=''; return; }
   if (f.size > RCH_VIDEO_MAX_MO*1024*1024) { toast('❌ Vidéo trop lourde (max '+RCH_VIDEO_MAX_MO+' Mo). Utilisez plutôt un lien YouTube/Vimeo.','error'); input.value=''; return; }
-  toast('⏳ Téléversement de la vidéo…','info');
-  var dataUrl;
+  /* [Mémoire] Même correctif que pmAjouterVideoFichier : la vidéo partait en
+     base64 dans le rapport, donc dans DATA, dans IndexedDB et dans la ligne
+     JSONB du rapport — 5× la taille du fichier en mémoire. Elle est désormais
+     envoyée telle quelle au Storage et le rapport ne garde que son URL. */
+  var vidId = 'v_'+Date.now()+'_'+Math.random().toString(36).substr(2,4), vidPath;
+  toast('⏳ Envoi de la vidéo ('+(f.size/1024/1024).toFixed(1)+' Mo)…','info');
   try {
-    dataUrl = await new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.onerror=function(){rej(new Error('read failed'));}; r.readAsDataURL(f); });
-  } catch(e){ toast('❌ Échec de lecture du fichier vidéo.','error'); input.value=''; return; }
-  RCH_STATE.videos.push({ id:'v_'+Date.now()+'_'+Math.random().toString(36).substr(2,4), provider:'upload', video_id:'', url:'', data:dataUrl, mime:f.type||'video/mp4', legende:f.name, visible:true });
+    vidPath = await pmUploadBlob(f, vidId, 'chantier');
+  } catch(e){
+    toast('❌ Envoi de la vidéo échoué ('+(e && e.message ? e.message : 'erreur réseau')+'). Rien n\'a été ajouté au rapport : réessayez, ou utilisez un lien YouTube/Vimeo.','error', 9000);
+    input.value=''; return;
+  }
+  RCH_STATE.videos.push({ id:vidId, provider:'upload', video_id:'', path:vidPath, bucket:PM_BUCKET, url:_pmPublicUrl(vidPath), mime:f.type||'video/mp4', legende:f.name, visible:true });
   input.value = '';
   rchRenderVideosList();
   toast('✅ Vidéo ajoutée au rapport.', 'success');
@@ -91836,7 +91843,7 @@ function portalRenderTravaux() {
           + videos.map(function(v){
               if (v.provider==='youtube') return '<div style="margin-bottom:10px;"><iframe width="100%" height="280" style="border:none;border-radius:8px;max-width:560px;display:block;" src="https://www.youtube.com/embed/'+v.video_id+'" allowfullscreen></iframe></div>';
               if (v.provider==='vimeo') return '<div style="margin-bottom:10px;"><iframe width="100%" height="280" style="border:none;border-radius:8px;max-width:560px;display:block;" src="https://player.vimeo.com/video/'+v.video_id+'" allowfullscreen></iframe></div>';
-              if (v.provider==='upload') return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:400px;" src="'+v.data+'"></video></div>';
+              if (v.provider==='upload') return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:400px;" src="'+(v.data||v.url)+'"></video></div>';
               return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:400px;" src="'+v.url+'"></video></div>';
             }).join('')
           + '</div>';
@@ -127475,9 +127482,18 @@ async function plrAjouterVideoFichier(input) {
   var f = (input.files||[])[0];
   if (!f) return;
   if (f.size > 25*1024*1024) { toast('❌ Vidéo trop lourde (max 25 Mo). Utilisez un lien YouTube/Vimeo.', 'error'); input.value=''; return; }
-  toast('⏳ Téléversement de la vidéo…', 'info');
-  var dataUrl = await new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.onerror=function(){rej();}; r.readAsDataURL(f); });
-  PLR_STATE.videos.push({ id:uid(), provider:'upload', video_id:'', url:'', data:dataUrl, mime:f.type||'video/mp4', legende:f.name, visible:true });
+  /* [Mémoire] Voir pmAjouterVideoFichier : envoi direct au Storage, le lot ne
+     conserve que l'URL. La lecture en base64 chargeait 5× la taille du
+     fichier dans le tas JavaScript. */
+  var vidId = uid(), vidPath;
+  toast('⏳ Envoi de la vidéo ('+(f.size/1024/1024).toFixed(1)+' Mo)…', 'info');
+  try {
+    vidPath = await pmUploadBlob(f, vidId, 'lot');
+  } catch(e){
+    toast('❌ Envoi de la vidéo échoué ('+(e && e.message ? e.message : 'erreur réseau')+'). Rien n\'a été ajouté : réessayez, ou utilisez un lien YouTube/Vimeo.','error', 9000);
+    input.value=''; return;
+  }
+  PLR_STATE.videos.push({ id:vidId, provider:'upload', video_id:'', path:vidPath, bucket:PM_BUCKET, url:_pmPublicUrl(vidPath), mime:f.type||'video/mp4', legende:f.name, visible:true });
   input.value = '';
   plrRenderVideosList();
   toast('✅ Vidéo ajoutée.', 'success');
@@ -127743,7 +127759,7 @@ function portplRenderAvancement() {
       ? '<div style="margin-top:10px;">' + videos.map(function(v){
           if (v.provider==='youtube') return '<div style="margin-bottom:10px;"><iframe width="100%" height="340" style="border:none;border-radius:8px;max-width:640px;display:block;" src="https://www.youtube.com/embed/'+v.video_id+'" allowfullscreen></iframe></div>';
           if (v.provider==='vimeo') return '<div style="margin-bottom:10px;"><iframe width="100%" height="340" style="border:none;border-radius:8px;max-width:640px;display:block;" src="https://player.vimeo.com/video/'+v.video_id+'" allowfullscreen></iframe></div>';
-          if (v.provider==='upload') return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:480px;" src="'+v.data+'"></video></div>';
+          if (v.provider==='upload') return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:480px;" src="'+(v.data||v.url)+'"></video></div>';
           return '<div style="margin-bottom:10px;"><video controls style="width:100%;border-radius:8px;max-height:480px;" src="'+v.url+'"></video></div>';
         }).join('') + '</div>' : '';
     return '<div class="portal-tl-item">'
