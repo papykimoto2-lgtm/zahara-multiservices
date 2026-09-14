@@ -1734,8 +1734,16 @@
       t += '<div style="position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden;"><iframe src="https://www.youtube-nocookie.com/embed/'+esc(m.video_id)+'" loading="lazy" allowfullscreen allow="accelerometer; encrypted-media; picture-in-picture" style="position:absolute;inset:0;width:100%;height:100%;border:0;"></iframe></div>';
     } else if (m.provider==='vimeo' && m.video_id){
       t += '<div style="position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden;"><iframe src="https://player.vimeo.com/video/'+esc(m.video_id)+'" loading="lazy" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0;"></iframe></div>';
-    } else if (m.url){
-      t += '<video controls preload="metadata" style="width:100%;border-radius:10px;background:#000;" src="'+esc(m.url)+'"></video>';
+    } else if (m.url || m.data){
+      /* [FIX] Seul m.url etait teste. Or l'ERP enregistre une video
+         televersee avec url:'' et le fichier dans data (base64), et l'URL
+         n'apparait qu'une fois le relais Storage passe. Sans bucket — ou
+         avant la premiere synchro — aucune branche ne s'executait et la
+         carte video restait vide, sans le moindre message. Les photos et
+         les documents avaient deja ce repli ; la video ne l'avait pas. */
+      t += '<video controls preload="metadata" style="width:100%;border-radius:10px;background:#000;" src="'+esc(m.url||m.data)+'"></video>';
+    } else {
+      t += '<div style="padding:18px;border:1px dashed #cfdfed;border-radius:10px;color:#4b6a8b;font-size:.82rem;text-align:center;">Vidéo indisponible — le fichier n\'a pas encore été transféré.</div>';
     }
     if (m.titre) t += '<div class="pp-video-title" style="font-weight:700;font-size:.9rem;margin-top:8px;">'+esc(m.titre)+'</div>';
     if (m.commentaire) t += '<div style="font-size:.82rem;color:#4b6a8b;margin-top:4px;line-height:1.5;">'+esc(m.commentaire)+'</div>';
@@ -1755,7 +1763,12 @@
   }
   function rendreMediasEden(){
     var photos = MEDIAS.filter(function(m){ return m.type==='photo' && (m.categorie==='eden'||m.categorie==='catalogue'); });
-    var videos = MEDIAS.filter(function(m){ return m.type==='video' && (m.categorie==='eden'||m.categorie==='catalogue'||m.categorie==='chantier'); });
+    /* [FIX] Le filtre ne retenait que trois des six categories proposees par
+       l'ERP : une video publiee en « Biens en location » ou en « Operation
+       d'investissement » n'apparaissait nulle part. Publier une video, c'est
+       vouloir la montrer — elles sont donc toutes reprises, le regroupement
+       par rattachement les remettant dans leur contexte. */
+    var videos = MEDIAS.filter(function(m){ return m.type==='video'; });
     var docs   = MEDIAS.filter(function(m){ return m.type==='document'; });
     var v=document.getElementById('eden-videos'), vw=document.getElementById('eden-videos-wrap');
     if(v && videos.length){
