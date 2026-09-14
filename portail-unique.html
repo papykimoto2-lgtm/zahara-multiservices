@@ -947,13 +947,48 @@
     if (json) h['Content-Type'] = 'application/json';
     return h;
   }
+  /* [FIX] Toute réponse non-200 était rapportée comme « auth », que chaque
+     espace traduit par « Identifiant ou code incorrect ». Un service
+     indisponible, une fonction non déployée (404) ou un dossier sans code
+     d'accès généré renvoyaient donc au visiteur un message faux, qui
+     l'envoyait re-saisir indéfiniment un code pourtant valide — et privait
+     le support de tout moyen de distinguer les trois cas. Le motif réel est
+     désormais remonté ; les appelants affichent le message du serveur quand
+     il y en a un. */
+  /* Message affiché au visiteur : le motif réel du refus, quand le serveur
+     en donne un (dossier sans code généré, service indisponible, réseau),
+     sinon le message d'identifiants erronés avec le décompte de tentatives. */
+  function _msgLoginErreur(e, reste){
+    if (e && e.message === 'rate') return 'Trop de tentatives. Réessayez plus tard.';
+    if (e && e.message_public) return e.message_public;
+    return 'Identifiant ou code incorrect.' + (reste <= 2 ? ' (' + reste + ' tentative(s) restante(s))' : '');
+  }
+
   async function portalLogin(kind, ident, code){
-    var r = await fetch(LOGIN_FN_URL, {
-      method:'POST', headers:{ 'Content-Type':'application/json', apikey: SB_KEY },
-      body: JSON.stringify({ kind: kind, ident: ident, code: code })
-    });
+    var r;
+    try {
+      r = await fetch(LOGIN_FN_URL, {
+        method:'POST', headers:{ 'Content-Type':'application/json', apikey: SB_KEY },
+        body: JSON.stringify({ kind: kind, ident: ident, code: code })
+      });
+    } catch(e) {
+      var eRes = new Error('reseau');
+      eRes.message_public = 'Connexion au serveur impossible. Vérifiez votre réseau puis réessayez.';
+      throw eRes;
+    }
     if (r.status === 429) throw new Error('rate');
-    if (!r.ok) throw new Error('auth');
+    if (!r.ok) {
+      var d0 = null; try { d0 = await r.json(); } catch(e2){}
+      var err = new Error((d0 && d0.error) || 'auth');
+      if (r.status === 404) {
+        err.message_public = 'Service de connexion indisponible. Signalez-le à votre conseiller.';
+      } else if (d0 && d0.message) {
+        err.message_public = d0.message;
+      } else if (r.status >= 500) {
+        err.message_public = 'Service momentanément indisponible. Réessayez dans quelques instants.';
+      }
+      throw err;
+    }
     var d = await r.json();
     SB_TOKEN = d.access_token;
     try { sessionStorage.setItem('pp_token', SB_TOKEN); } catch(e){}
@@ -1189,7 +1224,7 @@
       att[bfKey]=(att[bfKey]||0)+1; localStorage.setItem('sous_bf',JSON.stringify(att));
       var reste=5-(att[bfKey]||0);
       logConnexion('[SOUSCRIPTEUR] '+ident, false, 'Code incorrect ('+(att[bfKey]||0)+'e tentative)');
-      setErr('sousError','Identifiant ou code incorrect.'+(reste<=2?' ('+reste+' tentative(s) restante(s))':''));
+      setErr('sousError',_msgLoginErreur(e, reste));
     }
     btn.disabled=false; btn.innerHTML='Se connecter';
   }
@@ -1402,7 +1437,7 @@
       att[bfKey]=(att[bfKey]||0)+1; localStorage.setItem('app_bf',JSON.stringify(att));
       var reste=5-(att[bfKey]||0);
       logConnexion('[APPORTEUR] '+ident, false, 'Code incorrect ('+(att[bfKey]||0)+'e tentative)');
-      setErr('appError','Identifiant ou code incorrect.'+(reste<=2?' ('+reste+' tentative(s) restante(s))':''));
+      setErr('appError',_msgLoginErreur(e, reste));
     }
     btn.disabled=false; btn.innerHTML='Se connecter';
   }
@@ -1517,7 +1552,7 @@
       att[bfKey]=(att[bfKey]||0)+1; localStorage.setItem('fon_bf',JSON.stringify(att));
       var reste=5-(att[bfKey]||0);
       logConnexion('[ACQUEREUR FONCIER] '+ident, false, 'Code incorrect');
-      setErr('fonError', (e && e.message==='rate') ? 'Trop de tentatives. Réessayez plus tard.' : ('Identifiant ou code incorrect.'+(reste<=2?' ('+reste+' tentative(s) restante(s))':'')));
+      setErr('fonError', _msgLoginErreur(e, reste));
     }
     btn.disabled=false; btn.innerHTML='Se connecter';
   }
@@ -2371,7 +2406,7 @@
       att[bfKey]=(att[bfKey]||0)+1; localStorage.setItem('dsp_bf',JSON.stringify(att));
       var reste=5-(att[bfKey]||0);
       logConnexion('[DIASPORA] '+ident, false, 'Code incorrect');
-      setErr('dspError','Identifiant ou code incorrect.'+(reste<=2?' ('+reste+' tentative(s) restante(s))':''));
+      setErr('dspError',_msgLoginErreur(e, reste));
     }
     btn.disabled=false; btn.innerHTML='Se connecter';
   }
@@ -2666,8 +2701,7 @@
       att[bfKey]=(att[bfKey]||0)+1; localStorage.setItem('mand_bf',JSON.stringify(att));
       var reste=5-(att[bfKey]||0);
       logConnexion('[PROPRIETAIRE] '+ident, false, 'Code incorrect');
-      setErr('mandError', (e && e.message==='rate') ? 'Trop de tentatives. Réessayez plus tard.'
-        : ('Identifiant ou code incorrect.'+(reste<=2?' ('+reste+' tentative(s) restante(s))':'')));
+      setErr('mandError', _msgLoginErreur(e, reste));
     }
     btn.disabled=false; btn.innerHTML='Se connecter';
   }
@@ -2895,8 +2929,7 @@
       att[bfKey]=(att[bfKey]||0)+1; localStorage.setItem('fin_bf',JSON.stringify(att));
       var reste=5-(att[bfKey]||0);
       logConnexion('[FINANCIER] '+ident, false, 'Code incorrect');
-      setErr('finError', (e && e.message==='rate') ? 'Trop de tentatives. Réessayez plus tard.'
-        : ('Identifiant ou code incorrect.'+(reste<=2?' ('+reste+' tentative(s) restante(s))':'')));
+      setErr('finError', _msgLoginErreur(e, reste));
     }
     btn.disabled=false; btn.innerHTML='Se connecter';
   }
@@ -3745,8 +3778,7 @@
       att[bfKey]=(att[bfKey]||0)+1; localStorage.setItem('am_bf',JSON.stringify(att));
       var reste=5-(att[bfKey]||0);
       logConnexion('[AMENAGEUR] '+ident, false, 'Code incorrect');
-      setErr('amError', (e && e.message==='rate') ? 'Trop de tentatives. Réessayez plus tard.'
-        : ('Identifiant ou code incorrect.'+(reste<=2?' ('+reste+' tentative(s) restante(s))':'')));
+      setErr('amError', _msgLoginErreur(e, reste));
     }
     btn.disabled=false; btn.innerHTML='Se connecter';
   }
@@ -3960,8 +3992,7 @@
       att[bfKey]=(att[bfKey]||0)+1; localStorage.setItem('pl_bf',JSON.stringify(att));
       var reste=5-(att[bfKey]||0);
       logConnexion('[PARTENAIRE-LOT] '+ident, false, 'Code incorrect');
-      setErr('plError', (e && e.message==='rate') ? 'Trop de tentatives. Réessayez plus tard.'
-        : ('Identifiant ou code incorrect.'+(reste<=2?' ('+reste+' tentative(s) restante(s))':'')));
+      setErr('plError', _msgLoginErreur(e, reste));
     }
     btn.disabled=false; btn.innerHTML='Se connecter';
   }
@@ -4191,8 +4222,7 @@
       att[bfKey]=(att[bfKey]||0)+1; localStorage.setItem('pf_bf',JSON.stringify(att));
       var reste=5-(att[bfKey]||0);
       logConnexion('[PROP-TERRIEN] '+ident, false, 'Code incorrect');
-      setErr('pfError', (e && e.message==='rate') ? 'Trop de tentatives. Réessayez plus tard.'
-        : ('Identifiant ou code incorrect.'+(reste<=2?' ('+reste+' tentative(s) restante(s))':'')));
+      setErr('pfError', _msgLoginErreur(e, reste));
     }
     btn.disabled=false; btn.innerHTML='Se connecter';
   }
@@ -4356,8 +4386,7 @@
       att[bfKey]=(att[bfKey]||0)+1; localStorage.setItem('lt_bf',JSON.stringify(att));
       var reste=5-(att[bfKey]||0);
       logConnexion('[LOCATAIRE] '+ident, false, 'Code incorrect');
-      setErr('ltError', (e && e.message==='rate') ? 'Trop de tentatives. Réessayez plus tard.'
-        : ('Identifiant ou code incorrect.'+(reste<=2?' ('+reste+' tentative(s) restante(s))':'')));
+      setErr('ltError', _msgLoginErreur(e, reste));
     }
     btn.disabled=false; btn.innerHTML='Se connecter';
   }
@@ -4661,7 +4690,7 @@
       att[bfKey]=(att[bfKey]||0)+1; localStorage.setItem('cp_bf',JSON.stringify(att));
       var reste=5-(att[bfKey]||0);
       logConnexion('[COPROPRIETAIRE] '+ident, false, 'Code incorrect');
-      setErr('cpError','Identifiant ou code incorrect.'+(reste<=2?(' ('+reste+' tentative(s) restante(s))'):''));
+      setErr('cpError',_msgLoginErreur(e, reste));
     }
     btn.disabled=false; btn.innerHTML='Se connecter';
   }
