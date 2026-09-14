@@ -949,7 +949,7 @@
   }
   async function portalLogin(kind, ident, code){
     var r = await fetch(LOGIN_FN_URL, {
-      method:'POST', headers:{ 'Content-Type':'application/json', apikey: SB_KEY },
+      method:'POST', headers:{ 'Content-Type':'application/json', apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY },
       body: JSON.stringify({ kind: kind, ident: ident, code: code })
     });
     if (r.status === 429) throw new Error('rate');
