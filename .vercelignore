@@ -1,0 +1,6 @@
+# Sources des Edge Functions Supabase : elles se déploient avec la CLI
+# Supabase (supabase functions deploy), jamais avec le site. Les exclure
+# évite que Vercel les serve en clair sur le domaine public — elles ne
+# contiennent aucun secret, mais exposeraient inutilement les noms de tables
+# et la logique d'authentification du portail.
+supabase/
