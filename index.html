@@ -24122,6 +24122,24 @@ function dbGetAll(store) {
   });
 }
 
+/* Nombre d'enregistrements RÉELLEMENT présents dans IndexedDB, sans les
+   désérialiser (count() natif). Repli sur getAll() pour le mode mémoire
+   dégradé, dont le shim n'implémente pas count(). Résout null quand le store
+   est illisible : à l'écran, un « — » est honnête là où un 0 laisserait croire
+   à une base vide mais saine. */
+function dbCount(store) {
+  return new Promise(function(resolve) {
+    if (!db || !db.objectStoreNames.contains(store)) { resolve(null); return; }
+    try {
+      var os = db.transaction(store, 'readonly').objectStore(store);
+      if (typeof os.count !== 'function') { dbGetAll(store).then(function(a){ resolve(a.length); }); return; }
+      var req = os.count();
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror = function() { resolve(null); };
+    } catch(e) { resolve(null); }
+  });
+}
+
 /* dbPut — résout désormais avec un booléen (true = écrit avec succès en base,
    false = échec ou store/BD absent). Aucun appelant existant ne lisait cette
    valeur de retour (tous font `await dbPut(...)` sans l'exploiter), donc ce
@@ -45548,35 +45566,63 @@ function loadParamFields() {
   buildDBStats();
 }
 
-function buildDBStats() {
+/* [FIX] Trois défauts corrigés ici :
+   1. une ligne sur deux lisait DATA.x.length SANS garde — un seul store absent
+      (module jamais chargé, store récent) levait un TypeError et la section
+      restait vide pour de bon, bouton « ↻ Actualiser stats » compris : il
+      relançait la même fonction, qui replantait au même endroit ;
+   2. les compteurs venaient de la RAM alors que la section s'intitule
+      « IndexedDB ». Une écriture locale perdue, ou le mode mémoire dégradé,
+      restait donc invisible ici — précisément le genre de divergence
+      silencieuse qui a masqué le code d'accès portail jamais persisté ;
+   3. les entrées null qui traînent dans DATA[] étaient comptées comme de
+      vrais enregistrements.
+   On affiche désormais le compte réel d'IndexedDB et on signale en rouge tout
+   écart avec la mémoire, au lieu de présenter un seul chiffre indiscutable. */
+async function buildDBStats() {
   var el = document.getElementById('db-stats');
   if (!el) return;
-  var counts = [
-    ['👥 Souscripteurs', DATA.clients.length],
-    ['💳 Versements', DATA.versements.length],
-    ['🏠 Lots', DATA.lots.length],
-    ['🏗️ Programmes', DATA.programmes.length],
-    ['📋 Conventions', DATA.conventions.length],
-    ['📊 Situations', DATA.situations.length],
-    ['📐 Conceptions', DATA.conceptions.length],
-    ['📜 Permis', (DATA.permis||[]).length],
-    ['📋 Rapports chantier', (DATA.rapports_chantier||[]).length],
-    ['👤 Employés', DATA.employes.length],
-    ['⏱️ Pointages', DATA.pointages.length],
-    ['💼 Bulletins', DATA.bulletins.length],
-    ['📒 Écritures', DATA.ecritures.length],
-    ['🏦 Lignes relevé', (DATA.releves_bank||[]).length],
-    ['🏠 Biens amortis', (DATA.biens_amort||[]).length],
-    ['🎯 Leads', DATA.leads.length],
+  var stores = [
+    ['👥 Souscripteurs', 'clients'],
+    ['💳 Versements', 'versements'],
+    ['🏠 Lots', 'lots'],
+    ['🏗️ Programmes', 'programmes'],
+    ['📋 Conventions', 'conventions'],
+    ['📊 Situations', 'situations'],
+    ['📐 Conceptions', 'conceptions'],
+    ['📜 Permis', 'permis'],
+    ['📋 Rapports chantier', 'rapports_chantier'],
+    ['👤 Employés', 'employes'],
+    ['⏱️ Pointages', 'pointages'],
+    ['💼 Bulletins', 'bulletins'],
+    ['📒 Écritures', 'ecritures'],
+    ['🏦 Lignes relevé', 'releves_bank'],
+    ['🏠 Biens amortis', 'biens_amort'],
+    ['🎯 Leads', 'leads'],
   ];
+  var lignes = await Promise.all(stores.map(function(s){
+    return dbCount(s[1]).then(function(n){
+      var ram = Array.isArray(DATA[s[1]]) ? DATA[s[1]].filter(function(x){ return x; }).length : 0;
+      return { label: s[0], bdd: n, ram: ram };
+    });
+  }));
   el.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;">'
-    +counts.map(function(c){
-      return '<div style="display:flex;justify-content:space-between;padding:5px 8px;background:var(--card2);border-radius:4px;">'
-        +'<span style="color:var(--blanc-dim);">'+c[0]+'</span>'
-        +'<strong style="color:var(--or);">'+c[1]+'</strong>'
+    +lignes.map(function(l){
+      var ecart = (l.bdd !== null && l.bdd !== l.ram);
+      var titre = ecart
+        ? ' title="IndexedDB : '+l.bdd+' — en mémoire : '+l.ram+'. Des enregistrements ne sont pas persistés localement."'
+        : (l.bdd === null ? ' title="Store illisible ou absent de la base locale."' : '');
+      return '<div style="display:flex;justify-content:space-between;padding:5px 8px;background:var(--card2);border-radius:4px;"'+titre+'>'
+        +'<span style="color:var(--blanc-dim);">'+l.label+'</span>'
+        +'<strong style="color:'+(ecart?'var(--rouge)':'var(--or)')+';">'+(l.bdd === null ? '—' : l.bdd)
+        +(ecart ? ' <span style="font-weight:400;font-size:10px;">(RAM '+l.ram+')</span>' : '')
+        +'</strong>'
       +'</div>';
     }).join('')
-  +'</div>';
+  +'</div>'
+  +(typeof _MEMDB_ACTIVE !== 'undefined' && _MEMDB_ACTIVE
+    ? '<div style="margin-top:10px;padding:8px;border-radius:4px;background:rgba(220,38,38,0.1);color:var(--rouge);font-size:11px;line-height:1.5;">⚠️ Mode mémoire dégradé : IndexedDB est indisponible sur ce poste. Les données locales sont volatiles — la synchro cloud est indispensable.</div>'
+    : '');
 }
 
 function exportAllCSV() {
