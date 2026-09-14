@@ -5450,6 +5450,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <button class="tab-btn" onclick="switchTab('validations','fed')">📝 Engagements de dépense <span class="nav-badge" id="badge-tab-valid-fed" style="display:none;position:static;margin-left:4px;">0</span></button>
               <button class="tab-btn" onclick="switchTab('validations','transferts')">🔀 Transferts budgétaires <span class="nav-badge" id="badge-tab-valid-transferts" style="display:none;position:static;margin-left:4px;">0</span></button>
               <button class="tab-btn" onclick="switchTab('validations','budgetprev')">📊 Budget prévisionnel <span class="nav-badge" id="badge-tab-valid-budgetprev" style="display:none;position:static;margin-left:4px;">0</span></button>
+              <button class="tab-btn" onclick="switchTab('validations','reappro')">🏦 Réapprovisionnement <span class="nav-badge" id="badge-tab-valid-reappro" style="display:none;position:static;margin-left:4px;">0</span></button>
             </div>
           </div>
         </div>
@@ -5465,6 +5466,9 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <div class="tab-pane" id="tab-validations-budgetprev">
           <div id="validations-budgetprev-box"></div>
         </div>
+        <div class="tab-pane" id="tab-validations-reappro">
+          <div id="validations-reappro-box"></div>
+        </div>
 
         <div class="steps-nav" style="margin:18px 0 10px;">
           <div class="etape">
@@ -5472,6 +5476,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <div class="etape-btns">
               <button class="tab-btn active" onclick="switchTab('validations','histo-caisse')">💰 Mouvements de caisse</button>
               <button class="tab-btn" onclick="switchTab('validations','histo-da')">📝 Demandes d'Achat (DA)</button>
+              <button class="tab-btn" onclick="switchTab('validations','histo-reappro')">🏦 Réapprovisionnements</button>
             </div>
           </div>
         </div>
@@ -5494,6 +5499,9 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         </div>
         <div class="tab-pane" id="tab-validations-histo-da">
           <div id="histo-validations-da-box"></div>
+        </div>
+        <div class="tab-pane" id="tab-validations-histo-reappro">
+          <div id="histo-validations-reappro-box"></div>
         </div>
       </div>
 
@@ -43006,6 +43014,34 @@ function ckActions() {
           boutons: [ { lib:'✅ Aller valider', fn:"goTo('budget')" } ]
         });
       }
+    }
+  } catch(e){}
+
+  /* R-REAPPRO — Demandes de réapprovisionnement de fonds. Deux attentes
+     distinctes, et la seconde est la plus traître : une demande VALIDÉE mais
+     jamais servie donne à la hiérarchie le sentiment d'avoir fait le
+     nécessaire, alors qu'aucun franc n'est entré en caisse et que la division
+     reste à l'arrêt. On les remonte donc séparément. */
+  try {
+    var _reapAttente = (DATA.demandes_reappro||[]).filter(function(d){ return d.statut === 'soumise'; });
+    if (_reapAttente.length) {
+      push({
+        aid: 'reappro_attente', prio: 70, urgent: false, icone: '🏦',
+        titre: _reapAttente.length + ' demande(s) de réapprovisionnement de fonds en attente de validation',
+        detail: 'Une caisse de division à sec bloque tous ses décaissements sur le terrain tant que la demande n\'est pas validée.',
+        montant: _reapAttente.reduce(function(s,d){ return s + (parseFloat(d.montant_demande)||0); }, 0),
+        boutons: [ { lib:'✅ Aller valider', fn:"goTo('validations')" } ]
+      });
+    }
+    var _reapAServir = (DATA.demandes_reappro||[]).filter(function(d){ return d.statut === 'validee'; });
+    if (_reapAServir.length) {
+      push({
+        aid: 'reappro_a_servir', prio: 72, urgent: false, icone: '💶',
+        titre: _reapAServir.length + ' demande(s) validée(s) mais pas encore servie(s)',
+        detail: 'Les fonds sont accordés mais ne sont PAS encore entrés en caisse — la division reste sans liquidités tant que le versement n\'est pas fait.',
+        montant: _reapAServir.reduce(function(s,d){ return s + (parseFloat(d.montant_accorde)||0); }, 0),
+        boutons: [ { lib:'🏦 Servir la demande', fn:"goTo('caisse')" } ]
+      });
     }
   } catch(e){}
 
@@ -101667,13 +101703,27 @@ function _histoValidationsFiltrees() {
     return true;
   }).sort(function(a,b){ return ((b.valide_le||b.rejete_le||'')).localeCompare(a.valide_le||b.rejete_le||''); });
 
-  return { caisse: caisse, da: da };
+  /* Une demande servie reste une décision validée : on la garde dans
+     l'historique sous le même statut, la date de référence étant celle de
+     la décision (valide_le) et non celle du versement. */
+  var reappro = (DATA.demandes_reappro || []).filter(function(r) {
+    if (!(r.statut === 'validee' || r.statut === 'servie' || r.statut === 'rejetee')) return false;
+    var statut = (r.statut === 'rejetee') ? 'rejete' : 'valide';
+    if (statutFiltre && statut !== statutFiltre) return false;
+    var d = r.valide_le || '';
+    if (debut && d.slice(0,10) < debut) return false;
+    if (fin && d.slice(0,10) > fin) return false;
+    return true;
+  }).sort(function(a,b){ return (b.valide_le||'').localeCompare(a.valide_le||''); });
+
+  return { caisse: caisse, da: da, reappro: reappro };
 }
 
 function renderHistoriqueValidations() {
   var boxC = document.getElementById('histo-validations-caisse-box');
   var boxD = document.getElementById('histo-validations-da-box');
-  if (!boxC && !boxD) return;
+  var boxR = document.getElementById('histo-validations-reappro-box');
+  if (!boxC && !boxD && !boxR) return;
   var f = _histoValidationsFiltrees();
 
   if (boxC) {
@@ -101720,11 +101770,38 @@ function renderHistoriqueValidations() {
       boxD.innerHTML = h2;
     }
   }
+
+  if (boxR) {
+    if (!f.reappro.length) {
+      boxR.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune décision de réapprovisionnement sur cette période/filtre.</div>';
+    } else {
+      var h3 = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N°</th><th>Division / Caisse</th><th style="text-align:right;">Demandé</th><th style="text-align:right;">Accordé</th><th>Demandeur</th><th>Décision</th><th>Par / le</th></tr></thead><tbody>';
+      f.reappro.forEach(function(r) {
+        var estRejete = r.statut === 'rejetee';
+        var caisse = (DATA.caisses||[]).find(function(x){ return x.id===r.caisse_id; });
+        h3 += '<tr>'
+          + '<td style="font-family:monospace;">' + escHtml(r.numero||'') + '</td>'
+          + '<td>' + escHtml(r.division_id ? _nomDivision(r.division_id) : '—')
+            + '<div style="font-size:10px;color:var(--blanc-dim);">' + escHtml(caisse ? (caisse.nom||'') : '') + '</div></td>'
+          + '<td style="text-align:right;">' + fmtF(r.montant_demande) + ' F</td>'
+          + '<td style="text-align:right;font-weight:700;">' + (r.montant_accorde ? fmtF(r.montant_accorde) + ' F' : '—') + '</td>'
+          + '<td>' + escHtml(r.demande_par||'') + '</td>'
+          + '<td>' + (!estRejete
+              ? '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Validé' + (r.statut==='servie' ? ' (servi)' : '') + '</span>'
+              : '<span class="badge" style="background:rgba(220,53,69,0.15);color:var(--rouge);">✖ Rejeté</span>')
+            + (estRejete && r.motif_rejet ? '<div style="font-size:10px;color:var(--rouge);">' + escHtml(r.motif_rejet) + '</div>' : '') + '</td>'
+          + '<td style="font-size:11px;">' + escHtml(r.valide_par||'') + '<br><span style="color:var(--blanc-dim);">' + (r.valide_le||'').slice(0,16).replace('T',' ') + '</span></td>'
+          + '</tr>';
+      });
+      h3 += '</tbody></table></div></div>';
+      boxR.innerHTML = h3;
+    }
+  }
 }
 
 function exporterHistoriqueValidations() {
   var f = _histoValidationsFiltrees();
-  if (!f.caisse.length && !f.da.length) { toast('Rien à exporter pour ce filtre.', 'error'); return; }
+  if (!f.caisse.length && !f.da.length && !f.reappro.length) { toast('Rien à exporter pour ce filtre.', 'error'); return; }
   var lignes = [];
   lignes.push(['Type','N°','Objet / Motif','Montant FCFA','Demandeur','Statut','Décidé par','Décidé le','Motif de rejet']);
   f.caisse.forEach(function(m) {
@@ -101737,6 +101814,11 @@ function exporterHistoriqueValidations() {
     var estRejete = d.statut === 'rejetee';
     lignes.push(['DA / FED', fedLabelDocument(d), d.objet||'', d.montant||0, d.soumis_par||'',
       estRejete?'Rejeté':'Validé', d.valide_par||'', ((d.valide_le||d.rejete_le)||'').slice(0,16).replace('T',' '), d.motif_rejet||'']);
+  });
+  f.reappro.forEach(function(r) {
+    var estRejete = r.statut === 'rejetee';
+    lignes.push(['Réapprovisionnement', r.numero||'', r.motif||'', (estRejete ? r.montant_demande : (r.montant_accorde || r.montant_demande))||0, r.demande_par||'',
+      estRejete?'Rejeté':(r.statut==='servie'?'Validé (servi)':'Validé'), r.valide_par||'', (r.valide_le||'').slice(0,16).replace('T',' '), r.motif_rejet||'']);
   });
   var csv = lignes.map(function(l){ return l.map(function(c){ return '"' + String(c).replace(/"/g,'""') + '"'; }).join(';'); }).join('\r\n');
   var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -125277,6 +125359,7 @@ function renderPageValidations() {
   _pilotageRenderValidFED();
   _pilotageRenderValidTransferts();
   _pilotageRenderValidBudgetPrev();
+  _pilotageRenderValidReappro();
   if (typeof renderHistoriqueValidations === 'function') renderHistoriqueValidations();
 }
 
@@ -125341,6 +125424,45 @@ function _pilotageRenderValidFED() {
       + '<td style="white-space:nowrap;">'
       + '<button class="btn btn-primary btn-sm" onclick="daValider(\'' + d.id + '\').then(renderPageValidations)">✅ Valider</button> '
       + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)daRejeter(\'' + d.id + '\',m).then(renderPageValidations);})()">❌ Rejeter</button>'
+      + '</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+  box.innerHTML = html;
+}
+
+/* Demandes de réapprovisionnement de fonds en attente. Le solde constaté
+   est affiché à côté du montant demandé : c'est lui qui justifie la
+   demande, et le validateur ne devrait pas avoir à aller le chercher. */
+function _pilotageRenderValidReappro() {
+  var box = document.getElementById('validations-reappro-box'); if (!box) return;
+  var divFiltre = (document.getElementById('val-filtre-division')||{}).value || '';
+  var liste = (DATA.demandes_reappro||[]).filter(function(d){ return d.statut === 'soumise'; })
+    .sort(function(a,b){ return (a.soumis_le||a.created_at||'').localeCompare(b.soumis_le||b.created_at||''); });
+  if (divFiltre) liste = liste.filter(function(d){ return d.division_id === divFiltre; });
+  var badge = document.getElementById('badge-tab-valid-reappro');
+  if (badge) { badge.textContent = liste.length; badge.style.display = liste.length ? 'inline-block' : 'none'; }
+  if (!liste.length) { box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:24px;">✅ Aucune demande de réapprovisionnement en attente' + (divFiltre ? ' pour ce secteur' : '') + '.</div>'; return; }
+
+  var monPlafond = (typeof userPlafond === 'function') ? userPlafond() : Infinity;
+  var jePeuxValider = (typeof userPeut === 'function') ? userPeut('Caisse', 'v') : true;
+  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N°</th><th>Division / Caisse</th><th style="text-align:right;">Demandé</th><th style="text-align:right;">Solde constaté</th><th>Motif</th><th>Demandé par</th><th></th></tr></thead><tbody>';
+  liste.forEach(function(d) {
+    var caisse = (DATA.caisses||[]).find(function(x){ return x.id === d.caisse_id; });
+    var montant = parseFloat(d.montant_demande) || 0;
+    var habilite = jePeuxValider && (!isFinite(monPlafond) || montant <= monPlafond);
+    html += '<tr>'
+      + '<td><b>' + escHtml(d.numero||'') + '</b></td>'
+      + '<td>' + escHtml(d.division_id ? _nomDivision(d.division_id) : '—')
+        + '<div style="font-size:10px;color:var(--blanc-dim);">' + escHtml(caisse ? (caisse.nom||'') : 'caisse supprimée') + '</div></td>'
+      + '<td style="text-align:right;font-weight:700;">' + fmtF(montant) + ' F</td>'
+      + '<td style="text-align:right;">' + ((d.solde_constate === null || d.solde_constate === undefined) ? '—' : fmtF(d.solde_constate) + ' F') + '</td>'
+      + '<td style="font-size:11px;max-width:240px;">' + escHtml(d.motif||'') + '</td>'
+      + '<td style="font-size:11px;">' + escHtml(d.demande_par||'—') + '</td>'
+      + '<td style="white-space:nowrap;">'
+      + (habilite
+          ? '<button class="btn btn-primary btn-sm" onclick="(function(){var m=prompt(\'Montant accordé (FCFA) :\', \'' + montant + '\');if(m!==null)reapValider(\'' + d.id + '\', m).then(renderPageValidations);})()">✅ Valider</button> '
+            + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)reapRejeter(\'' + d.id + '\', m).then(renderPageValidations);})()">❌ Rejeter</button>'
+          : '<span style="font-size:11px;color:var(--blanc-dim);">Au-dessus de votre plafond</span>')
       + '</td></tr>';
   });
   html += '</tbody></table></div></div>';
