@@ -3164,6 +3164,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </div>
           <div class="spacer"></div>
           <button class="btn btn-secondary btn-sm" onclick="exportClients()">⬇ Export</button>
+          <button class="btn btn-secondary btn-sm" onclick="impSouscTrigger()" title="Importer une liste de souscripteurs avec leurs lots attribués (Excel ou CSV)">📥 Importer</button>
+          <input type="file" id="imp-sousc-file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="impSouscFichier(this)">
           <button class="btn btn-primary" onclick="openClientModal()">+ Nouveau</button>
         </div>
 
@@ -17389,6 +17391,12 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <input type="text" class="form-control" id="c-profession">
           </div>
           <div class="form-group">
+            <label>Employeur</label>
+            <input type="text" class="form-control" id="c-employeur" placeholder="Ex : SOLIBRA, CNPS, fonction publique…" list="dl-employeurs">
+            <datalist id="dl-employeurs"></datalist>
+            <div style="font-size:11px;color:var(--dim);margin-top:3px;">Exigé par les banques pour un dossier en crédit — conditionne l'accord de financement.</div>
+          </div>
+          <div class="form-group">
             <label>Téléphone *</label>
             <input type="tel" class="form-control" id="c-tel">
           </div>
@@ -17508,6 +17516,23 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <div id="c-surface-regul-action" style="margin-top:6px;"></div>
             <div id="c-tma-action" style="margin-top:6px;"></div>
             <div id="c-subrogation-action" style="margin-top:6px;"></div>
+          </div>
+          <div class="form-group">
+            <label>Mode d'acquisition</label>
+            <select class="form-control" id="c-mode-acquisition" onchange="_majAideModeAcquisition()">
+              <option value="">— Non précisé —</option>
+              <option value="cash">Cash</option>
+              <option value="vefa">VEFA (vente en l'état futur d'achèvement)</option>
+              <option value="credit_bancaire">Crédit bancaire</option>
+              <option value="location_vente">Location-vente</option>
+              <option value="autre">Autre</option>
+            </select>
+            <div id="c-mode-acquisition-hint" style="font-size:11px;color:var(--dim);margin-top:3px;"></div>
+          </div>
+          <div class="form-group">
+            <label>Frais de dossier (FCFA)</label>
+            <input type="number" class="form-control" id="c-frais-dossier" value="0" min="0" step="1000">
+            <div style="font-size:11px;color:var(--dim);margin-top:3px;">Distincts du prix de vente : non déduits du reste à payer.</div>
           </div>
           <div class="form-group">
             <label>Prix de vente total (FCFA)</label>
@@ -31564,13 +31589,52 @@ function openClientModal(id) {
   openModal('modal-client');
 }
 
+/* Employeurs déjà saisis, proposés en autocomplétion : sur un même programme
+   les souscripteurs viennent souvent des mêmes entreprises, et une graphie
+   unique est ce qui rend le champ exploitable (regroupement par employeur,
+   dossiers bancaires d'un même organisme). */
+function _majListeEmployeurs() {
+  var dl = document.getElementById('dl-employeurs'); if (!dl) return;
+  var vus = {};
+  (DATA.clients || []).forEach(function(c) {
+    var e = (c.employeur || '').trim();
+    if (e) vus[e] = (vus[e] || 0) + 1;
+  });
+  dl.innerHTML = Object.keys(vus).sort(function(a, b) { return vus[b] - vus[a] || a.localeCompare(b); })
+    .map(function(e) { return '<option value="' + escHtml(e) + '">'; }).join('');
+}
+
+/* Chaque mode d'acquisition appelle un suivi différent : le rappeler au moment
+   du choix évite d'avoir à le savoir. */
+var MODES_ACQUISITION = {
+  cash:            { label: 'Cash',            aide: 'Paiement intégral — aucun échéancier à produire.' },
+  vefa:            { label: 'VEFA',            aide: 'Paiement par appels de fonds liés à l\'avancement des travaux.' },
+  credit_bancaire: { label: 'Crédit bancaire', aide: 'Renseignez l\'employeur : la banque conditionne l\'accord à la situation professionnelle.' },
+  location_vente:  { label: 'Location-vente',  aide: 'Loyers imputés sur le prix ; le transfert de propriété intervient au terme.' },
+  autre:           { label: 'Autre',           aide: '' }
+};
+function _majAideModeAcquisition() {
+  var sel = document.getElementById('c-mode-acquisition');
+  var hint = document.getElementById('c-mode-acquisition-hint');
+  if (!sel || !hint) return;
+  var def = MODES_ACQUISITION[sel.value];
+  hint.textContent = def ? def.aide : '';
+  hint.style.color = (sel.value === 'credit_bancaire' && !((document.getElementById('c-employeur') || {}).value || '').trim())
+    ? 'var(--rouge)' : 'var(--dim)';
+}
+function libelleModeAcquisition(v) {
+  return (MODES_ACQUISITION[v] || {}).label || '';
+}
+
 function clearClientForm() {
-  ['c-nom','c-prenoms','c-ddn','c-nationalite','c-profession','c-tel','c-email','c-adresse','c-commune','c-lat','c-lng',
-   'c-piece-num','c-montant-total','c-apport','c-duree','c-date-debut','c-date-souscription','c-mensualite','c-type-logement','c-surface',
+  ['c-nom','c-prenoms','c-ddn','c-nationalite','c-profession','c-employeur','c-tel','c-email','c-adresse','c-commune','c-lat','c-lng',
+   'c-piece-num','c-mode-acquisition','c-frais-dossier','c-montant-total','c-apport','c-duree','c-date-debut','c-date-souscription','c-mensualite','c-type-logement','c-surface',
    'c-commercial','c-apporteur'].forEach(function(id) {
     var el = document.getElementById(id);
-    if (el) el.value = el.id === 'c-nationalite' ? 'Ivoirienne' : el.id === 'c-duree' ? '60' : el.id === 'c-apport' ? '0' : '';
+    if (el) el.value = el.id === 'c-nationalite' ? 'Ivoirienne' : el.id === 'c-duree' ? '60' : (el.id === 'c-apport' || el.id === 'c-frais-dossier') ? '0' : '';
   });
+  _majListeEmployeurs();
+  _majAideModeAcquisition();
   var svEcart = document.getElementById('c-surface-ecart'); if (svEcart) svEcart.style.display = 'none';
   var cGeoStatutClear = document.getElementById('c-geoloc-statut'); if (cGeoStatutClear) cGeoStatutClear.textContent = '';
   document.getElementById('doc-btns').style.display = 'none';
@@ -31585,8 +31649,9 @@ function clearClientForm() {
 
 function fillClientForm(c) {
   var map = { 'c-nom': 'nom', 'c-prenoms': 'prenoms', 'c-ddn': 'ddn', 'c-nationalite': 'nationalite',
-    'c-profession': 'profession', 'c-tel': 'tel', 'c-email': 'email', 'c-adresse': 'adresse',
-    'c-piece-num': 'piece_num', 'c-montant-total': 'montant_total', 'c-apport': 'apport',
+    'c-profession': 'profession', 'c-employeur': 'employeur', 'c-tel': 'tel', 'c-email': 'email', 'c-adresse': 'adresse',
+    'c-piece-num': 'piece_num', 'c-mode-acquisition': 'mode_acquisition', 'c-frais-dossier': 'frais_dossier',
+    'c-montant-total': 'montant_total', 'c-apport': 'apport',
     'c-duree': 'duree', 'c-date-debut': 'date_debut', 'c-date-souscription': 'date_souscription', 'c-type-logement': 'type_logement', 'c-surface': 'surface',
     'c-lat': 'lat', 'c-lng': 'lng', 'c-commune': 'commune'
   };
@@ -31863,6 +31928,9 @@ async function saveClient() {
     nationalite: document.getElementById('c-nationalite').value,
     matrimonial: document.getElementById('c-matrimonial').value,
     profession: document.getElementById('c-profession').value,
+    employeur: (document.getElementById('c-employeur')||{}).value || '',
+    mode_acquisition: (document.getElementById('c-mode-acquisition')||{}).value || '',
+    frais_dossier: parseFloat((document.getElementById('c-frais-dossier')||{}).value) || 0,
     tel: tel,
     email: document.getElementById('c-email').value,
     adresse: document.getElementById('c-adresse').value,
@@ -35323,6 +35391,620 @@ async function confirmerGenerationLots() {
 ══════════════════════════════════════════════════════════════════ */
 
 /* Découpe une ligne CSV en gérant les guillemets et ; ou , */
+/* ══════════════════════════════════════════════════════════════════
+   IMPORT DES SOUSCRIPTEURS ET LOTS ATTRIBUÉS (Excel / CSV)
+   Les listes de souscription vivent en tableur chez le promoteur. Les
+   reprendre à la main, c'est des centaines de fiches saisies deux fois —
+   et un fichier réel n'est jamais propre : colonnes décalées, lignes sans
+   lot, montants qui ne bouclent pas. L'import analyse d'abord, montre ce
+   qu'il a compris et ce qu'il refuse, et n'écrit qu'après validation.
+══════════════════════════════════════════════════════════════════ */
+var _impSousc = null;   /* { lignes, retenues, rejets, alertes, source } */
+
+/* Libellés reconnus pour chaque champ — la position des colonnes varie d'un
+   fichier à l'autre, leur intitulé beaucoup moins. */
+var IMP_SOUSC_COLONNES = [
+  { cle:'lot',        motifs:[/^n[°o]?\s*lot/i, /^lot$/i] },
+  { cle:'ilot',       motifs:[/^n[°o]?\s*ilot/i, /^[îi]lot$/i] },
+  { cle:'tf',         motifs:[/^n[°o]?\s*tf/i, /titre\s*foncier/i] },
+  { cle:'dossier',    motifs:[/^n[°o]?\s*dm$/i, /^n[°o]?\s*dossier/i] },
+  { cle:'sup_reelle', motifs:[/superficie.*r[ée]elle/i, /^r[ée]elle$/i] },
+  { cle:'sup_plus',   motifs:[/^plus$/i, /superficie.*suppl/i] },
+  { cle:'sup_totale', motifs:[/^total$/i, /superficie.*total/i] },
+  { cle:'vb3p',       motifs:[/^vb\s*3\s*p$/i] },
+  { cle:'vb4p',       motifs:[/^vb\s*4\s*p$/i] },
+  { cle:'cout',       motifs:[/co[uû]t.*villa/i, /prix.*vente/i, /^co[uû]t$/i] },
+  { cle:'nom',        motifs:[/nom\s*et\s*pr[ée]nom/i, /^nom$/i, /souscripteur/i] },
+  { cle:'employeur',  motifs:[/employeur/i] },
+  { cle:'mode',       motifs:[/mode.*acquisition/i, /financement/i] },
+  { cle:'frais',      motifs:[/frais.*dossier/i] },
+  { cle:'apport',     motifs:[/apport/i] },
+  { cle:'reste',      motifs:[/reste.*payer/i] },
+  { cle:'contact',    motifs:[/^contact$/i, /t[ée]l[ée]phone/i, /^tel$/i] },
+  { cle:'email',      motifs:[/e-?mail/i] }
+];
+
+/* Reconnaissance par le CONTENU des colonnes.
+   Indispensable ici : dans un tableur métier réel, les en-têtes sont fusionnés
+   (« SUPERFICIE TERRAIN » couvre trois colonnes, « N° » deux) et seule la
+   première cellule d'une fusion porte le texte dans le fichier. Les intitulés
+   se retrouvent donc décalés des données qu'ils annoncent — vérifié sur la
+   liste MAPHOUET, où « N° TF » est écrit en colonne 1 pour des valeurs en
+   colonne 2. Se fier aux seuls libellés produit un import silencieusement
+   faux ; on regarde donc ce que les colonnes contiennent réellement. */
+function _impSouscProfilColonne(valeurs) {
+  var v = valeurs.filter(function(x){ return x !== ''; });
+  if (!v.length) return null;
+  var n = v.length;
+  /* Part des lignes réellement renseignées : une colonne qui ne porte que
+     trois valeurs ne peut pas être le téléphone d'une liste de 238
+     souscripteurs, même si ces trois valeurs ressemblent à des numéros. */
+  var remplissage = n / Math.max(1, valeurs.length);
+  var part = function(test) { return v.filter(test).length / n; };
+  var estNombre = function(x){ return /^[\d\s.,]+$/.test(x); };
+  var nums = v.filter(estNombre).map(function(x){ return parseFloat(String(x).replace(/[^\d.]/g, '')) || 0; });
+  var moyenne = nums.length ? nums.reduce(function(a, b){ return a + b; }, 0) / nums.length : 0;
+  /* Un montant est rond (multiple de 1000) ; un numéro d'ordre ne l'est pas. */
+  var ronds = nums.length ? nums.filter(function(x){ return x >= 1000 && x % 1000 === 0; }).length / nums.length : 0;
+  /* Les superficies d'un même lotissement se ressemblent (180, 200, 209…) ;
+     des numéros d'îlot ou de dossier sont dispersés. */
+  var dispersion = (function(){
+    if (nums.length < 3 || !moyenne) return 9;
+    var va = nums.reduce(function(a, x){ return a + (x - moyenne) * (x - moyenne); }, 0) / nums.length;
+    return Math.sqrt(va) / moyenne;
+  })();
+  return {
+    n: n, remplissage: remplissage, moyenne: moyenne, ronds: ronds, dispersion: dispersion,
+    email:   part(function(x){ return /@/.test(x) && /\./.test(x); }),
+    tel:     part(function(x){
+      var d = String(x).replace(/\D/g, '');
+      if (d.length < 8 || /@/.test(x)) return false;
+      /* Un numéro ivoirien commence par 0 (ou en porte deux séparés par « / ») ;
+         un montant, lui, finit par des zéros et ne contient pas de séparateur. */
+      return /^0\d/.test(d) || x.indexOf('/') > -1;
+    }),
+    texte:   part(function(x){ return !estNombre(x) && String(x).length >= 4; }),
+    nombre:  part(estNombre),
+    typoVilla: part(function(x){ return /^VB\s*\d\s*P$/i.test(String(x).trim()); }),
+    /* Un nom de personne fait plusieurs mots ; un code de typologie, une
+       mention « CASH » ou un libellé d'employeur court, non. */
+    multiMots: part(function(x){ var t = String(x).trim(); return t.length >= 8 && t.split(/\s+/).length >= 2; }),
+    valeursDistinctes: (function(){ var u = {}; v.forEach(function(x){ u[x] = 1; }); return Object.keys(u).length / n; })(),
+    mode:    part(function(x){ return /CASH|VEFA|CR[EÉ]DIT|BANCAIRE|^CB$|^LV/i.test(x); }),
+    entier:  part(function(x){ return /^\d{1,4}$/.test(String(x).trim()); })
+  };
+}
+
+/* Chaque champ sait se reconnaître dans un profil de colonne. Le score le plus
+   élevé l'emporte, une colonne n'étant attribuée qu'une fois. */
+var IMP_SOUSC_PROFILS = [
+  { cle:'email',      score:function(p){ return p.email > 0.5 ? 10 + p.email + p.remplissage : 0; } },
+  { cle:'contact',    score:function(p){ return (p.tel > 0.5 && p.remplissage > 0.2) ? 9 + p.tel + p.remplissage : 0; } },
+  { cle:'mode',       score:function(p){ return p.mode > 0.4 ? 9 + p.mode + p.remplissage : 0; } },
+  { cle:'cout',       score:function(p){ return (p.nombre > 0.7 && p.ronds > 0.5 && p.remplissage > 0.2 && p.moyenne >= 5000000) ? 8 + p.nombre + p.remplissage : 0; } },
+  { cle:'apport',     score:function(p){ return (p.nombre > 0.7 && p.ronds > 0.5 && p.moyenne >= 1000000 && p.moyenne < 5000000) ? 7 + p.nombre : 0; } },
+  { cle:'frais',      score:function(p){ return (p.nombre > 0.7 && p.ronds > 0.7 && p.moyenne >= 50000 && p.moyenne < 1000000) ? 7 + p.ronds : 0; } },
+  { cle:'nom',        score:function(p){
+      if (p.email > 0.1 || p.tel > 0.1 || p.mode > 0.2 || p.typoVilla > 0.1) return 0;
+      /* Seuils volontairement souples sur « texte » : une colonne de noms
+         réelle contient toujours quelques scories numériques (lignes de
+         sous-total, renvois). Les discriminants fiables sont ailleurs — un
+         nom complet fait plusieurs mots, et sur une liste de souscripteurs
+         les noms sont presque tous différents, là où un employeur revient
+         d'une ligne à l'autre. */
+      if (p.texte < 0.6 || p.multiMots < 0.5 || p.valeursDistinctes < 0.7 || p.remplissage < 0.2) return 0;
+      return 8 + p.multiMots + p.valeursDistinctes + p.remplissage;
+    } },
+  { cle:'employeur',  score:function(p){
+      if (p.email > 0.1 || p.tel > 0.1 || p.mode > 0.2 || p.typoVilla > 0.1) return 0;
+      if (p.texte < 0.5) return 0;
+      /* Moins de valeurs distinctes qu'une colonne de noms : score inversé. */
+      return 6 + p.texte + (1 - p.valeursDistinctes);
+    } },
+  { cle:'type_logement', score:function(p){ return p.typoVilla > 0.5 ? 9 + p.typoVilla : 0; } },
+  { cle:'sup_reelle', score:function(p){ return (p.nombre > 0.7 && p.dispersion < 0.5 && p.moyenne >= 80 && p.moyenne <= 2000) ? 6 + p.nombre : 0; } },
+  { cle:'lot',        score:function(p){ return (p.entier > 0.8 && p.moyenne < 1000) ? 5 + p.entier : 0; } }
+];
+
+function _impSouscDetecterParContenu(lignes, premiereDonnee) {
+  var largeur = 0;
+  for (var i = premiereDonnee; i < lignes.length; i++) largeur = Math.max(largeur, (lignes[i] || []).length);
+  var profils = [], candidats = [];
+  for (var col = 0; col < largeur; col++) {
+    var vals = [];
+    for (var l = premiereDonnee; l < Math.min(lignes.length, premiereDonnee + 120); l++) {
+      vals.push(String((lignes[l] || [])[col] || '').trim());
+    }
+    var p = _impSouscProfilColonne(vals);
+    profils[col] = p;
+    if (!p || p.n < 3) continue;
+    IMP_SOUSC_PROFILS.forEach(function(def) {
+      var s = def.score(p);
+      if (s > 0) candidats.push({ cle:def.cle, col:col, score:s });
+    });
+  }
+  candidats.sort(function(a, b){ return b.score - a.score; });
+  var map = {}, prises = {};
+  candidats.forEach(function(c) {
+    if (map[c.cle] != null || prises[c.col]) return;
+    map[c.cle] = c.col; prises[c.col] = 1;
+  });
+  return { map: map, profils: profils, largeur: largeur };
+}
+
+/* Un tableur métier empile souvent deux lignes d'en-tête (« SUPERFICIE
+   TERRAIN » au-dessus de « REELLE | PLUS | TOTAL ») : on les fusionne, et
+   on retient comme en-tête la ligne qui reconnaît le plus de champs. */
+function _impSouscDetecterColonnes(lignes) {
+  var meilleur = { score:0, map:{}, ligneEntete:0 };
+  for (var i = 0; i < Math.min(8, lignes.length); i++) {
+    var haut = lignes[i] || [], bas = lignes[i + 1] || [];
+    var largeur = Math.max(haut.length, bas.length);
+    var map = {}, score = 0;
+    for (var col = 0; col < largeur; col++) {
+      var libelles = [(haut[col] || '').trim(), (bas[col] || '').trim()].filter(Boolean);
+      if (!libelles.length) continue;
+      IMP_SOUSC_COLONNES.forEach(function(def) {
+        if (map[def.cle] != null) return;
+        for (var l = 0; l < libelles.length; l++) {
+          for (var m = 0; m < def.motifs.length; m++) {
+            if (def.motifs[m].test(libelles[l])) { map[def.cle] = col; score++; return; }
+          }
+        }
+      });
+    }
+    if (score > meilleur.score) meilleur = { score:score, map:map, ligneEntete:i };
+  }
+  return meilleur;
+}
+
+function _impSouscNombre(v) {
+  var s = String(v == null ? '' : v).replace(/[^\d,.\-]/g, '').replace(/\s/g, '');
+  if (!s) return null;
+  if (s.indexOf(',') > -1 && s.indexOf('.') === -1) s = s.replace(',', '.');
+  var n = parseFloat(s);
+  return isFinite(n) ? n : null;
+}
+/* CASH, VEFA, CREDIT BANCAIRE V., CB, LV/3ANS… → valeur normalisée du champ */
+function _impSouscMode(v) {
+  var s = String(v || '').trim().toUpperCase();
+  if (!s) return { val:'', brut:'' };
+  if (/^[\d\s.,]+$/.test(s)) return { val:'', brut:s, montant:true };   /* un montant dans la colonne mode */
+  if (/CASH/.test(s))                       return { val:'cash', brut:s };
+  if (/VEFA/.test(s))                       return { val:'vefa', brut:s };
+  if (/CR[EÉ]DIT|^CB$|BANCAIRE/.test(s))    return { val:'credit_bancaire', brut:s };
+  if (/^LV|LOCATION|LOC[ -]?VENTE/.test(s)) return { val:'location_vente', brut:s };
+  return { val:'autre', brut:s };
+}
+
+function impSouscTrigger() {
+  if (typeof exigerDroit === 'function' && !exigerDroit('Souscripteurs', 'c', 'l\'import de souscripteurs')) return;
+  var i = document.getElementById('imp-sousc-file'); if (i) { i.value = ''; i.click(); }
+}
+
+function impSouscFichier(input) {
+  var f = input.files && input.files[0]; if (!f) return;
+  var nom = f.name, estExcel = /\.xlsx?$/i.test(nom);
+  var rd = new FileReader();
+  rd.onload = async function(ev) {
+    try {
+      var lignes;
+      if (estExcel) {
+        if (!xlsxDisponible()) { toast('Ce navigateur ne sait pas ouvrir un .xlsx — enregistrez le fichier en CSV (séparateur ;) et réimportez.', 'error'); input.value=''; return; }
+        lignes = await xlsxLireFeuille(ev.target.result, 0);
+      } else {
+        var txt = new TextDecoder('utf-8').decode(new Uint8Array(ev.target.result));
+        var brut = txt.split(/\r?\n/).filter(function(l){ return l.trim() !== ''; });
+        if (!brut.length) { toast('Fichier vide.', 'error'); input.value=''; return; }
+        var sep = (brut[0].split(';').length > brut[0].split(',').length) ? ';' : ',';
+        lignes = brut.map(function(l){ return _csvSplit(l, sep); });
+      }
+      impSouscAnalyser(lignes, nom);
+    } catch (e) { toast('Lecture impossible : ' + (e.message || e), 'error'); }
+    input.value = '';
+  };
+  rd.readAsArrayBuffer(f);
+}
+
+/* Ordre d'affichage et libellés de l'écran de correspondance. */
+var IMP_SOUSC_CHAMPS = [
+  { cle:'nom',        libelle:'Nom et prénoms *', requis:true },
+  { cle:'lot',        libelle:'N° de lot' },
+  { cle:'ilot',       libelle:'N° d\'îlot' },
+  { cle:'tf',         libelle:'N° de titre foncier' },
+  { cle:'dossier',    libelle:'N° de dossier' },
+  { cle:'employeur',  libelle:'Employeur' },
+  { cle:'mode',       libelle:'Mode d\'acquisition' },
+  { cle:'cout',       libelle:'Coût / prix de vente' },
+  { cle:'apport',     libelle:'Apport personnel' },
+  { cle:'reste',      libelle:'Reste à payer' },
+  { cle:'frais',      libelle:'Frais de dossier' },
+  { cle:'sup_reelle', libelle:'Superficie réelle' },
+  { cle:'sup_plus',   libelle:'Superficie supplémentaire' },
+  { cle:'sup_totale', libelle:'Superficie totale' },
+  { cle:'type_logement', libelle:'Type de logement' },
+  { cle:'contact',    libelle:'Contact / téléphone' },
+  { cle:'email',      libelle:'Adresse e-mail' }
+];
+
+var _impSouscBrut = null;   /* { lignes, premiereDonnee, map, largeur, source } */
+var _impSouscEnteteDesalignee = false;
+
+function impSouscAnalyser(lignes, source) {
+  var parEntete = _impSouscDetecterColonnes(lignes);
+  var premiereDonnee = parEntete.ligneEntete + 1;
+  /* saute les lignes de sous-en-tête restantes */
+  while (premiereDonnee < lignes.length && (lignes[premiereDonnee] || []).filter(Boolean).length < 3) premiereDonnee++;
+  var parContenu = _impSouscDetecterParContenu(lignes, premiereDonnee);
+  /* Le contenu prime sur l'intitulé : c'est lui qui décrit la colonne pour de
+     bon. Les libellés ne servent qu'à combler les champs que le contenu ne
+     distingue pas (îlot, TF, superficies voisines en magnitude). */
+  var map = {}, prises = {};
+  Object.keys(parContenu.map).forEach(function(k){ map[k] = parContenu.map[k]; prises[parContenu.map[k]] = 1; });
+  /* Les intitulés ne servent qu'à situer le début des données, jamais à
+     désigner une colonne : dans un tableur aux en-têtes fusionnés ils sont
+     décalés des valeurs qu'ils annoncent, et s'y fier écrivait un numéro de
+     dossier dans les frais, un n° d'îlot dans la superficie (constaté sur la
+     liste MAPHOUET). Un champ que le contenu ne sait pas reconnaître reste
+     donc vide et se désigne à l'écran suivant, valeurs sous les yeux — une
+     proposition fausse coûte plus cher qu'une case à remplir. */
+  var ignoresParEntete = Object.keys(parEntete.map).filter(function(k) {
+    return map[k] == null || parEntete.map[k] !== map[k];
+  });
+  _impSouscEnteteDesalignee = ignoresParEntete.length > 0;
+  _impSouscBrut = { lignes:lignes, premiereDonnee:premiereDonnee, map:map,
+                    largeur:parContenu.largeur, source:source };
+  impSouscRendreMapping();
+}
+
+/* Écran de correspondance : aucune colonne n'est imposée, chaque champ est
+   confirmé par l'utilisateur avec un extrait réel des valeurs sous les yeux —
+   même principe que le mapping des calques à l'import DXF. */
+function impSouscRendreMapping() {
+  var B = _impSouscBrut; if (!B) return;
+  function extrait(col) {
+    var vals = [];
+    for (var i = B.premiereDonnee; i < B.lignes.length && vals.length < 3; i++) {
+      var v = String((B.lignes[i] || [])[col] || '').trim();
+      if (v) vals.push(v.length > 18 ? v.slice(0, 18) + '…' : v);
+    }
+    return vals.join(' · ') || 'vide';
+  }
+  var options = [];
+  for (var c = 0; c < B.largeur; c++) options.push({ col:c, txt:'Col ' + (c + 1) + ' — ' + extrait(c) });
+
+  var rows = IMP_SOUSC_CHAMPS.map(function(ch) {
+    var sel = B.map[ch.cle];
+    return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:5px;">'
+      + '<span style="flex:0 0 175px;font-size:12px;' + (ch.requis ? 'font-weight:600;' : '') + '">' + ch.libelle + '</span>'
+      + '<select class="form-control imp-col" data-cle="' + ch.cle + '" style="flex:1;font-size:12px;">'
+      + '<option value="">— Ignorer —</option>'
+      + options.map(function(o) {
+          return '<option value="' + o.col + '"' + (sel === o.col ? ' selected' : '') + '>' + escHtml(o.txt) + '</option>';
+        }).join('')
+      + '</select></div>';
+  }).join('');
+
+  var body = ''
+    + '<div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Source : <b>' + escHtml(B.source) + '</b> · '
+    + (B.lignes.length - B.premiereDonnee) + ' ligne(s) de données, ' + B.largeur + ' colonne(s).<br>'
+    + 'Les colonnes ont été reconnues d\'après leur contenu. <b>Vérifiez chaque ligne ci-dessous</b> : dans un tableur aux en-têtes fusionnés, les intitulés ne tombent pas toujours en face des données qu\'ils annoncent.</div>'
+    + (_impSouscEnteteDesalignee ? '<div class="alert alert-info" style="font-size:11.5px;margin-bottom:10px;">⚠ Les intitulés de ce fichier sont décalés par rapport aux données (cellules fusionnées) : ils ont été écartés. Les champs restés sur « Ignorer » sont à désigner à la main — l\'aperçu de chaque colonne montre ses premières valeurs.</div>' : '')
+    + rows
+    + '<div id="imp-sousc-erreur" style="color:var(--rouge);font-size:12px;margin:8px 0;"></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">'
+    + '<button class="btn btn-secondary" onclick="closeModal(\'modal-imp-sousc\')">Annuler</button>'
+    + '<button class="btn btn-primary" onclick="impSouscValiderMapping()">▶ Analyser</button></div>';
+
+  _impSouscModal();
+  document.getElementById('imp-sousc-body').innerHTML = body;
+  openModal('modal-imp-sousc');
+}
+
+function impSouscValiderMapping() {
+  var B = _impSouscBrut; if (!B) return;
+  var map = {};
+  document.querySelectorAll('#imp-sousc-body .imp-col').forEach(function(s) {
+    if (s.value !== '') map[s.getAttribute('data-cle')] = parseInt(s.value, 10);
+  });
+  var err = document.getElementById('imp-sousc-erreur');
+  if (map.nom == null) { if (err) err.textContent = 'La colonne « Nom et prénoms » est indispensable.'; return; }
+  B.map = map;
+  _impSouscConstruire();
+}
+
+function _impSouscConstruire() {
+  var B = _impSouscBrut, lignes = B.lignes, source = B.source;
+  var m = B.map, retenues = [], rejets = [], lotsVus = {};
+  for (var i = B.premiereDonnee; i < lignes.length; i++) {
+    var r = lignes[i] || [];
+    var val = function(cle) { return m[cle] != null ? String(r[m[cle]] || '').trim() : ''; };
+    var nom = val('nom');
+    if (!nom && !val('lot')) continue;                       /* ligne vide ou de séparation */
+    var lot = val('lot'), alertes = [];
+    var mode = _impSouscMode(val('mode'));
+    if (mode.montant) alertes.push('colonne « mode d\'acquisition » contenant un montant (' + mode.brut + ') — champ laissé vide');
+
+    if (!nom) { rejets.push({ ligne:i + 1, lot:lot, motif:'aucun nom de souscripteur' }); continue; }
+    if (lot) {
+      if (lotsVus[lot]) { rejets.push({ ligne:i + 1, lot:lot, motif:'lot déjà présent ligne ' + lotsVus[lot] + ' du fichier' }); continue; }
+      lotsVus[lot] = i + 1;
+    } else {
+      alertes.push('aucun lot attribué — la fiche sera créée sans rattachement');
+    }
+    var cout = _impSouscNombre(val('cout')), apport = _impSouscNombre(val('apport')), reste = _impSouscNombre(val('reste'));
+    if (cout && (apport || reste) && Math.abs((apport || 0) + (reste || 0) - cout) > 1000) {
+      alertes.push('apport + reste à payer ≠ coût (écart ' + fcfa(Math.round((apport || 0) + (reste || 0) - cout)) + ')');
+    }
+    if (mode.val === 'credit_bancaire' && !val('employeur')) alertes.push('crédit bancaire sans employeur renseigné');
+    var supR = _impSouscNombre(val('sup_reelle')), supP = _impSouscNombre(val('sup_plus')), supT = _impSouscNombre(val('sup_totale'));
+    if (supT && (supR || supP) && Math.abs((supR || 0) + (supP || 0) - supT) > 0.5) {
+      alertes.push('superficie totale ≠ réelle + supplément');
+    }
+    retenues.push({
+      ligne:i + 1, nom:nom, lot:lot, ilot:val('ilot'), tf:val('tf'), dossier:val('dossier'),
+      employeur:val('employeur'), mode:mode.val, mode_brut:mode.brut,
+      cout:cout || 0, apport:apport || 0, reste:reste, frais:_impSouscNombre(val('frais')) || 0,
+      surface:supT || supR || null, sup_plus:supP || 0,
+      type_logement:(val('type_logement') || (val('vb4p') ? 'VB4P' : (val('vb3p') ? 'VB3P' : ''))),
+      contact:val('contact'), email:val('email'), alertes:alertes
+    });
+  }
+  _impSousc = { retenues:retenues, rejets:rejets, source:source, colonnes:Object.keys(m) };
+  impSouscRendre();
+}
+
+function _impSouscModal() {
+  var mo = document.getElementById('modal-imp-sousc');
+  if (mo) return mo;
+  mo = document.createElement('div');
+  mo.className = 'modal-overlay'; mo.id = 'modal-imp-sousc';
+  mo.innerHTML = '<div class="modal" style="max-width:860px;">'
+    + '<div class="modal-header"><h3>📥 Import de souscripteurs et lots attribués</h3>'
+    + '<button class="btn btn-secondary btn-icon" onclick="closeModal(\'modal-imp-sousc\')">✕</button></div>'
+    + '<div class="modal-body" id="imp-sousc-body"></div></div>';
+  document.body.appendChild(mo);
+  return mo;
+}
+
+function impSouscRendre() {
+  var R = _impSousc; if (!R) return;
+  var avecAlerte = R.retenues.filter(function(x){ return x.alertes.length; });
+  var sansLot = R.retenues.filter(function(x){ return !x.lot; }).length;
+  var progs = (DATA.programmes || []);
+  function pastille(n, libelle, couleur) {
+    return '<div style="flex:1;min-width:120px;padding:10px;border:1px solid var(--bord);border-radius:8px;text-align:center;">'
+      + '<div style="font-size:22px;font-weight:700;color:' + couleur + ';">' + n + '</div>'
+      + '<div style="font-size:11px;color:var(--dim);">' + libelle + '</div></div>';
+  }
+  var lignesAlertes = avecAlerte.slice(0, 60).map(function(x) {
+    return '<tr><td style="white-space:nowrap;">L' + x.ligne + '</td><td>' + escHtml(x.nom.slice(0, 28)) + '</td>'
+      + '<td style="text-align:center;">' + (x.lot || '—') + '</td>'
+      + '<td style="font-size:11px;color:#E67E22;">' + x.alertes.map(escHtml).join('<br>') + '</td></tr>';
+  }).join('');
+  var lignesRejets = R.rejets.slice(0, 40).map(function(x) {
+    return '<tr><td style="white-space:nowrap;">L' + x.ligne + '</td><td style="text-align:center;">' + (x.lot || '—') + '</td>'
+      + '<td style="font-size:11px;color:var(--rouge);">' + escHtml(x.motif) + '</td></tr>';
+  }).join('');
+
+  var body = ''
+    + '<div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Source : <b>' + escHtml(R.source) + '</b> · '
+    + R.colonnes.length + ' colonne(s) reconnue(s) : ' + R.colonnes.join(', ') + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
+    + pastille(R.retenues.length, 'fiches à créer', 'var(--vert)')
+    + pastille(R.retenues.length - sansLot, 'avec lot attribué', 'var(--or)')
+    + pastille(avecAlerte.length, 'à vérifier', '#E67E22')
+    + pastille(R.rejets.length, 'refusées', 'var(--rouge)')
+    + '</div>'
+    + (R.rejets.length ? '<div style="font-weight:600;font-size:12px;margin:10px 0 4px;">Lignes refusées — non importées</div>'
+        + '<div style="max-height:150px;overflow:auto;"><table style="width:100%;font-size:12px;"><tbody>' + lignesRejets + '</tbody></table></div>' : '')
+    + (avecAlerte.length ? '<div style="font-weight:600;font-size:12px;margin:14px 0 4px;">Importées, mais à vérifier après coup</div>'
+        + '<div style="max-height:220px;overflow:auto;"><table style="width:100%;font-size:12px;"><tbody>' + lignesAlertes + '</tbody></table>'
+        + (avecAlerte.length > 60 ? '<div style="padding:6px;text-align:center;color:var(--dim);font-size:11px;">… ' + (avecAlerte.length - 60) + ' autre(s)</div>' : '')
+        + '</div>' : '')
+    + '<div class="form-grid" style="margin-top:14px;">'
+    + '<div class="form-group span-2"><label>Programme de rattachement *</label><select id="imp-sousc-prog" class="form-control">'
+    + '<option value="">— Choisir —</option>'
+    + progs.map(function(p){ return '<option value="' + p.id + '">' + escHtml(p.nom || p.id) + '</option>'; }).join('')
+    + '</select><div style="font-size:11px;color:var(--dim);margin-top:3px;">Les numéros de lot sont rapprochés des lots de ce programme.</div></div>'
+    + '</div>'
+    + '<div class="form-grid">'
+    + '<div class="form-group"><label><input type="checkbox" id="imp-sousc-maj" checked> Mettre à jour une fiche existante (même nom et contact) plutôt que d\'en créer une seconde</label></div>'
+    + '<div class="form-group"><label><input type="checkbox" id="imp-sousc-lots" checked> Rattacher les lots trouvés dans le programme</label></div>'
+    + '</div>'
+    + '<div id="imp-sousc-erreur" style="color:var(--rouge);font-size:12px;margin:6px 0;"></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">'
+    + '<button class="btn btn-secondary" onclick="closeModal(\'modal-imp-sousc\')">Annuler</button>'
+    + '<button class="btn btn-primary" onclick="impSouscConfirmer()">✅ Importer ' + R.retenues.length + ' fiche(s)</button></div>';
+
+  _impSouscModal();
+  document.getElementById('imp-sousc-body').innerHTML = body;
+  openModal('modal-imp-sousc');
+}
+
+async function impSouscConfirmer() {
+  var R = _impSousc; if (!R) return;
+  var progId = (document.getElementById('imp-sousc-prog') || {}).value || '';
+  var err = document.getElementById('imp-sousc-erreur');
+  if (!progId) { if (err) err.textContent = 'Choisissez le programme de rattachement.'; return; }
+  var majExistants = (document.getElementById('imp-sousc-maj') || {}).checked;
+  var rattacherLots = (document.getElementById('imp-sousc-lots') || {}).checked;
+
+  DATA.clients = DATA.clients || []; DATA.lots = DATA.lots || [];
+  var nCrees = 0, nMaj = 0, nLots = 0, nLotsIntrouvables = 0, nLotsOccupes = 0;
+  var normTel = function(t) { return String(t || '').replace(/\D/g, '').slice(-8); };
+
+  for (var i = 0; i < R.retenues.length; i++) {
+    var x = R.retenues[i];
+    /* Nom et prénoms arrivent dans une seule colonne : le premier mot fait le
+       nom de famille, le reste les prénoms — convention du fichier source. */
+    var morceaux = x.nom.split(/\s+/);
+    var nomFam = morceaux[0] || x.nom, prenoms = morceaux.slice(1).join(' ');
+
+    /* Rapprochement d'une fiche existante — volontairement strict : sur une
+       liste de plusieurs centaines de souscripteurs, les homonymes sont la
+       règle. Le nom seul ne suffit donc JAMAIS ; il faut un contact ou un
+       n° de dossier concordant, sans quoi 238 lignes fusionnaient en une
+       douzaine de fiches (constaté au test). */
+    var telImp = normTel(x.contact);
+    var existant = majExistants ? DATA.clients.find(function(c) {
+      if ((c.nom || '').toUpperCase() !== nomFam.toUpperCase()) return false;
+      if ((c.prenoms || '').toUpperCase() !== prenoms.toUpperCase()) return false;
+      if (x.dossier && c.dossier) return String(c.dossier) === String(x.dossier);
+      if (telImp && c.tel) return normTel(c.tel) === telImp;
+      return false;
+    }) : null;
+
+    var lot = null;
+    if (rattacherLots && x.lot) {
+      lot = DATA.lots.find(function(l) {
+        return l.programme_id === progId && String(l.numero).trim() === String(x.lot).trim();
+      });
+      if (!lot) nLotsIntrouvables++;
+      else if (lot.client_id && (!existant || lot.client_id !== existant.id)) { nLotsOccupes++; lot = null; }
+    }
+
+    var c = existant || { id:uid(), created_at:today(), statut:'actif' };
+    c.nom = nomFam; c.prenoms = prenoms;
+    c.tel = x.contact || c.tel || ''; c.email = x.email || c.email || '';
+    c.employeur = x.employeur || c.employeur || '';
+    if (x.mode) c.mode_acquisition = x.mode;
+    if (x.frais) c.frais_dossier = x.frais;
+    if (x.cout) c.montant_total = x.cout;
+    if (x.apport) c.apport = x.apport;
+    if (x.surface) c.surface = x.surface;
+    if (x.type_logement) c.type_logement = x.type_logement;
+    if (x.dossier) c.dossier = x.dossier;
+    c.programme_id = progId;
+    c.nature_bien = c.nature_bien || 'villa';
+    if (lot) { c.lot_id = lot.id; }
+    c._modifie = new Date().toISOString();
+    c.notes_import = 'Import ' + R.source + (x.alertes.length ? ' — à vérifier : ' + x.alertes.join(' ; ') : '');
+
+    if (existant) { nMaj++; } else { DATA.clients.push(c); nCrees++; }
+    await dbPut('clients', c);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+
+    if (lot) {
+      lot.client_id = c.id;
+      lot.statut = 'vendu';
+      if (x.ilot && !lot.ilot) lot.ilot = x.ilot;
+      if (x.tf && !lot.num_titre) lot.num_titre = x.tf;
+      lot._modifie = new Date().toISOString();
+      await dbPut('lots', lot);
+      if (typeof syncToSupabase === 'function') syncToSupabase('pi_lots', lot);
+      nLots++;
+    }
+  }
+
+  closeModal('modal-imp-sousc');
+  toast('✅ Import : ' + nCrees + ' fiche(s) créée(s), ' + nMaj + ' mise(s) à jour, ' + nLots + ' lot(s) rattaché(s)'
+    + (nLotsIntrouvables ? ' · ' + nLotsIntrouvables + ' n° de lot absent(s) du programme' : '')
+    + (nLotsOccupes ? ' · ' + nLotsOccupes + ' lot(s) déjà attribué(s), laissé(s) en l\'état' : '') + '.',
+    'success', 9000);
+  if (typeof renderClients === 'function') renderClients();
+  if (typeof renderLots === 'function') renderLots();
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LECTURE .XLSX SANS BIBLIOTHÈQUE
+   Les imports Excel du logiciel testent `typeof XLSX` et, faute de
+   bibliothèque chargée (aucune ne l'est), renvoient TOUJOURS l'utilisateur
+   vers un « convertissez en CSV » — l'import .xlsx n'a donc jamais
+   fonctionné. Plutôt que d'ajouter une dépendance CDN (l'application doit
+   rester utilisable hors ligne), on lit le format directement : un .xlsx
+   est une archive ZIP de fichiers XML, et DecompressionStream('deflate-raw')
+   est natif dans les navigateurs. Retour identique à sheet_to_json
+   {header:1} : un tableau de lignes, chaque ligne un tableau de chaînes.
+══════════════════════════════════════════════════════════════════ */
+function xlsxDisponible() { return typeof DecompressionStream === 'function'; }
+
+async function _zipEntrees(buf) {
+  var dv = new DataView(buf), n = buf.byteLength, fin = -1;
+  for (var i = n - 22; i >= 0 && i > n - 66000; i--) {      /* end of central directory */
+    if (dv.getUint32(i, true) === 0x06054b50) { fin = i; break; }
+  }
+  if (fin < 0) throw new Error('archive illisible');
+  var nb = dv.getUint16(fin + 10, true), off = dv.getUint32(fin + 16, true), out = {};
+  for (var k = 0; k < nb; k++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    var methode = dv.getUint16(off + 10, true),
+        taille  = dv.getUint32(off + 20, true),
+        lnom    = dv.getUint16(off + 28, true),
+        lextra  = dv.getUint16(off + 30, true),
+        lcom    = dv.getUint16(off + 32, true),
+        debut   = dv.getUint32(off + 42, true);
+    var nom = new TextDecoder().decode(new Uint8Array(buf, off + 46, lnom));
+    /* en-tête local : sa longueur varie, il faut la relire */
+    var lnomL = dv.getUint16(debut + 26, true), lextraL = dv.getUint16(debut + 28, true);
+    var data = new Uint8Array(buf, debut + 30 + lnomL + lextraL, taille);
+    out[nom] = { methode: methode, data: data };
+    off += 46 + lnom + lextra + lcom;
+  }
+  return out;
+}
+async function _zipLire(entree) {
+  if (!entree) return '';
+  if (entree.methode === 0) return new TextDecoder().decode(entree.data);
+  var flux = new Blob([entree.data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new TextDecoder().decode(await new Response(flux).arrayBuffer());
+}
+function _xlsxCol(ref) {            /* "BC12" → index de colonne 0-based */
+  var c = 0;
+  for (var i = 0; i < ref.length; i++) {
+    var code = ref.charCodeAt(i);
+    if (code < 65 || code > 90) break;
+    c = c * 26 + (code - 64);
+  }
+  return c - 1;
+}
+function _xmlTexte(frag) {
+  return frag.replace(/<[^>]+>/g, '')
+             .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+             .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+             .replace(/&#(\d+);/g, function(_, d){ return String.fromCharCode(+d); })
+             .replace(/&amp;/g, '&');
+}
+async function xlsxLireFeuille(arrayBuffer, indexFeuille) {
+  var z = await _zipEntrees(arrayBuffer);
+  /* chaînes partagées */
+  var partagees = [];
+  var xmlSS = await _zipLire(z['xl/sharedStrings.xml']);
+  if (xmlSS) {
+    var blocs = xmlSS.match(/<si[\s>][\s\S]*?<\/si>|<si\/>/g) || [];
+    partagees = blocs.map(function(si) {
+      var morceaux = si.match(/<t[^>]*>[\s\S]*?<\/t>/g) || [];
+      return morceaux.map(_xmlTexte).join('');
+    });
+  }
+  /* feuille demandée (ordre du classeur) */
+  var noms = Object.keys(z).filter(function(n){ return /^xl\/worksheets\/sheet\d+\.xml$/.test(n); })
+                   .sort(function(a, b){ return (+a.match(/(\d+)/)[1]) - (+b.match(/(\d+)/)[1]); });
+  var cible = noms[indexFeuille || 0];
+  if (!cible) throw new Error('aucune feuille dans le classeur');
+  var xml = await _zipLire(z[cible]);
+  var lignes = [];
+  (xml.match(/<row[\s>][\s\S]*?<\/row>|<row[^>]*\/>/g) || []).forEach(function(rowXml) {
+    var numLigne = +(rowXml.match(/\sr="(\d+)"/) || [0, lignes.length + 1])[1];
+    var cellules = [];
+    (rowXml.match(/<c[\s>][\s\S]*?<\/c>|<c[^>]*\/>/g) || []).forEach(function(cXml) {
+      var ref = (cXml.match(/\sr="([A-Z]+\d+)"/) || [])[1];
+      var col = ref ? _xlsxCol(ref) : cellules.length;
+      var type = (cXml.match(/\st="([^"]+)"/) || [])[1] || 'n';
+      var brut = (cXml.match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+      var val = '';
+      if (type === 's') val = partagees[+brut] || '';
+      else if (type === 'inlineStr') val = _xmlTexte((cXml.match(/<is>[\s\S]*?<\/is>/) || [''])[0]);
+      else if (brut != null) val = brut;
+      while (cellules.length < col) cellules.push('');
+      cellules[col] = String(val).trim();
+    });
+    while (lignes.length < numLigne - 1) lignes.push([]);
+    lignes[numLigne - 1] = cellules;
+  });
+  return lignes;
+}
+
 function _csvSplit(line, sep) {
   var out = [], cur = '', q = false;
   for (var i = 0; i < line.length; i++) {
