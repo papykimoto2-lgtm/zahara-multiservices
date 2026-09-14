@@ -73537,7 +73537,48 @@ async function pmAjouterVideo(){
 function pmOuvrirPhotos(){ var i=document.getElementById('pm-input-photos'); if(i){ i.value=''; i.click(); } }
 function pmOuvrirDocument(){ var i=document.getElementById('pm-input-doc'); if(i){ i.value=''; i.click(); } }
 function pmOuvrirVideoFichier(){ var i=document.getElementById('pm-input-video'); if(i){ i.value=''; i.click(); } }
-var PM_VIDEO_MAX_MO = 500;   /* [Ajusté] 100→500 Mo, décision explicite — voir garde ci-dessous sur la confirmation réelle de synchro, indispensable à cette taille */
+/* [PLAFOND DE SÉCURITÉ TEMPORAIRE — 500 → 25 Mo]
+   La conversion en base64 qui saturait la mémoire est supprimée (voir
+   pmAjouterVideoFichier ci-dessous) : la taille n'est donc plus le facteur
+   limitant côté mémoire. Ce plafond bas est maintenu le temps qu'UN envoi
+   réel de gros fichier soit validé en conditions de production. Une fois ce
+   test passé, cette seule valeur peut être relevée — rien d'autre à changer. */
+var PM_VIDEO_MAX_MO = 25;
+
+/* Envoi d'un fichier au Storage SANS conversion base64.
+   fetch accepte un Blob comme corps de requête : le navigateur le transmet
+   tel quel, sans jamais le matérialiser dans le tas JavaScript. C'est la
+   différence entre quelques mégaoctets et plusieurs gigaoctets — voir le
+   commentaire de pmAjouterVideoFichier. */
+async function pmUploadBlob(fichier, id, categorie){
+  if (!SB.url || !SB.key) throw new Error('cloud non configuré');
+  var ext = ((fichier.type||'').split('/')[1] || (fichier.name||'').split('.').pop() || 'bin').replace(/[^a-z0-9]/gi,'');
+  var chemin = (categorie||'general') + '/' + id + '.' + ext;
+  var resp = await fetch(SB.url + '/storage/v1/object/' + PM_BUCKET + '/' + encodeURI(chemin), {
+    method: 'POST',
+    headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + sbAuth(),
+               'Content-Type': fichier.type || 'application/octet-stream', 'x-upsert': 'true' },
+    body: fichier
+  });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  return chemin;
+}
+
+/* [CORRECTIF MÉMOIRE — cause de l'écran « Out of Memory »]
+   Cette fonction lisait la vidéo entière en base64 (readAsDataURL), puis
+   gardait cette chaîne dans DATA, dans IndexedDB, et la faisait recopier
+   deux fois de plus par le clone JSON de pmMediaVersStorage, avant de la
+   redécoder octet par octet. Pour une vidéo de 500 Mo, le pic dépassait
+   3 Go — contre une limite de tas d'environ 4 Go : l'onglet mourait avant
+   la fin de l'envoi, ce que confirme pi_portail_medias, qui ne contient
+   aucune vidéo volumineuse malgré les tentatives.
+   Le fichier part désormais directement au Storage, et l'enregistrement ne
+   conserve que son URL. Aucun binaire ne transite plus par la mémoire JS,
+   ni par IndexedDB, ni par la ligne JSONB.
+   Conséquence assumée : plus de repli base64 en cas d'échec réseau. Pour une
+   vidéo, ce repli était précisément ce qui tuait l'onglet — mieux vaut un
+   échec franc et un nouvel essai qu'un enregistrement local impossible à
+   synchroniser. */
 async function pmAjouterVideoFichier(input){
   var f = (input.files||[])[0];
   if(!f){ return; }
@@ -73547,13 +73588,19 @@ async function pmAjouterVideoFichier(input){
   if (cat === 'document') cat = 'eden';
   var titre = (document.getElementById('pm-titre')||{}).value || '';
   var commentaire = (document.getElementById('pm-commentaire')||{}).value || '';
-  toast('⏳ Lecture du fichier (' + (f.size/1024/1024).toFixed(1) + ' Mo)…','info');
-  var dataUrl;
+
+  var id = uid(), chemin;
+  toast('⏳ Envoi de la vidéo (' + (f.size/1024/1024).toFixed(1) + ' Mo)…','info');
   try {
-    dataUrl = await new Promise(function(res, rej){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.onerror=function(){rej(new Error('read failed'));}; r.readAsDataURL(f); });
-  } catch(e){ toast('❌ Échec de lecture du fichier vidéo.','error'); input.value=''; return; }
-  var media = Object.assign({ id: uid(), type:'video', categorie:cat, titre: titre || f.name.replace(/\.[^.]+$/,''), commentaire:commentaire }, pmRefCourant(),
-    { provider:'upload', video_id:'', url:'', data:dataUrl, mime:f.type||'video/mp4', nom:f.name, taille:f.size, visible:true, date:new Date().toISOString() });
+    chemin = await pmUploadBlob(f, id, cat);
+  } catch(e){
+    toast('❌ Envoi de la vidéo échoué (' + (e && e.message ? e.message : 'erreur réseau') + '). Rien n\'a été enregistré : réessayez avec une meilleure connexion, ou utilisez un lien YouTube/Vimeo.','error', 9000);
+    input.value=''; return;
+  }
+
+  var media = Object.assign({ id: id, type:'video', categorie:cat, titre: titre || f.name.replace(/\.[^.]+$/,''), commentaire:commentaire }, pmRefCourant(),
+    { provider:'upload', video_id:'', path:chemin, bucket:PM_BUCKET, url:_pmPublicUrl(chemin),
+      mime:f.type||'video/mp4', nom:f.name, taille:f.size, visible:true, date:new Date().toISOString() });
   DATA.portail_medias.push(media);
   await dbPut('portail_medias', media);
   /* [Fix] syncToSupabase() n'était pas attendu — le message de succès
@@ -73765,7 +73812,12 @@ async function pmUploadFichier(media){
   return path;
 }
 async function pmMediaVersStorage(media){
-  var clone = JSON.parse(JSON.stringify(media));
+  /* [Mémoire] JSON.parse(JSON.stringify(media)) recopiait DEUX fois la charge
+     utile — une fois sérialisée, une fois désérialisée — pour la supprimer
+     trois lignes plus bas. Sur une photo c'est du gaspillage ; sur une vidéo
+     c'était 1,3 Go de copies inutiles. Une copie de surface suffit : seuls des
+     champs scalaires sont modifiés ici, le binaire n'est jamais dupliqué. */
+  var clone = Object.assign({}, media);
   if (media.data && SB.url && SB.key) {
     var path = await pmUploadFichier(media);
     if (path) {
