@@ -3163,25 +3163,37 @@
   }
   function _mapPointsLots(){
     return (BIENS.lots||[]).map(function(l,i){
+      /* Un lot issu d'un plan de masse porte son contour exact : on trace le
+         lot tel qu'il est borne, au lieu d'une punaise au centre. Le point
+         reste le repli pour les lots positionnes a la main. */
+      var poly=_mapContour(l.geo_polygon);
       var lat=_mapNum(l.lat), lng=_mapNum(l.lng);
-      if(!_mapValide(lat,lng)) return null;
+      if(!poly && !_mapValide(lat,lng)) return null;
+      var c=poly?_mapCentre(poly):[lat,lng];
       var st=_mapStatutLot(l.statut);
       return { type:'lot', idx:i, nom:'Lot '+(l.numero||l.id)+(l.ilot?(' — îlot '+l.ilot):''),
-               lat:lat, lng:lng, flou:false, statut:st, dispo:st.lib,
+               lat:c[0], lng:c[1], polygone:poly, flou:false, statut:st, dispo:st.lib,
                prix:l.prix, surf:l.superficie, nature:l.nature,
                estimee:!!l.position_estimee, brut:l };
     }).filter(Boolean);
   }
+  /* Contour publie par l'ERP : [[lat,lng], ...] ou [{lat,lng}, ...].
+     Utilise pour les parcelles, les lots issus d'un plan de masse et
+     l'emprise d'un programme. */
+  function _mapContour(geo){
+    if(!geo || !geo.length || geo.length<3) return null;
+    var poly=geo.map(function(pt){
+      var a=_mapNum(Array.isArray(pt)?pt[0]:pt.lat), b=_mapNum(Array.isArray(pt)?pt[1]:pt.lng);
+      return _mapValide(a,b)?[a,b]:null;
+    }).filter(Boolean);
+    return poly.length>=3 ? poly : null;
+  }
+  function _mapCentre(poly){
+    return poly.reduce(function(a,x){ return [a[0]+x[0]/poly.length, a[1]+x[1]/poly.length]; },[0,0]);
+  }
   function _mapPolygonesParcelles(){
     return (BIENS.parcelles||[]).map(function(p,i){
-      var poly=null;
-      if(p.geo_polygon && p.geo_polygon.length>=3){
-        poly=p.geo_polygon.map(function(pt){
-          var a=_mapNum(Array.isArray(pt)?pt[0]:pt.lat), b=_mapNum(Array.isArray(pt)?pt[1]:pt.lng);
-          return _mapValide(a,b)?[a,b]:null;
-        }).filter(Boolean);
-        if(poly.length<3) poly=null;
-      }
+      var poly=_mapContour(p.geo_polygon);
       var lat=_mapNum(p.lat), lng=_mapNum(p.lng);
       if(!poly && !_mapValide(lat,lng)) return null;
       var st=_mapStatutLot(p.statut);
@@ -3208,6 +3220,7 @@
       var dispos=Number(p.lots_disponibles)||0;
       var prevus=Number(p.lots_prevus)||0;
       out.push({ type:'programme', idx:i, nom:p.nom||'Programme', lat:lat, lng:lng, flou:false,
+                 polygone:_mapContour(p.geo_polygon),
                  desc:p.description||'', dispo:PROG_STATUTS[p.statut]||p.statut||'En commercialisation',
                  commune:p.commune||p.localisation||'',
                  lotsMorceles:morceles, lotsDispos:dispos, lotsPrevus:prevus,
@@ -3542,9 +3555,16 @@
       /* La forme réelle d'une parcelle vaut mieux qu'un point : c'est elle
          qui dit si le terrain est constructible et comment il se découpe. */
       if(p.polygone){
-        L.polygon(p.polygone,{ color:p.statut.col, weight:2,
+        var forme = L.polygon(p.polygone,{ color:p.statut.col, weight:2,
           fillColor:p.statut.col, fillOpacity:.25 }).addTo(CARTE.couche).bindPopup(_mapPopup(p));
         p.polygone.forEach(function(x){ bornes.push(x); });
+        /* Un plan de masse compte des centaines de lots : une punaise sur
+           chacun masquerait le trace et alourdirait la carte pour rien. La
+           forme porte deja le popup et l'etiquette. */
+        if (CARTE.etiquettes && p.nom) {
+          forme.bindTooltip(esc(p.nom), { permanent:true, direction:'center', className:'carte-etiquette' });
+        }
+        return;
       }
       if(p.flou){
         L.circle([p.lat,p.lng],{ radius:250, color:'#94a3b8', weight:1.5,
