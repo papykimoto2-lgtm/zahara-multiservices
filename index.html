@@ -25773,6 +25773,22 @@ async function syncToSupabase(table, obj, opts) {
 
   if (table !== 'pi_users' && obj && typeof obj === 'object') {
     obj._modifie = new Date().toISOString();
+    /* ── Faux conflits, 2e moitié du correctif ────────────────────────────
+       _modifie était bien réaligné (local + cloud) ci-dessous, mais JAMAIS
+       _baseModifie — la référence à laquelle le contrôle de conflit compare
+       l'horodatage distant. Cette référence restait donc figée à l'ouverture
+       de la fiche (APP._clientBaseModifie & co.) pendant que _modifie avançait
+       à CHAQUE envoi. Dès le 2e enregistrement du même enregistrement dans la
+       session, le distant (avancé par NOTRE propre envoi précédent) était plus
+       récent que cette référence périmée → conflit signalé à tort → l'envoi
+       était ABANDONNÉ (return false plus haut) sans que rien ne parte au cloud.
+       C'est ce qui empêchait le hash du code d'accès portail d'atteindre
+       Supabase : l'Edge Function portal-login ne voyait jamais le nouveau code
+       et refusait la connexion du souscripteur (401).
+       Après un envoi, la version de référence est celle que NOUS venons
+       d'écrire : un conflit n'a de sens que face à une modification tierce
+       postérieure. */
+    obj._baseModifie = obj._modifie;
     /* ── Correction faux conflits ────────────────────────────────────────
        obj._modifie n'existait jusqu'ici QUE dans l'objet en mémoire au
        moment de cet envoi cloud : dbPut(store, obj) a toujours déjà été
@@ -27746,9 +27762,13 @@ async function _appliquerSuppressionsSync(){
     try { if (typeof tombAdd === 'function') tombAdd(ts.store, ts.record_id); } catch(e){}
     try { delete _dirtySync[ts.store + '|' + String(ts.record_id)]; } catch(e){}
     if (Array.isArray(DATA[ts.store])) {
-      var avant = DATA[ts.store].length;
-      DATA[ts.store] = DATA[ts.store].filter(function(x){ return String(x.id) !== String(ts.record_id); });
-      if (DATA[ts.store].length !== avant) {
+      /* x pouvait être null (entrée vide glissée dans le store) : x.id levait
+         alors un TypeError NON rattrapé, qui interrompait tout le pull —
+         suppressions non appliquées, DATA.suppressions_sync jamais réécrit,
+         et données locales laissées périmées à chaque cycle de synchro. */
+      var reinjecte = DATA[ts.store].some(function(x){ return x && String(x.id) === String(ts.record_id); });
+      DATA[ts.store] = DATA[ts.store].filter(function(x){ return x && String(x.id) !== String(ts.record_id); });
+      if (reinjecte) {
         /* La ligne avait été réinjectée : purge locale + cloud */
         try { await dbDelete(ts.store, ts.record_id); } catch(e){}
         var ent = SUPA_STORE_MAP.find(function(x){ return x[1] === ts.store; });
@@ -93382,12 +93402,23 @@ async function _sousVerifyToken(token) {
 
     /* Persister IDB + sync cloud immédiate (CORRECTIF AUDIT : manquait) */
     await dbPut('clients', client);
-    if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', client);
+    var _cloudOk = (typeof syncToSupabase === 'function')
+      ? await syncToSupabase('pi_clients', client)
+      : false;
 
     /* Affichage sécurisé : modal interne au lieu d'alert() (CORRECTIF AUDIT) */
     _showCodeModal(client, code);
 
-    toast('✅ Code généré — communiquez-le immédiatement au souscripteur.', 'success');
+    if (_cloudOk) {
+      toast('✅ Code généré — communiquez-le immédiatement au souscripteur.', 'success');
+    } else {
+      /* Le code n'est affiché QU'UNE SEULE FOIS et le portail le vérifie côté
+         serveur : sans confirmation cloud, le souscripteur repartirait avec un
+         code que l'Edge Function ne peut pas valider (« Identifiant ou code
+         incorrect »). Mieux vaut le dire tout de suite que le laisser croire
+         à un succès. */
+      toast('⚠️ Code généré mais NON confirmé dans le cloud — le souscripteur ne pourra pas encore se connecter. Vérifiez la connexion, puis régénérez le code.', 'error');
+    }
   };
 })();
 
