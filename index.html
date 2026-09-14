@@ -31626,6 +31626,35 @@ function libelleModeAcquisition(v) {
   return (MODES_ACQUISITION[v] || {}).label || '';
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   DÉFAUTS DE SAISIE — Nature du bien & Commercial assigné
+
+   Les deux champs sont obligatoires mais restaient vides sur la quasi-
+   totalité des fiches reprises des anciens fichiers Excel : chaque
+   ouverture de la modale obligeait à les re-choisir à la main. Ils sont
+   désormais préremplis quand la fiche ne porte AUCUNE valeur — un choix
+   déjà enregistré n'est jamais écrasé, et le lot rattaché reste
+   prioritaire sur le défaut pour la nature (un terrain ne devient pas un
+   logement, la distinction commande l'écriture comptable de la vente).
+══════════════════════════════════════════════════════════════════ */
+var CLIENT_NATURE_DEFAUT = 'maison';               /* Logement (bâti) */
+var CLIENT_COMMERCIAL_DEFAUT = 'emp_1788440497496'; /* KOUAME APHOUET EULALIE Epse DIOMANDE */
+
+/* Applique les défauts au formulaire ouvert, sans jamais écraser une
+   valeur déjà choisie ni contredire la nature du lot rattaché. */
+function _clientAppliquerDefauts(c) {
+  var selComm = document.getElementById('c-commercial');
+  if (selComm && !selComm.value) {
+    var dispo = Array.prototype.some.call(selComm.options, function(o){ return o.value === CLIENT_COMMERCIAL_DEFAUT; });
+    if (dispo) selComm.value = CLIENT_COMMERCIAL_DEFAUT;
+  }
+  var selNat = document.getElementById('c-nature-manuel');
+  if (selNat && (!selNat.value || selNat.value === 'auto')) {
+    var lot = (c && c.lot_id) ? (DATA.lots || []).find(function(l){ return l.id === c.lot_id; }) : null;
+    if (!lot) selNat.value = CLIENT_NATURE_DEFAUT;   /* lot rattaché → la nature du lot fait foi */
+  }
+}
+
 function clearClientForm() {
   ['c-nom','c-prenoms','c-ddn','c-nationalite','c-profession','c-employeur','c-tel','c-email','c-adresse','c-commune','c-lat','c-lng',
    'c-piece-num','c-mode-acquisition','c-frais-dossier','c-montant-total','c-apport','c-duree','c-date-debut','c-date-souscription','c-mensualite','c-type-logement','c-surface',
@@ -31645,6 +31674,7 @@ function clearClientForm() {
   updateNatureBienUI(null);
   APP._clientLotsSupplementaires = [];
   if (typeof renderLotsSupplementairesListe === 'function') renderLotsSupplementairesListe();
+  _clientAppliquerDefauts(null);
 }
 
 function fillClientForm(c) {
@@ -31685,6 +31715,10 @@ function fillClientForm(c) {
     var natureAuto = lotActuel ? (lotActuel.nature === 'terrain' ? 'terrain' : 'maison') : null;
     selManuel.value = (c.nature_bien && c.nature_bien !== natureAuto) ? c.nature_bien : 'auto';
   }
+  /* Fiche reprise d'un ancien fichier : les deux champs obligatoires sont
+     préremplis pour que la modale s'ouvre déjà valide. Une valeur déjà
+     enregistrée reste intacte (les tests ci-dessus ont la priorité). */
+  _clientAppliquerDefauts(c);
   if (c.programme_id) {
     updateLotsByProgramme();
     setTimeout(function() {
