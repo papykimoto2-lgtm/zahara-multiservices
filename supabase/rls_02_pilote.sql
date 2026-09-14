@@ -1,6 +1,20 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- RLS — ÉTAPE 2 : PILOTE SUR UNE SEULE TABLE
 --
+-- ✅ APPLIQUÉ SUR ZAHARA (ilvusckdanwrckxqvhmr) le 14/09/2026.
+--    Migrations : create_pi_demandes_reappro, puis rls_pilote_demandes_reappro.
+--    État vérifié après application :
+--      · politique pi_demandes_reappro_staff — authenticated, ALL,
+--        ((auth.jwt() ->> 'app_role') IS NOT NULL)
+--      · has_table_privilege authenticated : SELECT/INSERT/UPDATE = true
+--      · has_table_privilege anon          : SELECT/INSERT = false
+--      · expression testée avec de vrais jeux de claims :
+--          jeton personnel  (app_role=admin)      → autorisé
+--          jeton souscripteur (kind=souscripteur) → refusé
+--    Préalable confirmé : staff-login délivre bien des jetons (78 connexions
+--    serveur réussies en base, la dernière le jour même).
+--    NON appliqué sur Menco : un pilote se mène sur une seule instance.
+--
 -- Table pilote : pi_demandes_reappro — choisie parce qu'elle ne contient
 -- AUCUNE donnée de production (module livré mais pas encore utilisé), qu'elle
 -- est interne (le portail n'y touche pas) et que l'ERP y écrit avec un retour
