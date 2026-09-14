@@ -74157,60 +74157,50 @@ async function pmAjouterVideo(){
 function pmOuvrirPhotos(){ var i=document.getElementById('pm-input-photos'); if(i){ i.value=''; i.click(); } }
 function pmOuvrirDocument(){ var i=document.getElementById('pm-input-doc'); if(i){ i.value=''; i.click(); } }
 function pmOuvrirVideoFichier(){ var i=document.getElementById('pm-input-video'); if(i){ i.value=''; i.click(); } }
-var PM_VIDEO_MAX_MO = 500;   /* [Ajusté] 100→500 Mo, décision explicite — voir garde ci-dessous sur la confirmation réelle de synchro, indispensable à cette taille */
 async function pmAjouterVideoFichier(input){
   var f = (input.files||[])[0];
-  if(!f){ return; }
-  if (f.type.indexOf('video/')!==0){ toast('❌ Fichier non reconnu comme vidéo.','error'); input.value=''; return; }
-  if (f.size > PM_VIDEO_MAX_MO*1024*1024){ toast('❌ Vidéo trop lourde (max '+PM_VIDEO_MAX_MO+' Mo). Utilisez plutôt un lien YouTube/Vimeo pour les vidéos plus longues.','error'); input.value=''; return; }
+  var err = videoVerifier(f);
+  if (err) { toast('❌ ' + err, 'error'); input.value=''; return; }
   var cat = (document.getElementById('pm-categorie')||{}).value || 'eden';
   if (cat === 'document') cat = 'eden';
   var titre = (document.getElementById('pm-titre')||{}).value || '';
   var commentaire = (document.getElementById('pm-commentaire')||{}).value || '';
-  toast('⏳ Lecture du fichier (' + (f.size/1024/1024).toFixed(1) + ' Mo)…','info');
-  var dataUrl;
+  var id = uid();
+
+  /* Le fichier part d'abord vers Storage. Rien n'est écrit en base tant que
+     l'envoi n'a pas abouti : une vidéo à moitié transférée ne doit pas
+     laisser une fiche média pointant vers un fichier inexistant. */
+  var depot;
   try {
-    dataUrl = await new Promise(function(res, rej){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.onerror=function(){rej(new Error('read failed'));}; r.readAsDataURL(f); });
-  } catch(e){ toast('❌ Échec de lecture du fichier vidéo.','error'); input.value=''; return; }
-  var media = Object.assign({ id: uid(), type:'video', categorie:cat, titre: titre || f.name.replace(/\.[^.]+$/,''), commentaire:commentaire }, pmRefCourant(),
-    { provider:'upload', video_id:'', url:'', data:dataUrl, mime:f.type||'video/mp4', nom:f.name, taille:f.size, visible:true, date:new Date().toISOString() });
+    depot = await videoUploadStream(f, cat, id, videoProgresOuvrir(f.name));
+  } catch (e) {
+    videoProgresFermer(); input.value='';
+    toast('❌ ' + (e && e.message === 'hors-ligne'
+      ? 'Connexion au serveur indisponible — impossible de téléverser une vidéo hors ligne.'
+      : (e && e.message) || 'Échec du téléversement.'), 'error');
+    return;
+  }
+  videoProgresFermer();
+
+  var media = Object.assign({ id:id, type:'video', categorie:cat,
+      titre: titre || f.name.replace(/\.[^.]+$/,''), commentaire:commentaire }, pmRefCourant(),
+    { provider:'upload', video_id:'', url: depot.url, path: depot.path, bucket: PM_BUCKET,
+      mime: depot.mime, nom: depot.nom, taille: depot.taille, visible:true,
+      date: new Date().toISOString() });
+
   DATA.portail_medias.push(media);
   await dbPut('portail_medias', media);
-  /* [Fix] syncToSupabase() n'était pas attendu — le message de succès
-     s'affichait immédiatement après la seule écriture LOCALE, sans savoir
-     si l'envoi au cloud avait réussi. Avec une limite passée à 100 Mo, le
-     temps de transfert devient significatif sur un réseau mobile instable
-     (documenté à plusieurs reprises dans ce projet) : la fenêtre d'échec
-     s'élargit d'autant, et l'utilisateur croirait avoir « publié au
-     portail » alors que la vidéo resterait coincée en local, invisible
-     pour quiconque d'autre tant que la synchro différée ne finit pas par
-     réussir. On attend maintenant réellement le résultat, avec un message
-     honnête selon ce qui s'est vraiment passé. */
-  toast('⏳ Envoi au serveur (' + (f.size/1024/1024).toFixed(1) + ' Mo — peut prendre plusieurs minutes sur réseau lent)…','info');
-  /* [Fix] sbFetch() n'a aucun timeout propre — sur un réseau très lent, un
-     fichier de 500 Mo pourrait bloquer l'interface indéfiniment sans le
-     moindre retour. Timeout dédié à CET appel (pas une modification globale
-     de sbFetch, qui affecterait d'autres appels plus légers ayant des
-     besoins différents) : au-delà de 15 min, on abandonne l'attente et on
-     bascule sur le message « en attente réseau » — l'enregistrement reste
-     en file d'attente locale (_outboxEnqueue côté syncToSupabase) et sera
-     réessayé automatiquement, ce timeout ne fait qu'éviter de figer l'écran. */
+  /* La ligne ne porte plus que l'URL : la synchro est instantanée quelle
+     que soit la taille de la vidéo. */
   var syncOk = false;
   if (typeof syncToSupabase === 'function') {
-    try {
-      syncOk = await Promise.race([
-        syncToSupabase('pi_portail_medias', media),
-        new Promise(function(resolve){ setTimeout(function(){ resolve('TIMEOUT'); }, 900000); })
-      ]);
-      if (syncOk === 'TIMEOUT') syncOk = false;
-    } catch(eSync) { syncOk = false; }
+    try { syncOk = await syncToSupabase('pi_portail_medias', media); } catch(e){ syncOk = false; }
   }
   input.value='';
-  if (syncOk) {
-    toast('✅ Vidéo téléversée et publiée au portail.','success');
-  } else {
-    toast('⚠️ Vidéo enregistrée localement, mais pas encore publiée au portail (réseau indisponible ou trop lent) — la synchronisation reprendra automatiquement dès que la connexion sera meilleure.','error');
-  }
+  toast(syncOk
+    ? '✅ Vidéo publiée au portail (' + (depot.taille/1048576).toFixed(0) + ' Mo).'
+    : '⚠️ Vidéo téléversée, mais la fiche n\'est pas encore synchronisée — elle le sera au retour du réseau.',
+    syncOk ? 'success' : 'error');
   pmRender();
 }
 function _pmLabelCat(c){ return ({eden:'Programme',chantier:'Chantier',catalogue:'Catalogue',location:'Location',document:'Document',investir:'Investir'})[c]||c; }
@@ -74379,8 +74369,109 @@ async function pmDelete(id){
    part vers le cloud. Portail public : déjà compatible (fallback m.url
    existant dans le gabarit). Dégradation propre : échec upload → repli
    base64 intégral (comportement identique à avant la migration). */
-var PM_BUCKET = 'portail-medias';
+var PM_BUCKET = 'portail-medias';
 function _pmPublicUrl(path){ return SB.url + '/storage/v1/object/public/' + PM_BUCKET + '/' + encodeURI(path); }
+
+/* ══════════════════════════════════════════════════════════════════
+   VIDÉOS — TÉLÉVERSEMENT DIRECT EN FLUX (sans base64)
+
+   Cause du blocage de la machine : la vidéo était lue avec
+   FileReader.readAsDataURL(). Une vidéo de 300 Mo produit alors une
+   chaîne base64 de ~400 Mo, qui est ensuite RECOPIÉE trois fois — dans
+   l'objet média, dans IndexedDB, puis dans le corps JSON envoyé à
+   PostgREST. Plus d'un gigaoctet de mémoire pour un seul fichier : le
+   navigateur sature et l'ordinateur se fige.
+
+   Le fichier part maintenant tel quel vers Storage (le File est un flux,
+   le navigateur n'en charge jamais l'intégralité en mémoire), et la ligne
+   de données ne conserve que son chemin public. Rien ne transite plus par
+   la base. La prévisualisation locale utilise un objectURL, libéré ensuite.
+
+   XMLHttpRequest et non fetch() : c'est le seul moyen d'obtenir la
+   progression réelle de l'envoi, indispensable au-delà de 100 Mo.
+══════════════════════════════════════════════════════════════════ */
+var VIDEO_MAX_MO = 500;
+var VIDEO_MIME_OK = ['video/mp4','video/webm','video/ogg','video/quicktime','video/x-matroska'];
+
+function _videoNomSur(f, id){
+  var ext = (f.name.split('.').pop() || 'mp4').replace(/[^a-z0-9]/gi,'').slice(0,5).toLowerCase() || 'mp4';
+  return id + '.' + ext;
+}
+
+/* Retourne { path, url, mime, taille, nom } ou lève une erreur explicite. */
+function videoUploadStream(file, dossier, id, onProgress){
+  return new Promise(function(resolve, reject){
+    if (!SB.url || !SB.key) { reject(new Error('hors-ligne')); return; }
+    var path = (dossier || 'videos') + '/' + _videoNomSur(file, id);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', SB.url + '/storage/v1/object/' + PM_BUCKET + '/' + encodeURI(path), true);
+    xhr.setRequestHeader('apikey', SB.key);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + sbAuth());
+    xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+    xhr.setRequestHeader('x-upsert', 'true');
+    xhr.timeout = 3600000;               /* 1 h : 500 Mo sur lien lent */
+    xhr.upload.onprogress = function(e){
+      if (e.lengthComputable && typeof onProgress === 'function') {
+        onProgress(Math.round(e.loaded / e.total * 100), e.loaded, e.total);
+      }
+    };
+    xhr.onload = function(){
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve({ path: path, url: _pmPublicUrl(path), mime: file.type || 'video/mp4',
+                  taille: file.size, nom: file.name });
+      } else if (xhr.status === 413) {
+        reject(new Error('Le serveur refuse ce fichier : il dépasse la taille autorisée du bucket.'));
+      } else if (xhr.status === 401 || xhr.status === 403) {
+        reject(new Error('Session expirée ou droits insuffisants — reconnectez-vous puis réessayez.'));
+      } else {
+        reject(new Error('Le serveur a refusé l\'envoi (code ' + xhr.status + ').'));
+      }
+    };
+    xhr.onerror   = function(){ reject(new Error('Connexion interrompue pendant l\'envoi.')); };
+    xhr.ontimeout = function(){ reject(new Error('Délai dépassé — connexion trop lente pour ce fichier.')); };
+    xhr.send(file);                      /* le File part en flux, jamais en mémoire */
+  });
+}
+
+/* Contrôles communs aux trois points d'import vidéo. */
+function videoVerifier(f){
+  if (!f) return 'Aucun fichier sélectionné.';
+  var mime = (f.type || '').toLowerCase();
+  if (mime.indexOf('video/') !== 0) return 'Ce fichier n\'est pas une vidéo.';
+  if (VIDEO_MIME_OK.indexOf(mime) === -1) return 'Format non pris en charge (MP4, WebM, OGG, MOV ou MKV attendus).';
+  if (f.size > VIDEO_MAX_MO*1024*1024)
+    return 'Vidéo trop lourde : ' + (f.size/1048576).toFixed(0) + ' Mo pour un maximum de ' + VIDEO_MAX_MO + ' Mo. Compressez-la ou publiez un lien YouTube/Vimeo.';
+  return null;
+}
+
+/* Indicateur de progression discret, réutilisé par les trois appelants. */
+function videoProgresOuvrir(nomFichier){
+  var el = document.getElementById('_video-progres');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = '_video-progres';
+    el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10000;'
+      + 'background:#101033;color:#fff;padding:12px 18px;border-radius:12px;min-width:280px;'
+      + 'box-shadow:0 8px 28px rgba(0,0,0,.35);font-size:13px;';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = '<div style="margin-bottom:8px;">📤 Envoi de <b></b></div>'
+    + '<div style="height:6px;background:rgba(255,255,255,.18);border-radius:3px;overflow:hidden;">'
+    + '<div id="_video-progres-barre" style="height:100%;width:0;background:#4ade80;transition:width .2s;"></div></div>'
+    + '<div id="_video-progres-txt" style="margin-top:6px;opacity:.8;">0 %</div>';
+  el.querySelector('b').textContent = nomFichier;
+  el.style.display = 'block';
+  return function(pct, charge, total){
+    var b = document.getElementById('_video-progres-barre');
+    var t = document.getElementById('_video-progres-txt');
+    if (b) b.style.width = pct + '%';
+    if (t) t.textContent = pct + ' % — ' + (charge/1048576).toFixed(0) + ' / ' + (total/1048576).toFixed(0) + ' Mo';
+  };
+}
+function videoProgresFermer(){
+  var el = document.getElementById('_video-progres');
+  if (el) el.style.display = 'none';
+}
 async function pmUploadFichier(media){
   if (!SB.url || !SB.key || !media || !media.data) return null;
   var ext = (media.mime||'').split('/')[1] || (media.nom||'').split('.').pop() || 'bin';
@@ -91940,18 +92031,23 @@ function rchAjouterVideo(){
 }
 async function rchAjouterVideoFichier(input){
   var f = (input.files||[])[0];
-  if (!f) return;
-  if (f.type.indexOf('video/')!==0) { toast('❌ Fichier non reconnu comme vidéo.','error'); input.value=''; return; }
-  if (f.size > RCH_VIDEO_MAX_MO*1024*1024) { toast('❌ Vidéo trop lourde (max '+RCH_VIDEO_MAX_MO+' Mo). Utilisez plutôt un lien YouTube/Vimeo.','error'); input.value=''; return; }
-  toast('⏳ Téléversement de la vidéo…','info');
-  var dataUrl;
+  var err = videoVerifier(f);
+  if (err) { toast('❌ ' + err, 'error'); input.value=''; return; }
+  var id = 'v_'+Date.now()+'_'+Math.random().toString(36).substr(2,4);
+  var depot;
   try {
-    dataUrl = await new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.onerror=function(){rej(new Error('read failed'));}; r.readAsDataURL(f); });
-  } catch(e){ toast('❌ Échec de lecture du fichier vidéo.','error'); input.value=''; return; }
-  RCH_STATE.videos.push({ id:'v_'+Date.now()+'_'+Math.random().toString(36).substr(2,4), provider:'upload', video_id:'', url:'', data:dataUrl, mime:f.type||'video/mp4', legende:f.name, visible:true });
+    depot = await videoUploadStream(f, 'chantier', id, videoProgresOuvrir(f.name));
+  } catch (e) {
+    videoProgresFermer(); input.value='';
+    toast('❌ ' + ((e && e.message) || 'Échec du téléversement.'), 'error');
+    return;
+  }
+  videoProgresFermer();
+  RCH_STATE.videos.push({ id:id, provider:'upload', video_id:'', url: depot.url, path: depot.path,
+    bucket: PM_BUCKET, mime: depot.mime, taille: depot.taille, legende: depot.nom, visible:true });
   input.value = '';
   rchRenderVideosList();
-  toast('✅ Vidéo ajoutée au rapport.', 'success');
+  toast('✅ Vidéo téléversée (' + (depot.taille/1048576).toFixed(0) + ' Mo).', 'success');
 }
 function rchRenderVideosList(){
   var el = document.getElementById('rch-videos-list'); if (!el) return;
@@ -127784,14 +127880,23 @@ function plrAjouterVideoLien() {
 }
 async function plrAjouterVideoFichier(input) {
   var f = (input.files||[])[0];
-  if (!f) return;
-  if (f.size > 100*1024*1024) { toast('❌ Vidéo trop lourde (max 100 Mo). Utilisez un lien YouTube/Vimeo.', 'error'); input.value=''; return; }
-  toast('⏳ Téléversement de la vidéo…', 'info');
-  var dataUrl = await new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.onerror=function(){rej();}; r.readAsDataURL(f); });
-  PLR_STATE.videos.push({ id:uid(), provider:'upload', video_id:'', url:'', data:dataUrl, mime:f.type||'video/mp4', legende:f.name, visible:true });
+  var err = videoVerifier(f);
+  if (err) { toast('❌ ' + err, 'error'); input.value=''; return; }
+  var id = uid();
+  var depot;
+  try {
+    depot = await videoUploadStream(f, 'suivi-lot', id, videoProgresOuvrir(f.name));
+  } catch (e) {
+    videoProgresFermer(); input.value='';
+    toast('❌ ' + ((e && e.message) || 'Échec du téléversement.'), 'error');
+    return;
+  }
+  videoProgresFermer();
+  PLR_STATE.videos.push({ id:id, provider:'upload', video_id:'', url: depot.url, path: depot.path,
+    bucket: PM_BUCKET, mime: depot.mime, taille: depot.taille, legende: depot.nom, visible:true });
   input.value = '';
   plrRenderVideosList();
-  toast('✅ Vidéo ajoutée.', 'success');
+  toast('✅ Vidéo téléversée (' + (depot.taille/1048576).toFixed(0) + ' Mo).', 'success');
 }
 function plrRenderVideosList() {
   var el = document.getElementById('plr-videos-list');
