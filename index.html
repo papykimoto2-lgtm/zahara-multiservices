@@ -12170,6 +12170,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <button class="tab-btn" onclick="switchTab('caisse','decaissements')">💵 Décaissements à faire</button>
             <button class="tab-btn" onclick="switchTab('caisse','tiers')">💰 Comptabilité tiers</button>
             <button class="tab-btn" onclick="switchTab('caisse','mesdemandes')">📋 Mes demandes de validation <span class="nav-badge" id="badge-tab-mesdemandes" style="display:none;position:static;margin-left:4px;">0</span></button>
+            <button class="tab-btn" onclick="switchTab('caisse','reappro')">🏦 Réapprovisionnement <span class="nav-badge" id="badge-tab-reappro" style="display:none;position:static;margin-left:4px;">0</span></button>
             <button class="tab-btn" id="caisse-tab-btn-audit" onclick="switchTab('caisse','audit')" style="display:none;" title="Réservé aux administrateurs">🔍 Audit</button>
           </div>
         </div>
@@ -12179,6 +12180,21 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <div class="card-title" style="margin-bottom:2px;">📋 Mes demandes de validation</div>
             <div style="font-size:11px;color:var(--dim);margin-bottom:10px;">Tous vos mouvements soumis à validation — en attente, validés ou rejetés — pour suivre où en est chaque demande sans avoir à redemander.</div>
             <div id="caisse-mesdemandes-box"></div>
+          </div>
+        </div>
+
+        <!-- ══ Réapprovisionnement de fonds : une division à court de liquidités
+             demande une dotation, validée par la hiérarchie puis versée dans sa caisse ══ -->
+        <div class="tab-pane" id="tab-caisse-reappro">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+              <div>
+                <div class="card-title" style="margin-bottom:2px;">🏦 Demandes de réapprovisionnement de fonds</div>
+                <div style="font-size:11px;color:var(--dim);">Circuit : brouillon → soumise → validée par la hiérarchie → servie (entrée en caisse). Le montant accordé peut être inférieur au montant demandé.</div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="reapOuvrirModal(null)">➕ Nouvelle demande</button>
+            </div>
+            <div id="caisse-reappro-box" style="margin-top:12px;"></div>
           </div>
         </div>
 
@@ -23760,6 +23776,8 @@ var DATA = {
   vehicule_courses: [],
   /* v146 — Suivi budgétaire caisse (compte + division, mensuel ou annuel) */
   caisse_budgets: [],
+  /* v148 — Demandes de réapprovisionnement de fonds des caisses de division */
+  demandes_reappro: [],
   /* v147 — Circuit budgétaire complet : budget prévisionnel annuel par
      division/compte, validé par le DG, décrémenté par les Demandes d'Achat
      validées, avec transferts de ligne à ligne */
@@ -23923,6 +23941,8 @@ var ALL_STORES = [
   'vehicules', 'vehicule_carburant', 'vehicule_entretiens', 'vehicule_affectations', 'vehicule_courses',
   /* v146 — Suivi budgétaire caisse */
   'caisse_budgets',
+  /* v148 — Réapprovisionnement des caisses de division */
+  'demandes_reappro',
   /* v147 — Circuit budgétaire : DA + transferts */
   'fiches_engagement_depense', 'transferts_budgetaires',
   /* [FIX] Demandes de versement du portail souscripteur — n'était même pas
@@ -25958,6 +25978,7 @@ var SUPA_STORE_MAP = [
   ['pi_caisses',          'caisses'],
   ['pi_caisse_sessions',  'caisse_sessions'],
   ['pi_caisse_mouvements','caisse_mouvements'],
+  ['pi_demandes_reappro', 'demandes_reappro'],
   ['pi_users',           'users'],
   ['pi_portail_medias',  'portail_medias'],
   ['pi_portail_messages','portail_messages'],
@@ -29210,6 +29231,7 @@ function switchTab(context, tab) {
     if (tab==='tiers' && typeof caisseRenderBalanceAgee==='function') caisseRenderBalanceAgee();
     if (tab==='audit' && typeof renderCaisseAudit==='function') { renderCaisseAudit(); if (typeof caisseRevueMensuelleUI==='function') caisseRevueMensuelleUI(); }
     if (tab==='mesdemandes' && typeof caisseRenderMesDemandes==='function') caisseRenderMesDemandes();
+    if (tab==='reappro' && typeof reapRender==='function') reapRender();
   }
   if (context==='validations' && typeof renderPageValidations==='function') renderPageValidations();
   if (context==='lbcft') {
@@ -46413,7 +46435,7 @@ var ACTIONS_LIB = { c:'Créer', m:'Modifier', s:'Supprimer', v:'Valider' };
 /* Rattachement des stores sensibles à leur module, pour appliquer les droits
    au niveau des données et pas seulement de l'écran. */
 var STORE_MODULE = {
-  caisse_mouvements:'Caisse', caisse_sessions:'Caisse', caisses:'Caisse',
+  caisse_mouvements:'Caisse', caisse_sessions:'Caisse', caisses:'Caisse', demandes_reappro:'Caisse',
   ecritures:'Comptabilite', versements:'Paiements', factures_client:'Paiements',
   employes:'Paie', bulletins:'Paie', pointages:'Journaliers & Temporaires',
   clients:'Souscripteurs', lots:'Lots & Reservations', programmes:'Programmes',
@@ -122394,6 +122416,277 @@ async function caisseTransfererFonds() {
   if (typeof caisseNotifierValidation === 'function') { caisseNotifierValidation(mvtSortie, 'demande'); caisseNotifierValidation(mvtEntree, 'demande'); }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   RÉAPPROVISIONNEMENT DE FONDS DES CAISSES DE DIVISION
+   Une division dont la caisse s'épuise demande une dotation à la
+   hiérarchie. Circuit volontairement calqué sur celui des Fiches
+   d'Engagement de Dépense (brouillon → soumise → validée/rejetée), pour
+   que les utilisateurs retrouvent les mêmes règles d'un module à l'autre.
+   Le point sensible est la dernière étape : tant que la demande n'est pas
+   SERVIE, aucun franc n'entre en caisse. « Servir » crée un vrai bon
+   d'entrée, soumis au même circuit de validation que n'importe quel
+   mouvement — une dotation validée sur le papier ne doit pas pouvoir
+   gonfler un solde sans passer par la caisse elle-même.
+   ══════════════════════════════════════════════════════════════════════ */
+var REAPPRO_STATUTS = {
+  brouillon: { lib:'📝 Brouillon',                couleur:'var(--blanc-dim)' },
+  soumise:   { lib:'🕓 En attente de validation', couleur:'var(--or)' },
+  validee:   { lib:'✅ Validée — à servir',       couleur:'var(--or)' },
+  rejetee:   { lib:'❌ Rejetée',                  couleur:'var(--rouge)' },
+  servie:    { lib:'🏦 Servie',                   couleur:'var(--vert)' }
+};
+
+function reapGenererNumero() {
+  var annee = new Date().getFullYear();
+  var n = (DATA.demandes_reappro||[]).filter(function(d){ return (d.numero||'').indexOf('REAP-'+annee) === 0; }).length + 1;
+  return 'REAP-' + annee + '-' + String(n).padStart(4,'0');
+}
+
+/* Solde constatable d'une caisse : celui de sa session ouverte. Null quand
+   la caisse est fermée — on préfère l'afficher que d'inventer un solde
+   qu'aucune session ne porte. */
+function reapSoldeCaisse(caisseId) {
+  if (typeof caisseGetSessionOuverte !== 'function') return null;
+  var s = caisseGetSessionOuverte(caisseId);
+  return s ? caisseSoldeSession(s) : null;
+}
+
+function reapRemplirCaisses() {
+  var sel = document.getElementById('rea-caisse'); if (!sel) return;
+  var divId = (document.getElementById('rea-division')||{}).value || '';
+  var liste = (DATA.caisses||[]).filter(function(c){ return (c.division_id||'') === divId; });
+  sel.innerHTML = liste.length
+    ? liste.map(function(c){ return '<option value="'+c.id+'">'+escHtml(c.nom||c.id)+'</option>'; }).join('')
+    : '<option value="">— Aucune caisse rattachée à cette division —</option>';
+  reapAfficherSolde();
+}
+
+function reapAfficherSolde() {
+  var box = document.getElementById('rea-solde-actuel'); if (!box) return;
+  var caisseId = (document.getElementById('rea-caisse')||{}).value || '';
+  if (!caisseId) { box.textContent = ''; return; }
+  var solde = reapSoldeCaisse(caisseId);
+  box.innerHTML = (solde === null)
+    ? '⚠️ Caisse actuellement fermée — le solde sera constaté à sa réouverture.'
+    : 'Solde actuel de cette caisse : <strong>' + fmtF(solde) + ' FCFA</strong>';
+}
+
+function reapOuvrirModal(id) {
+  var d = id ? (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }) : null;
+  if (id && !d) return;
+  if (d && d.statut !== 'brouillon') { toast('Seule une demande en brouillon peut être modifiée.', 'error'); return; }
+  var selDiv = document.getElementById('rea-division'); if (!selDiv) return;
+  selDiv.innerHTML = (DATA.divisions||[]).length
+    ? (DATA.divisions||[]).map(function(x){ return '<option value="'+x.id+'">'+escHtml(x.nom||x.libelle||x.id)+'</option>'; }).join('')
+    : '<option value="">— Aucune division enregistrée —</option>';
+  document.getElementById('rea-id').value = d ? d.id : '';
+  document.getElementById('rea-titre').textContent = d ? ('🏦 Demande ' + (d.numero||'')) : '🏦 Demande de réapprovisionnement';
+  selDiv.value = d ? (d.division_id||'') : ((APP.currentUser && (APP.currentUser.division_id || APP.currentUser.division)) || '');
+  /* Un utilisateur sans division rattachée (ou dont la division a disparu)
+     laisserait le select sur aucune valeur, donc sans caisse proposée. */
+  if (!selDiv.value && selDiv.options.length) selDiv.selectedIndex = 0;
+  reapRemplirCaisses();
+  if (d && d.caisse_id) document.getElementById('rea-caisse').value = d.caisse_id;
+  document.getElementById('rea-montant').value = d ? (d.montant_demande||0) : 0;
+  document.getElementById('rea-date-besoin').value = d ? (d.date_besoin||'') : today();
+  document.getElementById('rea-motif').value = d ? (d.motif||'') : '';
+  reapAfficherSolde();
+  openModal('modal-reappro');
+}
+
+async function reapSauver() {
+  var id = (document.getElementById('rea-id')||{}).value || '';
+  if (!exigerDroit('Caisse', id ? 'm' : 'c', 'une demande de réapprovisionnement')) return;
+  var divisionId = document.getElementById('rea-division').value || '';
+  var caisseId = document.getElementById('rea-caisse').value || '';
+  var montant = parseFloat(document.getElementById('rea-montant').value) || 0;
+  var motif = (document.getElementById('rea-motif').value || '').trim();
+  if (!divisionId || !caisseId) { toast('Division et caisse à réapprovisionner sont obligatoires.', 'error'); return; }
+  if (montant <= 0) { toast('Le montant demandé doit être supérieur à zéro.', 'error'); return; }
+  if (!motif) { toast('Le motif est obligatoire — c\'est lui que la hiérarchie lit pour décider.', 'error'); return; }
+
+  var existant = id ? (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }) : null;
+  if (existant && existant.statut !== 'brouillon') { toast('Seule une demande en brouillon peut être modifiée.', 'error'); return; }
+
+  var d = existant || { id: uid(), numero: reapGenererNumero(), statut: 'brouillon', created_at: new Date().toISOString() };
+  d.division_id = divisionId; d.caisse_id = caisseId;
+  d.montant_demande = montant; d.motif = motif;
+  d.date_besoin = document.getElementById('rea-date-besoin').value || '';
+  /* Solde figé à la demande : c'est la situation que le validateur doit
+     juger, pas celle — forcément différente — du jour de la validation. */
+  d.solde_constate = reapSoldeCaisse(caisseId);
+  d.demande_par = d.demande_par || ((APP.currentUser && APP.currentUser.nom) || '—');
+  d.demande_le = d.demande_le || new Date().toISOString();
+  d._modifie = new Date().toISOString();
+  if (!existant) DATA.demandes_reappro.push(d);
+  await dbPut('demandes_reappro', d);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_demandes_reappro', d);
+  closeModal('modal-reappro');
+  toast('💾 Demande ' + d.numero + ' enregistrée (brouillon) — soumettez-la pour validation.', 'success');
+  reapRender();
+}
+
+async function reapSoumettre(id) {
+  var d = (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }); if (!d) return;
+  if (d.statut !== 'brouillon') { toast('Seule une demande en brouillon peut être soumise.', 'error'); return; }
+  d.statut = 'soumise'; d.soumis_le = new Date().toISOString(); d._modifie = new Date().toISOString();
+  await dbPut('demandes_reappro', d);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_demandes_reappro', d);
+  toast('📤 Demande ' + d.numero + ' soumise pour validation.', 'success');
+  reapRender();
+}
+
+async function reapValider(id, montantAccorde) {
+  var d = (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }); if (!d) return;
+  if (!exigerDroit('Caisse', 'v', 'la validation de cette demande de réapprovisionnement')) return;
+  if (d.statut !== 'soumise') { toast('Seule une demande soumise peut être validée.', 'error'); return; }
+  var demande = parseFloat(d.montant_demande) || 0;
+  var montant = (montantAccorde === undefined || montantAccorde === null || montantAccorde === '') ? demande : parseFloat(montantAccorde);
+  if (!(montant > 0)) { toast('Le montant accordé doit être supérieur à zéro.', 'error'); return; }
+  /* Accorder plus que demandé contournerait le contrôle : le validateur
+     doit alors rejeter et faire refaire une demande au bon montant. */
+  if (montant > demande) { toast('Le montant accordé ne peut pas dépasser le montant demandé (' + fmtF(demande) + ' F).', 'error'); return; }
+  if (!exigerPlafond(montant, 'La validation de cette demande de réapprovisionnement')) return;
+  d.statut = 'validee'; d.montant_accorde = montant;
+  d.valide_par = (APP.currentUser&&APP.currentUser.nom)||'—'; d.valide_le = new Date().toISOString(); d._modifie = new Date().toISOString();
+  /* forceRole : le droit de CETTE action ('v') vient d'être exigé ci-dessus.
+     Le verrou générique de dbPut, lui, revérifie 'm' (modifier) — un
+     validateur habilité à valider mais pas à modifier verrait sa décision
+     rejetée en silence (dbPut résout false, personne ne lit ce retour). */
+  await dbPut('demandes_reappro', d, { forceRole: true });
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_demandes_reappro', d);
+  toast('✅ Demande ' + d.numero + ' validée pour ' + fmtF(montant) + ' F — reste à la servir pour que les fonds entrent en caisse.', 'success', 6000);
+  reapRender();
+}
+
+async function reapRejeter(id, motif) {
+  var d = (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }); if (!d) return;
+  if (!exigerDroit('Caisse', 'v', 'le rejet de cette demande de réapprovisionnement')) return;
+  if (d.statut !== 'soumise') { toast('Seule une demande soumise peut être rejetée.', 'error'); return; }
+  d.statut = 'rejetee'; d.motif_rejet = motif||'';
+  d.valide_par = (APP.currentUser&&APP.currentUser.nom)||'—'; d.valide_le = new Date().toISOString(); d._modifie = new Date().toISOString();
+  await dbPut('demandes_reappro', d, { forceRole: true }); /* droit 'v' déjà exigé — cf. reapValider */
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_demandes_reappro', d);
+  toast('❌ Demande ' + d.numero + ' rejetée.', 'info');
+  reapRender();
+}
+
+async function reapSupprimer(id) {
+  var d = (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }); if (!d) return;
+  if (d.statut !== 'brouillon') { toast('Seule une demande en brouillon peut être supprimée — rejetez-la sinon.', 'error'); return; }
+  if (!confirm('Supprimer la demande ' + d.numero + ' ?')) return;
+  await deleteRecord('demandes_reappro', id);
+  DATA.demandes_reappro = (DATA.demandes_reappro||[]).filter(function(x){ return x.id!==id; });
+  toast('Supprimée.', 'info');
+  reapRender();
+}
+
+/* Versement effectif : crée le bon d'entrée dans la caisse destinataire.
+   Exige une session ouverte ET opérable — un mouvement sans session n'a
+   pas de brouillard où atterrir, et une caisse tenue par quelqu'un d'autre
+   ne doit pas être mouvementée dans son dos. */
+async function reapServir(id) {
+  var d = (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }); if (!d) return;
+  if (!exigerDroit('Caisse', 'c', 'le versement de cette demande de réapprovisionnement')) return;
+  if (d.statut !== 'validee') { toast('Seule une demande validée peut être servie.', 'error'); return; }
+  var caisse = (DATA.caisses||[]).find(function(c){ return c.id === d.caisse_id; });
+  if (!caisse) { toast('Caisse introuvable — elle a peut-être été supprimée depuis la demande.', 'error'); return; }
+  var session = caisseGetSessionOuverte(d.caisse_id);
+  if (!session) { toast('🔒 La caisse « ' + (caisse.nom||'') + ' » est fermée — ouvrez-la avant de servir la demande.', 'error', 6000); return; }
+  if (typeof caisseSessionEstOperable === 'function' && !caisseSessionEstOperable(session)) {
+    toast('🔒 Cette caisse est actuellement tenue par un(e) autre utilisateur(rice).', 'error'); return;
+  }
+  var montant = parseFloat(d.montant_accorde) || 0;
+  if (!(montant > 0)) { toast('Montant accordé invalide.', 'error'); return; }
+  if (!confirm('Verser ' + fmtF(montant) + ' FCFA dans la caisse « ' + (caisse.nom||'') + ' » ?\n\nUn bon d\'entrée sera créé et suivra le circuit de validation habituel de la caisse.')) return;
+
+  var dat = today();
+  var numero = await caisseProchainNumero(d.caisse_id, 'entree', dat, caisse.compte);
+  var auteurNom = (APP.currentUser && APP.currentUser.nom) || '—';
+  var mvt = {
+    id: uid(), session_id: session.id, caisse_id: d.caisse_id,
+    date: dat + 'T' + new Date().toISOString().slice(11, 19), numero: numero,
+    type: 'entree', montant: montant,
+    motif: 'Réapprovisionnement ' + d.numero + (d.motif ? ' — ' + d.motif : ''),
+    beneficiaire: '', piece_ref: d.numero,
+    statut: 'a_ventiler', compte_ventile: null, ecriture_id: null,
+    ventile_par: null, ventile_le: null,
+    requiert_validation: true, valide: false, rejete: false,
+    plafond_demandeur: (typeof userPlafond === 'function') ? userPlafond() : Infinity,
+    demande_par: auteurNom, demande_role: (APP.currentUser && APP.currentUser.role) || '', demande_le: new Date().toISOString(),
+    reappro_id: d.id,
+    created_by: auteurNom, created_at: new Date().toISOString()
+  };
+  DATA.caisse_mouvements.push(mvt);
+  mvt._baseModifie = mvt._modifie || null;
+  await dbPut('caisse_mouvements', mvt);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
+
+  d.statut = 'servie'; d.mouvement_id = mvt.id;
+  d.servi_par = auteurNom; d.servi_le = new Date().toISOString(); d._modifie = new Date().toISOString();
+  /* forceRole : les fonds viennent d'entrer en caisse. Si ce passage à
+     « servie » échouait sur un contrôle de droit, la demande resterait
+     affichée « à servir » et pourrait être servie une seconde fois. */
+  await dbPut('demandes_reappro', d, { forceRole: true });
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_demandes_reappro', d);
+
+  toast('🏦 ' + fmtF(montant) + ' FCFA versés — bon d\'entrée ' + numero + ' créé, en attente de validation comme tout mouvement de caisse.', 'success', 7000);
+  reapRender();
+  if (typeof caisseRenderListe === 'function') caisseRenderListe();
+  if (typeof caisseRenderDashboard === 'function') caisseRenderDashboard();
+  if (typeof caisseRenderValidations === 'function') caisseRenderValidations();
+  if (typeof caisseNotifierValidation === 'function') caisseNotifierValidation(mvt, 'demande');
+}
+
+function reapRender() {
+  var box = document.getElementById('caisse-reappro-box'); if (!box) return;
+  var liste = (DATA.demandes_reappro||[]).slice().sort(function(a,b){
+    return (b.demande_le||b.created_at||'').localeCompare(a.demande_le||a.created_at||'');
+  });
+  var badge = document.getElementById('badge-tab-reappro');
+  var nbAction = liste.filter(function(d){ return d.statut==='soumise' || d.statut==='validee'; }).length;
+  if (badge) { badge.textContent = nbAction; badge.style.display = nbAction ? 'inline-block' : 'none'; }
+  if (!liste.length) {
+    box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune demande pour l\'instant — cliquez sur « ➕ Nouvelle demande » lorsqu\'une caisse de division doit être réapprovisionnée.</div>';
+    return;
+  }
+  var html = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>'
+    + '<th>N°</th><th>Division / Caisse</th><th style="text-align:right;">Demandé</th><th style="text-align:right;">Accordé</th>'
+    + '<th>Motif</th><th>Statut</th><th></th></tr></thead><tbody>';
+  liste.forEach(function(d){
+    var st = REAPPRO_STATUTS[d.statut] || { lib: d.statut||'', couleur:'var(--blanc-dim)' };
+    var caisse = (DATA.caisses||[]).find(function(c){ return c.id===d.caisse_id; });
+    var actions = '';
+    if (d.statut === 'brouillon') {
+      actions = '<button class="btn btn-secondary btn-sm btn-icon" title="Modifier" onclick="reapOuvrirModal(\''+d.id+'\')">✏️</button> '
+              + '<button class="btn btn-primary btn-sm" onclick="reapSoumettre(\''+d.id+'\')">📤 Soumettre</button> '
+              + '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer" onclick="reapSupprimer(\''+d.id+'\')">🗑</button>';
+    } else if (d.statut === 'soumise') {
+      actions = '<button class="btn btn-primary btn-sm" onclick="(function(){var m=prompt(\'Montant accordé (FCFA) :\', \''+(d.montant_demande||0)+'\');if(m!==null)reapValider(\''+d.id+'\', m);})()">✅ Valider</button> '
+              + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)reapRejeter(\''+d.id+'\', m);})()">❌ Rejeter</button>';
+    } else if (d.statut === 'validee') {
+      actions = '<button class="btn btn-primary btn-sm" onclick="reapServir(\''+d.id+'\')">🏦 Servir (entrée en caisse)</button>';
+    }
+    var detail = '';
+    if (d.statut === 'rejetee' && d.motif_rejet) detail = '<div style="font-size:10px;color:var(--rouge);">Motif : '+escHtml(d.motif_rejet)+'</div>';
+    else if (d.statut === 'servie') detail = '<div style="font-size:10px;color:var(--blanc-dim);">par '+escHtml(d.servi_par||'—')+' le '+dateShort(d.servi_le)+'</div>';
+    else if (d.statut === 'validee' || d.statut === 'rejetee') detail = '<div style="font-size:10px;color:var(--blanc-dim);">par '+escHtml(d.valide_par||'—')+'</div>';
+    html += '<tr>'
+      + '<td><b>'+escHtml(d.numero||'')+'</b><div style="font-size:10px;color:var(--blanc-dim);">'+escHtml(d.demande_par||'')+'</div></td>'
+      + '<td>'+escHtml(d.division_id ? _nomDivision(d.division_id) : '—')
+        + '<div style="font-size:10px;color:var(--blanc-dim);">'+escHtml(caisse ? (caisse.nom||'') : 'caisse supprimée')
+        + (d.solde_constate !== null && d.solde_constate !== undefined ? ' · solde constaté '+fmtF(d.solde_constate)+' F' : '')+'</div></td>'
+      + '<td style="text-align:right;font-weight:700;">'+fmtF(d.montant_demande)+' F</td>'
+      + '<td style="text-align:right;font-weight:700;">'+(d.montant_accorde ? fmtF(d.montant_accorde)+' F' : '—')+'</td>'
+      + '<td style="font-size:11px;max-width:240px;">'+escHtml(d.motif||'')+'</td>'
+      + '<td><span class="badge" style="color:'+st.couleur+';">'+st.lib+'</span>'+detail+'</td>'
+      + '<td style="white-space:nowrap;">'+actions+'</td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  box.innerHTML = html;
+}
+
 /* ── PIÈCES JUSTIFICATIVES DES MOUVEMENTS DE CAISSE ──────────────────
    Store 'documents' (entity_type 'caisse_mouvement'). La caissière joint
    les justificatifs au bon ; le comptable les consulte à la ventilation. */
@@ -128989,6 +129282,34 @@ goTo = function(page) {
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-caisse-transfert')">Annuler</button>
       <button class="btn btn-primary" onclick="caisseTransfererFonds()">🔄 Effectuer le transfert</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : demande de réapprovisionnement de fonds d'une caisse de division -->
+<div class="modal-overlay" id="modal-reappro">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="rea-titre">🏦 Demande de réapprovisionnement</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-reappro')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="rea-id">
+      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">
+        La demande est enregistrée en <strong>brouillon</strong>, puis soumise à la hiérarchie. Les fonds n'entrent en caisse qu'après validation, au moment où la demande est <strong>servie</strong>.
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Division *</label><select class="form-control" id="rea-division" onchange="reapRemplirCaisses()"></select></div>
+        <div class="form-group"><label>Caisse à réapprovisionner *</label><select class="form-control" id="rea-caisse" onchange="reapAfficherSolde()"></select></div>
+        <div class="form-group"><label>Montant demandé (FCFA) *</label><input type="number" class="form-control" id="rea-montant" value="0" min="0"></div>
+        <div class="form-group"><label>Date de besoin</label><input type="date" class="form-control" id="rea-date-besoin"></div>
+        <div class="form-group span-2"><label>Motif / justification *</label><textarea class="form-control" id="rea-motif" rows="3" placeholder="Ex : règlement des fournisseurs du chantier, caisse épuisée avant la fin du mois"></textarea></div>
+      </div>
+      <div id="rea-solde-actuel" style="font-size:12px;color:var(--blanc-dim);margin-top:6px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-reappro')">Annuler</button>
+      <button class="btn btn-primary" onclick="reapSauver()">💾 Enregistrer le brouillon</button>
     </div>
   </div>
 </div>
