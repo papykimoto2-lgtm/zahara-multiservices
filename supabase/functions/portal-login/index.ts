@@ -166,6 +166,14 @@ function identVariants(s: unknown): string[] {
 // Les tables correspondent une à une à celles que le portail interroge juste
 // après la connexion ; les champs d'identifiant reprennent ceux des
 // générateurs de code de l'ERP et des écrans de connexion du portail.
+// Un champ d'identifiant peut désigner une valeur imbriquée, notée en
+// pointillé : chez l'acquéreur foncier, le contact vit dans data.acheteur.tel
+// et non à la racine de la fiche. Oublier ce cas suffit à rendre tout un
+// espace inaccessible alors que le numéro figure bien au dossier.
+function lire(obj: any, chemin: string): unknown {
+  return chemin.split(".").reduce((o: any, k) => (o == null ? o : o[k]), obj);
+}
+
 const KINDS: Record<string, {
   table: string;
   identFields: string[];
@@ -174,11 +182,16 @@ const KINDS: Record<string, {
 }> = {
   souscripteur:    { table: "pi_clients",                  identFields: ["dossier", "tel", "email"],                  idClaim: "client_id" },
   apporteur:       { table: "pi_apporteurs",               identFields: ["email", "tel"],                             idClaim: "apporteur_id" },
-  foncier:         { table: "pi_cessions_foncieres",       identFields: ["dossier", "tel", "email"],                  idClaim: "cession_id" },
+  // L'identifiant remis à l'acquéreur est son n° de dossier (cf.
+  // genererCodeAcquereurFoncier), mais ses coordonnées vivent sous `acheteur`.
+  foncier:         { table: "pi_cessions_foncieres",       identFields: ["dossier", "acheteur.tel", "acheteur.email", "contact", "tel", "email"], idClaim: "cession_id" },
   mandant:         { table: "pi_proprietaires_bailleurs",  identFields: ["tel", "email"],                             idClaim: "proprietaire_id" },
   coproprietaire:  { table: "pi_lots_copro",               identFields: ["proprietaire_email", "proprietaire_tel"],   idClaim: "lot_id" },
-  partenaire_lot:  { table: "pi_partenaires_lot",          identFields: ["tel", "email"],                             idClaim: "partenaire_id" },
-  amenageur:       { table: "pi_amenageurs",               identFields: ["tel", "email"],                             idClaim: "amenageur_id" },
+  // whatsapp est un champ à part entière de la fiche partenaire, et c'est
+  // souvent le seul numéro qu'il connaisse. contact/telephone sont des alias
+  // défensifs : les deux instances n'ont pas la même ancienneté de données.
+  partenaire_lot:  { table: "pi_partenaires_lot",          identFields: ["tel", "whatsapp", "email", "contact", "telephone"], idClaim: "partenaire_id" },
+  amenageur:       { table: "pi_amenageurs",               identFields: ["tel", "email", "contact"],                  idClaim: "amenageur_id" },
   // L'écran « financier » du portail accepte « Nom / raison sociale,
   // téléphone ou email » : les quatre champs sont donc acceptés.
   financier:       { table: "pi_af_financiers",            identFields: ["nom", "raison_sociale", "tel", "email"],    idClaim: "financier_id" },
@@ -236,6 +249,7 @@ type Resolution = {
   parent_id: string;
   idClaim: string;
   nom: string;
+  nested: boolean;
   expiration: string | null;
 };
 
@@ -258,9 +272,10 @@ async function resolvePortalLogin(kind: string, ident: string, code: string): Pr
       if (!rec) continue;
       // On accepte n'importe lequel des identifiants présents sur la fiche :
       // l'acteur ne sait pas lequel on attend de lui.
-      const matches = cfg.identFields.some(
-        (f) => rec[f] && identVariants(rec[f]).some((v) => cibles.has(v)),
-      );
+      const matches = cfg.identFields.some((f) => {
+        const val = lire(rec, f);
+        return val && identVariants(val).some((v) => cibles.has(v));
+      });
       if (!matches) continue;
       if (!(await codeValide(rec, code))) continue;
 
@@ -270,6 +285,7 @@ async function resolvePortalLogin(kind: string, ident: string, code: string): Pr
         parent_id: String(parentId),
         idClaim: cfg.idClaim,
         nom: rec.nom ?? rec.raison_sociale ?? rec.proprietaire_nom ?? rec.acquereur ?? "",
+        nested: !!cfg.nested,
         expiration: rec.code_expiration ?? rec.date_expiration ?? null,
       };
     }
@@ -337,6 +353,10 @@ Deno.serve(async (req) => {
     // l'équivalent par profil pour les autres espaces.
     [res.idClaim]: res.id,
     parent_id: res.parent_id,
+    // Un propriétaire terrien peut figurer dans plusieurs opérations : c'est
+    // le couple (propriétaire, opération) qui identifie ses apports, d'où
+    // l'opération renvoyée à part.
+    ...(res.nested ? { operation_id: res.parent_id } : {}),
   });
 });
 
