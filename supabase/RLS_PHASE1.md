@@ -31,6 +31,32 @@ portail : les protéger n'a aucun effet sur lui. C'est le lot sûr.
 > premières sont **exposées au portail**, donc parmi les plus délicates. Les
 > commencer en premier, c'est prendre le risque maximal d'emblée.
 
+## État réel des bases, mesuré le 14/09/2026
+
+L'accès aux projets Supabase ayant été accordé, la classification ci-dessus
+peut être confrontée à la réalité :
+
+| | Zahara | Menco |
+|---|---|---|
+| Tables `pi_*` | 162 | 162 |
+| RLS activée | 162 | 162 |
+| Politique `anon` **sans aucune condition** | **162** | **162** |
+
+**La RLS est activée partout mais entièrement permissive.** La clé anon, qui
+figure en clair dans le portail public, donne un accès complet en lecture et
+en écriture à la totalité des tables — `pi_users` comprise, avec ses logins,
+ses hashs et ses sels.
+
+Cela infirme un point sur lequel je m'étais appuyé : je croyais, d'après un
+commentaire de l'ERP, que `pi_users` était déjà protégée et que le mécanisme
+jeton → politique → accès était donc éprouvé en production. Il ne l'est pas.
+Le pilote (`rls_02_pilote.sql`) n'est donc plus une simple précaution : c'est
+la première validation réelle du mécanisme.
+
+Le claim à exiger est en revanche connu et vérifié : **`app_role`**, présent
+dans les jetons de `staff-login` et absent de ceux du portail (voir
+`functions/staff-login/CONTRAT.md`).
+
 ## Ordre recommandé
 
 1. **Pilote** sur `pi_demandes_reappro` (`rls_02_pilote.sql`) — table sans

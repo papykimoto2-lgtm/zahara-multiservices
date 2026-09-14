@@ -9,10 +9,11 @@
 -- politique nouvelle.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- ── 1. La politique de référence ───────────────────────────────────────────
--- pi_users est déjà protégée et fonctionne : sa politique est le modèle à
--- répliquer. L'expression renvoyée dans « qual » contient littéralement le
--- claim exigé.
+-- ── 1. Politiques de pi_users ──────────────────────────────────────────────
+-- ⚠️ RÉSULTAT CONSTATÉ le 14/09/2026 sur les DEUX instances : deux politiques
+--    « anon_all » et « auth_all », toutes deux en qual=true. pi_users est donc
+--    OUVERTE à la clé anon, en lecture comme en écriture. Relancer cette
+--    requête sert désormais à vérifier que cela a changé.
 select policyname, roles, cmd, qual, with_check
 from pg_policies
 where schemaname = 'public' and tablename = 'pi_users'
