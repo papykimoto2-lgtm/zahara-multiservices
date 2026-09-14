@@ -29407,7 +29407,56 @@ function requireParamCompte(cle, libelle) {
   return val;
 }
 
-function openModal(id) { document.getElementById(id).classList.add('open'); }
+/* Empilement des modales.
+   Toutes les .modal-overlay partagent z-index:500 — à valeur égale, c'est
+   l'ordre du DOM qui tranche. Une modale déclarée PLUS HAUT dans le fichier
+   s'ouvrait donc DERRIÈRE celle qui l'appelait, inaccessible : cas vécu avec
+   le sélecteur « Plusieurs contours détectés » (déclaré ~ligne 17800), qui
+   disparaissait sous la fiche Parcelle (~ligne 20700) au moment précis où
+   l'utilisateur devait choisir son lot. On surélève toute modale ouverte
+   par-dessus une autre, sans toucher aux deux modales à z-index 9999
+   (aperçu d'impression, verrou de caisse) qui doivent rester au sommet. */
+var _MODAL_Z_BASE = 500, _MODAL_Z_MAX = 900, _modalZ = _MODAL_Z_BASE;
+function openModal(id) {
+  var el = document.getElementById(id); if (!el) return;
+  el.classList.add('open');
+  if (typeof _modalEmpiler === 'function') _modalEmpiler(el);   /* immédiat, sans attendre l'observateur */
+}
+
+/* Deux tiers des modales sont ouvertes en manipulant directement classList
+   (code historique : 66 appels) et ne passeraient donc pas par openModal().
+   Plutôt que de réécrire ces appels un par un — et d'avoir à y penser à chaque
+   ajout futur — un observateur applique la règle d'empilement à TOUTE
+   .modal-overlay qui reçoit la classe 'open'. Sans cela, une modale déclarée
+   haut dans le fichier s'ouvre derrière celle qui l'appelle : c'était le cas
+   du sélecteur de contour DXF sous la fiche Parcelle, et cela reste vrai pour
+   modal-rect (déclarée ligne ~5580) sous n'importe quelle fiche.
+   Les deux modales à z-index 9999 (aperçu d'impression, verrou de caisse)
+   sont laissées intactes : elles doivent rester au sommet. */
+function _modalEmpiler(el){
+  if (!el || !el.classList || !el.classList.contains('modal-overlay')) return;
+  if (el.classList.contains('open')) {
+    if (el.dataset.zStack) return;
+    if (el.style.zIndex && +el.style.zIndex > _MODAL_Z_MAX) return;
+    var autreOuverte = false;
+    var ouvertes = document.querySelectorAll('.modal-overlay.open');
+    for (var i = 0; i < ouvertes.length; i++) { if (ouvertes[i] !== el) { autreOuverte = true; break; } }
+    if (!autreOuverte) return;
+    _modalZ = Math.min(_modalZ + 10, _MODAL_Z_MAX);
+    el.style.zIndex = _modalZ;
+    el.dataset.zStack = '1';
+  } else if (el.dataset.zStack) {
+    el.style.zIndex = '';
+    delete el.dataset.zStack;
+    if (!document.querySelector('.modal-overlay.open')) _modalZ = _MODAL_Z_BASE;
+  }
+}
+(function _empilementModales(){
+  if (typeof MutationObserver !== 'function') return;
+  new MutationObserver(function(muts){
+    for (var i = 0; i < muts.length; i++) _modalEmpiler(muts[i].target);
+  }).observe(document.documentElement, { attributes:true, attributeFilter:['class'], subtree:true });
+})();
 
 /* Onglets de l'aide « Hiérarchie foncière » */
 function fhTab(name) {
@@ -29700,8 +29749,21 @@ function openFlux(key) {
 }
 if (typeof window !== 'undefined') { window.fluxTab = fluxTab; window.openFlux = openFlux; }
 function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-  APP.editingId = null;
+  var el = document.getElementById(id); if (!el) return;
+  el.classList.remove('open');
+  el.style.zIndex = '';
+  /* [FIX doublon de fiche] APP.editingId était remis à null à CHAQUE fermeture,
+     y compris celle d'une sous-modale ouverte par-dessus une fiche en cours
+     d'édition. Enchaînement vécu : fiche Parcelle ouverte (editingId posé) →
+     import DXF à plusieurs contours → choix d'un contour → fermeture du
+     sélecteur → editingId perdu → « Enregistrer » créait une PARCELLE EN
+     DOUBLON au lieu de mettre à jour celle qu'on éditait, le bornage importé
+     atterrissant sur la copie. Le contexte d'édition n'est donc libéré que
+     lorsque plus aucune modale n'est ouverte. */
+  if (!document.querySelector('.modal-overlay.open')) {
+    _modalZ = _MODAL_Z_BASE;
+    APP.editingId = null;
+  }
 }
 
 /* ──────────────────────────────────────────────────────
