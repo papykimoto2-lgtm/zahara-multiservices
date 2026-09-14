@@ -4921,7 +4921,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <button type="button" class="btn btn-primary btn-sm" onclick="pmAjouterVideo()">✅ Publier la vidéo</button>
             <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('pm-video-form').style.display='none'">Annuler</button>
           </div>
-          <div style="font-size:11px;color:#6B6B9A;margin-top:8px;">Les photos sont compressées automatiquement. Documents : PDF recommandé (max ~4 Mo). Vidéo téléversée : fichier stocké directement dans l'application (max 25 Mo, formats MP4/WebM/OGG/MOV) — pour des vidéos plus longues ou plus lourdes, préférez le lien YouTube/Vimeo.</div>
+          <div style="font-size:11px;color:#6B6B9A;margin-top:8px;">Les photos sont compressées automatiquement (jusqu'à 100 Mo par image en entrée — ramenée à 1600 px pour la publication). Documents : PDF recommandé (max 5 Mo, stocké tel quel sans compression). Vidéo téléversée : fichier stocké directement dans l'application (max 25 Mo, formats MP4/WebM/OGG/MOV) — pour des vidéos plus longues ou plus lourdes, préférez le lien YouTube/Vimeo.</div>
         </div>
 
         <div class="card">
@@ -74230,9 +74230,18 @@ async function pmAjouterPhotos(input){
   var nbOk = 0, nbEchec = 0;
   for(var k=0;k<files.length;k++){
     var f=files[k];
-    if(f.size > 6*1024*1024){ toast('❌ '+f.name+' dépasse 6 Mo.','error'); continue; }
-    var dataUrl = await new Promise(function(res){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.readAsDataURL(f); });
-    var compressed = await _compressImage(dataUrl, 1600, 0.7);
+    /* Plafond porté de 6 à 100 Mo : la limite portait sur le fichier ENTRANT
+       alors que la photo publiée est de toute façon ramenée à 1600 px — un
+       cliché de téléphone récent (48 Mpx, 20 à 30 Mo) ou un scan haute
+       définition était refusé sans raison. La compression part maintenant du
+       fichier lui-même, sans data-URL intermédiaire, sans quoi 100 Mo
+       feraient 133 Mo de chaîne en mémoire avant le moindre traitement. */
+    if(f.size > 100*1024*1024){ toast('❌ '+f.name+' dépasse 100 Mo.','error'); continue; }
+    var compressed = await _compressImageFichier(f, 1600, 0.7);
+    /* Garde-fou base : la photo voyage en base64 dans une ligne Postgres.
+       Au-delà de 3 Mo après compression (image très texturée), on repasse en
+       1200 px / qualité 0,6 plutôt que d'alourdir la synchronisation. */
+    if (compressed.length > 3*1024*1024) compressed = await _compressImageFichier(f, 1200, 0.6);
     var media = Object.assign({ id: uid(), type:'photo', categorie:cat, titre: titre || f.name.replace(/\.[^.]+$/,''), commentaire:(document.getElementById('pm-commentaire')||{}).value||'' }, pmRefCourant(), { data:compressed, mime:'image/jpeg', taille:Math.round(compressed.length*3/4), visible:true, date:new Date().toISOString() });
     DATA.portail_medias.push(media);
     await dbPut('portail_medias', media);
@@ -91976,6 +91985,52 @@ function rchTraiterPhotos(files) {
 
 /* Compresse/redimensionne une image (dataURL) : max maxDim px, JPEG qualité donnée.
    Réduit fortement le poids (souvent ×10-20) pour alléger la base et la synchro cloud. */
+/* Compression directement depuis le fichier, sans base64 intermédiaire.
+   _compressImage() exige une data-URL : pour une photo de 100 Mo cela veut
+   dire une chaîne de ~133 Mo en mémoire AVANT même de commencer à réduire
+   l'image — un onglet mobile n'y survit pas. createImageBitmap() décode le
+   fichier tel quel ; on retombe sur une URL d'objet, puis sur l'ancien
+   chemin, si le navigateur ne le propose pas. */
+async function _compressImageFichier(file, maxDim, quality) {
+  function versCanvas(source, largeur, hauteur) {
+    var w = largeur, h = hauteur;
+    if (w > maxDim || h > maxDim) {
+      if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+      else { w = Math.round(w * maxDim / h); h = maxDim; }
+    }
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(source, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', quality || 0.7);
+  }
+  if (typeof createImageBitmap === 'function') {
+    var bmp = null;
+    try {
+      bmp = await createImageBitmap(file);
+      var out = versCanvas(bmp, bmp.width, bmp.height);
+      bmp.close && bmp.close();
+      return out;
+    } catch (e) { if (bmp && bmp.close) bmp.close(); }
+  }
+  var url = null;
+  try {
+    url = URL.createObjectURL(file);
+    var res = await new Promise(function(resolve, reject) {
+      var img = new Image();
+      img.onload = function(){ try { resolve(versCanvas(img, img.width, img.height)); } catch(e){ reject(e); } };
+      img.onerror = reject;
+      img.src = url;
+    });
+    return res;
+  } catch (e) {
+    /* dernier recours : l'ancien chemin, réservé de fait aux petits fichiers */
+    var dataUrl = await new Promise(function(res2){ var r = new FileReader(); r.onload = function(ev){ res2(ev.target.result); }; r.readAsDataURL(file); });
+    return _compressImage(dataUrl, maxDim, quality);
+  } finally {
+    if (url) URL.revokeObjectURL(url);
+  }
+}
+
 function _compressImage(dataUrl, maxDim, quality) {
   return new Promise(function(resolve){
     try {
