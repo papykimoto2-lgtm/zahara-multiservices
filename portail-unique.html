@@ -3174,6 +3174,8 @@
       return { type:'lot', idx:i, nom:'Lot '+(l.numero||l.id)+(l.ilot?(' — îlot '+l.ilot):''),
                lat:c[0], lng:c[1], polygone:poly, flou:false, statut:st, dispo:st.lib,
                prix:l.prix, surf:l.superficie, nature:l.nature,
+               numero:l.numero, ilot:l.ilot, typeLot:l.type, pieces:l.pieces,
+               nbBornes:Number(l.nb_bornes)||0,
                estimee:!!l.position_estimee, brut:l };
     }).filter(Boolean);
   }
@@ -3335,6 +3337,16 @@
           +(p.surf>=10000?(' ('+(p.surf/10000).toFixed(2)+' ha)'):'')+'</div>':'')
         +(p.nature?'<div style="font-size:.76rem;color:#4b6a8b;">'+esc(p.nature)+'</div>':'')
         +(p.affectation?'<div style="font-size:.76rem;color:#4b6a8b;">'+esc(p.affectation)+'</div>':'')
+        /* Caracteristiques techniques : elles etaient publiees par la vue mais
+           n'apparaissaient nulle part dans la fiche. Un lot borne l'indique —
+           c'est ce qui distingue un terrain leve par un geometre d'un
+           emplacement approximatif. */
+        +((p.numero||p.ilot||p.typeLot||p.pieces)?('<div style="font-size:.76rem;color:#4b6a8b;margin-top:4px;">'
+           +[ p.numero?('Lot n° '+esc(p.numero)):'', p.ilot?('îlot '+esc(p.ilot)):'',
+              p.typeLot?esc(p.typeLot):'', p.pieces?(esc(p.pieces)+' pièces'):'' ].filter(Boolean).join(' · ')
+           +'</div>'):'')
+        +(p.polygone?('<div style="font-size:.72rem;color:#16a34a;margin-top:4px;">📐 Terrain borné — contour issu du plan de masse'
+           +(p.nbBornes?(', '+p.nbBornes+' bornes'):'')+'</div>'):'')
         +(p.prix?'<div style="margin-top:6px;font-size:.9rem;">Prix : <strong style="color:#0f4c81;">'+fmt(p.prix)+' F</strong>'
           +(p.surf?('<span style="font-size:.72rem;color:#4b6a8b;"> · '+fmt(Math.round(p.prix/p.surf))+' F/m²</span>'):'')+'</div>':'')
         +'<div style="margin-top:7px;"><span class="pill '+(dispo?'p-vert':(p.statut.cle==='reserve'?'p-or':'p-bleu'))+'">'+esc(p.statut.lib)+'</span></div>'
