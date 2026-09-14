@@ -4921,7 +4921,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <button type="button" class="btn btn-primary btn-sm" onclick="pmAjouterVideo()">✅ Publier la vidéo</button>
             <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('pm-video-form').style.display='none'">Annuler</button>
           </div>
-          <div style="font-size:11px;color:#6B6B9A;margin-top:8px;">Les photos sont compressées automatiquement (jusqu'à 100 Mo par image en entrée — ramenée à 1600 px pour la publication). Documents : PDF recommandé (max 5 Mo, stocké tel quel sans compression). Vidéo téléversée : fichier stocké directement dans l'application (max 25 Mo, formats MP4/WebM/OGG/MOV) — pour des vidéos plus longues ou plus lourdes, préférez le lien YouTube/Vimeo.</div>
+          <div style="font-size:11px;color:#6B6B9A;margin-top:8px;">Les photos sont compressées automatiquement (jusqu'à 100 Mo par image en entrée — ramenée à 1600 px pour la publication). Documents : PDF recommandé (max 100 Mo). Vidéo téléversée : fichier stocké directement dans l'application (max 100 Mo, formats MP4/WebM/OGG/MOV) — pour des vidéos plus longues ou plus lourdes, préférez le lien YouTube/Vimeo.</div>
         </div>
 
         <div class="card">
@@ -19614,7 +19614,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <div style="margin:10px 0;">
           <input type="file" id="lb-photo-upload" accept="image/*" multiple style="display:none;" onchange="lbAjouterPhotos(this)">
           <button class="btn btn-secondary btn-sm" onclick="document.getElementById('lb-photo-upload').click()">📁 Ajouter des photos</button>
-          <span style="font-size:11px;color:var(--dim);margin-left:8px;">Compressées automatiquement · max 6 Mo/photo avant compression</span>
+          <span style="font-size:11px;color:var(--dim);margin-left:8px;">Compressées automatiquement · max 100 Mo/photo avant compression</span>
         </div>
         <div id="lb-photos-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;"></div>
       </div>
@@ -20447,7 +20447,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <div id="emp-dossier-save-notice" style="display:none;padding:10px;background:rgba(184,115,51,0.1);border-left:3px solid var(--or);border-radius:4px;margin-bottom:14px;font-size:13px;color:var(--or);">
           ⚠️ Enregistrez d'abord la fiche employé (onglet Identité) avant de téléverser les pièces du dossier.
         </div>
-        <div style="color:var(--blanc-dim);font-size:13px;margin-bottom:14px;">Pièces constitutives du dossier du personnel. Formats acceptés : PDF, JPG, PNG (10 Mo max par pièce).</div>
+        <div style="color:var(--blanc-dim);font-size:13px;margin-bottom:14px;">Pièces constitutives du dossier du personnel. Formats acceptés : PDF, JPG, PNG (100 Mo max par pièce).</div>
         <input type="file" id="emp-doc-file-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="handleEmpDocFileSelected(this)">
         <div id="emp-dossier-list"></div>
       </div>
@@ -21145,7 +21145,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <span class="jur-upload-icon">📁</span>
         <div class="jur-upload-label">
           <strong>Cliquer pour uploader</strong> ou glisser-déposer<br>
-          <span style="font-size:11px;">PDF, Images (JPG/PNG), Word, Excel, ZIP — max 10 Mo/fichier</span>
+          <span style="font-size:11px;">PDF, Images (JPG/PNG), Word, Excel, ZIP — max 100 Mo/fichier</span>
         </div>
         <div class="jur-upload-progress" id="jur-upload-progress">
           <div class="jur-upload-progress-fill" id="jur-upload-progress-fill" style="width:0%"></div>
@@ -22360,7 +22360,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
       <!-- ── ONGLET VUES & ANGLES ── -->
       <div id="modal-plantab-vues" class="plan-modal-pane" style="display:none;">
         <div class="alert alert-info" style="margin-bottom:14px;">
-          📐 Uploadez les plans sous différents angles et coupes. Formats acceptés : PNG, JPG, PDF, DWG, SVG — max 5 Mo par fichier.
+          📐 Uploadez les plans sous différents angles et coupes. Formats acceptés : PNG, JPG, PDF, DWG, SVG — max 100 Mo par fichier.
         </div>
 
         <!-- Zone drop globale -->
@@ -22399,7 +22399,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </button>
           <input type="file" id="plan-doc-input" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.zip"
             style="display:none;" onchange="planAjouterDoc(this)">
-          <span style="font-size:11px;color:var(--dim);">PDF, Word, Excel, ZIP — max 10 Mo</span>
+          <span style="font-size:11px;color:var(--dim);">PDF, Word, Excel, ZIP — max 100 Mo</span>
         </div>
       </div>
 
@@ -22649,7 +22649,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="plan-dropzone-inner">
             <div style="font-size:36px;margin-bottom:8px;">📸</div>
             <div style="font-weight:700;font-size:14px;">Glisser des photos ici</div>
-            <div style="font-size:12px;color:var(--dim);margin:4px 0 12px;">JPG, PNG, HEIC — max 5 Mo par photo</div>
+            <div style="font-size:12px;color:var(--dim);margin:4px 0 12px;">JPG, PNG, HEIC — max 100 Mo par photo</div>
             <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
               <label for="rch-photo-input" class="btn btn-primary btn-sm"
                 style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;margin:0;">
@@ -22689,7 +22689,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <!-- [AJOUT — revue photo/vidéo] Vidéos du rapport, même gabarit que le module lotissement (plr*) -->
         <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
           <button type="button" class="btn btn-secondary btn-sm" onclick="rchOuvrirVideo()">🔗 Vidéo (YouTube/Vimeo/lien)</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="rchOuvrirVideoFichier()">📤 Vidéo (fichier, max 25 Mo)</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="rchOuvrirVideoFichier()">📤 Vidéo (fichier, max 100 Mo)</button>
           <input type="file" id="rch-input-video" accept="video/mp4,video/webm,video/ogg,video/quicktime" style="display:none;" onchange="rchAjouterVideoFichier(this)">
         </div>
         <div id="rch-video-form" style="display:none;margin-top:10px;padding:12px;border:1px dashed #B87333;border-radius:10px;">
@@ -23387,7 +23387,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div style="display:flex;gap:8px;align-items:center;">
             <button class="btn btn-secondary btn-sm" onclick="document.getElementById('modal-msg-file').click()">📎 Joindre fichier</button>
             <input type="file" id="modal-msg-file" multiple style="display:none;" onchange="msgModalAjouterFichiers(this)">
-            <span style="font-size:11px;color:var(--dim);">max 5 Mo par fichier</span>
+            <span style="font-size:11px;color:var(--dim);">max 100 Mo par fichier</span>
           </div>
           <div id="modal-msg-attach-list" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;"></div>
         </div>
@@ -45162,7 +45162,7 @@ function handleLogoUpload(event) {
 
   var maxSize = 2 * 1024 * 1024; // 2 Mo max
   if (file.size > maxSize) {
-    toast('Logo trop lourd (max 2 Mo). Compressez l\'image.', 'error');
+    toast('Logo trop lourd (max 100 Mo). Compressez l\'image.', 'error');
     return;
   }
 
@@ -45284,7 +45284,7 @@ function handlePortailLogoUpload(event) {
   if (!file) return;
   var maxSize = 2 * 1024 * 1024; // 2 Mo max
   if (file.size > maxSize) {
-    toast('Logo trop lourd (max 2 Mo). Compressez l\'image.', 'error');
+    toast('Logo trop lourd (max 100 Mo). Compressez l\'image.', 'error');
     return;
   }
   var reader = new FileReader();
@@ -45330,7 +45330,7 @@ function handlePortailHeroUpload(event) {
   if (!file) return;
   var maxSize = 3 * 1024 * 1024; // 3 Mo max
   if (file.size > maxSize) {
-    toast('Image trop lourde (max 3 Mo). Compressez l\'image.', 'error');
+    toast('Image trop lourde (max 100 Mo). Compressez l\'image.', 'error');
     return;
   }
   var reader = new FileReader();
@@ -50961,7 +50961,7 @@ function triggerEmpDocUpload(code) {
 function handleEmpDocFileSelected(input) {
   var file = input.files[0];
   if (!file) return;
-  if (file.size > 10 * 1024 * 1024) { toast('Fichier trop volumineux (max 10 Mo).', 'error'); input.value = ''; return; }
+  if (file.size > 100 * 1024 * 1024) { toast('Fichier trop volumineux (max 100 Mo).', 'error'); input.value = ''; return; }
   var cat = _pendingEmpDocCat;
   var label = (EMP_DOC_TYPES.find(function(t) { return t.code === cat; }) || {}).label || cat;
   var empId = APP.editingId;
@@ -51411,7 +51411,7 @@ function handleDivisionLogoUpload(event) {
   if (!file) return;
   var maxSize = 2 * 1024 * 1024; // 2 Mo max
   if (file.size > maxSize) {
-    toast('Logo trop lourd (max 2 Mo). Compressez l\'image.', 'error');
+    toast('Logo trop lourd (max 100 Mo). Compressez l\'image.', 'error');
     return;
   }
   var reader = new FileReader();
@@ -60780,7 +60780,7 @@ async function sigParcelleSave(){
 function sigOrthoTrigger(){ var i=document.getElementById('sig-ortho-file'); if(i){i.value='';i.click();} }
 function sigOrthoFile(input){
   var f=input.files&&input.files[0]; if(!f) return;
-  if(f.size>15*1024*1024){ toast('Image trop lourde (max 15 Mo).','error'); return; }
+  if(f.size>100*1024*1024){ toast('Image trop lourde (max 100 Mo).','error'); return; }
   var r=new FileReader();
   r.onload=function(e){
     var c=_sig.map?_sig.map.getCenter():{lat:5.35,lng:-4.02};
@@ -69029,7 +69029,7 @@ async function lbAjouterPhotos(input){
   var files=Array.from(input.files||[]).filter(function(f){return f.type.indexOf('image/')===0;});
   for(var k=0;k<files.length;k++){
     var f=files[k];
-    if(f.size>6*1024*1024){ toast('❌ '+f.name+' dépasse 6 Mo.','error'); continue; }
+    if(f.size>100*1024*1024){ toast('❌ '+f.name+' dépasse 6 Mo.','error'); continue; }
     var dataUrl=await new Promise(function(res){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.readAsDataURL(f); });
     var compressed=await _compressImage(dataUrl,1600,0.7);
     _lbPhotos.push({ id:uid(), data:compressed, legende:f.name.replace(/\.[^.]+$/,'') });
@@ -74260,7 +74260,7 @@ async function pmAjouterDocument(input){
   var titre = (document.getElementById('pm-titre')||{}).value || '';
   var f = (input.files||[])[0];
   if(!f){ return; }
-  if(f.size > 5*1024*1024){ toast('❌ Document trop lourd (max 5 Mo).','error'); input.value=''; return; }
+  if(f.size > 100*1024*1024){ toast('❌ Document trop lourd (max 100 Mo).','error'); input.value=''; return; }
   var dataUrl = await new Promise(function(res){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.readAsDataURL(f); });
   var media = Object.assign({ id: uid(), type:'document', categorie:'document', titre: titre || f.name, commentaire:(document.getElementById('pm-commentaire')||{}).value||'' }, pmRefCourant(), { data:dataUrl, mime:f.type||'application/pdf', nom:f.name, taille:f.size, visible:true, date:new Date().toISOString() });
   DATA.portail_medias.push(media);
@@ -74404,13 +74404,69 @@ async function pmMediaVersStorage(media){
   }
   return clone;
 }
+/* ══════════════════════════════════════════════════════════════════
+   PIÈCES JOINTES VOLUMINEUSES → STORAGE
+   Les documents (GED, pièces du personnel, plans, factures fournisseurs…)
+   partaient intégralement en base64 dans une ligne Postgres : un PDF de
+   10 Mo y occupait 13 Mo, rechargé à chaque synchronisation. C'est ce qui
+   imposait les plafonds de 5 à 10 Mo, indépendamment de toute contrainte
+   métier. Le relais écrit pour les médias du portail est donc généralisé :
+   le fichier va dans Storage, la ligne ne conserve que son URL. Le base64
+   reste en local (IndexedDB) pour la consultation hors ligne.
+   Repli inchangé : si Storage refuse, on renvoie le base64 comme avant.
+══════════════════════════════════════════════════════════════════ */
+var DOC_BUCKET = 'documents';
+async function docUploadFichier(doc){
+  if (!SB.url || !SB.key || !doc || !doc.data) return null;
+  var nom = String(doc.nom || doc.titre || 'piece').replace(/[^\w.\-]+/g, '_').slice(-80);
+  var path = (doc.entity_type || doc.categorie || 'general') + '/' + (doc.id || uid()) + '_' + nom;
+  var resp = await fetch(SB.url + '/storage/v1/object/' + DOC_BUCKET + '/' + encodeURI(path), {
+    method: 'POST',
+    headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + sbAuth(),
+               'Content-Type': doc.mime || doc.type_mime || 'application/octet-stream', 'x-upsert': 'true' },
+    body: _b64ToBytes(doc.data)
+  });
+  if (!resp.ok) throw new Error('upload ' + resp.status);
+  return path;
+}
+async function docVersStorage(doc){
+  var clone = JSON.parse(JSON.stringify(doc));
+  if (doc.data && SB.url && SB.key) {
+    var path = await docUploadFichier(doc);
+    if (path) {
+      clone.path = path; clone.bucket = DOC_BUCKET;
+      delete clone.data;   /* cloud : chemin seul, jamais le base64 */
+    }
+  }
+  return clone;
+}
+/* Ouverture d'une pièce dont le cloud ne détient que le chemin : URL signée,
+   valable une heure, car le bucket « documents » n'est pas public. */
+async function docUrlSignee(doc){
+  if (doc && doc.data) return doc.data;
+  if (!doc || !doc.path || !SB.url || !SB.key) return null;
+  try {
+    var r = await fetch(SB.url + '/storage/v1/object/sign/' + (doc.bucket || DOC_BUCKET) + '/' + encodeURI(doc.path), {
+      method: 'POST',
+      headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + sbAuth(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: 3600 })
+    });
+    if (!r.ok) return null;
+    var j = await r.json();
+    return SB.url + '/storage/v1' + (j.signedURL || j.signedUrl || '');
+  } catch(e) { return null; }
+}
+
 (function(){
   if (typeof syncToSupabase !== 'function') return;
   var _origSyncPM = syncToSupabase;
+  /* Tables dont la colonne `data` porte un fichier complet. */
+  var TABLES_FICHIERS = { 'pi_portail_medias':'media', 'pi_documents':'doc' };
   syncToSupabase = async function(table, obj, opts){
-    if (table === 'pi_portail_medias' && obj && obj.data && SB.url && SB.key) {
+    var genre = TABLES_FICHIERS[table];
+    if (genre && obj && obj.data && SB.url && SB.key) {
       try {
-        var cloud = await pmMediaVersStorage(obj);
+        var cloud = (genre === 'media') ? await pmMediaVersStorage(obj) : await docVersStorage(obj);
         return await _origSyncPM.call(this, table, cloud, opts);
       } catch(e) { /* échec upload → repli base64 intégral vers le cloud */ }
     }
@@ -77456,7 +77512,7 @@ var _sigLineWidth = 2.5;
       téléverseur demande donc explicitement la portée de visibilité. */
 function uploadDocumentForEntity(entity_type, entity_id, file, typeLabel) {
   if (!file) return;
-  if (file.size > 10 * 1024 * 1024) { toast('Fichier trop volumineux (max 10 MB).', 'error'); return; }
+  if (file.size > 100 * 1024 * 1024) { toast('Fichier trop volumineux (max 10 MB).', 'error'); return; }
   var description = typeLabel || (prompt('Description du document (optionnel) :', file.name.replace(/\.[^.]+$/, '')) || '');
   var visiblePortail = false, conditionPortail = 'immediat';
   if (entity_type === 'client' || entity_type === 'programme' || entity_type === 'cession' || entity_type === 'financier') {
@@ -78054,7 +78110,7 @@ async function confirmerUploadGlobal() {
   var entity_type = document.getElementById('upload-doc-entity-type').value;
   var entity_id   = document.getElementById('upload-doc-entity-id').value.trim() || 'global';
   var description = document.getElementById('upload-doc-description').value.trim();
-  if (file.size > 10*1024*1024) { toast('Fichier trop volumineux (max 10 MB).','error'); return; }
+  if (file.size > 100*1024*1024) { toast('Fichier trop volumineux (max 10 MB).','error'); return; }
   var reader = new FileReader();
   reader.onload = async function(e) {
     var doc = { id:uid(), entity_type:entity_type, entity_id:entity_id, name:file.name, type:file.type, size:file.size, blob:e.target.result, upload_date:today(), description:description };
@@ -100582,7 +100638,7 @@ function afTriggerDocUpload(stage){
 
 function afHandleDocFile(input){
   var file = input.files && input.files[0]; if(!file) return;
-  if (file.size > 10*1024*1024){ toast('Fichier trop volumineux (max 10 Mo).','error'); input.value=''; return; }
+  if (file.size > 100*1024*1024){ toast('Fichier trop volumineux (max 100 Mo).','error'); input.value=''; return; }
   var stage = _afPendingDocStage;
   var r = new FileReader();
   r.onload = async function(e){
@@ -118218,7 +118274,7 @@ function qrSvgTag(text){
   window.archiPhotoChargee = function(input) {
     var f = input.files && input.files[0];
     if (!f) return;
-    if (f.size > 15 * 1024 * 1024) { if (window.toast) toast('Image trop lourde (max 15 Mo).', 'error'); return; }
+    if (f.size > 100 * 1024 * 1024) { if (window.toast) toast('Image trop lourde (max 100 Mo).', 'error'); return; }
     var reader = new FileReader();
     reader.onload = function(e) {
       var img = new Image();
@@ -121420,7 +121476,7 @@ async function facAttenteAjouterDocument(input) {
   var fichiers = Array.from(input.files || []);
   for (var i = 0; i < fichiers.length; i++) {
     var f = fichiers[i];
-    if (f.size > 5*1024*1024) { toast('❌ « ' + f.name + ' » dépasse 5 Mo — ignoré.', 'error'); continue; }
+    if (f.size > 100*1024*1024) { toast('❌ « ' + f.name + ' » dépasse 5 Mo — ignoré.', 'error'); continue; }
     var dataUrl = await new Promise(function(res){ var r = new FileReader(); r.onload = function(e){ res(e.target.result); }; r.readAsDataURL(f); });
     _faDocuments.push({ id: uid(), nom: f.name, mime: f.type || 'application/octet-stream', taille: f.size, data: dataUrl });
   }
@@ -123702,7 +123758,7 @@ async function cbLoadDocsFor(mvtId){
 function cbTriggerDocUpload(){ var inp=document.getElementById('cb-doc-file-input'); if(inp){ inp.value=''; inp.click(); } }
 function cbHandleDocFile(input){
   var f=input.files&&input.files[0]; if(!f) return;
-  if (f.size>10*1024*1024){ toast('Fichier trop volumineux (max 10 Mo).','error'); input.value=''; return; }
+  if (f.size>100*1024*1024){ toast('Fichier trop volumineux (max 100 Mo).','error'); input.value=''; return; }
   var r=new FileReader();
   r.onload=function(e){ _cbDocs.push({ _pending:true, id:uid(), name:f.name, type:f.type||'application/octet-stream', size:f.size, blob:e.target.result, upload_date:today() }); cbRenderDocs(); input.value=''; };
   r.readAsDataURL(f);
@@ -127698,7 +127754,7 @@ async function plrAjouterPhotos(input) {
   var files = Array.from(input.files||[]).filter(function(f){ return f.type.indexOf('image/')===0; });
   for (var k=0;k<files.length;k++) {
     var f = files[k];
-    if (f.size > 6*1024*1024) { toast('❌ '+f.name+' dépasse 6 Mo.', 'error'); continue; }
+    if (f.size > 100*1024*1024) { toast('❌ '+f.name+' dépasse 6 Mo.', 'error'); continue; }
     var dataUrl = await new Promise(function(res){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.readAsDataURL(f); });
     var compressed = await _compressImage(dataUrl, 1600, 0.7);
     PLR_STATE.photos.push({ id:uid(), data:compressed, legende:f.name.replace(/\.[^.]+$/,''), visible:true });
@@ -127729,7 +127785,7 @@ function plrAjouterVideoLien() {
 async function plrAjouterVideoFichier(input) {
   var f = (input.files||[])[0];
   if (!f) return;
-  if (f.size > 25*1024*1024) { toast('❌ Vidéo trop lourde (max 25 Mo). Utilisez un lien YouTube/Vimeo.', 'error'); input.value=''; return; }
+  if (f.size > 100*1024*1024) { toast('❌ Vidéo trop lourde (max 100 Mo). Utilisez un lien YouTube/Vimeo.', 'error'); input.value=''; return; }
   toast('⏳ Téléversement de la vidéo…', 'info');
   var dataUrl = await new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(e){res(e.target.result);}; r.onerror=function(){rej();}; r.readAsDataURL(f); });
   PLR_STATE.videos.push({ id:uid(), provider:'upload', video_id:'', url:'', data:dataUrl, mime:f.type||'video/mp4', legende:f.name, visible:true });
