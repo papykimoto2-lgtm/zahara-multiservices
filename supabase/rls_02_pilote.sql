@@ -1,31 +1,28 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- RLS — ÉTAPE 2 : PILOTE SUR UNE SEULE TABLE
 --
--- ✅ APPLIQUÉ SUR ZAHARA le 15/09/2026, via le connecteur Supabase MCP,
---    sur le projet izgpvhwhbrgeagjfhfli (confirmé être la base de production
---    réelle : programmes MAPHOUET 3 etc., 409 clients).
---    Migrations : create_pi_demandes_reappro, puis rls_pilote_demandes_reappro.
---    État vérifié après application :
+-- ✅ APPLIQUÉ SUR ZAHARA (ilvusckdanwrckxqvhmr, projet « Zahara Multi
+--    service ») le 14/09/2026, comme l'affirmait la version originale de ce
+--    commentaire. Re-vérifié directement le 15/09/2026 :
 --      · politique pi_demandes_reappro_staff — authenticated, ALL,
 --        ((auth.jwt() ->> 'app_role') IS NOT NULL)
---      · has_table_privilege anon          : SELECT/INSERT/UPDATE = false
---      · has_table_privilege authenticated : SELECT/INSERT/UPDATE = true
---        (accès de base accordé par GRANT ; le filtrage réel ligne par ligne
---        reste conditionné par la présence du claim app_role, imposée par la
---        politique — non re-testé ici avec un vrai jeton faute de session
---        navigateur, voir la recette ci-dessous)
---      · RLS active, aucune alerte de l'advisor sécurité sur cette table
+--      · RLS active sur pi_demandes_reappro, table vide (0 ligne, module
+--        livré mais pas encore utilisé en production)
 --    NON appliqué sur Menco : un pilote se mène sur une seule instance.
 --
---    ⚠️ CORRECTIF : une version antérieure de ce commentaire affirmait le
---    pilote déjà appliqué le 14/09/2026 sur le projet ref ilvusckdanwrckxqvhmr,
---    avec un test à de vrais jetons. Vérification faite le 15/09/2026 via le
---    connecteur Supabase MCP réellement connecté au compte de l'utilisateur :
---    cette référence de projet ne correspondait à AUCUN projet accessible, la
---    table pi_demandes_reappro n'existait pas encore, et aucune des deux
---    migrations n'apparaissait dans l'historique. Le pilote n'avait donc
---    jamais été appliqué à la base réellement utilisée par l'ERP ; c'est
---    chose faite depuis le 15/09/2026 ci-dessus, sur la bonne base.
+--    ⚠️ HISTORIQUE DE LA CONFUSION (pour ne pas la reproduire) : le
+--    15/09/2026, une vérification via le connecteur Supabase MCP a semblé
+--    montrer que ce pilote n'avait jamais été appliqué. C'était faux : le
+--    connecteur était en réalité relié à un AUTRE compte Supabase, contenant
+--    un projet sans rapport avec Zahara (mêmes noms de tables pi_*, mais
+--    gérante, fournisseurs et données différents). Le pilote a alors été
+--    réappliqué PAR ERREUR sur ce mauvais projet, puis retiré une fois
+--    l'erreur découverte. Le vrai projet Zahara (ref ilvusckdanwrckxqvhmr)
+--    n'a jamais cessé d'avoir ce pilote correctement en place depuis le
+--    14/09. Leçon : une référence de projet ne suffit pas à s'identifier —
+--    toujours confirmer via le tableau de bord Supabase de l'utilisateur
+--    (organisation, nom du projet) avant d'agir, pas seulement via les
+--    données qu'on y trouve.
 --
 -- Table pilote : pi_demandes_reappro — choisie parce qu'elle ne contient
 -- AUCUNE donnée de production (module livré mais pas encore utilisé), qu'elle
