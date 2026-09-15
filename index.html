@@ -48321,6 +48321,29 @@ function updateLotsByProgramme(gardeSelection) {
   var progId = document.getElementById('c-programme').value;
   var lotSelect = document.getElementById('c-lot');
   if (!lotSelect) return;
+  /* [FIX] Les « Autres lots de ce souscripteur » sont explicitement décrits
+     comme « même programme » dans le formulaire — mais rien ne les purgeait
+     quand on changeait le Programme en cours de saisie : la liste "Ajouter un
+     autre lot" se recalculait bien pour le nouveau programme (ci-dessous),
+     tandis que les lots déjà ajoutés pour l'ANCIEN programme restaient
+     affichés et auraient été enregistrés tels quels dans client.lot_ids à la
+     sauvegarde — un souscripteur avec des lots de deux programmes différents,
+     échéancier/montant total incohérents. On les purge ici, avant toute autre
+     chose, dès qu'ils ne correspondent plus au programme sélectionné. Sans
+     effet au premier remplissage du formulaire (fillClientForm) puisque
+     APP._clientLotsSupplementaires y est alors déjà cohérent avec le
+     programme du client. */
+  if (APP._clientLotsSupplementaires && APP._clientLotsSupplementaires.length) {
+    var _avantPurge = APP._clientLotsSupplementaires.length;
+    APP._clientLotsSupplementaires = APP._clientLotsSupplementaires.filter(function(lid) {
+      var l = DATA.lots.find(function(x) { return x.id === lid; });
+      return l && l.programme_id === progId;
+    });
+    if (APP._clientLotsSupplementaires.length !== _avantPurge) {
+      if (typeof renderLotsSupplementairesListe === 'function') renderLotsSupplementairesListe();
+      toast((_avantPurge - APP._clientLotsSupplementaires.length) + ' lot(s) supplémentaire(s) retiré(s) — ils appartenaient au programme précédent.', 'info', 4000);
+    }
+  }
   var selectionPrecedente = gardeSelection ? lotSelect.value : '';
   lotSelect.disabled = false;
   lotSelect.removeAttribute('disabled');
