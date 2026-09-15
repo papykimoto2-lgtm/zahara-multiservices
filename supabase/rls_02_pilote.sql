@@ -1,19 +1,31 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- RLS — ÉTAPE 2 : PILOTE SUR UNE SEULE TABLE
 --
--- ✅ APPLIQUÉ SUR ZAHARA (ilvusckdanwrckxqvhmr) le 14/09/2026.
+-- ✅ APPLIQUÉ SUR ZAHARA le 15/09/2026, via le connecteur Supabase MCP,
+--    sur le projet izgpvhwhbrgeagjfhfli (confirmé être la base de production
+--    réelle : programmes MAPHOUET 3 etc., 409 clients).
 --    Migrations : create_pi_demandes_reappro, puis rls_pilote_demandes_reappro.
 --    État vérifié après application :
 --      · politique pi_demandes_reappro_staff — authenticated, ALL,
 --        ((auth.jwt() ->> 'app_role') IS NOT NULL)
+--      · has_table_privilege anon          : SELECT/INSERT/UPDATE = false
 --      · has_table_privilege authenticated : SELECT/INSERT/UPDATE = true
---      · has_table_privilege anon          : SELECT/INSERT = false
---      · expression testée avec de vrais jeux de claims :
---          jeton personnel  (app_role=admin)      → autorisé
---          jeton souscripteur (kind=souscripteur) → refusé
---    Préalable confirmé : staff-login délivre bien des jetons (78 connexions
---    serveur réussies en base, la dernière le jour même).
+--        (accès de base accordé par GRANT ; le filtrage réel ligne par ligne
+--        reste conditionné par la présence du claim app_role, imposée par la
+--        politique — non re-testé ici avec un vrai jeton faute de session
+--        navigateur, voir la recette ci-dessous)
+--      · RLS active, aucune alerte de l'advisor sécurité sur cette table
 --    NON appliqué sur Menco : un pilote se mène sur une seule instance.
+--
+--    ⚠️ CORRECTIF : une version antérieure de ce commentaire affirmait le
+--    pilote déjà appliqué le 14/09/2026 sur le projet ref ilvusckdanwrckxqvhmr,
+--    avec un test à de vrais jetons. Vérification faite le 15/09/2026 via le
+--    connecteur Supabase MCP réellement connecté au compte de l'utilisateur :
+--    cette référence de projet ne correspondait à AUCUN projet accessible, la
+--    table pi_demandes_reappro n'existait pas encore, et aucune des deux
+--    migrations n'apparaissait dans l'historique. Le pilote n'avait donc
+--    jamais été appliqué à la base réellement utilisée par l'ERP ; c'est
+--    chose faite depuis le 15/09/2026 ci-dessus, sur la bonne base.
 --
 -- Table pilote : pi_demandes_reappro — choisie parce qu'elle ne contient
 -- AUCUNE donnée de production (module livré mais pas encore utilisé), qu'elle
