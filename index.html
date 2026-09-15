@@ -17413,6 +17413,10 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <input type="text" class="form-control" id="c-profession">
           </div>
           <div class="form-group">
+            <label>Employeur</label>
+            <input type="text" class="form-control" id="c-employeur">
+          </div>
+          <div class="form-group">
             <label>Téléphone *</label>
             <input type="tel" class="form-control" id="c-tel">
           </div>
@@ -17506,9 +17510,65 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <div id="c-nature-badge" style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;"></div>
           </div>
           <div class="form-group">
-            <label id="c-type-logement-label">Type de logement</label>
+            <label id="c-type-logement-label">Type de logement / villa</label>
             <input type="text" class="form-control" id="c-type-logement" placeholder="Auto depuis le lot (modifiable)">
           </div>
+
+          <!-- ── Dossier villa / foncier — champs administratifs du dossier
+               physique du souscripteur (N° DM, TF, îlot, superficies, coût de
+               la villa, mode d'acquisition...). Table pi_clients étant en
+               jsonb libre, ces champs n'exigent aucune migration. ── -->
+          <div class="form-group span-2" style="margin-top:6px;border-top:1px solid var(--bord);padding-top:14px;">
+            <div class="form-section-title" style="margin-bottom:0;">🏘️ Dossier villa / foncier</div>
+          </div>
+          <div class="form-group">
+            <label>N° DM</label>
+            <input type="text" class="form-control" id="c-num-dm">
+          </div>
+          <div class="form-group">
+            <label>N° TF</label>
+            <input type="text" class="form-control" id="c-numero-tf" placeholder="Auto depuis le lot (modifiable)">
+          </div>
+          <div class="form-group">
+            <label>N° Îlot</label>
+            <input type="text" class="form-control" id="c-ilot" placeholder="Auto depuis le lot (modifiable)">
+          </div>
+          <div class="form-group">
+            <label>Superficie réelle (m²)</label>
+            <input type="number" class="form-control" id="c-superficie-reelle" placeholder="0" oninput="clientCalcSuperficieTotale()">
+          </div>
+          <div class="form-group">
+            <label>Superficie supplémentaire (m²)</label>
+            <input type="number" class="form-control" id="c-superficie-supplementaire" placeholder="0" oninput="clientCalcSuperficieTotale()">
+          </div>
+          <div class="form-group">
+            <label>Superficie totale (m²)</label>
+            <input type="number" class="form-control" id="c-superficie-totale" readonly style="color:var(--or);font-weight:bold;">
+          </div>
+          <div class="form-group">
+            <label>Terrain supplémentaire (FCFA)</label>
+            <input type="number" class="form-control" id="c-terrain-supplementaire" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>Coût de la villa (FCFA)</label>
+            <input type="number" class="form-control" id="c-cout-villa" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>Mode d'acquisition</label>
+            <select class="form-control" id="c-mode-acquisition">
+              <option value="">— Non précisé —</option>
+              <option value="comptant">Comptant</option>
+              <option value="credit_bancaire">Crédit bancaire</option>
+              <option value="financement_direct">Financement direct (promoteur)</option>
+              <option value="mixte">Mixte</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div class="form-group span-2">
+            <label>Modification</label>
+            <textarea class="form-control" id="c-modification" rows="2" placeholder="Notes de modification du dossier..."></textarea>
+          </div>
+
           <div class="form-group" id="c-grp-mode-livraison">
             <label>Mode de livraison</label>
             <select class="form-control" id="c-mode-livraison" style="font-weight:700;">
@@ -31571,12 +31631,15 @@ function openClientModal(id) {
 }
 
 function clearClientForm() {
-  ['c-nom','c-prenoms','c-ddn','c-nationalite','c-profession','c-tel','c-email','c-adresse','c-commune','c-lat','c-lng',
+  ['c-nom','c-prenoms','c-ddn','c-nationalite','c-profession','c-employeur','c-tel','c-email','c-adresse','c-commune','c-lat','c-lng',
    'c-piece-num','c-montant-total','c-apport','c-duree','c-date-debut','c-date-souscription','c-mensualite','c-type-logement','c-surface',
-   'c-commercial','c-apporteur'].forEach(function(id) {
+   'c-commercial','c-apporteur',
+   'c-num-dm','c-numero-tf','c-ilot','c-superficie-reelle','c-superficie-supplementaire','c-superficie-totale',
+   'c-terrain-supplementaire','c-cout-villa','c-modification'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = el.id === 'c-nationalite' ? 'Ivoirienne' : el.id === 'c-duree' ? '60' : el.id === 'c-apport' ? '0' : '';
   });
+  var modeAcqEl = document.getElementById('c-mode-acquisition'); if (modeAcqEl) modeAcqEl.value = '';
   var svEcart = document.getElementById('c-surface-ecart'); if (svEcart) svEcart.style.display = 'none';
   var cGeoStatutClear = document.getElementById('c-geoloc-statut'); if (cGeoStatutClear) cGeoStatutClear.textContent = '';
   document.getElementById('doc-btns').style.display = 'none';
@@ -31591,10 +31654,13 @@ function clearClientForm() {
 
 function fillClientForm(c) {
   var map = { 'c-nom': 'nom', 'c-prenoms': 'prenoms', 'c-ddn': 'ddn', 'c-nationalite': 'nationalite',
-    'c-profession': 'profession', 'c-tel': 'tel', 'c-email': 'email', 'c-adresse': 'adresse',
+    'c-profession': 'profession', 'c-employeur': 'employeur', 'c-tel': 'tel', 'c-email': 'email', 'c-adresse': 'adresse',
     'c-piece-num': 'piece_num', 'c-montant-total': 'montant_total', 'c-apport': 'apport',
     'c-duree': 'duree', 'c-date-debut': 'date_debut', 'c-date-souscription': 'date_souscription', 'c-type-logement': 'type_logement', 'c-surface': 'surface',
-    'c-lat': 'lat', 'c-lng': 'lng', 'c-commune': 'commune'
+    'c-lat': 'lat', 'c-lng': 'lng', 'c-commune': 'commune',
+    'c-num-dm': 'num_dm', 'c-numero-tf': 'numero_tf', 'c-ilot': 'ilot',
+    'c-superficie-reelle': 'superficie_reelle', 'c-superficie-supplementaire': 'superficie_supplementaire', 'c-superficie-totale': 'superficie_totale',
+    'c-terrain-supplementaire': 'terrain_supplementaire', 'c-cout-villa': 'cout_villa', 'c-modification': 'modification'
   };
   Object.keys(map).forEach(function(id) {
     var el = document.getElementById(id);
@@ -31609,6 +31675,7 @@ function fillClientForm(c) {
   setSelectValue('c-programme', c.programme_id);
   setSelectValue('c-commercial', c.commercial_id || '');
   setSelectValue('c-apporteur', c.apporteur_id || '');
+  setSelectValue('c-mode-acquisition', c.mode_acquisition || '');
   /* [multi-lot] Préremplit la liste des lots supplémentaires (tous les
      lot_ids sauf le lot principal lot_id) pour affichage/modification. */
   APP._clientLotsSupplementaires = (typeof _lotIdsDeClient === 'function' ? _lotIdsDeClient(c) : (c.lot_ids||[])).filter(function(lid){ return lid !== c.lot_id; });
@@ -31869,6 +31936,7 @@ async function saveClient() {
     nationalite: document.getElementById('c-nationalite').value,
     matrimonial: document.getElementById('c-matrimonial').value,
     profession: document.getElementById('c-profession').value,
+    employeur: document.getElementById('c-employeur').value,
     tel: tel,
     email: document.getElementById('c-email').value,
     adresse: document.getElementById('c-adresse').value,
@@ -31900,6 +31968,17 @@ async function saveClient() {
       return 'indetermine';
     })(),
     type_logement: document.getElementById('c-type-logement').value,
+    /* ── Dossier villa / foncier (12 champs demandés) ── */
+    num_dm: document.getElementById('c-num-dm').value,
+    numero_tf: document.getElementById('c-numero-tf').value,
+    ilot: document.getElementById('c-ilot').value,
+    superficie_reelle: parseFloat(document.getElementById('c-superficie-reelle').value) || 0,
+    superficie_supplementaire: parseFloat(document.getElementById('c-superficie-supplementaire').value) || 0,
+    superficie_totale: parseFloat(document.getElementById('c-superficie-totale').value) || 0,
+    cout_villa: parseFloat(document.getElementById('c-cout-villa').value) || 0,
+    mode_acquisition: document.getElementById('c-mode-acquisition').value,
+    terrain_supplementaire: parseFloat(document.getElementById('c-terrain-supplementaire').value) || 0,
+    modification: document.getElementById('c-modification').value,
     mode_livraison: (function(){ var el=document.getElementById('c-mode-livraison'); return el ? el.value : 'gros_oeuvre'; })(),
     standing: document.getElementById('c-standing').value,
     montant_total: parseFloat(document.getElementById('c-montant-total').value) || 0,
@@ -48383,6 +48462,16 @@ function ajouterLotSupplementaireClient() {
   if (typeof clientCompareSurface === 'function') clientCompareSurface();
   toast('Lot ajouté — montant total et surface suggérés mis à jour (ajustez si besoin).', 'info', 2500);
 }
+/* Superficie totale du dossier villa = superficie réelle + superficie
+   supplémentaire (calcul automatique, champ en lecture seule — même
+   convention que la mensualité calculée). */
+function clientCalcSuperficieTotale() {
+  var elTotal = document.getElementById('c-superficie-totale'); if (!elTotal) return;
+  var reelle = parseFloat(document.getElementById('c-superficie-reelle').value) || 0;
+  var supp = parseFloat(document.getElementById('c-superficie-supplementaire').value) || 0;
+  elTotal.value = (reelle || supp) ? (reelle + supp) : '';
+}
+
 /* Compare la surface saisie (souvent la surface contractuelle, potentiellement
    arrondie/négociée) à la somme des surfaces réelles des lots rattachés —
    simple indicateur, jamais bloquant : l'utilisateur reste libre de sa saisie. */
@@ -48914,6 +49003,10 @@ function onClientLotChange() {
   document.getElementById('c-montant-total').value = lot.prix || '';
   document.getElementById('c-type-logement').value = lot.type || '';
   if (document.getElementById('c-surface')) document.getElementById('c-surface').value = lot.surface || '';
+  /* Dossier villa / foncier — préremplis depuis le lot rattaché, modifiables
+     ensuite (même convention que le type de logement ci-dessus). */
+  var elIlot = document.getElementById('c-ilot'); if (elIlot) elIlot.value = lot.ilot || '';
+  var elTf = document.getElementById('c-numero-tf'); if (elTf) elTf.value = lot.numero_tf || lot.num_titre || '';
   var modeLiv = lot.mode_livraison || 'gros_oeuvre';
   var modeLivEl = document.getElementById('c-mode-livraison');
   if (modeLivEl) modeLivEl.value = modeLiv;
