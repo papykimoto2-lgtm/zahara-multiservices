@@ -37599,7 +37599,7 @@ async function _conflitMarquerResolu(id) {
   renderConflitsSync();
 }
 
-function saveComptesDefaut() {
+async function saveComptesDefaut() {
   if (!exigerDroit('Comptabilite', 'm', 'les comptes par défaut')) return;
   if (typeof _paramsToucher === 'function') _paramsToucher();
   DATA.params = DATA.params || {};
@@ -37672,6 +37672,15 @@ function saveComptesDefaut() {
   populateDatalistPlanComptable();
   if (typeof renderPlanComptableParam === 'function') { try{ renderPlanComptableParam(); }catch(e){} }
 
+  /* [FIX] dbPut() manquait ici : DATA.params n'était mis à jour qu'en mémoire
+     et poussé vers Supabase, jamais réécrit dans IndexedDB. Au rechargement
+     de la page (F5, ou simple redémarrage de l'app), DATA.params était
+     rehydraté depuis la copie locale restée sur l'ancienne valeur — les
+     comptes par défaut semblaient donc "non persistants" alors qu'ils
+     avaient bien été acceptés à l'enregistrement. Tous les autres écrans de
+     Paramètres font systématiquement dbPut() avant syncToSupabase() ; celui-ci
+     l'omettait seul. */
+  await dbPut('params', DATA.params);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
   toast(_comptesCrees.length
     ? '✅ Comptes par défaut enregistrés. ' + _comptesCrees.length + ' nouveau(x) compte(s) créé(s) dans le plan comptable : ' + _comptesCrees.join(', ') + '.'
