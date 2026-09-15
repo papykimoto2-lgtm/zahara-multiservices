@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Espace Souscripteur & Apporteur</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1B4332">
+  <link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Espace Client">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
   <style>
@@ -248,6 +256,9 @@
           <button class="tab-link" data-tab="locataire"><i class="fas fa-house-user"></i> Locataire</button>
           <button class="tab-link" data-tab="copropriete"><i class="fas fa-building"></i> Copropriétaire</button>
         </div>
+      </li>
+      <li id="pwa-install-li" style="display:none;">
+        <button class="tab-link" id="pwa-install-btn" type="button" style="background:var(--pp-or);color:#fff;" onclick="pwaInstaller()"><i class="fas fa-arrow-down-to-line"></i> INSTALLER L'APPLI</button>
       </li>
     </ul>
   </div>
@@ -4951,6 +4962,56 @@
     var b = e.target.closest ? e.target.closest('.tab-link') : null;
     if (b) _anaOngletVu(b.getAttribute('data-tab') || '');
   });
+</script>
+
+<script>
+  /* ---- Application installable (PWA) ---- */
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('/sw.js').catch(function(){});
+    });
+  }
+
+  var _pwaDeferredPrompt = null;
+  var _pwaEnEstDeja = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  var _pwaEstIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+
+  function _pwaAfficherBouton(){
+    if (_pwaEnEstDeja) return;
+    var li = document.getElementById('pwa-install-li');
+    if (li) li.style.display = '';
+  }
+
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    _pwaDeferredPrompt = e;
+    _pwaAfficherBouton();
+  });
+
+  window.addEventListener('appinstalled', function(){
+    _pwaDeferredPrompt = null;
+    var li = document.getElementById('pwa-install-li');
+    if (li) li.style.display = 'none';
+  });
+
+  function pwaInstaller(){
+    if (_pwaDeferredPrompt) {
+      _pwaDeferredPrompt.prompt();
+      _pwaDeferredPrompt.userChoice.finally(function(){ _pwaDeferredPrompt = null; });
+      return;
+    }
+    if (_pwaEstIOS) {
+      alert("Pour installer l'application sur iPhone/iPad :\n\n1. Appuyez sur le bouton Partager (le carré avec une flèche vers le haut)\n2. Choisissez « Sur l'écran d'accueil »\n3. Appuyez sur « Ajouter »");
+      return;
+    }
+    alert("Votre navigateur ne propose pas l'installation directe ici. Utilisez le menu du navigateur (⋮ ou Partager) puis « Installer l'application » ou « Ajouter à l'écran d'accueil ».");
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    if (_pwaEstIOS && !_pwaEnEstDeja) _pwaAfficherBouton();
+  });
+
+  window.pwaInstaller = pwaInstaller;
 </script>
 </body>
 </html>

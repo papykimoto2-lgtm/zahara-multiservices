@@ -1,0 +1,19 @@
+{
+  "name": "Espace Client — Zahara MultiServices",
+  "short_name": "Espace Client",
+  "description": "Portail unique des souscripteurs, apporteurs et partenaires Zahara MultiServices : suivi de dossier, lots, versements et documents.",
+  "start_url": "/portail-unique.html?pwa=1",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F6F1E7",
+  "theme_color": "#1B4332",
+  "lang": "fr",
+  "icons": [
+    { "src": "/icons/favicon-32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
