@@ -31625,6 +31625,15 @@ function openClientModal(id) {
     document.getElementById('client-historique-block').innerHTML = '';
     var tmaActionNew = document.getElementById('c-tma-action'); if (tmaActionNew) tmaActionNew.innerHTML = '';
     var subroActionNew = document.getElementById('c-subrogation-action'); if (subroActionNew) subroActionNew.innerHTML = '';
+    /* [défauts nouveau souscripteur] Nature "logement (bâti)", mode de
+       livraison "Clé en main", programme CITE MAPHOUET 1, et commercial =
+       DG à défaut — pré-remplis pour éviter la ressaisie systématique,
+       modifiables ensuite si le dossier concerne un autre programme. */
+    var natManDefault = document.getElementById('c-nature-manuel'); if (natManDefault) natManDefault.value = 'maison';
+    updateNatureBienUI(null);
+    var modeLivDefault = document.getElementById('c-mode-livraison'); if (modeLivDefault) modeLivDefault.value = 'cle_en_main';
+    setSelectValue('c-programme', 'mu1w2aomek818');
+    setSelectValue('c-commercial', 'emp_1788440497496');
   }
   if (typeof updateLotsByProgramme === 'function') updateLotsByProgramme();
   openModal('modal-client');
