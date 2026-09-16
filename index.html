@@ -74015,6 +74015,15 @@ async function _dataUrlToBlob(dataUrl){
 }
 async function pmUploadBlob(fichier, id, categorie){
   if (!SB.url || !SB.key) throw new Error('cloud non configuré');
+  /* [FIX] Le bucket portail-medias exige auth.role()='authenticated' en
+     écriture (policy pm_staff_write) — sbAuth() retombe silencieusement sur
+     la clé anonyme si la session staff a expiré (durée 12h), et Supabase
+     Storage renvoie alors un HTTP 400 générique (violation RLS, pas
+     l'habituel 401/403) qui ne dit pas du tout à l'utilisateur qu'il doit
+     juste se reconnecter. On le détecte ici, avant même d'essayer l'envoi. */
+  if (typeof staffActif === 'function' && !staffActif()) {
+    throw new Error('session expirée — déconnectez-vous puis reconnectez-vous pour envoyer un fichier');
+  }
   var ext = ((fichier.type||'').split('/')[1] || (fichier.name||'').split('.').pop() || 'bin').replace(/[^a-z0-9]/gi,'');
   var chemin = (categorie||'general') + '/' + id + '.' + ext;
   var resp = await fetch(SB.url + '/storage/v1/object/' + PM_BUCKET + '/' + encodeURI(chemin), {
@@ -74023,7 +74032,12 @@ async function pmUploadBlob(fichier, id, categorie){
                'Content-Type': fichier.type || 'application/octet-stream', 'x-upsert': 'true' },
     body: fichier
   });
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  if (!resp.ok) {
+    if (resp.status === 400 && typeof staffActif === 'function' && !staffActif()) {
+      throw new Error('session expirée — déconnectez-vous puis reconnectez-vous pour envoyer un fichier');
+    }
+    throw new Error('HTTP ' + resp.status);
+  }
   return chemin;
 }
 
