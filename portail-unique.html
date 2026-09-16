@@ -46,6 +46,14 @@
     .hero-content { position:relative; z-index:2; }
     .hero h2 { font-family:var(--pp-serif); font-weight:600; font-size:2.4rem; margin-bottom:16px; letter-spacing:-.5px; }
     .hero p { font-size:1.02rem; opacity:.92; max-width:640px; margin:0 auto; }
+    /* Bannière à deux colonnes, activée uniquement quand une vidéo institutionnelle
+       est configurée (classe has-video posée par JS) — sans vidéo, la bannière
+       garde son rendu centré d'origine, inchangé. */
+    .hero-flex.has-video { display:flex; align-items:center; gap:44px; text-align:left; }
+    .hero-flex.has-video .hero-text { flex:1 1 50%; }
+    .hero-flex.has-video .hero-video-half { flex:1 1 50%; }
+    .hero-flex.has-video .hero-text p { margin:0; max-width:none; }
+    @media (max-width:980px) { .hero-flex.has-video { flex-direction:column; text-align:center; } .hero-flex.has-video .hero-text p { margin:0 auto; max-width:640px; } }
     .content-section { background:white; border-radius:20px; margin:50px auto; padding:40px 32px; border:1px solid #efe8d8; }
     .content-section h3{ font-family:var(--pp-serif); font-weight:600; }
     .tab-pane { display:none; animation:fadeIn 0.3s; }
@@ -264,11 +272,24 @@
   </div>
 </header>
 
-<section class="hero"><div class="hero-content container"><h2>BIENVENUE</h2><p></p>
-  <div class="hero-stats" id="hero-stats" style="display:none;">
-    <div class="hero-stat"><b id="hs-familles">—</b><span>Familles accompagnées</span></div>
-    <div class="hero-stat"><b id="hs-programmes">—</b><span>Programmes livrés/actifs</span></div>
-    <div class="hero-stat"><b id="hs-avancement">—</b><span>Avancement moyen chantiers</span></div>
+<section class="hero"><div class="hero-content container">
+  <div class="hero-flex" id="hero-flex">
+    <div class="hero-text">
+      <h2>BIENVENUE</h2><p></p>
+      <div class="hero-stats" id="hero-stats" style="display:none;">
+        <div class="hero-stat"><b id="hs-familles">—</b><span>Familles accompagnées</span></div>
+        <div class="hero-stat"><b id="hs-programmes">—</b><span>Programmes livrés/actifs</span></div>
+        <div class="hero-stat"><b id="hs-avancement">—</b><span>Avancement moyen chantiers</span></div>
+      </div>
+    </div>
+    <!-- Vidéo institutionnelle (moitié de bannière) : lecture uniquement au clic
+         (preload="none") — rien n'est téléchargé tant que le visiteur n'appuie
+         pas sur play, essentiel pour un fichier pouvant peser jusqu'à 150 Mo. -->
+    <div class="hero-video-half" id="hero-video-half" style="display:none;">
+      <video controls preload="none" id="hero-video-el" style="width:100%;display:block;border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.35);max-height:360px;object-fit:cover;background:#000;">
+        <source id="hero-video-src" src="" type="video/mp4">
+      </video>
+    </div>
   </div>
 </div></section>
 
@@ -1947,6 +1968,26 @@
     if(la){ var lg=BR('logo_url',''); la.innerHTML = (lg ? '<img src="'+esc(lg)+'" alt="'+esc(nom)+'" style="height:44px;max-width:200px;object-fit:contain;">' : '<h1>'+esc(nom)+'</h1>') + '<p>'+esc(slogan)+'</p>'; }
     var ht=document.querySelector('.hero h2'); if(ht) ht.textContent = BR('hero_titre', nom.toUpperCase());
     var hp=document.querySelector('.hero-content p'); if(hp) hp.textContent = BR('hero_texte', nom + " — votre partenaire immobilier en Côte d'Ivoire.");
+    /* Vidéo institutionnelle : n'active la mise en page deux colonnes, et ne
+       pose le src (source du <video>), que si une vidéo est réellement
+       configurée — sinon rien n'est chargé et la bannière reste centrée
+       comme avant. */
+    var heroVideoUrl = BR('hero_video_url','');
+    var hf = document.getElementById('hero-flex');
+    var hvHalf = document.getElementById('hero-video-half');
+    if (heroVideoUrl && hf && hvHalf) {
+      hf.classList.add('has-video');
+      hvHalf.style.display = '';
+      var hvSrc = document.getElementById('hero-video-src');
+      if (hvSrc) hvSrc.src = heroVideoUrl;
+      var hvEl = document.getElementById('hero-video-el');
+      if (hvEl) hvEl.load();
+      var heroPoster = BR('hero_image','');
+      if (hvEl && heroPoster) hvEl.poster = heroPoster;
+    } else if (hf) {
+      hf.classList.remove('has-video');
+      if (hvHalf) hvHalf.style.display = 'none';
+    }
 
     /* Onglet + page programme */
     var progNom = BR('programme_nom','');

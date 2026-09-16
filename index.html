@@ -6288,6 +6288,21 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div style="font-size:11px;color:#6B6B9A;margin-top:4px;">Collez une URL d'image, ou importez un fichier (PNG/JPG/WEBP, 3 Mo max — format paysage recommandé).</div>
               </div>
               <div class="form-group span-2">
+                <label>🎬 Vidéo institutionnelle (moitié de la bannière d'accueil)</label>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('portail-hero-video-file-input').click()">📁 Importer une vidéo</button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="portail-hero-video-clear-btn" onclick="clearPortailHeroVideo()" style="display:none;">🗑️ Retirer</button>
+                  <input type="file" id="portail-hero-video-file-input" accept="video/mp4,video/webm,video/ogg,video/quicktime" style="display:none;" onchange="handlePortailHeroVideoUpload(event)">
+                  <span id="portail-hero-video-statut" style="font-size:12px;color:#6B6B9A;"></span>
+                </div>
+                <div id="portail-hero-video-progress-zone" style="display:none;margin-top:8px;">
+                  <div style="background:#EEF0F6;border-radius:8px;height:8px;overflow:hidden;"><div id="portail-hero-video-progress-bar" style="background:var(--pp-primary,#003366);height:100%;width:0%;transition:width .2s;"></div></div>
+                  <div id="portail-hero-video-progress-txt" style="font-size:11px;color:#6B6B9A;margin-top:3px;"></div>
+                </div>
+                <div style="font-size:11px;color:#6B6B9A;margin-top:4px;">MP4/WebM/OGG/MOV, 150 Mo max. Affichée sur la moitié droite de la bannière d'accueil du portail, lecture uniquement au clic du visiteur (rien n'est chargé tant qu'il n'a pas cliqué).</div>
+                <input type="hidden" id="param-portail-hero-video-url">
+              </div>
+              <div class="form-group span-2">
                 <label>Titre du bandeau d'accueil</label>
                 <input type="text" id="param-portail-hero-titre" class="form-control" placeholder="Ex : L'ASSURANCE D'ÊTRE LOGÉ">
               </div>
@@ -44855,6 +44870,82 @@ function clearPortailHeroImg() {
   if (fileInput) fileInput.value = '';
 }
 
+/** Upload de la vidéo institutionnelle (moitié droite de la bannière du portail
+    public). Jusqu'à 150 Mo : envoyée directement au Storage via XHR (et non
+    fetch/pmUploadBlob) pour disposer d'une vraie barre de progression — sans
+    ça, un fichier de cette taille laisserait l'admin devant un écran figé
+    plusieurs dizaines de secondes sans retour. Ne part jamais en base64 dans
+    pi_params (seule l'URL Storage y est stockée), sans quoi la ligne JSONB du
+    paramétrage exploserait et casserait la synchro de tout le reste. */
+function handlePortailHeroVideoUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var maxSize = 150 * 1024 * 1024;
+  if (file.size > maxSize) {
+    toast('Vidéo trop lourde (max 150 Mo).', 'error');
+    event.target.value = '';
+    return;
+  }
+  if (!SB.url || !SB.key) { toast('Cloud non configuré — impossible d\'envoyer la vidéo.', 'error'); return; }
+
+  var statutEl = document.getElementById('portail-hero-video-statut');
+  var zone = document.getElementById('portail-hero-video-progress-zone');
+  var bar  = document.getElementById('portail-hero-video-progress-bar');
+  var txt  = document.getElementById('portail-hero-video-progress-txt');
+  if (statutEl) statutEl.textContent = '';
+  if (zone) zone.style.display = '';
+  if (bar) bar.style.width = '0%';
+  if (txt) txt.textContent = 'Envoi en cours… 0 %';
+
+  var ext = ((file.type||'').split('/')[1] || (file.name||'').split('.').pop() || 'mp4').replace(/[^a-z0-9]/gi,'');
+  var chemin = 'hero/herovid_' + Date.now() + '.' + ext;
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', SB.url + '/storage/v1/object/' + PM_BUCKET + '/' + encodeURI(chemin), true);
+  xhr.setRequestHeader('apikey', SB.key);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + sbAuth());
+  xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+  xhr.setRequestHeader('x-upsert', 'true');
+  xhr.upload.onprogress = function(e){
+    if (!e.lengthComputable) return;
+    var pct = Math.round(e.loaded / e.total * 100);
+    if (bar) bar.style.width = pct + '%';
+    if (txt) txt.textContent = 'Envoi en cours… ' + pct + '% (' + (e.loaded/1024/1024).toFixed(1) + ' / ' + (e.total/1024/1024).toFixed(1) + ' Mo)';
+  };
+  xhr.onload = function(){
+    if (zone) zone.style.display = 'none';
+    if (xhr.status >= 200 && xhr.status < 300) {
+      var url = _pmPublicUrl(chemin);
+      var input = document.getElementById('param-portail-hero-video-url');
+      if (input) input.value = url;
+      if (statutEl) statutEl.innerHTML = '✅ Vidéo importée (' + (file.size/1024/1024).toFixed(1) + ' Mo)';
+      var clearBtn = document.getElementById('portail-hero-video-clear-btn');
+      if (clearBtn) clearBtn.style.display = '';
+      toast('Vidéo institutionnelle importée — pensez à cliquer sur « Enregistrer » pour la publier.', 'success');
+    } else {
+      toast('❌ Échec de l\'envoi de la vidéo (HTTP ' + xhr.status + ').', 'error');
+    }
+  };
+  xhr.onerror = function(){
+    if (zone) zone.style.display = 'none';
+    toast('❌ Échec de l\'envoi de la vidéo (réseau).', 'error');
+  };
+  xhr.send(file);
+}
+
+/** Retire la vidéo institutionnelle de la bannière (le fichier reste au
+    Storage — seule la référence dans le paramétrage est effacée). */
+function clearPortailHeroVideo() {
+  var input = document.getElementById('param-portail-hero-video-url');
+  if (input) input.value = '';
+  var statutEl = document.getElementById('portail-hero-video-statut');
+  if (statutEl) statutEl.textContent = '';
+  var clearBtn = document.getElementById('portail-hero-video-clear-btn');
+  if (clearBtn) clearBtn.style.display = 'none';
+  var fileInput = document.getElementById('portail-hero-video-file-input');
+  if (fileInput) fileInput.value = '';
+}
+
 
 /* ══════════════════════════════════════════════════════════════
    PARAMÈTRES — Fonctions save/load pour les nouveaux onglets
@@ -45385,6 +45476,7 @@ async function saveParams() {
     portail_couleur_secondaire:   gv('param-portail-couleur-secondaire')||'#0077b6',
     portail_couleur_primaire_dark:gv('param-portail-couleur-primaire-dark')||'#001f4f',
     portail_hero_image:           gv('param-portail-hero-image'),
+    portail_hero_video_url:       gv('param-portail-hero-video-url'),
     portail_hero_titre:           gv('param-portail-hero-titre'),
     hero_texte:                   gv('param-portail-hero-texte'),
     portail_footer_texte:         gv('param-portail-footer-texte'),
@@ -45495,6 +45587,7 @@ function buildPortailBrand(){
     couleur_secondaire:     p.portail_couleur_secondaire || '#0077b6',
     couleur_primaire_dark:  p.portail_couleur_primaire_dark || '#001f4f',
     hero_image:             p.portail_hero_image || '',
+    hero_video_url:         p.portail_hero_video_url || '',
     hero_titre:             p.portail_hero_titre || '',
     hero_texte:             p.hero_texte || '',
     footer_texte:           p.portail_footer_texte || '',
@@ -45622,6 +45715,13 @@ function loadParamFields() {
   sv('param-portail-couleur-primaire-dark', p.portail_couleur_primaire_dark||'#001f4f');
   sv('param-portail-hero-image', p.portail_hero_image||'');
   if (typeof updatePortailHeroPreview === 'function') updatePortailHeroPreview(p.portail_hero_image||'');
+  sv('param-portail-hero-video-url', p.portail_hero_video_url||'');
+  (function(){
+    var statutEl = document.getElementById('portail-hero-video-statut');
+    var clearBtn = document.getElementById('portail-hero-video-clear-btn');
+    if (statutEl) statutEl.innerHTML = p.portail_hero_video_url ? '✅ Vidéo déjà en place' : '';
+    if (clearBtn) clearBtn.style.display = p.portail_hero_video_url ? '' : 'none';
+  })();
   sv('param-portail-hero-titre', p.portail_hero_titre||'');
   sv('param-portail-hero-texte', p.hero_texte||'');
   sv('param-portail-footer-texte', p.portail_footer_texte||'');
