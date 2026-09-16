@@ -1347,18 +1347,42 @@
     return s.map(function(v){ var b=v.type==='frais_souscription'?'<span class="pill p-or">Frais</span>':'<span class="pill p-gris">'+esc(labelType(v.type))+'</span>'; return '<tr><td>'+dshort(v.date)+'</td><td>'+b+'</td><td>'+fmt(v.montant)+' F</td><td>'+esc(v.mode||'—')+'</td></tr>'; }).join('');
   }
   function sRapportsLies(){
+    /* [FIX] Ne filtrait jamais par visibilite : un rapport marqué "Interne
+       seulement" (rch-visibilite côté ERP) s'affichait quand même ici si son
+       programme/convention correspondait — contraire au réglage explicite
+       posé par l'équipe chantier. */
     var convIds=S.conventions.map(function(c){return c.id;}), prog=S.client.programme_id, progNom=sProgNom();
     return S.rapports.filter(function(r){
+      if (r.visibilite==='interne') return false;
       return (r.client_id===S.client.id)||(r.convention_id&&convIds.indexOf(r.convention_id)!==-1)||(r.programme_id&&r.programme_id===prog)||(r.programme&&r.programme===progNom);
-    }).sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+    }).sort(function(a,b){return new Date(b.date_debut||b.date||0)-new Date(a.date_debut||a.date||0);});
   }
   function blocTravaux(){
-    var raps=sRapportsLies(), photos=[];
-    raps.forEach(function(r){ (r.photos||[]).forEach(function(p){ if(p&&p.visible!==false) photos.push(p); }); });
-    (MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='chantier'; }).forEach(function(m){ photos.push({ data:m.data, legende:m.titre }); });
-    var ph=photos.length?photos.map(function(p){ var src=p.data||p.url||''; return '<div class="photo-item"><img src="'+esc(src)+'" loading="lazy" alt="">'+(p.legende?'<div class="photo-cap">'+esc(p.legende)+'</div>':'')+'</div>'; }).join(''):'<p style="color:#4b6a8b;">Aucune photo disponible.</p>';
-    var rp=raps.length?raps.map(function(r){ return '<div style="border:1px solid #eef2f8; border-radius:12px; padding:12px; margin-bottom:10px;"><strong>📅 '+dshort(r.date)+' — Avancement '+(parseFloat(r.avancement)||0)+'%</strong>'+(r.travaux?'<div style="font-size:.85rem; margin-top:6px;">'+esc(r.travaux)+'</div>':'')+'</div>'; }).join(''):'<p style="color:#4b6a8b;">Aucun rapport partagé.</p>';
-    return '<div class="card"><strong>🚧 Photos de chantier</strong><div class="photo-grid">'+ph+'</div></div><div class="card"><strong>📋 Rapports d\'avancement</strong><div style="margin-top:10px;">'+rp+'</div></div>';
+    var raps=sRapportsLies(), photosMaison=[], photosGenerales=[];
+    var monLot=S.client.lot_id;
+    raps.forEach(function(r){
+      (r.photos||[]).forEach(function(p){
+        if(!p||p.visible===false) return;
+        /* [AJOUT] Une photo rattachée à un lot (p.lot_id, voir rchMajLot côté
+           ERP) n'est mise en avant que pour le souscripteur de CE lot — une
+           photo générale (sans lot_id) reste visible par tous les
+           souscripteurs du programme, comme avant. */
+        if (p.lot_id) { if (monLot && p.lot_id===monLot) photosMaison.push(p); }
+        else photosGenerales.push(p);
+      });
+    });
+    (MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='chantier'; }).forEach(function(m){ photosGenerales.push({ data:m.data, legende:m.titre }); });
+    var vignette=function(p){ var src=p.data||p.url||''; return '<div class="photo-item"><img src="'+esc(src)+'" loading="lazy" alt="">'+(p.legende?'<div class="photo-cap">'+esc(p.legende)+'</div>':'')+'</div>'; };
+    var blocMaison = photosMaison.length
+      ? '<div class="card"><strong>🏠 Photos de votre maison</strong><div class="photo-grid">'+photosMaison.map(vignette).join('')+'</div></div>'
+      : '';
+    var ph=photosGenerales.length?photosGenerales.map(vignette).join(''):'<p style="color:#4b6a8b;">Aucune photo disponible.</p>';
+    /* [FIX] r.travaux n'a jamais existé — le champ enregistré par l'ERP est
+       travaux_realises (saveRapportChantier) ; r.date n'existe pas non plus,
+       c'est date_debut/date_fin. Le résumé des travaux et la date restaient
+       vides sur cette carte depuis toujours. */
+    var rp=raps.length?raps.map(function(r){ return '<div style="border:1px solid #eef2f8; border-radius:12px; padding:12px; margin-bottom:10px;"><strong>📅 '+dshort(r.date_debut||r.date)+' — Avancement '+(parseFloat(r.avancement)||0)+'%</strong>'+(r.travaux_realises?'<div style="font-size:.85rem; margin-top:6px;">'+esc(r.travaux_realises)+'</div>':'')+'</div>'; }).join(''):'<p style="color:#4b6a8b;">Aucun rapport partagé.</p>';
+    return blocMaison+'<div class="card"><strong>🚧 Photos générales du chantier</strong><div class="photo-grid">'+ph+'</div></div><div class="card"><strong>📋 Rapports d\'avancement</strong><div style="margin-top:10px;">'+rp+'</div></div>';
   }
   function _clearToken(){ SB_TOKEN=null; _effacerSessionPortail(); }
   function logoutSouscripteur(){ S.client=null; _clearToken(); document.getElementById('sous-dash').style.display='none'; document.getElementById('sous-login').style.display='block'; document.getElementById('sousCode').value=''; }

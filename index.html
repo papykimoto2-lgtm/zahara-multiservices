@@ -81828,6 +81828,11 @@ refreshDashboard = function() {
 function onSelectConventionRapport(){
   var id=document.getElementById('rch-convention').value;if(!id)return;
   var conv=DATA.conventions.find(function(c){return c.id===id;});if(!conv)return;
+  /* [AJOUT portail souscripteur] Lots du programme de cette convention,
+     pour permettre de rattacher chaque photo à la maison d'un souscripteur
+     précis (voir rchRenderPhotosGrid). */
+  RCH_STATE.lotsDisponibles = (DATA.lots||[]).filter(function(l){ return l.programme_id===conv.programme_id; });
+  if (typeof rchRenderPhotosGrid === 'function') rchRenderPhotosGrid();
   document.getElementById('rch-avancement').value=conv.avancement||0;
   var prevPct=Math.round(Math.min(100,conv.date_demarrage&&conv.date_fin_prev?(new Date()-new Date(conv.date_demarrage))/(new Date(conv.date_fin_prev)-new Date(conv.date_demarrage))*100:conv.avancement||0));
   document.getElementById('rch-avancement-prevu').value=prevPct;
@@ -91457,9 +91462,10 @@ async function deletePlan(id) {
 
 /* ── État local modal rapport ── */
 var RCH_STATE = {
-  photos: [],       /* photos du rapport en cours { id, data, type, nom, taille, categorie, legende, visible, date } */
+  photos: [],       /* photos du rapport en cours { id, data, type, nom, taille, categorie, legende, visible, date, lot_id } */
   videos: [],       /* [AJOUT] vidéos du rapport — même structure que plr* (lotissement), pour parité avec les autres portails */
-  cameraStream: null
+  cameraStream: null,
+  lotsDisponibles: []  /* [AJOUT portail souscripteur] lots du programme de la convention sélectionnée — permet de rattacher une photo à la maison d'un souscripteur précis plutôt qu'au chantier en général */
 };
 
 var RCH_CAT_LABELS = {
@@ -91677,6 +91683,18 @@ function rchRenderPhotosGrid() {
     var catOpts = Object.keys(RCH_CAT_LABELS).map(function(k){
       return '<option value="'+k+'"'+(p.categorie===k?' selected':'')+'>'+RCH_CAT_ICONS[k]+' '+RCH_CAT_LABELS[k]+'</option>';
     }).join('');
+    /* [AJOUT] Rattachement optionnel de la photo à un lot précis du
+       programme : sans quoi elle est "générale" (visible par tous les
+       souscripteurs du programme) — voir rchMajLot(). Si le lot déjà tagué
+       n'est plus dans RCH_STATE.lotsDisponibles (ex. convention changée
+       après coup), on l'ajoute quand même à la liste plutôt que de perdre
+       le tag silencieusement. */
+    var lotsListe = (RCH_STATE.lotsDisponibles||[]).slice();
+    if (p.lot_id && !lotsListe.some(function(l){ return l.id===p.lot_id; })) {
+      lotsListe.push({ id:p.lot_id, numero:'⚠️ '+p.lot_id+' (hors liste)' });
+    }
+    var lotOpts = '<option value=""' + (p.lot_id?'':' selected') + '>🏘️ Général (tout le programme)</option>'
+      + lotsListe.map(function(l){ return '<option value="'+l.id+'"'+(p.lot_id===l.id?' selected':'')+'>'+escHtml(l.numero||l.nom||l.id)+'</option>'; }).join('');
     return '<div class="rch-photo-card">'
       +'<img class="rch-photo-thumb" src="'+p.data+'" alt="'+p.legende+'"'
       +' onclick="rchOuvrirLightbox('+i+')">'
@@ -91689,6 +91707,10 @@ function rchRenderPhotosGrid() {
         +' placeholder="Légende..."'
         +' onchange="rchMajLegende(\''+p.id+'\',this.value)"'
         +' style="font-size:11px;margin-bottom:4px;" onclick="event.stopPropagation();">'
+      +'<select onchange="rchMajLot(\''+p.id+'\',this.value)" title="Maison/lot concerné(e) — la photo n\'apparaîtra que sur le portail du souscripteur de ce lot"'
+        +' class="form-control" style="font-size:10px;padding:2px 4px;min-height:26px;margin-bottom:4px;width:100%;" onclick="event.stopPropagation();">'
+        + lotOpts
+        + '</select>'
       +'<div style="display:flex;gap:4px;align-items:center;">'
       +'<select onchange="rchMajCategorie(\''+p.id+'\',this.value)"'
         +' class="form-control" style="font-size:10px;padding:2px 4px;min-height:28px;" onclick="event.stopPropagation();">'
@@ -91703,6 +91725,7 @@ function rchRenderPhotosGrid() {
 function rchMajLegende(id, val)  { var p=RCH_STATE.photos.find(function(x){return x.id===id;}); if(p) p.legende=val; }
 function rchMajCategorie(id,val) { var p=RCH_STATE.photos.find(function(x){return x.id===id;}); if(p){ p.categorie=val; rchRenderPhotosGrid(); } }
 function rchMajVisible(id,val)   { var p=RCH_STATE.photos.find(function(x){return x.id===id;}); if(p) p.visible=val; }
+function rchMajLot(id,val)       { var p=RCH_STATE.photos.find(function(x){return x.id===id;}); if(p) p.lot_id=val||''; }
 function rchSupprimerPhoto(id)   { RCH_STATE.photos=RCH_STATE.photos.filter(function(x){return x.id!==id;}); rchUpdateBadgePhotos(); rchRenderPhotosGrid(); }
 
 /* ─────────────────────────────────────────────
@@ -91831,9 +91854,21 @@ function rchGenererApercu() {
     var convId = document.getElementById('rch-convention').value;
     if (!convId) { toast('Sélectionnez une convention.','error'); return; }
     var av = parseInt(document.getElementById('rch-avancement').value)||0;
+    /* [FIX portail souscripteur] Le rapport ne portait jamais programme_id :
+       côté portail, sRapportsLies() (portail-unique.html) tente de relier un
+       rapport au souscripteur via son programme (r.programme_id===prog), en
+       plus de r.convention_id/S.conventions — mais aucune convention n'a
+       jamais de client_id renseigné (saveConvention() ne le pose pas), donc
+       cette voie était morte. Sans programme_id sur le rapport lui-même,
+       AUCUNE des conditions de sRapportsLies() ne pouvait matcher : les
+       photos de chantier, pourtant conçues pour apparaître dans le portail
+       (onglet Aperçu souscripteur, case Visibilité), n'y arrivaient jamais.
+       On stocke désormais le programme hérité de la convention. */
+    var convPourProgramme = (DATA.conventions||[]).find(function(c){ return c.id===convId; });
     var r = {
       id: APP.editingId || uid(),
       convention_id: convId,
+      programme_id: convPourProgramme ? (convPourProgramme.programme_id || '') : '',
       numero: document.getElementById('rch-numero').value.trim(),
       date_debut: document.getElementById('rch-date-debut').value,
       date_fin: document.getElementById('rch-date-fin').value,
@@ -91860,7 +91895,7 @@ function rchGenererApercu() {
     await dbPut('rapports_chantier', r);
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_rapports_chantier', r);
     /* Mettre à jour avancement convention */
-    var conv = DATA.conventions.find(function(c){ return c.id===convId; });
+    var conv = convPourProgramme;
     if (conv && av>=(conv.avancement||0)) { conv.avancement=av; await dbPut('conventions',conv); if (typeof syncToSupabase === 'function') syncToSupabase('pi_conventions', conv); }
     closeModal('modal-rapport-chantier');
     rchFermerCamera();
@@ -91896,6 +91931,11 @@ function rchGenererApercu() {
       });
       if (convId) sel.value = convId;
     }
+    /* [AJOUT] Lots disponibles pour le rattachement photo↔maison, quand une
+       convention est déjà présélectionnée à l'ouverture (idem : .value= ne
+       déclenche pas onSelectConventionRapport). */
+    var _convInit = convId ? (DATA.conventions||[]).find(function(c){ return c.id===convId; }) : null;
+    RCH_STATE.lotsDisponibles = _convInit ? (DATA.lots||[]).filter(function(l){ return l.programme_id===_convInit.programme_id; }) : [];
     /* Dates auto */
     var now = new Date();
     var monday = new Date(now); monday.setDate(now.getDate()-now.getDay()+1);
@@ -91948,6 +91988,12 @@ function rchGenererApercu() {
       el('rch-valideur',r.valideur);
       el('rch-statut',r.statut);
       el('rch-visibilite',r.visibilite||'souscripteurs');
+      /* [AJOUT] Lots disponibles pour le rattachement photo↔maison — la
+         sélection programmatique de rch-convention ci-dessus ne déclenche pas
+         son onchange (onSelectConventionRapport), donc RCH_STATE.lotsDisponibles
+         resterait vide sans cet appel explicite. */
+      var _convEdit = DATA.conventions.find(function(c){ return c.id===r.convention_id; });
+      RCH_STATE.lotsDisponibles = _convEdit ? (DATA.lots||[]).filter(function(l){ return l.programme_id===_convEdit.programme_id; }) : [];
       /* Charger photos */
       RCH_STATE.photos = r.photos ? JSON.parse(JSON.stringify(r.photos)) : [];
       RCH_STATE.videos = r.videos ? JSON.parse(JSON.stringify(r.videos)) : [];
