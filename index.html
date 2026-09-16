@@ -22708,7 +22708,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="plan-dropzone-inner">
             <div style="font-size:36px;margin-bottom:8px;">📸</div>
             <div style="font-weight:700;font-size:14px;">Glisser des photos ici</div>
-            <div style="font-size:12px;color:var(--dim);margin:4px 0 12px;">JPG, PNG, HEIC — max 5 Mo par photo</div>
+            <div style="font-size:12px;color:var(--dim);margin:4px 0 12px;">JPG, PNG, HEIC — max 15 Mo par photo</div>
             <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
               <label for="rch-photo-input" class="btn btn-primary btn-sm"
                 style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;margin:0;">
@@ -22748,7 +22748,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <!-- [AJOUT — revue photo/vidéo] Vidéos du rapport, même gabarit que le module lotissement (plr*) -->
         <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
           <button type="button" class="btn btn-secondary btn-sm" onclick="rchOuvrirVideo()">🔗 Vidéo (YouTube/Vimeo/lien)</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="rchOuvrirVideoFichier()">📤 Vidéo (fichier, max 25 Mo)</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="rchOuvrirVideoFichier()">📤 Vidéo (fichier, max 50 Mo)</button>
           <input type="file" id="rch-input-video" accept="video/mp4,video/webm,video/ogg,video/quicktime" style="display:none;" onchange="rchAjouterVideoFichier(this)">
         </div>
         <div id="rch-video-form" style="display:none;margin-top:10px;padding:12px;border:1px dashed #B87333;border-radius:10px;">
@@ -91509,7 +91509,7 @@ function rchUpdateBadgePhotos() {
    le seul des trois à rejeter toute vidéo malgré un libellé de bouton
    ailleurs dans l'app annonçant "Photos & Vidéos".
 ──────────────────────────────────────────────── */
-var RCH_VIDEO_MAX_MO = 25; /* aligné sur plr* (lotissement) — au-delà, lien YouTube/Vimeo recommandé */
+var RCH_VIDEO_MAX_MO = 50; /* [AJUSTÉ 25→50 Mo] au-delà, lien YouTube/Vimeo toujours recommandé (illimité, pas de coût de stockage) */
 function rchOuvrirVideo(){ var f=document.getElementById('rch-video-form'); if(f){ f.style.display = f.style.display==='none' ? 'block' : 'none'; var u=document.getElementById('rch-video-url'); if(u) u.focus(); } }
 function rchOuvrirVideoFichier(){ var i=document.getElementById('rch-input-video'); if(i){ i.value=''; i.click(); } }
 function rchAjouterVideo(){
@@ -91598,12 +91598,12 @@ function rchOuvrirGalerie() {
 }
 
 function rchTraiterPhotos(files) {
-  var MAX = 5 * 1024 * 1024;
+  var MAX = 15 * 1024 * 1024; /* [AJUSTÉ 5→15 Mo] chaque photo est de toute façon compressée juste après (1600px/JPEG 70%) — le poids réellement stocké reste faible quelle que soit la taille d'origine acceptée ici */
   var catDef = (document.getElementById('rch-photo-categorie-defaut')||{}).value || 'general';
   var legDef = (document.getElementById('rch-photo-legende-defaut')||{}).value || '';
   var loaded = 0;
   files.filter(function(f){ return f.type.startsWith('image/'); }).forEach(function(file) {
-    if (file.size > MAX) { toast('❌ '+file.name+' dépasse 5 Mo.','error'); return; }
+    if (file.size > MAX) { toast('❌ '+file.name+' dépasse 15 Mo.','error'); return; }
     var reader = new FileReader();
     reader.onload = function(e) {
       _compressImage(e.target.result, 1600, 0.7).then(async function(compressed){
