@@ -32984,11 +32984,29 @@ function getTauxCommissions() {
 function isVersementSouscription(versement) {
   if (versement.type === 'frais_souscription') return true; // frais → taux souscription
   if (versement.type === 'apport') return true;
-  // Si c'est le 1er versement du client
+  /* [FIX] Comparait seulement "existe-t-il un AUTRE versement", sans regarder
+     les dates : dépendait donc de l'ordre d'INSERTION en mémoire, pas de la
+     chronologie réelle du paiement. Deux cas concrets cassés par ça :
+     1) Import CSV en masse ou régénération/réparation (regenererToutesCommissions,
+        verifierCommissionsVersements) : tous les versements d'un client sont
+        déjà présents dans DATA.versements au moment du calcul → CHAQUE
+        versement, y compris le tout premier chronologiquement, voyait "un
+        autre existe" et perdait le taux souscription (plus élevé).
+     2) Rattrapage d'un versement passé saisi après un versement plus récent :
+        le vrai 1er paiement (antérieur) était classé "régulier" à tort, et
+        celui saisi en premier (mais postérieur) gardait indûment "souscription".
+     On compare désormais les dates : ce versement est "souscription" s'il est
+     le plus ANCIEN pour ce client (à égalité de date — même jour — l'id sert
+     de tie-break stable ; les versements n'ont pas d'horodatage plus précis). */
+  var maDate = versement.date || '';
   var autresVersements = DATA.versements.filter(function(v) {
     return v.client_id === versement.client_id && v.id !== versement.id;
   });
-  return autresVersements.length === 0;
+  return autresVersements.every(function(v) {
+    var d = v.date || '';
+    if (d !== maDate) return d > maDate;
+    return String(v.id) > String(versement.id);
+  });
 }
 
 /* Frais de souscription = NON remboursables → n'entrent pas dans le prix payé. */
@@ -33236,8 +33254,15 @@ async function genererCommissionsVersement(versement) {
   if ((client.apporteur || client.apporteur_id) && existTypes.indexOf('apporteur') === -1) {
     // Taux spécifique à l'apporteur > taux global
     var apObj = client.apporteur_id ? DATA.apporteurs.find(function(a){return a.id===client.apporteur_id;}) : null;
+    /* [FIX] apObj.taux_souscription||taux.apporteur_souscription écrasait un
+       taux à 0 EXPLICITEMENT saisi sur la fiche apporteur (cas légitime :
+       apporteur non rémunéré sur cette vente, déjà payé au forfait ailleurs)
+       par le taux global des Paramètres — l'apporteur touchait alors une
+       commission qu'il n'était pas censé avoir. On ne retombe sur le taux
+       global que si rien n'est renseigné du tout (undefined/null/''). */
+    var _tauxOuDefaut = function(v, dflt){ return (v !== undefined && v !== null && v !== '') ? (parseFloat(v)||0) : dflt; };
     var tauxAp = apObj
-      ? (isSouscription ? (apObj.taux_souscription||taux.apporteur_souscription) : (apObj.taux_regulier||taux.apporteur_regulier))
+      ? (isSouscription ? _tauxOuDefaut(apObj.taux_souscription, taux.apporteur_souscription) : _tauxOuDefaut(apObj.taux_regulier, taux.apporteur_regulier))
       : (isSouscription ? taux.apporteur_souscription : taux.apporteur_regulier);
     var montantAp = Math.round(montant * tauxAp / 100);
     if (montantAp > 0) {
@@ -33303,18 +33328,41 @@ async function payerCommission(id) {
   var choix = prompt(modeLabels + '\n\nEntrez 1, 2, 3 ou 4 :', '1');
   var mode = modes[parseInt(choix)-1] || 'virement';
 
+  /* [FIX] Le statut "payee" était persisté AVANT la comptabilisation, sans
+     filet : si comptabiliserCommission/comptabiliserPaiementCommission
+     échouait ensuite (compte par défaut manquant, réseau...), la commission
+     restait enregistrée "payee" en base avec une référence de paiement mais
+     SANS écriture comptable — et annulerCommission() refuse d’annuler toute
+     commission déjà "payee", bloquant toute correction depuis l’interface.
+     comptabiliserPaiementCommission() exige comm.statut==='payee' pour agir
+     (son propre garde-fou anti-doublon) : le statut doit donc bien être posé
+     avant l’appel, mais on revient en arrière — et on RE-PERSISTE ce retour
+     en base — si la comptabilisation échoue, au lieu de laisser un état
+     "payee" incorrect et bloqué définitivement. */
+  var statutAvant = comm.statut, datePaieAvant = comm.date_paiement, refPaieAvant = comm.ref_paiement;
   comm.statut = 'payee';
   comm.date_paiement = today();
   comm.ref_paiement = ref;
   await dbPut('commissions', comm);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', comm);
 
-  // Comptabiliser la charge si pas encore fait
-  if (!comm.ecriture_id) {
-    await comptabiliserCommission(comm, true);
+  try {
+    // Comptabiliser la charge si pas encore fait
+    if (!comm.ecriture_id) {
+      await comptabiliserCommission(comm, true);
+    }
+    // Comptabiliser le règlement
+    await comptabiliserPaiementCommission(comm, mode);
+  } catch(e) {
+    comm.statut = statutAvant;
+    comm.date_paiement = datePaieAvant;
+    comm.ref_paiement = refPaieAvant;
+    await dbPut('commissions', comm);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', comm);
+    toast('❌ Échec de la comptabilisation du paiement (' + (e && e.message ? e.message : 'erreur') + ') — la commission n’a PAS été marquée payée. Vérifiez les comptes par défaut puis réessayez.', 'error', 9000);
+    renderCommissions();
+    return;
   }
-  // Comptabiliser le règlement
-  await comptabiliserPaiementCommission(comm, mode);
 
   filterEcritures();
   renderCommissions();
@@ -100991,12 +101039,22 @@ async function annulerCommissionSilencieux(comm) {
 /* Recalcule les commissions d'un versement modifié */
 async function reimpacterCommissionsVersement(versement) {
   var liees = (DATA.commissions || []).filter(function(c) { return c.versement_id === versement.id && c.statut !== 'annulee'; });
-  if (liees.some(function(c) { return c.statut === 'payee'; })) {
-    toast('Commission déjà payée sur ce versement — recalcul bloqué. Extournez d\u2019abord le règlement.', 'error');
-    return false;
-  }
+  /* [FIX] Bloquait TOUT recalcul dès qu’UNE SEULE commission liée était payée
+     (ex. commerciale payée, apporteur pas encore) — même la commission
+     encore recalculable en toute sécurité restait figée sur l’ancien
+     montant, et l’appelant (savePaiement) affichait quand même "commissions
+     réimpactées" malgré ce blocage silencieux. Traité désormais au cas par
+     cas, comme deleteVersement() le fait déjà : annulerCommissionSilencieux()
+     ne touche jamais une commission payée (no-op ci-dessus), et
+     genererCommissionsVersement() ne recrée pas un type déjà présent et non
+     annulé — une commission payée reste donc protégée, seule celle
+     réellement recalculable est régénérée sur le nouveau montant. */
+  var dejaPayees = liees.filter(function(c){ return c.statut === 'payee'; });
   for (var i = 0; i < liees.length; i++) await annulerCommissionSilencieux(liees[i]);
   await genererCommissionsVersement(versement);
+  if (dejaPayees.length) {
+    toast('⚠️ ' + dejaPayees.length + ' commission(s) déjà payée(s) sur ce versement conservée(s) telle(s) quelle(s) (montant non recalculé) — extournez le règlement si elle(s) doi(ven)t changer.', 'info', 8000);
+  }
   if (typeof renderCommissions === 'function') renderCommissions();
   if (typeof filterEcritures === 'function') filterEcritures();
   if (typeof buildBalance === 'function') buildBalance();
