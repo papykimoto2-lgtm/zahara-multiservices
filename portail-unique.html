@@ -51,7 +51,14 @@
        garde son rendu centré d'origine, inchangé. */
     .hero-flex.has-video, .hero-flex.has-slides { display:flex; align-items:center; gap:44px; text-align:left; }
     .hero-flex.has-video .hero-text, .hero-flex.has-slides .hero-text { flex:1 1 50%; }
-    .hero-flex.has-video .hero-video-half, .hero-flex.has-slides .hero-slides-half { flex:1 1 50%; }
+    /* Les deux halves partagent la même règle sous les deux états : après la
+       fin de la vidéo, le diaporama prend le relais dans la moitié de
+       bannière SANS que la classe passe de has-video à has-slides (voir JS) —
+       .hero-slides-half doit donc aussi être correctement dimensionné sous
+       has-video, et réciproquement pour une vidéo qui serait injectée en JS
+       pendant que has-slides est actif. */
+    .hero-flex.has-video .hero-video-half, .hero-flex.has-slides .hero-slides-half,
+    .hero-flex.has-video .hero-slides-half, .hero-flex.has-slides .hero-video-half { flex:1 1 50%; }
     .hero-flex.has-video .hero-text p, .hero-flex.has-slides .hero-text p { margin:0; max-width:none; }
     @media (max-width:980px) { .hero-flex.has-video, .hero-flex.has-slides { flex-direction:column; text-align:center; } .hero-flex.has-video .hero-text p, .hero-flex.has-slides .hero-text p { margin:0 auto; max-width:640px; } }
     .hero-slides-half { position:relative; }
@@ -2032,25 +2039,37 @@
        configurée — sinon rien n'est chargé et la bannière reste centrée
        comme avant. */
     var heroVideoUrl = BR('hero_video_url','');
+    var heroSlides = BR('hero_slides', []);
+    if (!Array.isArray(heroSlides)) heroSlides = [];
     var hf = document.getElementById('hero-flex');
     var hvHalf = document.getElementById('hero-video-half');
+    var hsHalf = document.getElementById('hero-slides-half');
     if (heroVideoUrl && hf && hvHalf) {
       hf.classList.add('has-video');
       hvHalf.style.display = '';
+      if (hsHalf) hsHalf.style.display = 'none';
       var hvSrc = document.getElementById('hero-video-src');
       if (hvSrc) hvSrc.src = heroVideoUrl;
       var hvEl = document.getElementById('hero-video-el');
       if (hvEl) hvEl.load();
       var heroPoster = BR('hero_image','');
       if (hvEl && heroPoster) hvEl.poster = heroPoster;
+      /* À la fin de la vidéo, enchaîne automatiquement sur le diaporama photo
+         (s'il y en a un de réglé) dans la même moitié de bannière — la vidéo
+         garde juste la priorité à l'ARRIVÉE sur la page, pas indéfiniment. */
+      if (hvEl && heroSlides.length && hsHalf) {
+        hvEl.addEventListener('ended', function(){
+          hvHalf.style.display = 'none';
+          hsHalf.style.display = '';
+          heroSlidesDemarrer(heroSlides);
+        }, { once: true });
+      }
     } else if (hf) {
       hf.classList.remove('has-video');
       if (hvHalf) hvHalf.style.display = 'none';
-      /* Diaporama photo : uniquement si aucune vidéo institutionnelle n'est
-         réglée (la vidéo garde la priorité quand les deux sont configurées). */
-      var heroSlides = BR('hero_slides', []);
-      var hsHalf = document.getElementById('hero-slides-half');
-      if (Array.isArray(heroSlides) && heroSlides.length && hf && hsHalf) {
+      /* Pas de vidéo réglée : le diaporama (s'il y en a un) prend directement
+         la moitié de bannière. */
+      if (heroSlides.length && hsHalf) {
         hf.classList.add('has-slides');
         hsHalf.style.display = '';
         heroSlidesDemarrer(heroSlides);
