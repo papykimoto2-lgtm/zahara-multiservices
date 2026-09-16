@@ -111378,14 +111378,15 @@ function _ppSyntheseGoFinitionHtml(nomens) {
 function printPreviewDQE() {
   /* ─ Récupération du type et des données ─ */
   var type = ((document.getElementById('dqe-type-logement') || {}).value) || 'F2';
-  var nomens = (DATA.nomenclatures || []).filter(function(n) { return n.type_logement === type; });
-  if (!nomens.length) {
-    var defaults = (NOMENCLATURES_PAR_DEFAUT && NOMENCLATURES_PAR_DEFAUT[type]) || [];
-    nomens = defaults.map(function(item) {
-      return { id: uid(), type_logement: type, poste: item.poste, materiau: item.materiau,
-               unite: item.unite, quantite: item.quantite, prix_forfait: item.prix_forfait || 0 };
-    });
-  }
+  /* [FIX] Filtrait DATA.nomenclatures directement par type_logement seul,
+     tous programmes confondus — contrairement à l'écran (chargerNomenclature
+     → dqeNomenclaturesPourType, scopée par dqe-filter-programme). Un type
+     partagé par deux programmes (ex. « F3 ») faisait imprimer/exporter un
+     déboursé, coût de revient et prix de vente sommant les DEUX programmes,
+     divergents de ce qui est affiché à l'écran au moment de l'impression.
+     Repasse par le point centralisé, comme calculerCoutParType() et les
+     autres consommateurs déjà corrigés. */
+  var nomens = dqeNomenclaturesPourType(type).nomens;
   /* ─ Regroupement par poste ─ */
   var postes = {}, totalGlobal = 0;
   nomens.forEach(function(n) {
