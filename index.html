@@ -45257,6 +45257,11 @@ async function savePurgeParams() {
     purge_visites_days: gv('param-purge-visites')||365,
   });
   await dbPut('params', DATA.params);
+  /* [FIX] syncToSupabase absent : les seuils de purge restaient locaux à ce
+     poste — jamais poussés au cloud, donc invisibles sur les autres postes,
+     et perdus sur CE poste au prochain pull cloud (le champ n'a jamais
+     existé côté serveur pour être préservé). */
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
   toast('Paramètres de purge enregistrés.', 'success');
 }
 
@@ -45297,12 +45302,19 @@ function renderParamsReporting() {
     +'<div class="card"><div class="form-section-title">📊 Rapports automatiques</div>'
     +'<div class="form-grid" style="margin-top:10px;">'
     +'<div class="form-group"><label>Rapport CA mensuel</label>'
-    +'<select class="form-control" id="rpt-ca-freq"><option value="desactive">Désactivé</option>'
-    +'<option value="mensuel" '+(p.rpt_ca_freq==="mensuel"?"selected":"")+'}>Mensuel (1er du mois)</option>'
-    +'<option value="hebdo">Hebdomadaire (lundi)</option></select></div>'
+    /* [FIX] Un "}" résiduel dans l'attribut cassait le "selected" du choix
+       Mensuel (le navigateur voyait selected} — invalide, donc ignoré), et
+       ni "Hebdomadaire" ci-dessous ni aucune option de rpt-rh-freq n'avaient
+       de logique selected du tout : la donnée était bien enregistrée (dbPut
+       + sync corrects dans saveReportingParams), mais l'écran retombait
+       toujours sur "Désactivé" à chaque réouverture de l'onglet — l'utilisateur
+       croyait que son choix ne s'enregistrait pas. */
+    +'<select class="form-control" id="rpt-ca-freq"><option value="desactive"'+(p.rpt_ca_freq!=="mensuel"&&p.rpt_ca_freq!=="hebdo"?" selected":"")+'>Désactivé</option>'
+    +'<option value="mensuel" '+(p.rpt_ca_freq==="mensuel"?"selected":"")+'>Mensuel (1er du mois)</option>'
+    +'<option value="hebdo" '+(p.rpt_ca_freq==="hebdo"?"selected":"")+'>Hebdomadaire (lundi)</option></select></div>'
     +'<div class="form-group"><label>Rapport RH/présence</label>'
-    +'<select class="form-control" id="rpt-rh-freq"><option value="desactive">Désactivé</option>'
-    +'<option value="mensuel">Mensuel</option></select></div>'
+    +'<select class="form-control" id="rpt-rh-freq"><option value="desactive"'+(p.rpt_rh_freq!=="mensuel"?" selected":"")+'>Désactivé</option>'
+    +'<option value="mensuel" '+(p.rpt_rh_freq==="mensuel"?"selected":"")+'>Mensuel</option></select></div>'
     +'<div class="form-group span-2"><label>Email(s) destinataires (séparés par ;)</label>'
     +'<input type="text" class="form-control" id="rpt-emails" value="'+(escHtml(p.rpt_emails||''))+'" placeholder="email1@exemple.ci;email2@exemple.ci"></div>'
     +'<div class="form-group span-2"><label>Objet des rapports automatiques</label>'
@@ -45377,11 +45389,15 @@ async function saveWorkflowParams() {
     var e = document.getElementById('wf-'+k);
     if (e) DATA.params = Object.assign(DATA.params||{}, { ['wf_'+k]: e.checked });
   });
-  var gv = function(id){ var e=document.getElementById(id); return e?parseFloat(e.value)||0:0; };
+  /* [FIX] gv(id)||défaut écrasait un seuil de validation volontairement mis
+     à 0 (ex. "toute dépense, même 0 FCFA, doit passer par le N1") par la
+     valeur par défaut — gv0() ne retombe sur le défaut que si le champ est
+     vraiment vide/non numérique, pas quand l'utilisateur a saisi 0. */
+  var gv0 = function(id, dflt){ var e=document.getElementById(id); if(!e || e.value==='') return dflt; var n=parseFloat(e.value); return isNaN(n)?dflt:n; };
   DATA.params = Object.assign(DATA.params||{}, {
-    workflow_seuil_n1:  gv('param-workflow-seuil-n1')  || 1000000,
-    workflow_seuil_n2:  gv('param-workflow-seuil-n2')  || 5000000,
-    workflow_seuil_pdg: gv('param-workflow-seuil-pdg') || 20000000,
+    workflow_seuil_n1:  gv0('param-workflow-seuil-n1', 1000000),
+    workflow_seuil_n2:  gv0('param-workflow-seuil-n2', 5000000),
+    workflow_seuil_pdg: gv0('param-workflow-seuil-pdg', 20000000),
   });
   await dbPut('params', DATA.params);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
@@ -45394,82 +45410,84 @@ async function saveWorkflowParams() {
 async function saveModulesAvancesParams() {
   var gv  = function(id){ var e=document.getElementById(id); return e?e.value:''; };
   var gvn = function(id){ var e=document.getElementById(id); return e?parseFloat(e.value)||0:0; };
+  /* [FIX] gvn(id)||défaut écrasait un 0 volontairement saisi par l'utilisateur (taux d'indexation locative à 0%, seuil à 0...) avec la valeur par défaut — gvn0() ne retombe dessus que si le champ est vraiment vide/non numérique. */
+  var gvn0 = function(id, dflt){ var e=document.getElementById(id); if(!e || e.value==='') return dflt; var n=parseFloat(e.value); return isNaN(n)?dflt:n; };
   var gvc = function(id){ var e=document.getElementById(id); return e?e.checked:false; };
   DATA.params = Object.assign(DATA.params||{}, {
-    lbcft_seuil_suspect:        gvn('param-lbcft-seuil-suspect')       || 5000000,
-    lbcft_seuil_id_renforcee:   gvn('param-lbcft-seuil-id-renforcee')  || 2500000,
-    lbcft_revue_kyc_mois:       gvn('param-lbcft-revue-kyc-mois')      || 12,
-    lbcft_conservation_annees:  gvn('param-lbcft-conservation-annees') || 10,
+    lbcft_seuil_suspect:        gvn0('param-lbcft-seuil-suspect', 5000000),
+    lbcft_seuil_id_renforcee:   gvn0('param-lbcft-seuil-id-renforcee', 2500000),
+    lbcft_revue_kyc_mois:       gvn0('param-lbcft-revue-kyc-mois', 12),
+    lbcft_conservation_annees:  gvn0('param-lbcft-conservation-annees', 10),
     lbcft_responsable:          gv('param-lbcft-responsable'),
     lbcft_email_centif:         gv('param-lbcft-email-centif'),
     lbcft_controle_pep:         gvc('param-lbcft-controle-pep'),
 
-    treso_plafond_caisse:       gvn('param-treso-plafond-caisse')      || 2000000,
-    treso_plafond_especes:      gvn('param-treso-plafond-especes')     || 5000000,
-    treso_seuil_alerte_solde:   gvn('param-treso-seuil-alerte-solde')  || 500000,
-    treso_delai_rapprochement:  gvn('param-treso-delai-rapprochement') || 5,
+    treso_plafond_caisse:       gvn0('param-treso-plafond-caisse', 2000000),
+    treso_plafond_especes:      gvn0('param-treso-plafond-especes', 5000000),
+    treso_seuil_alerte_solde:   gvn0('param-treso-seuil-alerte-solde', 500000),
+    treso_delai_rapprochement:  gvn0('param-treso-delai-rapprochement', 5),
     treso_devise_ref:           gv('param-treso-devise-ref') || 'XOF',
     treso_double_validation:    gvc('param-treso-double-validation'),
 
     budget_methode:              gv('param-budget-methode') || 'exercice_fixe',
     budget_devise:                gv('param-budget-devise') || 'XOF',
-    budget_seuil_depassement_pct: gvn('param-budget-seuil-depassement-pct') || 10,
-    budget_validation_montant:    gvn('param-budget-validation-montant')    || 5000000,
+    budget_seuil_depassement_pct: gvn0('param-budget-seuil-depassement-pct', 10),
+    budget_validation_montant:    gvn0('param-budget-validation-montant', 5000000),
 
-    dqe_marge_defaut_pct: gvn('param-dqe-marge-defaut-pct') || 15,
-    dqe_coeff_aleas_pct:  gvn('param-dqe-coeff-aleas-pct')  || 5,
-    dqe_tva_pct:          gvn('param-dqe-tva-pct')          || 18,
-    dqe_validite_jours:   gvn('param-dqe-validite-jours')   || 30,
+    dqe_marge_defaut_pct: gvn0('param-dqe-marge-defaut-pct', 15),
+    dqe_coeff_aleas_pct:  gvn0('param-dqe-coeff-aleas-pct', 5),
+    dqe_tva_pct:          gvn0('param-dqe-tva-pct', 18),
+    dqe_validite_jours:   gvn0('param-dqe-validite-jours', 30),
 
-    debourse_seuil_validation: gvn('param-debourse-seuil-validation') || 1000000,
+    debourse_seuil_validation: gvn0('param-debourse-seuil-validation', 1000000),
     debourse_compte_defaut:    gv('param-debourse-compte-defaut'),
     debourse_circuit:          gv('param-debourse-circuit') || 'chef_dg',
 
-    stock_seuil_min_alerte:      gvn('param-stock-seuil-min-alerte') || 20,
+    stock_seuil_min_alerte:      gvn0('param-stock-seuil-min-alerte', 20),
     stock_methode_valorisation:  gv('param-stock-methode-valorisation') || 'CUMP',
-    achats_delai_paiement_jours: gvn('param-achats-delai-paiement-jours') || 30,
-    achats_seuil_validation_bc:  gvn('param-achats-seuil-validation-bc')  || 500000,
+    achats_delai_paiement_jours: gvn0('param-achats-delai-paiement-jours', 30),
+    achats_seuil_validation_bc:  gvn0('param-achats-seuil-validation-bc', 500000),
 
-    foncier_alerte_titre_jours: gvn('param-foncier-alerte-titre-jours') || 60,
-    foncier_delai_instruction:  gvn('param-foncier-delai-instruction')  || 30,
-    foncier_taux_redevance:     gvn('param-foncier-taux-redevance')     || 0,
+    foncier_alerte_titre_jours: gvn0('param-foncier-alerte-titre-jours', 60),
+    foncier_delai_instruction:  gvn0('param-foncier-delai-instruction', 30),
+    foncier_taux_redevance:     gvn0('param-foncier-taux-redevance', 0),
     foncier_registre_ref:       gv('param-foncier-registre-ref'),
 
-    juridique_alerte_echeance_jours: gvn('param-juridique-alerte-echeance-jours') || 30,
-    juridique_prescription_annees:   gvn('param-juridique-prescription-annees')   || 5,
+    juridique_alerte_echeance_jours: gvn0('param-juridique-alerte-echeance-jours', 30),
+    juridique_prescription_annees:   gvn0('param-juridique-prescription-annees', 5),
     juridique_cabinet:               gv('param-juridique-cabinet'),
     juridique_numerotation:          gv('param-juridique-numerotation'),
 
-    locatif_indexation_pct:      gvn('param-locatif-indexation-pct')      || 3,
-    locatif_preavis_jours:       gvn('param-locatif-preavis-jours')       || 90,
-    locatif_penalite_retard_pct: gvn('param-locatif-penalite-retard-pct') || 5,
-    locatif_depot_garantie_mois: gvn('param-locatif-depot-garantie-mois') || 2,
-    locatif_jour_echeance:       gvn('param-locatif-jour-echeance')       || 5,
+    locatif_indexation_pct:      gvn0('param-locatif-indexation-pct', 3),
+    locatif_preavis_jours:       gvn0('param-locatif-preavis-jours', 90),
+    locatif_penalite_retard_pct: gvn0('param-locatif-penalite-retard-pct', 5),
+    locatif_depot_garantie_mois: gvn0('param-locatif-depot-garantie-mois', 2),
+    locatif_jour_echeance:       gvn0('param-locatif-jour-echeance', 5),
 
     copro_frequence_charges:    gv('param-copro-frequence-charges') || 'trimestrielle',
-    copro_taux_interet_retard:  gvn('param-copro-taux-interet-retard') || 1,
-    copro_quorum_ag:            gvn('param-copro-quorum-ag') || 50,
-    copro_fonds_reserve_pct:    gvn('param-copro-fonds-reserve-pct') || 5,
+    copro_taux_interet_retard:  gvn0('param-copro-taux-interet-retard', 1),
+    copro_quorum_ag:            gvn0('param-copro-quorum-ag', 50),
+    copro_fonds_reserve_pct:    gvn0('param-copro-fonds-reserve-pct', 5),
 
-    parcauto_alerte_visite_jours:    gvn('param-parcauto-alerte-visite-jours')    || 30,
-    parcauto_alerte_assurance_jours: gvn('param-parcauto-alerte-assurance-jours') || 30,
-    parcauto_seuil_entretien_km:     gvn('param-parcauto-seuil-entretien-km')     || 500,
-    parcauto_plafond_carburant:      gvn('param-parcauto-plafond-carburant')      || 150000,
+    parcauto_alerte_visite_jours:    gvn0('param-parcauto-alerte-visite-jours', 30),
+    parcauto_alerte_assurance_jours: gvn0('param-parcauto-alerte-assurance-jours', 30),
+    parcauto_seuil_entretien_km:     gvn0('param-parcauto-seuil-entretien-km', 500),
+    parcauto_plafond_carburant:      gvn0('param-parcauto-plafond-carburant', 150000),
 
-    crm_delai_relance_prospect: gvn('param-crm-delai-relance-prospect') || 3,
-    crm_score_min_qualif:       gvn('param-crm-score-min-qualif')       || 50,
+    crm_delai_relance_prospect: gvn0('param-crm-delai-relance-prospect', 3),
+    crm_score_min_qualif:       gvn0('param-crm-score-min-qualif', 50),
     crm_source_defaut:          gv('param-crm-source-defaut') || 'site_web',
     crm_territoires:            gv('param-crm-territoires'),
 
-    agenda_rappel_minutes: gvn('param-agenda-rappel-minutes') || 30,
+    agenda_rappel_minutes: gvn0('param-agenda-rappel-minutes', 30),
     agenda_heure_debut:    gv('param-agenda-heure-debut') || '08:00',
     agenda_heure_fin:      gv('param-agenda-heure-fin') || '18:00',
     agenda_signature:      gv('param-agenda-signature'),
 
     diaspo_devise:                 gv('param-diaspo-devise') || 'EUR',
-    diaspo_taux_change_ref:        gvn('param-diaspo-taux-change-ref') || 655.957,
+    diaspo_taux_change_ref:        gvn0('param-diaspo-taux-change-ref', 655.957),
     diaspo_canal:                  gv('param-diaspo-canal') || 'whatsapp',
-    diaspo_delai_traitement_jours: gvn('param-diaspo-delai-traitement-jours') || 15,
+    diaspo_delai_traitement_jours: gvn0('param-diaspo-delai-traitement-jours', 15),
   });
   await dbPut('params', DATA.params);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
@@ -45686,6 +45704,14 @@ async function publierParamsPortailManuel(){
 
 async function saveObjectifs() {
   var gv = function(id){ var e=document.getElementById(id); return e?parseFloat(e.value)||0:0; };
+  /* [FIX] gv(id)||défaut écrasait un 0 volontairement saisi (gv() renvoie déjà
+     0 pour un champ vide OU explicitement à 0 — indiscernables — puis
+     "0||70" retombe sur 70) : un gestionnaire voulant un seuil d'immobilisation
+     à 0% (aucune tolérance) ou une réservation invalidée immédiatement (0 jour)
+     voyait sa saisie silencieusement remplacée par la valeur par défaut à
+     chaque enregistrement. gv0() ne retombe sur le défaut que si le champ est
+     vraiment vide/non numérique. */
+  var gv0 = function(id, dflt){ var e=document.getElementById(id); if(!e || e.value==='') return dflt; var n=parseFloat(e.value); return isNaN(n)?dflt:n; };
   DATA.params = Object.assign(DATA.params||{},{
     objectif_ca_mensuel:     gv('param-obj-ca'),
     objectif_ventes_mensuel: gv('param-obj-ventes'),
@@ -45693,8 +45719,8 @@ async function saveObjectifs() {
     objectif_visites_mensuel:gv('param-obj-visites'),
     objectif_recouvrement:   gv('param-obj-recouvrement'),
     objectif_conversion:     gv('param-obj-conversion'),
-    seuil_immobilisation_pct:      gv('param-seuil-immob') || 70,
-    delai_validite_reservation_j:  gv('param-delai-validite-reservation') || 30,
+    seuil_immobilisation_pct:      gv0('param-seuil-immob', 70),
+    delai_validite_reservation_j:  gv0('param-delai-validite-reservation', 30),
     max_sans_rapport:        gv('param-max-sans-rapport'),
     objectif_avancement:     gv('param-obj-avancement'),
     delai_relance:           gv('param-delai-relance'),
@@ -45722,12 +45748,30 @@ async function saveAlerteSeuils() {
 
 async function saveAllParams() {
   if (typeof _paramsToucher === 'function') _paramsToucher();
-  await saveParams();
-  await saveObjectifs();
-  await saveAlerteSeuils();
-  await saveWorkflowParams();
-  await saveModulesAvancesParams();
-  toast('✅ Tous les paramètres enregistrés.','success');
+  /* [FIX] Aucun try/catch : une exception dans l'une des 5 sections
+     interrompait silencieusement TOUTES les suivantes — l'utilisateur ne
+     voyait que l'absence du toast final "Tous les paramètres enregistrés",
+     sans jamais savoir laquelle des sections n'avait pas été sauvée, ni que
+     les autres avaient été sautées. Chaque section est désormais
+     indépendante : un échec sur l'une n'empêche plus les autres d'être
+     enregistrées, et les échecs sont nommés explicitement à l'utilisateur. */
+  var etapes = [
+    ['Société / Portail / Commissions', saveParams],
+    ['Objectifs', saveObjectifs],
+    ['Seuils d\'alerte', saveAlerteSeuils],
+    ['Workflow de validation', saveWorkflowParams],
+    ['Modules avancés', saveModulesAvancesParams]
+  ];
+  var echecs = [];
+  for (var i = 0; i < etapes.length; i++) {
+    try { await etapes[i][1](); }
+    catch(e) { echecs.push(etapes[i][0]); console.error('[saveAllParams] échec section « ' + etapes[i][0] + ' »', e); }
+  }
+  if (echecs.length) {
+    toast('⚠️ Échec de l\'enregistrement pour : ' + echecs.join(', ') + '. Les autres sections ont bien été enregistrées — corrigez puis réessayez pour celle(s) en échec.', 'error', 9000);
+  } else {
+    toast('✅ Tous les paramètres enregistrés.','success');
+  }
 }
 
 function loadParamFields() {
@@ -77141,6 +77185,12 @@ async function saveCommsParams() {
     twilio_from:      gv('param-twilio-from'),
   });
   await dbPut('params', DATA.params);
+  /* [FIX] syncToSupabase absent : les identifiants EmailJS/WhatsApp/Twilio
+     (SID, token, from — nécessaires à l'envoi des SMS) restaient locaux à ce
+     poste, jamais poussés au cloud. Même le bouton « Tout enregistrer »
+     (saveAllParams, patché juste en dessous pour appeler cette fonction en
+     dernier) ne les envoyait donc jamais à Supabase. */
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
   initEmailJS();
   toast('✅ Paramètres communications enregistrés.','success');
 }
@@ -77149,7 +77199,12 @@ async function saveCommsParams() {
 var _origSaveAllParamsComms = saveAllParams;
 saveAllParams = async function() {
   await _origSaveAllParamsComms();
-  await saveCommsParams();
+  /* [FIX] Non protégé : un échec ici (ex. champ invalide) interrompait sans
+     toast, après que le reste de la chaîne (patchée juste au-dessus) ait
+     déjà affiché son propre résultat — incohérent avec la nouvelle
+     résilience par section de saveAllParams(). */
+  try { await saveCommsParams(); }
+  catch(e) { console.error('[saveAllParams] échec section « Communications »', e); toast('⚠️ Échec de l\'enregistrement des paramètres Communications.', 'error', 7000); }
 };
 
 /* ─── Patch loadParamFields ───────────────────────────── */
