@@ -34924,10 +34924,23 @@ function serieRenderRecap() {
     _SERIE_PREVIEW.length + ' lot(s) à générer — Programme : ' + ((prog && prog.nom) || '—');
   var standings = { economique:'Économique', moyen:'Moyen', haut:'Haut de gamme', prestige:'Prestige' };
   var livraisons = { gros_oeuvre:'Gros œuvre', second_oeuvre:'Second œuvre', cle_en_main:'Clé en main' };
+  /* [FIX rattachement DQE↔lot] La colonne « Type » était un champ texte
+     libre : une faute de frappe/casse retapée ici, juste avant la création
+     effective des lots, découplait silencieusement le lot de son DQE réel
+     (_typeKey() ne matche alors plus aucune nomenclature → coût de revient
+     à 0 ou sur un mauvais gabarit, sans alerte). Remplacé par un select
+     contraint aux mêmes types de conception que modele-nom
+     (_dqeOptionsTypesConception), avec repli visible si la valeur actuelle
+     (héritée du modèle) ne correspond déjà à aucune conception. */
+  var _serieTypesHtml = (typeof _dqeOptionsTypesConception === 'function') ? _dqeOptionsTypesConception(_SERIE_PROGID) : '';
   document.getElementById('serie-recap-tbody').innerHTML = _SERIE_PREVIEW.map(function(r, idx) {
+    var typeManque = r.type && _serieTypesHtml.indexOf('value="' + escHtml(r.type) + '"') === -1;
+    var typeOptions = (typeManque ? '<option value="' + escHtml(r.type) + '">⚠️ ' + escHtml(r.type) + ' (introuvable en conception)</option>' : '') + _serieTypesHtml;
     return '<tr>'
       + '<td><input type="text" class="form-control" style="min-width:90px;" value="' + escHtml(r.numero) + '" onchange="serieModifierChamp(' + idx + ',\'numero\',this.value)"></td>'
-      + '<td><input type="text" class="form-control" style="min-width:100px;" value="' + escHtml(r.type) + '" onchange="serieModifierChamp(' + idx + ',\'type\',this.value)"></td>'
+      + '<td><select class="form-control" style="min-width:100px;" onchange="serieModifierChamp(' + idx + ',\'type\',this.value)" title="' + (typeManque ? 'Ce libellé ne correspond à aucune conception — le DQE ne le retrouvera pas.' : '') + '">'
+        + (typeOptions || '<option value="' + escHtml(r.type) + '">' + escHtml(r.type) + '</option>')
+        + '</select></td>'
       + '<td><input type="number" class="form-control" style="width:90px;" value="' + (r.surface||0) + '" onchange="serieModifierChamp(' + idx + ',\'surface\',this.value)"></td>'
       + '<td><input type="number" class="form-control" style="width:120px;" value="' + (r.prix||0) + '" onchange="serieModifierChamp(' + idx + ',\'prix\',this.value)"></td>'
       + '<td><select class="form-control" onchange="serieModifierChamp(' + idx + ',\'standing\',this.value)">'
@@ -34939,6 +34952,12 @@ function serieRenderRecap() {
       + '<td><button class="btn btn-danger btn-sm" onclick="serieSupprimerLigne(' + idx + ')">🗑</button></td>'
       + '</tr>';
   }).join('');
+  /* Le HTML des <option> ne porte pas d'attribut selected pour la colonne
+     Type (valeurs générées dynamiquement par ligne) — on pose la valeur
+     courante après coup, comme modeleRafraichirTypes() le fait déjà. */
+  document.querySelectorAll('#serie-recap-tbody select[onchange*="\'type\'"]').forEach(function(sel, i){
+    if (_SERIE_PREVIEW[i]) sel.value = _SERIE_PREVIEW[i].type;
+  });
 }
 
 function serieModifierChamp(idx, champ, val) {
@@ -83137,7 +83156,7 @@ function _dqeRecapProgramme(programmeId) {
   }
   var total = lignes.reduce(function(s,l){ return s+l.sousTotal; }, 0);
   var nbLotsReels = DATA.lots.filter(function(l){ return !programmeId || l.programme_id === programmeId; }).length;
-  return { lignes:lignes, total:total, nbLots: modeles.length ? nbLotsReels : nbLotsReels, nbPrevu: modeles.length ? modeles.reduce(function(s,m){ return s+(m.nb_unites||0); },0) : nbLotsReels, source: modeles.length ? 'modeles' : 'lots' };
+  return { lignes:lignes, total:total, nbLots: nbLotsReels, nbPrevu: modeles.length ? modeles.reduce(function(s,m){ return s+(m.nb_unites||0); },0) : nbLotsReels, source: modeles.length ? 'modeles' : 'lots' };
 }
 
 async function genererDQEPourProgramme() {
@@ -83188,22 +83207,37 @@ async function dqeValiderProgramme() {
   var ctx = window._dqeRevueProgramme;
   if (!ctx) return;
   var lots = DATA.lots.filter(function(l){ return l.programme_id === ctx.programmeId; });
-  var maj = 0;
+  var maj = 0, inchange = 0;
   for (var i = 0; i < lots.length; i++) {
     var lot = lots[i];
     var typeKey = _typeKey(lot.type_logement || lot.type);
     var coutDQE = _coutTypeDansProgramme(typeKey, ctx.programmeId);
-    if (!lot.cout_revient && coutDQE > 0) {
-      lot.cout_revient = coutDQE;
-      var idx = DATA.lots.findIndex(function(l){ return l.id===lot.id; });
-      if (idx >= 0) DATA.lots[idx].cout_revient = coutDQE;
-      await dbPut('lots', lot);
-      if (typeof syncToSupabase === 'function') syncToSupabase('pi_lots', lot);
-      maj++;
-    }
+    if (coutDQE <= 0) continue;
+    /* [FIX] L'ancienne garde « if (!lot.cout_revient && coutDQE > 0) »
+       sautait tout lot déjà pourvu d'un coût — y compris l'estimation
+       grossière posée à la création du lot depuis le modèle de logement
+       (genererLotsDepuisModeles → cout_revient: m.cout_revient). Résultat :
+       chiffrer un DQE complet puis cliquer « Valider — appliquer aux lots »
+       pouvait afficher « 0 lot(s) mis à jour » sans qu'aucun coût ne
+       change, alors même que le bouton promet explicitement l'application.
+       Le coût bâti (lot._coutBati) est désormais TOUJOURS rafraîchi avec la
+       valeur DQE courante ; la part foncière déjà ventilée séparément
+       (lot._coutFoncier, voir ventilerCoutFoncierProgramme) est ajoutée
+       telle quelle, jamais écrasée. */
+    var foncierExistant = parseFloat(lot._coutFoncier) || 0;
+    var nouveauCout = coutDQE + foncierExistant;
+    if (lot.cout_revient === nouveauCout && parseFloat(lot._coutBati) === coutDQE) { inchange++; continue; }
+    lot._coutBati = coutDQE;
+    lot.cout_revient = nouveauCout;
+    var idx = DATA.lots.findIndex(function(l){ return l.id===lot.id; });
+    if (idx >= 0) { DATA.lots[idx]._coutBati = coutDQE; DATA.lots[idx].cout_revient = nouveauCout; }
+    await dbPut('lots', lot);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_lots', lot);
+    maj++;
   }
   closeModal('modal-dqe-revue-programme');
-  toast('✅ DQE validé — ' + maj + ' lot(s) mis à jour.','success');
+  toast('✅ DQE validé — ' + maj + ' lot(s) mis à jour'
+    + (inchange ? ' (' + inchange + ' déjà à jour)' : '') + '.','success');
   buildEcartDQE();
 }
 
@@ -96446,13 +96480,24 @@ function edsImporterDepuisDQE() {
     toast('⚠️ Aucun poste de ce DQE n\'est relié à un ouvrage — rien d\'importable. Utilisez « Créer l\'ouvrage »/« Unifier tous les postes » dans le DQE d\'abord.', 'error');
     return;
   }
-  var n = 0;
+  /* [FIX doublon] Additionnait la quantité DQE à la quantité déjà présente
+     dans _edsLignes à CHAQUE clic sur « Importer depuis le DQE » — recliquer
+     après avoir juste ajouté un nouveau poste au DQE réimportait aussi tous
+     les postes déjà importés, en les AJOUTANT une seconde fois (contraire à
+     edsGenererMetreAuto(), qui remplace et reste idempotent). On calcule
+     donc le total par ouvrage à partir du DQE actuel, puis on REMPLACE la
+     quantité de la ligne existante — un réimport donne le même résultat que
+     le DQE courant, quel que soit le nombre de clics. */
+  var totauxParOuvrage = {};
   avecOuvrage.forEach(function(p){
-    var ex = _edsLignes.find(function(l){ return l.ouvrage_id === p.ouvrage_id; });
-    if (ex) { ex.qte = (parseFloat(ex.qte)||0) + (parseFloat(p.quantite)||0); }
-    else { _edsLignes.push({ id: uid(), ouvrage_id: p.ouvrage_id, qte: parseFloat(p.quantite)||0 }); }
-    n++;
+    totauxParOuvrage[p.ouvrage_id] = (totauxParOuvrage[p.ouvrage_id] || 0) + (parseFloat(p.quantite)||0);
   });
+  Object.keys(totauxParOuvrage).forEach(function(oid){
+    var ex = _edsLignes.find(function(l){ return l.ouvrage_id === oid; });
+    if (ex) { ex.qte = totauxParOuvrage[oid]; }
+    else { _edsLignes.push({ id: uid(), ouvrage_id: oid, qte: totauxParOuvrage[oid] }); }
+  });
+  var n = avecOuvrage.length;
   edsRenderLignes();
   toast('✅ ' + n + ' poste(s) importé(s) depuis le DQE « ' + type + ' »'
     + (sansOuvrage.length ? ' — ' + sansOuvrage.length + ' poste(s) sans ouvrage ignoré(s) (non importables).' : '.'), 'success');
@@ -108601,8 +108646,21 @@ function pgmRendrePilotage() {
    les deux options plutôt que d'en imposer une.
    ══════════════════════════════════════════════════════════════════════════ */
 
-function _dqeOrigines(type) {
-  var L = (DATA.nomenclatures || []).filter(function(n){ return n.type_logement === type; });
+function _dqeOrigines(type, programmeId) {
+  /* [FIX] Filtrait uniquement par type_logement, tous programmes confondus :
+     deux programmes partageant le même libellé de type (« F2 », « VILLA »…)
+     voyaient leurs postes fusionnés ici, et dqeSupprimerGenere() pouvait donc
+     effacer les postes _genere_plan/_genere_struct d'un AUTRE programme en
+     supprimant depuis l'écran d'un programme donné — silencieusement. Même
+     correctif que dqeNomenclaturesPourType()/dqeRevueCompletude() : n'exclut
+     que si l'entrée porte un programme_id ET qu'un programme précis est
+     filtré, pour ne pas casser les anciennes lignes sans programme_id. */
+  var progFiltre = programmeId !== undefined ? (programmeId || '') : ((document.getElementById('dqe-filter-programme') || {}).value || '');
+  var L = (DATA.nomenclatures || []).filter(function(n){
+    if (n.type_logement !== type) return false;
+    if (n.programme_id && progFiltre && n.programme_id !== progFiltre) return false;
+    return true;
+  });
   return {
     plan:   L.filter(function(n){ return n._genere_plan; }),
     struct: L.filter(function(n){ return n._genere_struct; }),
@@ -108612,8 +108670,9 @@ function _dqeOrigines(type) {
   };
 }
 
-async function dqeSupprimerGenere(type, origine) {
-  var O = _dqeOrigines(type);
+async function dqeSupprimerGenere(type, origine, programmeId) {
+  var progFiltre = programmeId !== undefined ? (programmeId || '') : ((document.getElementById('dqe-filter-programme') || {}).value || '');
+  var O = _dqeOrigines(type, progFiltre);
   var cible = origine === 'struct' ? O.struct : (origine === 'tout' ? O.plan.concat(O.struct) : O.plan);
   if (!cible.length) { toast('Aucun poste à supprimer.', 'info'); return; }
 
@@ -108625,7 +108684,16 @@ async function dqeSupprimerGenere(type, origine) {
   if (O.cctp.length)   conserve.push(O.cctp.length + ' poste(s) CCTP');
   if (O.manuel.length) conserve.push(O.manuel.length + ' poste(s) saisi(s) à la main');
 
+  /* [FIX] Portée programme rendue explicite dans la confirmation : sans
+     filtre programme actif, la suppression touche potentiellement plusieurs
+     programmes partageant ce libellé de type — ça ne doit plus être silencieux. */
+  var progNom = progFiltre ? (((DATA.programmes||[]).find(function(p){ return p.id === progFiltre; }) || {}).nom || progFiltre) : '';
+  var porteeMsg = progNom
+    ? 'Programme concerné : « ' + progNom + ' » uniquement.\n\n'
+    : '⚠️ Aucun programme filtré — si plusieurs programmes utilisent le type « ' + type + ' », leurs postes seront TOUS supprimés ensemble.\n\n';
+
   var msg = 'Supprimer ' + cible.length + ' poste(s) ' + libelle + ' du type « ' + type + ' » ?\n\n'
+    + porteeMsg
     + (conserve.length ? 'CONSERVÉS : ' + conserve.join(', ') + '.\n\n' : '')
     + 'Ces postes sont régénérables depuis l\'éditeur de plan.';
   if (!confirm(msg)) return;
@@ -110437,36 +110505,47 @@ async function edsCreerOuvragesManquants(type, programmeId) {
 }
 window.edsCreerOuvragesManquants = edsCreerOuvragesManquants;
 
-function dqeCollecterPlans() {
+function dqeCollecterPlans(programmeId) {
+  /* [FIX] Regroupement autrefois par type_logement SEUL : deux programmes
+     partageant le même libellé de type (« F2 », « VILLA »…) voyaient leurs
+     postes et montants fusionnés dans une seule ligne — trompeur — et le
+     bouton 🗑 de cette ligne (dqeSupprimerGenere) supprimait alors les postes
+     des DEUX programmes à la fois. Regroupement désormais par type +
+     programme_id ; le filtre dqe-filter-programme en haut de page s'applique
+     ici comme partout ailleurs dans le module. */
+  var progFiltre = programmeId !== undefined ? (programmeId || '') : ((document.getElementById('dqe-filter-programme') || {}).value || '');
   var parType = {};
   (DATA.nomenclatures || []).forEach(function(n){
+    if (n.programme_id && progFiltre && n.programme_id !== progFiltre) return;
     var t = n.type_logement || '(sans type)';
-    parType[t] = parType[t] || { type:t, plan:[], manuel:[], ajustes:[], le:'', surface:0, pieces:0, niveaux:0, planId:'', planRef:'', planVer:0 };
+    var pid = n.programme_id || '';
+    var key = t + '||' + pid;
+    parType[key] = parType[key] || { type:t, programme_id:pid, plan:[], manuel:[], ajustes:[], le:'', surface:0, pieces:0, niveaux:0, planId:'', planRef:'', planVer:0 };
     if (n._genere_plan) {
-      parType[t].plan.push(n);
-      if (n._ajuste_manuel) parType[t].ajustes.push(n);
+      parType[key].plan.push(n);
+      if (n._ajuste_manuel) parType[key].ajustes.push(n);
       /* On retient la génération la plus récente : régénérer remplace les
          lignes du même type, donc toutes portent normalement la même date —
          mais un import ou une reprise partielle peut en laisser d'anciennes. */
-      if (n._genere_le && n._genere_le > parType[t].le) {
-        parType[t].le      = n._genere_le;
-        parType[t].surface = parseFloat(n._genere_surface) || 0;
-        parType[t].pieces  = parseInt(n._genere_pieces) || 0;
-        parType[t].niveaux = parseInt(n._genere_niveaux) || 0;
-        parType[t].planId  = n._plan_id || '';
-        parType[t].planRef = n._plan_ref || '';
-        parType[t].planVer = parseInt(n._plan_version) || 0;
+      if (n._genere_le && n._genere_le > parType[key].le) {
+        parType[key].le      = n._genere_le;
+        parType[key].surface = parseFloat(n._genere_surface) || 0;
+        parType[key].pieces  = parseInt(n._genere_pieces) || 0;
+        parType[key].niveaux = parseInt(n._genere_niveaux) || 0;
+        parType[key].planId  = n._plan_id || '';
+        parType[key].planRef = n._plan_ref || '';
+        parType[key].planVer = parseInt(n._plan_version) || 0;
       }
     } else if (n._genere_cctp) {
-      parType[t].manuel.push(n);   /* généré par le CCTP : ni plan, ni saisie */
+      parType[key].manuel.push(n);   /* généré par le CCTP : ni plan, ni saisie */
     } else {
-      parType[t].manuel.push(n);
+      parType[key].manuel.push(n);
     }
   });
 
   return Object.keys(parType)
-    .map(function(t){
-      var d = parType[t];
+    .map(function(k){
+      var d = parType[k];
       var cout = function(list){
         return list.reduce(function(s,n){
           return s + ((parseFloat(n.quantite)||0) * (typeof dqeLignePU==='function' ? dqeLignePU(n) : 0)) + (parseFloat(n.prix_forfait)||0);
@@ -110515,8 +110594,12 @@ function dqeListePlans() {
     + '<div class="kpi-card" data-icon="💰"><div class="kpi-label">Montant cumulé</div><div class="kpi-value or" style="font-size:18px;">' + fmtF(totalPlan) + ' F</div><div class="kpi-delta">par unité, hors saisies manuelles</div></div>'
     + '</div>';
 
+  /* [FIX] Colonne Programme ajoutée : depuis que dqeCollecterPlans() groupe
+     par type + programme_id (et non plus par type seul), deux lignes
+     peuvent désormais partager le même libellé de type pour des programmes
+     différents — sans cette colonne, rien ne les distinguerait à l'écran. */
   h += '<div class="table-wrap"><table style="width:100%;font-size:12px;"><thead><tr>'
-    + '<th>Type de logement</th><th>Plan source</th><th>Généré le</th><th style="text-align:right;">Métré</th>'
+    + '<th>Type de logement</th><th>Programme</th><th>Plan source</th><th>Généré le</th><th style="text-align:right;">Métré</th>'
     + '<th style="text-align:right;">Postes</th><th style="text-align:right;">Montant plan</th>'
     + '<th style="text-align:right;">Ajouts manuels</th><th>État</th><th></th></tr></thead><tbody>';
 
@@ -110543,9 +110626,11 @@ function dqeListePlans() {
       etat = '<span style="color:var(--blanc-dim);">dessin non enregistré</span>';
     }
 
+    var progNomLigne = d.programme_id ? (((DATA.programmes||[]).find(function(p){ return p.id === d.programme_id; })||{}).nom || d.programme_id) : '—';
     h += '<tr>'
       + '<td><strong>' + escHtml(d.type) + '</strong>'
       + (d.niveaux > 1 ? '<br><span style="font-size:10px;color:var(--dim);">' + d.niveaux + ' niveaux</span>' : '') + '</td>'
+      + '<td style="font-size:11px;">' + escHtml(progNomLigne) + '</td>'
       + '<td>' + (d.planRef
             ? '<strong>' + escHtml(d.planRef) + '</strong>' + (d.planVer ? '<br><span style="font-size:10px;color:var(--dim);">v' + d.planVer + '</span>' : '')
             : '<span style="color:var(--blanc-dim);font-size:11px;">non enregistré</span>') + '</td>'
@@ -110560,8 +110645,8 @@ function dqeListePlans() {
       + (d.manuel.length ? d.manuel.length + ' poste(s)<br><span style="font-size:10px;">' + fmtF(d.coutManuel) + ' F</span>' : '—') + '</td>'
       + '<td style="font-size:11px;">' + etat + '</td>'
       + '<td style="white-space:nowrap;">'
-      + '<button class="btn btn-secondary btn-sm btn-icon" title="Voir les postes dans le DQE" onclick="dqeVoirType(\'' + escHtml(d.type).replace(/'/g,"\\'") + '\')">🔎</button> '
-      + '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer les postes issus du plan — saisies manuelles et CCTP conservés" onclick="dqeSupprimerGenere(\'' + escHtml(d.type).replace(/'/g,"\\'") + '\',\'plan\')">🗑</button>'
+      + '<button class="btn btn-secondary btn-sm btn-icon" title="Voir les postes dans le DQE" onclick="dqeVoirType(\'' + escHtml(d.type).replace(/'/g,"\\'") + '\',\'' + escHtml(d.programme_id||'').replace(/'/g,"\\'") + '\')">🔎</button> '
+      + '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer les postes issus du plan — saisies manuelles et CCTP conservés" onclick="dqeSupprimerGenere(\'' + escHtml(d.type).replace(/'/g,"\\'") + '\',\'plan\',\'' + escHtml(d.programme_id||'').replace(/'/g,"\\'") + '\')">🗑</button>'
       + '</td></tr>';
   });
   h += '</tbody></table></div>';
@@ -110577,8 +110662,16 @@ function dqeListePlans() {
 
 /* Ouvre le DQE filtré sur ce type : la liste sert de point d'entrée, pas de
    fin en soi. */
-function dqeVoirType(type) {
+function dqeVoirType(type, programmeId) {
   closeModal('modal-dqe-plans');
+  /* [FIX] Applique aussi le programme d'origine de la ligne cliquée : sans
+     ça, ouvrir un type partagé par plusieurs programmes depuis cette liste
+     pouvait retomber sur le programme déjà sélectionné (ou "Tous
+     programmes"), montrant potentiellement les postes d'un AUTRE programme. */
+  if (programmeId) {
+    var selProg = document.getElementById('dqe-filter-programme');
+    if (selProg) selProg.value = programmeId;
+  }
   var sel = document.getElementById('dqe-type-logement') || document.getElementById('nomen-type');
   if (sel) {
     sel.value = type;
@@ -110592,9 +110685,10 @@ function dqeExporterListePlans() {
   var liste = dqeCollecterPlans();
   if (!liste.length) { toast('Aucun DQE issu d\'un plan.', 'info'); return; }
   var e = function(s){ return '"' + String(s==null?'':s).replace(/"/g,'""') + '"'; };
-  var csv = '\uFEFFtype_logement;plan_source;version_plan;genere_le;surface_m2;nb_pieces;niveaux;postes_plan;montant_plan;postes_manuels;montant_manuel;montant_total\n';
+  var csv = '\uFEFFtype_logement;programme;plan_source;version_plan;genere_le;surface_m2;nb_pieces;niveaux;postes_plan;montant_plan;postes_manuels;montant_manuel;montant_total\n';
   liste.forEach(function(d){
-    csv += [e(d.type), e(d.planRef || ''), d.planVer || '',
+    var progNom = d.programme_id ? (((DATA.programmes||[]).find(function(p){ return p.id === d.programme_id; })||{}).nom || d.programme_id) : '';
+    csv += [e(d.type), e(progNom), e(d.planRef || ''), d.planVer || '',
             e(d.le ? d.le.slice(0,16).replace('T',' ') : ''), d.surface, d.pieces, d.niveaux,
             d.plan.length, d.coutPlan, d.manuel.length, d.coutManuel, d.coutTotal].join(';') + '\n';
   });
