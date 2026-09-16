@@ -70,7 +70,11 @@
     .hero-slides-dots { display:flex; gap:6px; justify-content:center; margin-top:10px; }
     .hero-slides-dots button { width:8px; height:8px; padding:0; border:none; border-radius:50%; background:#0003; cursor:pointer; }
     .hero-slides-dots button.on { background:var(--pp-or); width:20px; border-radius:5px; transition:width 200ms; }
-    @media (max-width:980px) { .hero-slides-viewport { height:240px; } }
+    .hero-slide-arrow { position:absolute; top:50%; transform:translateY(-50%); width:36px; height:36px; border-radius:50%; border:none; background:rgba(0,0,0,.35); color:#fff; font-size:22px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:3; transition:background 150ms; }
+    .hero-slide-arrow:hover { background:rgba(0,0,0,.6); }
+    .hero-slide-arrow.prev { left:10px; }
+    .hero-slide-arrow.next { right:10px; }
+    @media (max-width:980px) { .hero-slides-viewport { height:240px; } .hero-slide-arrow { width:30px; height:30px; font-size:18px; } }
     .content-section { background:white; border-radius:20px; margin:50px auto; padding:40px 32px; border:1px solid #efe8d8; }
     .content-section h3{ font-family:var(--pp-serif); font-weight:600; }
     .tab-pane { display:none; animation:fadeIn 0.3s; }
@@ -1166,30 +1170,63 @@
      instance active à la fois (clearInterval si déjà démarré, au cas où la
      branding se recharge). Images déjà hébergées et compressées côté ERP —
      pas de logique "clic pour charger" nécessaire ici, contrairement à la
-     vidéo institutionnelle. */
+     vidéo institutionnelle. Flèches précédent/suivant en plus des points,
+     et callback optionnel déclenché une fois le tour complet des photos
+     bouclé (utilisé pour repasser sur la vidéo institutionnelle). */
   var _heroSlidesTimer = null;
-  function heroSlidesDemarrer(slides){
+  var _heroSlidesListe = [];
+  var _heroSlidesFinTour = null;
+  function heroSlidesDemarrer(slides, onCycleComplete){
     var vp = document.getElementById('hero-slides-viewport');
     var dotsEl = document.getElementById('hero-slides-dots');
     if (!vp || !dotsEl || !slides || !slides.length) return;
     if (_heroSlidesTimer) { clearInterval(_heroSlidesTimer); _heroSlidesTimer = null; }
+    _heroSlidesListe = slides;
+    _heroSlidesFinTour = onCycleComplete || null;
 
     vp.innerHTML = slides.map(function(s, i){
       var src = (s && (s.url || s.data)) || '';
       var leg = (s && s.legende) || '';
       return '<img class="hero-slide-img' + (i===0?' on':'') + '" src="' + esc(src) + '" alt="' + esc(leg) + '" loading="' + (i===0?'eager':'lazy') + '">'
         + (leg ? '<div class="hero-slide-cap' + (i===0?' on':'') + '" data-idx="' + i + '">' + esc(leg) + '</div>' : '');
-    }).join('');
+    }).join('')
+    + (slides.length > 1 ? '<button type="button" class="hero-slide-arrow prev" onclick="heroSlidesManuel(-1)" aria-label="Photo précédente">‹</button>'
+      + '<button type="button" class="hero-slide-arrow next" onclick="heroSlidesManuel(1)" aria-label="Photo suivante">›</button>' : '');
     dotsEl.innerHTML = slides.length > 1 ? slides.map(function(_, i){
       return '<button type="button" class="' + (i===0?'on':'') + '" onclick="heroSlidesAller(' + i + ')" aria-label="Photo ' + (i+1) + '"></button>';
     }).join('') : '';
 
-    if (slides.length > 1) {
-      _heroSlidesTimer = setInterval(function(){ heroSlidesAller((_heroSlideActuel + 1) % slides.length); }, 4500);
-    }
     _heroSlideActuel = 0;
+    if (slides.length > 1) _heroSlidesRelancerTimer();
+  }
+  function _heroSlidesRelancerTimer(){
+    if (_heroSlidesTimer) { clearInterval(_heroSlidesTimer); }
+    _heroSlidesTimer = setInterval(function(){ heroSlidesAvancer(); }, 4500);
   }
   var _heroSlideActuel = 0;
+  function heroSlidesAvancer(){
+    var n = _heroSlidesListe.length; if (!n) return;
+    var suivant = _heroSlideActuel + 1;
+    if (suivant >= n) {
+      // Tour complet bouclé : callback (ex. retour à la vidéo) au lieu de reboucler.
+      if (typeof _heroSlidesFinTour === 'function') {
+        if (_heroSlidesTimer) { clearInterval(_heroSlidesTimer); _heroSlidesTimer = null; }
+        var cb = _heroSlidesFinTour; _heroSlidesFinTour = null;
+        cb();
+        return;
+      }
+      suivant = 0;
+    }
+    heroSlidesAller(suivant);
+  }
+  /* Navigation manuelle (flèches) : relance le minuteur à zéro pour ne pas
+     enchaîner un défilement automatique juste après le clic. */
+  function heroSlidesManuel(sens){
+    var n = _heroSlidesListe.length; if (!n) return;
+    var idx = (_heroSlideActuel + sens + n) % n;
+    heroSlidesAller(idx);
+    if (n > 1) _heroSlidesRelancerTimer();
+  }
   function heroSlidesAller(idx){
     var imgs = document.querySelectorAll('#hero-slides-viewport .hero-slide-img');
     var caps = document.querySelectorAll('#hero-slides-viewport .hero-slide-cap');
@@ -1201,6 +1238,7 @@
     _heroSlideActuel = idx;
   }
   window.heroSlidesAller = heroSlidesAller;
+  window.heroSlidesManuel = heroSlidesManuel;
 
   async function sb(path){
     var r=await fetch(SB_URL+'/rest/v1/'+path,{ headers:_authHdr() });
@@ -2056,13 +2094,23 @@
       if (hvEl && heroPoster) hvEl.poster = heroPoster;
       /* À la fin de la vidéo, enchaîne automatiquement sur le diaporama photo
          (s'il y en a un de réglé) dans la même moitié de bannière — la vidéo
-         garde juste la priorité à l'ARRIVÉE sur la page, pas indéfiniment. */
+         garde juste la priorité à l'ARRIVÉE sur la page, pas indéfiniment.
+         Une fois le tour complet des photos bouclé, retour sur la vidéo
+         (vignette, lecture à nouveau au clic — jamais de relecture
+         automatique, cohérent avec le "rien n'est chargé sans clic" voulu
+         pour un fichier pouvant peser 150 Mo). Écouteur permanent (pas
+         { once:true }) : le cycle se répète à chaque lecture de la vidéo. */
       if (hvEl && heroSlides.length && hsHalf) {
         hvEl.addEventListener('ended', function(){
           hvHalf.style.display = 'none';
           hsHalf.style.display = '';
-          heroSlidesDemarrer(heroSlides);
-        }, { once: true });
+          heroSlidesDemarrer(heroSlides, function(){
+            hsHalf.style.display = 'none';
+            hvHalf.style.display = '';
+            hvEl.load();
+            if (heroPoster) hvEl.poster = heroPoster;
+          });
+        });
       }
     } else if (hf) {
       hf.classList.remove('has-video');
