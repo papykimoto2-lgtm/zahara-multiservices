@@ -1,11 +1,23 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Edge Function : staff-login — ZAHARA MULTISERVICES (v6)
+// Edge Function : staff-login — ZAHARA MULTISERVICES (v7)
 //
-// ⚠️ SOURCE RÉCUPÉRÉE DEPUIS LE PROJET SUPABASE (version 6, déployée).
-//    Ce fichier est la copie de ce qui tourne réellement sur ilvusckdanwrckxqvhmr.
-//    ATTENTION : la version déployée chez Menco est DIFFÉRENTE (v4) et
-//    comporte deux bugs corrigés ici — voir functions/staff-login/CONTRAT.md.
-//    Ne pas déployer ce fichier sur Menco sans adapter l'origine CORS.
+// [FIX v7 — DOUBLONS DE LOGIN CASSAIENT TOUTE AUTHENTIFICATION]
+// pi_users contient des doublons (jusqu'à 10 lignes pour login="KESSIE",
+// probablement issus d'un import/seed initial). L'ancien code faisait
+// .eq("login", login).maybeSingle() : dès que PLUSIEURS lignes correspondent,
+// maybeSingle() renvoie une erreur PGRST116 ("multiple rows") — jamais
+// vérifiée ici (seul `data` était déstructuré, pas `error`). `data` valait
+// alors null, et le code retombait sur "Identifiant introuvable" (401) —
+// message trompeur : le login existe bel et bien, il existe juste en trop
+// d'exemplaires. Résultat mesuré : AUCUNE connexion serveur possible pour un
+// login dupliqué, quel que soit le mot de passe saisi, indéfiniment.
+//
+// Corrigé : on récupère TOUTES les lignes partageant ce login, et on essaie
+// le mot de passe contre chacune (en priorité les comptes actifs) jusqu'à
+// trouver la correspondance — la connexion aboutit dès qu'UN des doublons a
+// le bon mot de passe, sans qu'il soit nécessaire de nettoyer les doublons
+// en base au préalable. Le nettoyage des doublons reste recommandé côté
+// application, mais n'est plus bloquant pour se connecter.
 //
 // [FIX v6 — VERROU ANTI-BRUTE-FORCE REFERMÉ SUR L'APPLICATION]
 // Le compteur de tentatives interrogeait TOUTES les lignes d'échec de
@@ -122,22 +134,44 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     });
 
-  const { data: user } = await db.from("pi_users").select("*").eq("login", login).maybeSingle();
-  if (!user) { await logFail("Identifiant introuvable"); return json({ ok: false, error: "invalide" }, 401); }
-  if (user.statut && user.statut !== "actif") {
-    await logFail("Compte inactif"); return json({ ok: false, error: "inactif" }, 403);
+  // [FIX v7] .maybeSingle() cassait tout dès qu'un login existait en double
+  // (erreur PGRST116 jamais vérifiée, silencieusement traitée comme "pas
+  // trouvé"). On récupère toutes les lignes et on essaie le mot de passe
+  // contre chacune — les comptes actifs d'abord.
+  const { data: candidats } = await db.from("pi_users").select("*").eq("login", login);
+  if (!candidats || candidats.length === 0) {
+    await logFail("Identifiant introuvable");
+    return json({ ok: false, error: "invalide" }, 401);
+  }
+  const ordonnes = [...candidats].sort((a, b) => {
+    const aActif = !a.statut || a.statut === "actif" ? 0 : 1;
+    const bActif = !b.statut || b.statut === "actif" ? 0 : 1;
+    return aActif - bActif;
+  });
+
+  let user: any = null, upgrade = false;
+  for (const candidat of ordonnes) {
+    if (candidat.statut && candidat.statut !== "actif") continue;
+    let valid = false, candUpgrade = false;
+    if (candidat.pwd_algo === "pbkdf2" && candidat.password_hash && candidat.salt) {
+      valid = safeEq(await pbkdf2(password, candidat.salt, candidat.pwd_iter || PBKDF2_ITER), candidat.password_hash);
+    } else if (candidat.password_hash && candidat.salt) {
+      valid = safeEq(await sha256Salt(password, candidat.salt), candidat.password_hash);
+      candUpgrade = valid;
+    } else if (candidat.password) {
+      valid = safeEq(candidat.password, password);
+      candUpgrade = valid;
+    }
+    if (valid) { user = candidat; upgrade = candUpgrade; break; }
   }
 
-  let valid = false, upgrade = false;
-  if (user.pwd_algo === "pbkdf2" && user.password_hash && user.salt) {
-    valid = safeEq(await pbkdf2(password, user.salt, user.pwd_iter || PBKDF2_ITER), user.password_hash);
-  } else if (user.password_hash && user.salt) {
-    valid = safeEq(await sha256Salt(password, user.salt), user.password_hash);
-    upgrade = valid;
-  } else if (user.password) {
-    valid = safeEq(user.password, password); upgrade = valid;
+  if (!user) {
+    // Compte(s) trouvé(s) mais tous inactifs, ou mot de passe incorrect partout.
+    const tousInactifs = ordonnes.every((c) => c.statut && c.statut !== "actif");
+    if (tousInactifs) { await logFail("Compte inactif"); return json({ ok: false, error: "inactif" }, 403); }
+    await logFail("Mot de passe incorrect");
+    return json({ ok: false, error: "invalide" }, 401);
   }
-  if (!valid) { await logFail("Mot de passe incorrect"); return json({ ok: false, error: "invalide" }, 401); }
 
   if (upgrade) {
     const newHash = await pbkdf2(password, user.salt, PBKDF2_ITER);
