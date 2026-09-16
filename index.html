@@ -6313,6 +6313,12 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div id="portail-hero-slides-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;"></div>
                 <div style="font-size:11px;color:#6B6B9A;margin-top:4px;">PNG/JPG/WEBP, 5 Mo max par photo. Utilisez les flèches sur chaque vignette pour réordonner.</div>
                 <input type="hidden" id="param-portail-hero-slides-json">
+                <!-- [AJOUT] Le seul bouton "Tout enregistrer" est tout en haut de la
+                     page Paramètres — après avoir importé des photos ici, il est
+                     facile d'oublier de remonter jusqu'à lui et de croire, à tort,
+                     que l'ajout de photo suffit à publier. Bouton local pour
+                     enregistrer sans remonter, avec le même résultat. -->
+                <button type="button" class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="if(typeof saveParams==='function') saveParams();">💾 Enregistrer la vidéo/le diaporama</button>
               </div>
               <div class="form-group span-2">
                 <label>Titre du bandeau d'accueil</label>
