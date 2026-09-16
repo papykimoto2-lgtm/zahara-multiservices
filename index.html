@@ -6303,6 +6303,18 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <input type="hidden" id="param-portail-hero-video-url">
               </div>
               <div class="form-group span-2">
+                <label>🖼️ Diaporama photo (moitié de la bannière d'accueil)</label>
+                <div style="font-size:11px;color:#6B6B9A;margin-bottom:6px;">Alternative à la vidéo institutionnelle : si une vidéo est réglée ci-dessus, elle est prioritaire et le diaporama n'apparaît pas. Sans vidéo, ces photos défilent automatiquement sur la moitié droite de la bannière.</div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('portail-hero-slides-file-input').click()">📁 Ajouter des photos</button>
+                  <input type="file" id="portail-hero-slides-file-input" accept="image/png,image/jpeg,image/webp" multiple style="display:none;" onchange="handlePortailHeroSlidesUpload(event)">
+                  <span id="portail-hero-slides-statut" style="font-size:12px;color:#6B6B9A;"></span>
+                </div>
+                <div id="portail-hero-slides-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;"></div>
+                <div style="font-size:11px;color:#6B6B9A;margin-top:4px;">PNG/JPG/WEBP, 5 Mo max par photo. Utilisez les flèches sur chaque vignette pour réordonner.</div>
+                <input type="hidden" id="param-portail-hero-slides-json">
+              </div>
+              <div class="form-group span-2">
                 <label>Titre du bandeau d'accueil</label>
                 <input type="text" id="param-portail-hero-titre" class="form-control" placeholder="Ex : L'ASSURANCE D'ÊTRE LOGÉ">
               </div>
@@ -44994,6 +45006,79 @@ function clearPortailHeroVideo() {
   if (fileInput) fileInput.value = '';
 }
 
+/* ── Diaporama photo de la bannière (moitié droite, alternative à la vidéo) ── */
+var HERO_SLIDES_STATE = [];  /* [{ id, url, legende }] — persisté dans param-portail-hero-slides-json */
+
+function _heroSlidesPersisterChamp() {
+  var input = document.getElementById('param-portail-hero-slides-json');
+  if (input) input.value = HERO_SLIDES_STATE.length ? JSON.stringify(HERO_SLIDES_STATE) : '';
+}
+
+async function handlePortailHeroSlidesUpload(event) {
+  var files = Array.prototype.slice.call(event.target.files || []);
+  if (!files.length) return;
+  var maxSize = 5 * 1024 * 1024;
+  var statutEl = document.getElementById('portail-hero-slides-statut');
+  if (statutEl) statutEl.textContent = '⏳ Envoi en cours…';
+  var ok = 0, refus = 0;
+  for (var i = 0; i < files.length; i++) {
+    var file = files[i];
+    if (!file.type || file.type.indexOf('image/') !== 0) { refus++; continue; }
+    if (file.size > maxSize) { toast('❌ « ' + file.name + ' » dépasse 5 Mo — ignorée.', 'error'); refus++; continue; }
+    try {
+      var id = 'heroslide_' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
+      var chemin = await pmUploadBlob(file, id, 'hero_slides');
+      HERO_SLIDES_STATE.push({ id: id, url: _pmPublicUrl(chemin), legende: file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ') });
+      ok++;
+    } catch(e) {
+      toast('❌ Échec de l\'envoi de « ' + file.name + ' » (' + (e && e.message ? e.message : 'erreur') + ').', 'error');
+      refus++;
+    }
+  }
+  event.target.value = '';
+  _heroSlidesPersisterChamp();
+  renderPortailHeroSlidesGrid();
+  if (statutEl) statutEl.textContent = ok ? ('✅ ' + ok + ' photo(s) ajoutée(s)' + (refus ? ' — ' + refus + ' ignorée(s)' : '')) : '';
+  if (ok) toast(ok + ' photo(s) ajoutée(s) au diaporama — pensez à cliquer sur « Enregistrer ».', 'success');
+}
+
+function renderPortailHeroSlidesGrid() {
+  var grid = document.getElementById('portail-hero-slides-grid');
+  if (!grid) return;
+  if (!HERO_SLIDES_STATE.length) { grid.innerHTML = ''; return; }
+  grid.innerHTML = HERO_SLIDES_STATE.map(function(s, i) {
+    return '<div style="position:relative;border:1px solid #E0E0EA;border-radius:8px;overflow:hidden;background:#F5F5F8;">'
+      + '<img src="' + s.url + '" alt="" style="width:100%;height:80px;object-fit:cover;display:block;">'
+      + '<button type="button" onclick="heroSlideSupprimer(\'' + s.id + '\')" title="Retirer" style="position:absolute;top:3px;right:3px;background:#EF4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1;">✕</button>'
+      + '<div style="display:flex;gap:2px;padding:3px;">'
+      + '<button type="button" onclick="heroSlideDeplacer(\'' + s.id + '\',-1)" title="Déplacer avant" style="flex:1;font-size:10px;padding:2px;border:1px solid #E0E0EA;background:#fff;border-radius:4px;cursor:pointer;" ' + (i===0?'disabled':'') + '>◀</button>'
+      + '<button type="button" onclick="heroSlideDeplacer(\'' + s.id + '\',1)" title="Déplacer après" style="flex:1;font-size:10px;padding:2px;border:1px solid #E0E0EA;background:#fff;border-radius:4px;cursor:pointer;" ' + (i===HERO_SLIDES_STATE.length-1?'disabled':'') + '>▶</button>'
+      + '</div>'
+      + '<input type="text" value="' + s.legende.replace(/"/g,'&quot;') + '" placeholder="Légende (optionnel)" oninput="heroSlideMajLegende(\'' + s.id + '\',this.value)" style="width:100%;font-size:10px;padding:3px 4px;border:none;border-top:1px solid #E0E0EA;">'
+      + '</div>';
+  }).join('');
+}
+
+function heroSlideSupprimer(id) {
+  HERO_SLIDES_STATE = HERO_SLIDES_STATE.filter(function(s){ return s.id !== id; });
+  _heroSlidesPersisterChamp();
+  renderPortailHeroSlidesGrid();
+}
+function heroSlideMajLegende(id, val) {
+  var s = HERO_SLIDES_STATE.find(function(x){ return x.id === id; });
+  if (s) { s.legende = val; _heroSlidesPersisterChamp(); }
+}
+function heroSlideDeplacer(id, sens) {
+  var idx = HERO_SLIDES_STATE.findIndex(function(x){ return x.id === id; });
+  var cible = idx + sens;
+  if (idx < 0 || cible < 0 || cible >= HERO_SLIDES_STATE.length) return;
+  var tmp = HERO_SLIDES_STATE[idx];
+  HERO_SLIDES_STATE[idx] = HERO_SLIDES_STATE[cible];
+  HERO_SLIDES_STATE[cible] = tmp;
+  _heroSlidesPersisterChamp();
+  renderPortailHeroSlidesGrid();
+}
+
 
 /* ══════════════════════════════════════════════════════════════
    PARAMÈTRES — Fonctions save/load pour les nouveaux onglets
@@ -45543,6 +45628,7 @@ async function saveParams() {
     portail_couleur_primaire_dark:gv('param-portail-couleur-primaire-dark')||'#001f4f',
     portail_hero_image:           gv('param-portail-hero-image'),
     portail_hero_video_url:       gv('param-portail-hero-video-url'),
+    portail_hero_slides:          (function(){ try { return JSON.parse(gv('param-portail-hero-slides-json')||'[]'); } catch(e){ return DATA.params && DATA.params.portail_hero_slides || []; } })(),
     portail_hero_titre:           gv('param-portail-hero-titre'),
     hero_texte:                   gv('param-portail-hero-texte'),
     portail_footer_texte:         gv('param-portail-footer-texte'),
@@ -45654,6 +45740,7 @@ function buildPortailBrand(){
     couleur_primaire_dark:  p.portail_couleur_primaire_dark || '#001f4f',
     hero_image:             p.portail_hero_image || '',
     hero_video_url:         p.portail_hero_video_url || '',
+    hero_slides:            Array.isArray(p.portail_hero_slides) ? p.portail_hero_slides : [],
     hero_titre:             p.portail_hero_titre || '',
     hero_texte:             p.hero_texte || '',
     footer_texte:           p.portail_footer_texte || '',
@@ -45814,6 +45901,9 @@ function loadParamFields() {
     if (statutEl) statutEl.innerHTML = p.portail_hero_video_url ? '✅ Vidéo déjà en place' : '';
     if (clearBtn) clearBtn.style.display = p.portail_hero_video_url ? '' : 'none';
   })();
+  HERO_SLIDES_STATE = Array.isArray(p.portail_hero_slides) ? JSON.parse(JSON.stringify(p.portail_hero_slides)) : [];
+  sv('param-portail-hero-slides-json', HERO_SLIDES_STATE.length ? JSON.stringify(HERO_SLIDES_STATE) : '');
+  if (typeof renderPortailHeroSlidesGrid === 'function') renderPortailHeroSlidesGrid();
   sv('param-portail-hero-titre', p.portail_hero_titre||'');
   sv('param-portail-hero-texte', p.hero_texte||'');
   sv('param-portail-footer-texte', p.portail_footer_texte||'');

@@ -49,11 +49,21 @@
     /* Bannière à deux colonnes, activée uniquement quand une vidéo institutionnelle
        est configurée (classe has-video posée par JS) — sans vidéo, la bannière
        garde son rendu centré d'origine, inchangé. */
-    .hero-flex.has-video { display:flex; align-items:center; gap:44px; text-align:left; }
-    .hero-flex.has-video .hero-text { flex:1 1 50%; }
-    .hero-flex.has-video .hero-video-half { flex:1 1 50%; }
-    .hero-flex.has-video .hero-text p { margin:0; max-width:none; }
-    @media (max-width:980px) { .hero-flex.has-video { flex-direction:column; text-align:center; } .hero-flex.has-video .hero-text p { margin:0 auto; max-width:640px; } }
+    .hero-flex.has-video, .hero-flex.has-slides { display:flex; align-items:center; gap:44px; text-align:left; }
+    .hero-flex.has-video .hero-text, .hero-flex.has-slides .hero-text { flex:1 1 50%; }
+    .hero-flex.has-video .hero-video-half, .hero-flex.has-slides .hero-slides-half { flex:1 1 50%; }
+    .hero-flex.has-video .hero-text p, .hero-flex.has-slides .hero-text p { margin:0; max-width:none; }
+    @media (max-width:980px) { .hero-flex.has-video, .hero-flex.has-slides { flex-direction:column; text-align:center; } .hero-flex.has-video .hero-text p, .hero-flex.has-slides .hero-text p { margin:0 auto; max-width:640px; } }
+    .hero-slides-half { position:relative; }
+    .hero-slides-viewport { position:relative; width:100%; height:360px; border-radius:16px; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,.35); background:#0002; }
+    .hero-slide-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 900ms ease; }
+    .hero-slide-img.on { opacity:1; }
+    .hero-slide-cap { position:absolute; left:0; right:0; bottom:0; padding:10px 16px; font-size:.8rem; color:#fff; background:linear-gradient(to top, rgba(0,0,0,.6), transparent); opacity:0; transition:opacity 900ms ease; }
+    .hero-slide-cap.on { opacity:1; }
+    .hero-slides-dots { display:flex; gap:6px; justify-content:center; margin-top:10px; }
+    .hero-slides-dots button { width:8px; height:8px; padding:0; border:none; border-radius:50%; background:#0003; cursor:pointer; }
+    .hero-slides-dots button.on { background:var(--pp-or); width:20px; border-radius:5px; transition:width 200ms; }
+    @media (max-width:980px) { .hero-slides-viewport { height:240px; } }
     .content-section { background:white; border-radius:20px; margin:50px auto; padding:40px 32px; border:1px solid #efe8d8; }
     .content-section h3{ font-family:var(--pp-serif); font-weight:600; }
     .tab-pane { display:none; animation:fadeIn 0.3s; }
@@ -289,6 +299,15 @@
       <video controls preload="none" id="hero-video-el" style="width:100%;display:block;border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.35);max-height:360px;object-fit:cover;background:#000;">
         <source id="hero-video-src" src="" type="video/mp4">
       </video>
+    </div>
+    <!-- Diaporama photo (moitié de bannière) : alternative à la vidéo quand
+         aucune vidéo institutionnelle n'est configurée (la vidéo est
+         prioritaire si les deux sont réglées). Défilement automatique,
+         images déjà hébergées (Storage) donc légères — pas de lecture au
+         clic nécessaire ici, contrairement à la vidéo. -->
+    <div class="hero-slides-half" id="hero-slides-half" style="display:none;">
+      <div class="hero-slides-viewport" id="hero-slides-viewport"></div>
+      <div class="hero-slides-dots" id="hero-slides-dots"></div>
     </div>
   </div>
 </div></section>
@@ -1135,6 +1154,46 @@
   function dshort(d){ if(!d) return '—'; return String(d).slice(0,10).split('-').reverse().join('/'); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function unwrap(rows){ return (rows||[]).map(function(r){ return (r&&r.data)?r.data:r; }); }
+
+  /* Diaporama photo de la bannière — défilement automatique, une seule
+     instance active à la fois (clearInterval si déjà démarré, au cas où la
+     branding se recharge). Images déjà hébergées et compressées côté ERP —
+     pas de logique "clic pour charger" nécessaire ici, contrairement à la
+     vidéo institutionnelle. */
+  var _heroSlidesTimer = null;
+  function heroSlidesDemarrer(slides){
+    var vp = document.getElementById('hero-slides-viewport');
+    var dotsEl = document.getElementById('hero-slides-dots');
+    if (!vp || !dotsEl || !slides || !slides.length) return;
+    if (_heroSlidesTimer) { clearInterval(_heroSlidesTimer); _heroSlidesTimer = null; }
+
+    vp.innerHTML = slides.map(function(s, i){
+      var src = (s && (s.url || s.data)) || '';
+      var leg = (s && s.legende) || '';
+      return '<img class="hero-slide-img' + (i===0?' on':'') + '" src="' + esc(src) + '" alt="' + esc(leg) + '" loading="' + (i===0?'eager':'lazy') + '">'
+        + (leg ? '<div class="hero-slide-cap' + (i===0?' on':'') + '" data-idx="' + i + '">' + esc(leg) + '</div>' : '');
+    }).join('');
+    dotsEl.innerHTML = slides.length > 1 ? slides.map(function(_, i){
+      return '<button type="button" class="' + (i===0?'on':'') + '" onclick="heroSlidesAller(' + i + ')" aria-label="Photo ' + (i+1) + '"></button>';
+    }).join('') : '';
+
+    if (slides.length > 1) {
+      _heroSlidesTimer = setInterval(function(){ heroSlidesAller((_heroSlideActuel + 1) % slides.length); }, 4500);
+    }
+    _heroSlideActuel = 0;
+  }
+  var _heroSlideActuel = 0;
+  function heroSlidesAller(idx){
+    var imgs = document.querySelectorAll('#hero-slides-viewport .hero-slide-img');
+    var caps = document.querySelectorAll('#hero-slides-viewport .hero-slide-cap');
+    var dots = document.querySelectorAll('#hero-slides-dots button');
+    if (!imgs.length) return;
+    imgs.forEach(function(el, i){ el.classList.toggle('on', i === idx); });
+    caps.forEach(function(el){ el.classList.toggle('on', parseInt(el.getAttribute('data-idx'), 10) === idx); });
+    dots.forEach(function(el, i){ el.classList.toggle('on', i === idx); });
+    _heroSlideActuel = idx;
+  }
+  window.heroSlidesAller = heroSlidesAller;
 
   async function sb(path){
     var r=await fetch(SB_URL+'/rest/v1/'+path,{ headers:_authHdr() });
@@ -1987,6 +2046,18 @@
     } else if (hf) {
       hf.classList.remove('has-video');
       if (hvHalf) hvHalf.style.display = 'none';
+      /* Diaporama photo : uniquement si aucune vidéo institutionnelle n'est
+         réglée (la vidéo garde la priorité quand les deux sont configurées). */
+      var heroSlides = BR('hero_slides', []);
+      var hsHalf = document.getElementById('hero-slides-half');
+      if (Array.isArray(heroSlides) && heroSlides.length && hf && hsHalf) {
+        hf.classList.add('has-slides');
+        hsHalf.style.display = '';
+        heroSlidesDemarrer(heroSlides);
+      } else if (hsHalf) {
+        hf.classList.remove('has-slides');
+        hsHalf.style.display = 'none';
+      }
     }
 
     /* Onglet + page programme */
