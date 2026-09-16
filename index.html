@@ -35056,12 +35056,29 @@ async function ventilerCoutFoncierProgramme(progId) {
   if (!lots.length) { toast('Aucun lot à ventiler pour ce programme.', 'error'); return 0; }
 
   var sumSurf = lots.reduce(function(s,l){ return s + N(l.surface); }, 0);
+  /* [FIX arrondi] Chaque part était arrondie indépendamment (Math.round) :
+     sur un grand nombre de lots, la somme des parts pouvait s'écarter de
+     quelques FCFA du coût foncier total (les arrondis ne se compensent
+     jamais exactement). Méthode du plus grand reste : on arrondit à
+     l'inférieur puis on distribue les FCFA manquants un par un aux lots
+     ayant le plus grand reste — la somme des parts ventilées est alors
+     TOUJOURS strictement égale à coutFoncier. */
+  var partsBrutes = lots.map(function(l){
+    return sumSurf > 0 ? (coutFoncier * N(l.surface) / sumSurf) : (coutFoncier / lots.length);
+  });
+  var partsEntieres = partsBrutes.map(Math.floor);
+  var sommeEntiers = partsEntieres.reduce(function(s,v){ return s + v; }, 0);
+  var resteADistribuer = Math.round(coutFoncier - sommeEntiers);
+  var ordreParReste = lots.map(function(_, idx){ return idx; })
+    .sort(function(a,b){ return (partsBrutes[b]-partsEntieres[b]) - (partsBrutes[a]-partsEntieres[a]); });
+  for (var r = 0; r < resteADistribuer && ordreParReste.length; r++) {
+    partsEntieres[ordreParReste[r % ordreParReste.length]] += 1;
+  }
+
   var n = 0;
   for (var i = 0; i < lots.length; i++) {
     var l = lots[i];
-    /* Part foncière = prorata surface (ou équirépartition si aucune surface) */
-    var part = sumSurf > 0 ? Math.round(coutFoncier * N(l.surface) / sumSurf)
-                           : Math.round(coutFoncier / lots.length);
+    var part = partsEntieres[i];
     /* Coût bâti = coût actuel - ancienne part foncière (idempotence) */
     var coutBati = Math.max(0, N(l.cout_revient) - N(l._coutFoncier));
     l._coutFoncier = part;
