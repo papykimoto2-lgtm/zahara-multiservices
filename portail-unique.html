@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Espace Souscripteur & Apporteur</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1B4332">
+  <link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Espace Client">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
   <style>
@@ -38,6 +46,24 @@
     .hero-content { position:relative; z-index:2; }
     .hero h2 { font-family:var(--pp-serif); font-weight:600; font-size:2.4rem; margin-bottom:16px; letter-spacing:-.5px; }
     .hero p { font-size:1.02rem; opacity:.92; max-width:640px; margin:0 auto; }
+    /* Bannière à deux colonnes, activée uniquement quand une vidéo institutionnelle
+       est configurée (classe has-video posée par JS) — sans vidéo, la bannière
+       garde son rendu centré d'origine, inchangé. */
+    .hero-flex.has-video, .hero-flex.has-slides { display:flex; align-items:center; gap:44px; text-align:left; }
+    .hero-flex.has-video .hero-text, .hero-flex.has-slides .hero-text { flex:1 1 50%; }
+    .hero-flex.has-video .hero-video-half, .hero-flex.has-slides .hero-slides-half { flex:1 1 50%; }
+    .hero-flex.has-video .hero-text p, .hero-flex.has-slides .hero-text p { margin:0; max-width:none; }
+    @media (max-width:980px) { .hero-flex.has-video, .hero-flex.has-slides { flex-direction:column; text-align:center; } .hero-flex.has-video .hero-text p, .hero-flex.has-slides .hero-text p { margin:0 auto; max-width:640px; } }
+    .hero-slides-half { position:relative; }
+    .hero-slides-viewport { position:relative; width:100%; height:360px; border-radius:16px; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,.35); background:#0002; }
+    .hero-slide-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 900ms ease; }
+    .hero-slide-img.on { opacity:1; }
+    .hero-slide-cap { position:absolute; left:0; right:0; bottom:0; padding:10px 16px; font-size:.8rem; color:#fff; background:linear-gradient(to top, rgba(0,0,0,.6), transparent); opacity:0; transition:opacity 900ms ease; }
+    .hero-slide-cap.on { opacity:1; }
+    .hero-slides-dots { display:flex; gap:6px; justify-content:center; margin-top:10px; }
+    .hero-slides-dots button { width:8px; height:8px; padding:0; border:none; border-radius:50%; background:#0003; cursor:pointer; }
+    .hero-slides-dots button.on { background:var(--pp-or); width:20px; border-radius:5px; transition:width 200ms; }
+    @media (max-width:980px) { .hero-slides-viewport { height:240px; } }
     .content-section { background:white; border-radius:20px; margin:50px auto; padding:40px 32px; border:1px solid #efe8d8; }
     .content-section h3{ font-family:var(--pp-serif); font-weight:600; }
     .tab-pane { display:none; animation:fadeIn 0.3s; }
@@ -249,15 +275,40 @@
           <button class="tab-link" data-tab="copropriete"><i class="fas fa-building"></i> Copropriétaire</button>
         </div>
       </li>
+      <li id="pwa-install-li" style="display:none;">
+        <button class="tab-link" id="pwa-install-btn" type="button" style="background:var(--pp-or);color:#fff;" onclick="pwaInstaller()"><i class="fas fa-arrow-down-to-line"></i> INSTALLER L'APPLI</button>
+      </li>
     </ul>
   </div>
 </header>
 
-<section class="hero"><div class="hero-content container"><h2>BIENVENUE</h2><p></p>
-  <div class="hero-stats" id="hero-stats" style="display:none;">
-    <div class="hero-stat"><b id="hs-familles">—</b><span>Familles accompagnées</span></div>
-    <div class="hero-stat"><b id="hs-programmes">—</b><span>Programmes livrés/actifs</span></div>
-    <div class="hero-stat"><b id="hs-avancement">—</b><span>Avancement moyen chantiers</span></div>
+<section class="hero"><div class="hero-content container">
+  <div class="hero-flex" id="hero-flex">
+    <div class="hero-text">
+      <h2>BIENVENUE</h2><p></p>
+      <div class="hero-stats" id="hero-stats" style="display:none;">
+        <div class="hero-stat"><b id="hs-familles">—</b><span>Familles accompagnées</span></div>
+        <div class="hero-stat"><b id="hs-programmes">—</b><span>Programmes livrés/actifs</span></div>
+        <div class="hero-stat"><b id="hs-avancement">—</b><span>Avancement moyen chantiers</span></div>
+      </div>
+    </div>
+    <!-- Vidéo institutionnelle (moitié de bannière) : lecture uniquement au clic
+         (preload="none") — rien n'est téléchargé tant que le visiteur n'appuie
+         pas sur play, essentiel pour un fichier pouvant peser jusqu'à 150 Mo. -->
+    <div class="hero-video-half" id="hero-video-half" style="display:none;">
+      <video controls preload="none" id="hero-video-el" style="width:100%;display:block;border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.35);max-height:360px;object-fit:cover;background:#000;">
+        <source id="hero-video-src" src="" type="video/mp4">
+      </video>
+    </div>
+    <!-- Diaporama photo (moitié de bannière) : alternative à la vidéo quand
+         aucune vidéo institutionnelle n'est configurée (la vidéo est
+         prioritaire si les deux sont réglées). Défilement automatique,
+         images déjà hébergées (Storage) donc légères — pas de lecture au
+         clic nécessaire ici, contrairement à la vidéo. -->
+    <div class="hero-slides-half" id="hero-slides-half" style="display:none;">
+      <div class="hero-slides-viewport" id="hero-slides-viewport"></div>
+      <div class="hero-slides-dots" id="hero-slides-dots"></div>
+    </div>
   </div>
 </div></section>
 
@@ -1104,6 +1155,46 @@
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function unwrap(rows){ return (rows||[]).map(function(r){ return (r&&r.data)?r.data:r; }); }
 
+  /* Diaporama photo de la bannière — défilement automatique, une seule
+     instance active à la fois (clearInterval si déjà démarré, au cas où la
+     branding se recharge). Images déjà hébergées et compressées côté ERP —
+     pas de logique "clic pour charger" nécessaire ici, contrairement à la
+     vidéo institutionnelle. */
+  var _heroSlidesTimer = null;
+  function heroSlidesDemarrer(slides){
+    var vp = document.getElementById('hero-slides-viewport');
+    var dotsEl = document.getElementById('hero-slides-dots');
+    if (!vp || !dotsEl || !slides || !slides.length) return;
+    if (_heroSlidesTimer) { clearInterval(_heroSlidesTimer); _heroSlidesTimer = null; }
+
+    vp.innerHTML = slides.map(function(s, i){
+      var src = (s && (s.url || s.data)) || '';
+      var leg = (s && s.legende) || '';
+      return '<img class="hero-slide-img' + (i===0?' on':'') + '" src="' + esc(src) + '" alt="' + esc(leg) + '" loading="' + (i===0?'eager':'lazy') + '">'
+        + (leg ? '<div class="hero-slide-cap' + (i===0?' on':'') + '" data-idx="' + i + '">' + esc(leg) + '</div>' : '');
+    }).join('');
+    dotsEl.innerHTML = slides.length > 1 ? slides.map(function(_, i){
+      return '<button type="button" class="' + (i===0?'on':'') + '" onclick="heroSlidesAller(' + i + ')" aria-label="Photo ' + (i+1) + '"></button>';
+    }).join('') : '';
+
+    if (slides.length > 1) {
+      _heroSlidesTimer = setInterval(function(){ heroSlidesAller((_heroSlideActuel + 1) % slides.length); }, 4500);
+    }
+    _heroSlideActuel = 0;
+  }
+  var _heroSlideActuel = 0;
+  function heroSlidesAller(idx){
+    var imgs = document.querySelectorAll('#hero-slides-viewport .hero-slide-img');
+    var caps = document.querySelectorAll('#hero-slides-viewport .hero-slide-cap');
+    var dots = document.querySelectorAll('#hero-slides-dots button');
+    if (!imgs.length) return;
+    imgs.forEach(function(el, i){ el.classList.toggle('on', i === idx); });
+    caps.forEach(function(el){ el.classList.toggle('on', parseInt(el.getAttribute('data-idx'), 10) === idx); });
+    dots.forEach(function(el, i){ el.classList.toggle('on', i === idx); });
+    _heroSlideActuel = idx;
+  }
+  window.heroSlidesAller = heroSlidesAller;
+
   async function sb(path){
     var r=await fetch(SB_URL+'/rest/v1/'+path,{ headers:_authHdr() });
     if(!r.ok) throw new Error('HTTP '+r.status);
@@ -1336,18 +1427,42 @@
     return s.map(function(v){ var b=v.type==='frais_souscription'?'<span class="pill p-or">Frais</span>':'<span class="pill p-gris">'+esc(labelType(v.type))+'</span>'; return '<tr><td>'+dshort(v.date)+'</td><td>'+b+'</td><td>'+fmt(v.montant)+' F</td><td>'+esc(v.mode||'—')+'</td></tr>'; }).join('');
   }
   function sRapportsLies(){
+    /* [FIX] Ne filtrait jamais par visibilite : un rapport marqué "Interne
+       seulement" (rch-visibilite côté ERP) s'affichait quand même ici si son
+       programme/convention correspondait — contraire au réglage explicite
+       posé par l'équipe chantier. */
     var convIds=S.conventions.map(function(c){return c.id;}), prog=S.client.programme_id, progNom=sProgNom();
     return S.rapports.filter(function(r){
+      if (r.visibilite==='interne') return false;
       return (r.client_id===S.client.id)||(r.convention_id&&convIds.indexOf(r.convention_id)!==-1)||(r.programme_id&&r.programme_id===prog)||(r.programme&&r.programme===progNom);
-    }).sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+    }).sort(function(a,b){return new Date(b.date_debut||b.date||0)-new Date(a.date_debut||a.date||0);});
   }
   function blocTravaux(){
-    var raps=sRapportsLies(), photos=[];
-    raps.forEach(function(r){ (r.photos||[]).forEach(function(p){ if(p&&p.visible!==false) photos.push(p); }); });
-    (MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='chantier'; }).forEach(function(m){ photos.push({ data:m.data, legende:m.titre }); });
-    var ph=photos.length?photos.map(function(p){ var src=p.data||p.url||''; return '<div class="photo-item"><img src="'+esc(src)+'" loading="lazy" alt="">'+(p.legende?'<div class="photo-cap">'+esc(p.legende)+'</div>':'')+'</div>'; }).join(''):'<p style="color:#4b6a8b;">Aucune photo disponible.</p>';
-    var rp=raps.length?raps.map(function(r){ return '<div style="border:1px solid #eef2f8; border-radius:12px; padding:12px; margin-bottom:10px;"><strong>📅 '+dshort(r.date)+' — Avancement '+(parseFloat(r.avancement)||0)+'%</strong>'+(r.travaux?'<div style="font-size:.85rem; margin-top:6px;">'+esc(r.travaux)+'</div>':'')+'</div>'; }).join(''):'<p style="color:#4b6a8b;">Aucun rapport partagé.</p>';
-    return '<div class="card"><strong>🚧 Photos de chantier</strong><div class="photo-grid">'+ph+'</div></div><div class="card"><strong>📋 Rapports d\'avancement</strong><div style="margin-top:10px;">'+rp+'</div></div>';
+    var raps=sRapportsLies(), photosMaison=[], photosGenerales=[];
+    var monLot=S.client.lot_id;
+    raps.forEach(function(r){
+      (r.photos||[]).forEach(function(p){
+        if(!p||p.visible===false) return;
+        /* [AJOUT] Une photo rattachée à un lot (p.lot_id, voir rchMajLot côté
+           ERP) n'est mise en avant que pour le souscripteur de CE lot — une
+           photo générale (sans lot_id) reste visible par tous les
+           souscripteurs du programme, comme avant. */
+        if (p.lot_id) { if (monLot && p.lot_id===monLot) photosMaison.push(p); }
+        else photosGenerales.push(p);
+      });
+    });
+    (MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='chantier'; }).forEach(function(m){ photosGenerales.push({ data:m.data, legende:m.titre }); });
+    var vignette=function(p){ var src=p.data||p.url||''; return '<div class="photo-item"><img src="'+esc(src)+'" loading="lazy" alt="">'+(p.legende?'<div class="photo-cap">'+esc(p.legende)+'</div>':'')+'</div>'; };
+    var blocMaison = photosMaison.length
+      ? '<div class="card"><strong>🏠 Photos de votre maison</strong><div class="photo-grid">'+photosMaison.map(vignette).join('')+'</div></div>'
+      : '';
+    var ph=photosGenerales.length?photosGenerales.map(vignette).join(''):'<p style="color:#4b6a8b;">Aucune photo disponible.</p>';
+    /* [FIX] r.travaux n'a jamais existé — le champ enregistré par l'ERP est
+       travaux_realises (saveRapportChantier) ; r.date n'existe pas non plus,
+       c'est date_debut/date_fin. Le résumé des travaux et la date restaient
+       vides sur cette carte depuis toujours. */
+    var rp=raps.length?raps.map(function(r){ return '<div style="border:1px solid #eef2f8; border-radius:12px; padding:12px; margin-bottom:10px;"><strong>📅 '+dshort(r.date_debut||r.date)+' — Avancement '+(parseFloat(r.avancement)||0)+'%</strong>'+(r.travaux_realises?'<div style="font-size:.85rem; margin-top:6px;">'+esc(r.travaux_realises)+'</div>':'')+'</div>'; }).join(''):'<p style="color:#4b6a8b;">Aucun rapport partagé.</p>';
+    return blocMaison+'<div class="card"><strong>🚧 Photos générales du chantier</strong><div class="photo-grid">'+ph+'</div></div><div class="card"><strong>📋 Rapports d\'avancement</strong><div style="margin-top:10px;">'+rp+'</div></div>';
   }
   function _clearToken(){ SB_TOKEN=null; _effacerSessionPortail(); }
   function logoutSouscripteur(){ S.client=null; _clearToken(); document.getElementById('sous-dash').style.display='none'; document.getElementById('sous-login').style.display='block'; document.getElementById('sousCode').value=''; }
@@ -1912,6 +2027,38 @@
     if(la){ var lg=BR('logo_url',''); la.innerHTML = (lg ? '<img src="'+esc(lg)+'" alt="'+esc(nom)+'" style="height:44px;max-width:200px;object-fit:contain;">' : '<h1>'+esc(nom)+'</h1>') + '<p>'+esc(slogan)+'</p>'; }
     var ht=document.querySelector('.hero h2'); if(ht) ht.textContent = BR('hero_titre', nom.toUpperCase());
     var hp=document.querySelector('.hero-content p'); if(hp) hp.textContent = BR('hero_texte', nom + " — votre partenaire immobilier en Côte d'Ivoire.");
+    /* Vidéo institutionnelle : n'active la mise en page deux colonnes, et ne
+       pose le src (source du <video>), que si une vidéo est réellement
+       configurée — sinon rien n'est chargé et la bannière reste centrée
+       comme avant. */
+    var heroVideoUrl = BR('hero_video_url','');
+    var hf = document.getElementById('hero-flex');
+    var hvHalf = document.getElementById('hero-video-half');
+    if (heroVideoUrl && hf && hvHalf) {
+      hf.classList.add('has-video');
+      hvHalf.style.display = '';
+      var hvSrc = document.getElementById('hero-video-src');
+      if (hvSrc) hvSrc.src = heroVideoUrl;
+      var hvEl = document.getElementById('hero-video-el');
+      if (hvEl) hvEl.load();
+      var heroPoster = BR('hero_image','');
+      if (hvEl && heroPoster) hvEl.poster = heroPoster;
+    } else if (hf) {
+      hf.classList.remove('has-video');
+      if (hvHalf) hvHalf.style.display = 'none';
+      /* Diaporama photo : uniquement si aucune vidéo institutionnelle n'est
+         réglée (la vidéo garde la priorité quand les deux sont configurées). */
+      var heroSlides = BR('hero_slides', []);
+      var hsHalf = document.getElementById('hero-slides-half');
+      if (Array.isArray(heroSlides) && heroSlides.length && hf && hsHalf) {
+        hf.classList.add('has-slides');
+        hsHalf.style.display = '';
+        heroSlidesDemarrer(heroSlides);
+      } else if (hsHalf) {
+        hf.classList.remove('has-slides');
+        hsHalf.style.display = 'none';
+      }
+    }
 
     /* Onglet + page programme */
     var progNom = BR('programme_nom','');
@@ -4951,6 +5098,56 @@
     var b = e.target.closest ? e.target.closest('.tab-link') : null;
     if (b) _anaOngletVu(b.getAttribute('data-tab') || '');
   });
+</script>
+
+<script>
+  /* ---- Application installable (PWA) ---- */
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('/sw.js').catch(function(){});
+    });
+  }
+
+  var _pwaDeferredPrompt = null;
+  var _pwaEnEstDeja = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  var _pwaEstIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+
+  function _pwaAfficherBouton(){
+    if (_pwaEnEstDeja) return;
+    var li = document.getElementById('pwa-install-li');
+    if (li) li.style.display = '';
+  }
+
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    _pwaDeferredPrompt = e;
+    _pwaAfficherBouton();
+  });
+
+  window.addEventListener('appinstalled', function(){
+    _pwaDeferredPrompt = null;
+    var li = document.getElementById('pwa-install-li');
+    if (li) li.style.display = 'none';
+  });
+
+  function pwaInstaller(){
+    if (_pwaDeferredPrompt) {
+      _pwaDeferredPrompt.prompt();
+      _pwaDeferredPrompt.userChoice.finally(function(){ _pwaDeferredPrompt = null; });
+      return;
+    }
+    if (_pwaEstIOS) {
+      alert("Pour installer l'application sur iPhone/iPad :\n\n1. Appuyez sur le bouton Partager (le carré avec une flèche vers le haut)\n2. Choisissez « Sur l'écran d'accueil »\n3. Appuyez sur « Ajouter »");
+      return;
+    }
+    alert("Votre navigateur ne propose pas l'installation directe ici. Utilisez le menu du navigateur (⋮ ou Partager) puis « Installer l'application » ou « Ajouter à l'écran d'accueil ».");
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    if (_pwaEstIOS && !_pwaEnEstDeja) _pwaAfficherBouton();
+  });
+
+  window.pwaInstaller = pwaInstaller;
 </script>
 </body>
 </html>

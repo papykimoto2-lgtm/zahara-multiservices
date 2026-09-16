@@ -6288,6 +6288,33 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div style="font-size:11px;color:#6B6B9A;margin-top:4px;">Collez une URL d'image, ou importez un fichier (PNG/JPG/WEBP, 3 Mo max — format paysage recommandé).</div>
               </div>
               <div class="form-group span-2">
+                <label>🎬 Vidéo institutionnelle (moitié de la bannière d'accueil)</label>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('portail-hero-video-file-input').click()">📁 Importer une vidéo</button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="portail-hero-video-clear-btn" onclick="clearPortailHeroVideo()" style="display:none;">🗑️ Retirer</button>
+                  <input type="file" id="portail-hero-video-file-input" accept="video/mp4,video/webm,video/ogg,video/quicktime" style="display:none;" onchange="handlePortailHeroVideoUpload(event)">
+                  <span id="portail-hero-video-statut" style="font-size:12px;color:#6B6B9A;"></span>
+                </div>
+                <div id="portail-hero-video-progress-zone" style="display:none;margin-top:8px;">
+                  <div style="background:#EEF0F6;border-radius:8px;height:8px;overflow:hidden;"><div id="portail-hero-video-progress-bar" style="background:var(--pp-primary,#003366);height:100%;width:0%;transition:width .2s;"></div></div>
+                  <div id="portail-hero-video-progress-txt" style="font-size:11px;color:#6B6B9A;margin-top:3px;"></div>
+                </div>
+                <div style="font-size:11px;color:#6B6B9A;margin-top:4px;">MP4/WebM/OGG/MOV, 150 Mo max. Affichée sur la moitié droite de la bannière d'accueil du portail, lecture uniquement au clic du visiteur (rien n'est chargé tant qu'il n'a pas cliqué).</div>
+                <input type="hidden" id="param-portail-hero-video-url">
+              </div>
+              <div class="form-group span-2">
+                <label>🖼️ Diaporama photo (moitié de la bannière d'accueil)</label>
+                <div style="font-size:11px;color:#6B6B9A;margin-bottom:6px;">Alternative à la vidéo institutionnelle : si une vidéo est réglée ci-dessus, elle est prioritaire et le diaporama n'apparaît pas. Sans vidéo, ces photos défilent automatiquement sur la moitié droite de la bannière.</div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('portail-hero-slides-file-input').click()">📁 Ajouter des photos</button>
+                  <input type="file" id="portail-hero-slides-file-input" accept="image/png,image/jpeg,image/webp" multiple style="display:none;" onchange="handlePortailHeroSlidesUpload(event)">
+                  <span id="portail-hero-slides-statut" style="font-size:12px;color:#6B6B9A;"></span>
+                </div>
+                <div id="portail-hero-slides-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;"></div>
+                <div style="font-size:11px;color:#6B6B9A;margin-top:4px;">PNG/JPG/WEBP, 5 Mo max par photo. Utilisez les flèches sur chaque vignette pour réordonner.</div>
+                <input type="hidden" id="param-portail-hero-slides-json">
+              </div>
+              <div class="form-group span-2">
                 <label>Titre du bandeau d'accueil</label>
                 <input type="text" id="param-portail-hero-titre" class="form-control" placeholder="Ex : L'ASSURANCE D'ÊTRE LOGÉ">
               </div>
@@ -22708,7 +22735,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="plan-dropzone-inner">
             <div style="font-size:36px;margin-bottom:8px;">📸</div>
             <div style="font-weight:700;font-size:14px;">Glisser des photos ici</div>
-            <div style="font-size:12px;color:var(--dim);margin:4px 0 12px;">JPG, PNG, HEIC — max 5 Mo par photo</div>
+            <div style="font-size:12px;color:var(--dim);margin:4px 0 12px;">JPG, PNG, HEIC — max 15 Mo par photo</div>
             <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
               <label for="rch-photo-input" class="btn btn-primary btn-sm"
                 style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;margin:0;">
@@ -22748,7 +22775,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <!-- [AJOUT — revue photo/vidéo] Vidéos du rapport, même gabarit que le module lotissement (plr*) -->
         <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
           <button type="button" class="btn btn-secondary btn-sm" onclick="rchOuvrirVideo()">🔗 Vidéo (YouTube/Vimeo/lien)</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="rchOuvrirVideoFichier()">📤 Vidéo (fichier, max 25 Mo)</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="rchOuvrirVideoFichier()">📤 Vidéo (fichier, max 50 Mo)</button>
           <input type="file" id="rch-input-video" accept="video/mp4,video/webm,video/ogg,video/quicktime" style="display:none;" onchange="rchAjouterVideoFichier(this)">
         </div>
         <div id="rch-video-form" style="display:none;margin-top:10px;padding:12px;border:1px dashed #B87333;border-radius:10px;">
@@ -32969,11 +32996,29 @@ function getTauxCommissions() {
 function isVersementSouscription(versement) {
   if (versement.type === 'frais_souscription') return true; // frais → taux souscription
   if (versement.type === 'apport') return true;
-  // Si c'est le 1er versement du client
+  /* [FIX] Comparait seulement "existe-t-il un AUTRE versement", sans regarder
+     les dates : dépendait donc de l'ordre d'INSERTION en mémoire, pas de la
+     chronologie réelle du paiement. Deux cas concrets cassés par ça :
+     1) Import CSV en masse ou régénération/réparation (regenererToutesCommissions,
+        verifierCommissionsVersements) : tous les versements d'un client sont
+        déjà présents dans DATA.versements au moment du calcul → CHAQUE
+        versement, y compris le tout premier chronologiquement, voyait "un
+        autre existe" et perdait le taux souscription (plus élevé).
+     2) Rattrapage d'un versement passé saisi après un versement plus récent :
+        le vrai 1er paiement (antérieur) était classé "régulier" à tort, et
+        celui saisi en premier (mais postérieur) gardait indûment "souscription".
+     On compare désormais les dates : ce versement est "souscription" s'il est
+     le plus ANCIEN pour ce client (à égalité de date — même jour — l'id sert
+     de tie-break stable ; les versements n'ont pas d'horodatage plus précis). */
+  var maDate = versement.date || '';
   var autresVersements = DATA.versements.filter(function(v) {
     return v.client_id === versement.client_id && v.id !== versement.id;
   });
-  return autresVersements.length === 0;
+  return autresVersements.every(function(v) {
+    var d = v.date || '';
+    if (d !== maDate) return d > maDate;
+    return String(v.id) > String(versement.id);
+  });
 }
 
 /* Frais de souscription = NON remboursables → n'entrent pas dans le prix payé. */
@@ -33221,8 +33266,15 @@ async function genererCommissionsVersement(versement) {
   if ((client.apporteur || client.apporteur_id) && existTypes.indexOf('apporteur') === -1) {
     // Taux spécifique à l'apporteur > taux global
     var apObj = client.apporteur_id ? DATA.apporteurs.find(function(a){return a.id===client.apporteur_id;}) : null;
+    /* [FIX] apObj.taux_souscription||taux.apporteur_souscription écrasait un
+       taux à 0 EXPLICITEMENT saisi sur la fiche apporteur (cas légitime :
+       apporteur non rémunéré sur cette vente, déjà payé au forfait ailleurs)
+       par le taux global des Paramètres — l'apporteur touchait alors une
+       commission qu'il n'était pas censé avoir. On ne retombe sur le taux
+       global que si rien n'est renseigné du tout (undefined/null/''). */
+    var _tauxOuDefaut = function(v, dflt){ return (v !== undefined && v !== null && v !== '') ? (parseFloat(v)||0) : dflt; };
     var tauxAp = apObj
-      ? (isSouscription ? (apObj.taux_souscription||taux.apporteur_souscription) : (apObj.taux_regulier||taux.apporteur_regulier))
+      ? (isSouscription ? _tauxOuDefaut(apObj.taux_souscription, taux.apporteur_souscription) : _tauxOuDefaut(apObj.taux_regulier, taux.apporteur_regulier))
       : (isSouscription ? taux.apporteur_souscription : taux.apporteur_regulier);
     var montantAp = Math.round(montant * tauxAp / 100);
     if (montantAp > 0) {
@@ -33288,18 +33340,41 @@ async function payerCommission(id) {
   var choix = prompt(modeLabels + '\n\nEntrez 1, 2, 3 ou 4 :', '1');
   var mode = modes[parseInt(choix)-1] || 'virement';
 
+  /* [FIX] Le statut "payee" était persisté AVANT la comptabilisation, sans
+     filet : si comptabiliserCommission/comptabiliserPaiementCommission
+     échouait ensuite (compte par défaut manquant, réseau...), la commission
+     restait enregistrée "payee" en base avec une référence de paiement mais
+     SANS écriture comptable — et annulerCommission() refuse d’annuler toute
+     commission déjà "payee", bloquant toute correction depuis l’interface.
+     comptabiliserPaiementCommission() exige comm.statut==='payee' pour agir
+     (son propre garde-fou anti-doublon) : le statut doit donc bien être posé
+     avant l’appel, mais on revient en arrière — et on RE-PERSISTE ce retour
+     en base — si la comptabilisation échoue, au lieu de laisser un état
+     "payee" incorrect et bloqué définitivement. */
+  var statutAvant = comm.statut, datePaieAvant = comm.date_paiement, refPaieAvant = comm.ref_paiement;
   comm.statut = 'payee';
   comm.date_paiement = today();
   comm.ref_paiement = ref;
   await dbPut('commissions', comm);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', comm);
 
-  // Comptabiliser la charge si pas encore fait
-  if (!comm.ecriture_id) {
-    await comptabiliserCommission(comm, true);
+  try {
+    // Comptabiliser la charge si pas encore fait
+    if (!comm.ecriture_id) {
+      await comptabiliserCommission(comm, true);
+    }
+    // Comptabiliser le règlement
+    await comptabiliserPaiementCommission(comm, mode);
+  } catch(e) {
+    comm.statut = statutAvant;
+    comm.date_paiement = datePaieAvant;
+    comm.ref_paiement = refPaieAvant;
+    await dbPut('commissions', comm);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', comm);
+    toast('❌ Échec de la comptabilisation du paiement (' + (e && e.message ? e.message : 'erreur') + ') — la commission n’a PAS été marquée payée. Vérifiez les comptes par défaut puis réessayez.', 'error', 9000);
+    renderCommissions();
+    return;
   }
-  // Comptabiliser le règlement
-  await comptabiliserPaiementCommission(comm, mode);
 
   filterEcritures();
   renderCommissions();
@@ -34924,10 +34999,23 @@ function serieRenderRecap() {
     _SERIE_PREVIEW.length + ' lot(s) à générer — Programme : ' + ((prog && prog.nom) || '—');
   var standings = { economique:'Économique', moyen:'Moyen', haut:'Haut de gamme', prestige:'Prestige' };
   var livraisons = { gros_oeuvre:'Gros œuvre', second_oeuvre:'Second œuvre', cle_en_main:'Clé en main' };
+  /* [FIX rattachement DQE↔lot] La colonne « Type » était un champ texte
+     libre : une faute de frappe/casse retapée ici, juste avant la création
+     effective des lots, découplait silencieusement le lot de son DQE réel
+     (_typeKey() ne matche alors plus aucune nomenclature → coût de revient
+     à 0 ou sur un mauvais gabarit, sans alerte). Remplacé par un select
+     contraint aux mêmes types de conception que modele-nom
+     (_dqeOptionsTypesConception), avec repli visible si la valeur actuelle
+     (héritée du modèle) ne correspond déjà à aucune conception. */
+  var _serieTypesHtml = (typeof _dqeOptionsTypesConception === 'function') ? _dqeOptionsTypesConception(_SERIE_PROGID) : '';
   document.getElementById('serie-recap-tbody').innerHTML = _SERIE_PREVIEW.map(function(r, idx) {
+    var typeManque = r.type && _serieTypesHtml.indexOf('value="' + escHtml(r.type) + '"') === -1;
+    var typeOptions = (typeManque ? '<option value="' + escHtml(r.type) + '">⚠️ ' + escHtml(r.type) + ' (introuvable en conception)</option>' : '') + _serieTypesHtml;
     return '<tr>'
       + '<td><input type="text" class="form-control" style="min-width:90px;" value="' + escHtml(r.numero) + '" onchange="serieModifierChamp(' + idx + ',\'numero\',this.value)"></td>'
-      + '<td><input type="text" class="form-control" style="min-width:100px;" value="' + escHtml(r.type) + '" onchange="serieModifierChamp(' + idx + ',\'type\',this.value)"></td>'
+      + '<td><select class="form-control" style="min-width:100px;" onchange="serieModifierChamp(' + idx + ',\'type\',this.value)" title="' + (typeManque ? 'Ce libellé ne correspond à aucune conception — le DQE ne le retrouvera pas.' : '') + '">'
+        + (typeOptions || '<option value="' + escHtml(r.type) + '">' + escHtml(r.type) + '</option>')
+        + '</select></td>'
       + '<td><input type="number" class="form-control" style="width:90px;" value="' + (r.surface||0) + '" onchange="serieModifierChamp(' + idx + ',\'surface\',this.value)"></td>'
       + '<td><input type="number" class="form-control" style="width:120px;" value="' + (r.prix||0) + '" onchange="serieModifierChamp(' + idx + ',\'prix\',this.value)"></td>'
       + '<td><select class="form-control" onchange="serieModifierChamp(' + idx + ',\'standing\',this.value)">'
@@ -34939,6 +35027,12 @@ function serieRenderRecap() {
       + '<td><button class="btn btn-danger btn-sm" onclick="serieSupprimerLigne(' + idx + ')">🗑</button></td>'
       + '</tr>';
   }).join('');
+  /* Le HTML des <option> ne porte pas d'attribut selected pour la colonne
+     Type (valeurs générées dynamiquement par ligne) — on pose la valeur
+     courante après coup, comme modeleRafraichirTypes() le fait déjà. */
+  document.querySelectorAll('#serie-recap-tbody select[onchange*="\'type\'"]').forEach(function(sel, i){
+    if (_SERIE_PREVIEW[i]) sel.value = _SERIE_PREVIEW[i].type;
+  });
 }
 
 function serieModifierChamp(idx, champ, val) {
@@ -35037,12 +35131,29 @@ async function ventilerCoutFoncierProgramme(progId) {
   if (!lots.length) { toast('Aucun lot à ventiler pour ce programme.', 'error'); return 0; }
 
   var sumSurf = lots.reduce(function(s,l){ return s + N(l.surface); }, 0);
+  /* [FIX arrondi] Chaque part était arrondie indépendamment (Math.round) :
+     sur un grand nombre de lots, la somme des parts pouvait s'écarter de
+     quelques FCFA du coût foncier total (les arrondis ne se compensent
+     jamais exactement). Méthode du plus grand reste : on arrondit à
+     l'inférieur puis on distribue les FCFA manquants un par un aux lots
+     ayant le plus grand reste — la somme des parts ventilées est alors
+     TOUJOURS strictement égale à coutFoncier. */
+  var partsBrutes = lots.map(function(l){
+    return sumSurf > 0 ? (coutFoncier * N(l.surface) / sumSurf) : (coutFoncier / lots.length);
+  });
+  var partsEntieres = partsBrutes.map(Math.floor);
+  var sommeEntiers = partsEntieres.reduce(function(s,v){ return s + v; }, 0);
+  var resteADistribuer = Math.round(coutFoncier - sommeEntiers);
+  var ordreParReste = lots.map(function(_, idx){ return idx; })
+    .sort(function(a,b){ return (partsBrutes[b]-partsEntieres[b]) - (partsBrutes[a]-partsEntieres[a]); });
+  for (var r = 0; r < resteADistribuer && ordreParReste.length; r++) {
+    partsEntieres[ordreParReste[r % ordreParReste.length]] += 1;
+  }
+
   var n = 0;
   for (var i = 0; i < lots.length; i++) {
     var l = lots[i];
-    /* Part foncière = prorata surface (ou équirépartition si aucune surface) */
-    var part = sumSurf > 0 ? Math.round(coutFoncier * N(l.surface) / sumSurf)
-                           : Math.round(coutFoncier / lots.length);
+    var part = partsEntieres[i];
     /* Coût bâti = coût actuel - ancienne part foncière (idempotence) */
     var coutBati = Math.max(0, N(l.cout_revient) - N(l._coutFoncier));
     l._coutFoncier = part;
@@ -44819,6 +44930,155 @@ function clearPortailHeroImg() {
   if (fileInput) fileInput.value = '';
 }
 
+/** Upload de la vidéo institutionnelle (moitié droite de la bannière du portail
+    public). Jusqu'à 150 Mo : envoyée directement au Storage via XHR (et non
+    fetch/pmUploadBlob) pour disposer d'une vraie barre de progression — sans
+    ça, un fichier de cette taille laisserait l'admin devant un écran figé
+    plusieurs dizaines de secondes sans retour. Ne part jamais en base64 dans
+    pi_params (seule l'URL Storage y est stockée), sans quoi la ligne JSONB du
+    paramétrage exploserait et casserait la synchro de tout le reste. */
+function handlePortailHeroVideoUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var maxSize = 150 * 1024 * 1024;
+  if (file.size > maxSize) {
+    toast('Vidéo trop lourde (max 150 Mo).', 'error');
+    event.target.value = '';
+    return;
+  }
+  if (!SB.url || !SB.key) { toast('Cloud non configuré — impossible d\'envoyer la vidéo.', 'error'); return; }
+
+  var statutEl = document.getElementById('portail-hero-video-statut');
+  var zone = document.getElementById('portail-hero-video-progress-zone');
+  var bar  = document.getElementById('portail-hero-video-progress-bar');
+  var txt  = document.getElementById('portail-hero-video-progress-txt');
+  if (statutEl) statutEl.textContent = '';
+  if (zone) zone.style.display = '';
+  if (bar) bar.style.width = '0%';
+  if (txt) txt.textContent = 'Envoi en cours… 0 %';
+
+  var ext = ((file.type||'').split('/')[1] || (file.name||'').split('.').pop() || 'mp4').replace(/[^a-z0-9]/gi,'');
+  var chemin = 'hero/herovid_' + Date.now() + '.' + ext;
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', SB.url + '/storage/v1/object/' + PM_BUCKET + '/' + encodeURI(chemin), true);
+  xhr.setRequestHeader('apikey', SB.key);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + sbAuth());
+  xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+  xhr.setRequestHeader('x-upsert', 'true');
+  xhr.upload.onprogress = function(e){
+    if (!e.lengthComputable) return;
+    var pct = Math.round(e.loaded / e.total * 100);
+    if (bar) bar.style.width = pct + '%';
+    if (txt) txt.textContent = 'Envoi en cours… ' + pct + '% (' + (e.loaded/1024/1024).toFixed(1) + ' / ' + (e.total/1024/1024).toFixed(1) + ' Mo)';
+  };
+  xhr.onload = function(){
+    if (zone) zone.style.display = 'none';
+    if (xhr.status >= 200 && xhr.status < 300) {
+      var url = _pmPublicUrl(chemin);
+      var input = document.getElementById('param-portail-hero-video-url');
+      if (input) input.value = url;
+      if (statutEl) statutEl.innerHTML = '✅ Vidéo importée (' + (file.size/1024/1024).toFixed(1) + ' Mo)';
+      var clearBtn = document.getElementById('portail-hero-video-clear-btn');
+      if (clearBtn) clearBtn.style.display = '';
+      toast('Vidéo institutionnelle importée — pensez à cliquer sur « Enregistrer » pour la publier.', 'success');
+    } else {
+      toast('❌ Échec de l\'envoi de la vidéo (HTTP ' + xhr.status + ').', 'error');
+    }
+  };
+  xhr.onerror = function(){
+    if (zone) zone.style.display = 'none';
+    toast('❌ Échec de l\'envoi de la vidéo (réseau).', 'error');
+  };
+  xhr.send(file);
+}
+
+/** Retire la vidéo institutionnelle de la bannière (le fichier reste au
+    Storage — seule la référence dans le paramétrage est effacée). */
+function clearPortailHeroVideo() {
+  var input = document.getElementById('param-portail-hero-video-url');
+  if (input) input.value = '';
+  var statutEl = document.getElementById('portail-hero-video-statut');
+  if (statutEl) statutEl.textContent = '';
+  var clearBtn = document.getElementById('portail-hero-video-clear-btn');
+  if (clearBtn) clearBtn.style.display = 'none';
+  var fileInput = document.getElementById('portail-hero-video-file-input');
+  if (fileInput) fileInput.value = '';
+}
+
+/* ── Diaporama photo de la bannière (moitié droite, alternative à la vidéo) ── */
+var HERO_SLIDES_STATE = [];  /* [{ id, url, legende }] — persisté dans param-portail-hero-slides-json */
+
+function _heroSlidesPersisterChamp() {
+  var input = document.getElementById('param-portail-hero-slides-json');
+  if (input) input.value = HERO_SLIDES_STATE.length ? JSON.stringify(HERO_SLIDES_STATE) : '';
+}
+
+async function handlePortailHeroSlidesUpload(event) {
+  var files = Array.prototype.slice.call(event.target.files || []);
+  if (!files.length) return;
+  var maxSize = 5 * 1024 * 1024;
+  var statutEl = document.getElementById('portail-hero-slides-statut');
+  if (statutEl) statutEl.textContent = '⏳ Envoi en cours…';
+  var ok = 0, refus = 0;
+  for (var i = 0; i < files.length; i++) {
+    var file = files[i];
+    if (!file.type || file.type.indexOf('image/') !== 0) { refus++; continue; }
+    if (file.size > maxSize) { toast('❌ « ' + file.name + ' » dépasse 5 Mo — ignorée.', 'error'); refus++; continue; }
+    try {
+      var id = 'heroslide_' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
+      var chemin = await pmUploadBlob(file, id, 'hero_slides');
+      HERO_SLIDES_STATE.push({ id: id, url: _pmPublicUrl(chemin), legende: file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ') });
+      ok++;
+    } catch(e) {
+      toast('❌ Échec de l\'envoi de « ' + file.name + ' » (' + (e && e.message ? e.message : 'erreur') + ').', 'error');
+      refus++;
+    }
+  }
+  event.target.value = '';
+  _heroSlidesPersisterChamp();
+  renderPortailHeroSlidesGrid();
+  if (statutEl) statutEl.textContent = ok ? ('✅ ' + ok + ' photo(s) ajoutée(s)' + (refus ? ' — ' + refus + ' ignorée(s)' : '')) : '';
+  if (ok) toast(ok + ' photo(s) ajoutée(s) au diaporama — pensez à cliquer sur « Enregistrer ».', 'success');
+}
+
+function renderPortailHeroSlidesGrid() {
+  var grid = document.getElementById('portail-hero-slides-grid');
+  if (!grid) return;
+  if (!HERO_SLIDES_STATE.length) { grid.innerHTML = ''; return; }
+  grid.innerHTML = HERO_SLIDES_STATE.map(function(s, i) {
+    return '<div style="position:relative;border:1px solid #E0E0EA;border-radius:8px;overflow:hidden;background:#F5F5F8;">'
+      + '<img src="' + s.url + '" alt="" style="width:100%;height:80px;object-fit:cover;display:block;">'
+      + '<button type="button" onclick="heroSlideSupprimer(\'' + s.id + '\')" title="Retirer" style="position:absolute;top:3px;right:3px;background:#EF4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1;">✕</button>'
+      + '<div style="display:flex;gap:2px;padding:3px;">'
+      + '<button type="button" onclick="heroSlideDeplacer(\'' + s.id + '\',-1)" title="Déplacer avant" style="flex:1;font-size:10px;padding:2px;border:1px solid #E0E0EA;background:#fff;border-radius:4px;cursor:pointer;" ' + (i===0?'disabled':'') + '>◀</button>'
+      + '<button type="button" onclick="heroSlideDeplacer(\'' + s.id + '\',1)" title="Déplacer après" style="flex:1;font-size:10px;padding:2px;border:1px solid #E0E0EA;background:#fff;border-radius:4px;cursor:pointer;" ' + (i===HERO_SLIDES_STATE.length-1?'disabled':'') + '>▶</button>'
+      + '</div>'
+      + '<input type="text" value="' + s.legende.replace(/"/g,'&quot;') + '" placeholder="Légende (optionnel)" oninput="heroSlideMajLegende(\'' + s.id + '\',this.value)" style="width:100%;font-size:10px;padding:3px 4px;border:none;border-top:1px solid #E0E0EA;">'
+      + '</div>';
+  }).join('');
+}
+
+function heroSlideSupprimer(id) {
+  HERO_SLIDES_STATE = HERO_SLIDES_STATE.filter(function(s){ return s.id !== id; });
+  _heroSlidesPersisterChamp();
+  renderPortailHeroSlidesGrid();
+}
+function heroSlideMajLegende(id, val) {
+  var s = HERO_SLIDES_STATE.find(function(x){ return x.id === id; });
+  if (s) { s.legende = val; _heroSlidesPersisterChamp(); }
+}
+function heroSlideDeplacer(id, sens) {
+  var idx = HERO_SLIDES_STATE.findIndex(function(x){ return x.id === id; });
+  var cible = idx + sens;
+  if (idx < 0 || cible < 0 || cible >= HERO_SLIDES_STATE.length) return;
+  var tmp = HERO_SLIDES_STATE[idx];
+  HERO_SLIDES_STATE[idx] = HERO_SLIDES_STATE[cible];
+  HERO_SLIDES_STATE[cible] = tmp;
+  _heroSlidesPersisterChamp();
+  renderPortailHeroSlidesGrid();
+}
+
 
 /* ══════════════════════════════════════════════════════════════
    PARAMÈTRES — Fonctions save/load pour les nouveaux onglets
@@ -45082,6 +45342,11 @@ async function savePurgeParams() {
     purge_visites_days: gv('param-purge-visites')||365,
   });
   await dbPut('params', DATA.params);
+  /* [FIX] syncToSupabase absent : les seuils de purge restaient locaux à ce
+     poste — jamais poussés au cloud, donc invisibles sur les autres postes,
+     et perdus sur CE poste au prochain pull cloud (le champ n'a jamais
+     existé côté serveur pour être préservé). */
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
   toast('Paramètres de purge enregistrés.', 'success');
 }
 
@@ -45122,12 +45387,19 @@ function renderParamsReporting() {
     +'<div class="card"><div class="form-section-title">📊 Rapports automatiques</div>'
     +'<div class="form-grid" style="margin-top:10px;">'
     +'<div class="form-group"><label>Rapport CA mensuel</label>'
-    +'<select class="form-control" id="rpt-ca-freq"><option value="desactive">Désactivé</option>'
-    +'<option value="mensuel" '+(p.rpt_ca_freq==="mensuel"?"selected":"")+'}>Mensuel (1er du mois)</option>'
-    +'<option value="hebdo">Hebdomadaire (lundi)</option></select></div>'
+    /* [FIX] Un "}" résiduel dans l'attribut cassait le "selected" du choix
+       Mensuel (le navigateur voyait selected} — invalide, donc ignoré), et
+       ni "Hebdomadaire" ci-dessous ni aucune option de rpt-rh-freq n'avaient
+       de logique selected du tout : la donnée était bien enregistrée (dbPut
+       + sync corrects dans saveReportingParams), mais l'écran retombait
+       toujours sur "Désactivé" à chaque réouverture de l'onglet — l'utilisateur
+       croyait que son choix ne s'enregistrait pas. */
+    +'<select class="form-control" id="rpt-ca-freq"><option value="desactive"'+(p.rpt_ca_freq!=="mensuel"&&p.rpt_ca_freq!=="hebdo"?" selected":"")+'>Désactivé</option>'
+    +'<option value="mensuel" '+(p.rpt_ca_freq==="mensuel"?"selected":"")+'>Mensuel (1er du mois)</option>'
+    +'<option value="hebdo" '+(p.rpt_ca_freq==="hebdo"?"selected":"")+'>Hebdomadaire (lundi)</option></select></div>'
     +'<div class="form-group"><label>Rapport RH/présence</label>'
-    +'<select class="form-control" id="rpt-rh-freq"><option value="desactive">Désactivé</option>'
-    +'<option value="mensuel">Mensuel</option></select></div>'
+    +'<select class="form-control" id="rpt-rh-freq"><option value="desactive"'+(p.rpt_rh_freq!=="mensuel"?" selected":"")+'>Désactivé</option>'
+    +'<option value="mensuel" '+(p.rpt_rh_freq==="mensuel"?"selected":"")+'>Mensuel</option></select></div>'
     +'<div class="form-group span-2"><label>Email(s) destinataires (séparés par ;)</label>'
     +'<input type="text" class="form-control" id="rpt-emails" value="'+(escHtml(p.rpt_emails||''))+'" placeholder="email1@exemple.ci;email2@exemple.ci"></div>'
     +'<div class="form-group span-2"><label>Objet des rapports automatiques</label>'
@@ -45202,11 +45474,15 @@ async function saveWorkflowParams() {
     var e = document.getElementById('wf-'+k);
     if (e) DATA.params = Object.assign(DATA.params||{}, { ['wf_'+k]: e.checked });
   });
-  var gv = function(id){ var e=document.getElementById(id); return e?parseFloat(e.value)||0:0; };
+  /* [FIX] gv(id)||défaut écrasait un seuil de validation volontairement mis
+     à 0 (ex. "toute dépense, même 0 FCFA, doit passer par le N1") par la
+     valeur par défaut — gv0() ne retombe sur le défaut que si le champ est
+     vraiment vide/non numérique, pas quand l'utilisateur a saisi 0. */
+  var gv0 = function(id, dflt){ var e=document.getElementById(id); if(!e || e.value==='') return dflt; var n=parseFloat(e.value); return isNaN(n)?dflt:n; };
   DATA.params = Object.assign(DATA.params||{}, {
-    workflow_seuil_n1:  gv('param-workflow-seuil-n1')  || 1000000,
-    workflow_seuil_n2:  gv('param-workflow-seuil-n2')  || 5000000,
-    workflow_seuil_pdg: gv('param-workflow-seuil-pdg') || 20000000,
+    workflow_seuil_n1:  gv0('param-workflow-seuil-n1', 1000000),
+    workflow_seuil_n2:  gv0('param-workflow-seuil-n2', 5000000),
+    workflow_seuil_pdg: gv0('param-workflow-seuil-pdg', 20000000),
   });
   await dbPut('params', DATA.params);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
@@ -45219,82 +45495,84 @@ async function saveWorkflowParams() {
 async function saveModulesAvancesParams() {
   var gv  = function(id){ var e=document.getElementById(id); return e?e.value:''; };
   var gvn = function(id){ var e=document.getElementById(id); return e?parseFloat(e.value)||0:0; };
+  /* [FIX] gvn(id)||défaut écrasait un 0 volontairement saisi par l'utilisateur (taux d'indexation locative à 0%, seuil à 0...) avec la valeur par défaut — gvn0() ne retombe dessus que si le champ est vraiment vide/non numérique. */
+  var gvn0 = function(id, dflt){ var e=document.getElementById(id); if(!e || e.value==='') return dflt; var n=parseFloat(e.value); return isNaN(n)?dflt:n; };
   var gvc = function(id){ var e=document.getElementById(id); return e?e.checked:false; };
   DATA.params = Object.assign(DATA.params||{}, {
-    lbcft_seuil_suspect:        gvn('param-lbcft-seuil-suspect')       || 5000000,
-    lbcft_seuil_id_renforcee:   gvn('param-lbcft-seuil-id-renforcee')  || 2500000,
-    lbcft_revue_kyc_mois:       gvn('param-lbcft-revue-kyc-mois')      || 12,
-    lbcft_conservation_annees:  gvn('param-lbcft-conservation-annees') || 10,
+    lbcft_seuil_suspect:        gvn0('param-lbcft-seuil-suspect', 5000000),
+    lbcft_seuil_id_renforcee:   gvn0('param-lbcft-seuil-id-renforcee', 2500000),
+    lbcft_revue_kyc_mois:       gvn0('param-lbcft-revue-kyc-mois', 12),
+    lbcft_conservation_annees:  gvn0('param-lbcft-conservation-annees', 10),
     lbcft_responsable:          gv('param-lbcft-responsable'),
     lbcft_email_centif:         gv('param-lbcft-email-centif'),
     lbcft_controle_pep:         gvc('param-lbcft-controle-pep'),
 
-    treso_plafond_caisse:       gvn('param-treso-plafond-caisse')      || 2000000,
-    treso_plafond_especes:      gvn('param-treso-plafond-especes')     || 5000000,
-    treso_seuil_alerte_solde:   gvn('param-treso-seuil-alerte-solde')  || 500000,
-    treso_delai_rapprochement:  gvn('param-treso-delai-rapprochement') || 5,
+    treso_plafond_caisse:       gvn0('param-treso-plafond-caisse', 2000000),
+    treso_plafond_especes:      gvn0('param-treso-plafond-especes', 5000000),
+    treso_seuil_alerte_solde:   gvn0('param-treso-seuil-alerte-solde', 500000),
+    treso_delai_rapprochement:  gvn0('param-treso-delai-rapprochement', 5),
     treso_devise_ref:           gv('param-treso-devise-ref') || 'XOF',
     treso_double_validation:    gvc('param-treso-double-validation'),
 
     budget_methode:              gv('param-budget-methode') || 'exercice_fixe',
     budget_devise:                gv('param-budget-devise') || 'XOF',
-    budget_seuil_depassement_pct: gvn('param-budget-seuil-depassement-pct') || 10,
-    budget_validation_montant:    gvn('param-budget-validation-montant')    || 5000000,
+    budget_seuil_depassement_pct: gvn0('param-budget-seuil-depassement-pct', 10),
+    budget_validation_montant:    gvn0('param-budget-validation-montant', 5000000),
 
-    dqe_marge_defaut_pct: gvn('param-dqe-marge-defaut-pct') || 15,
-    dqe_coeff_aleas_pct:  gvn('param-dqe-coeff-aleas-pct')  || 5,
-    dqe_tva_pct:          gvn('param-dqe-tva-pct')          || 18,
-    dqe_validite_jours:   gvn('param-dqe-validite-jours')   || 30,
+    dqe_marge_defaut_pct: gvn0('param-dqe-marge-defaut-pct', 15),
+    dqe_coeff_aleas_pct:  gvn0('param-dqe-coeff-aleas-pct', 5),
+    dqe_tva_pct:          gvn0('param-dqe-tva-pct', 18),
+    dqe_validite_jours:   gvn0('param-dqe-validite-jours', 30),
 
-    debourse_seuil_validation: gvn('param-debourse-seuil-validation') || 1000000,
+    debourse_seuil_validation: gvn0('param-debourse-seuil-validation', 1000000),
     debourse_compte_defaut:    gv('param-debourse-compte-defaut'),
     debourse_circuit:          gv('param-debourse-circuit') || 'chef_dg',
 
-    stock_seuil_min_alerte:      gvn('param-stock-seuil-min-alerte') || 20,
+    stock_seuil_min_alerte:      gvn0('param-stock-seuil-min-alerte', 20),
     stock_methode_valorisation:  gv('param-stock-methode-valorisation') || 'CUMP',
-    achats_delai_paiement_jours: gvn('param-achats-delai-paiement-jours') || 30,
-    achats_seuil_validation_bc:  gvn('param-achats-seuil-validation-bc')  || 500000,
+    achats_delai_paiement_jours: gvn0('param-achats-delai-paiement-jours', 30),
+    achats_seuil_validation_bc:  gvn0('param-achats-seuil-validation-bc', 500000),
 
-    foncier_alerte_titre_jours: gvn('param-foncier-alerte-titre-jours') || 60,
-    foncier_delai_instruction:  gvn('param-foncier-delai-instruction')  || 30,
-    foncier_taux_redevance:     gvn('param-foncier-taux-redevance')     || 0,
+    foncier_alerte_titre_jours: gvn0('param-foncier-alerte-titre-jours', 60),
+    foncier_delai_instruction:  gvn0('param-foncier-delai-instruction', 30),
+    foncier_taux_redevance:     gvn0('param-foncier-taux-redevance', 0),
     foncier_registre_ref:       gv('param-foncier-registre-ref'),
 
-    juridique_alerte_echeance_jours: gvn('param-juridique-alerte-echeance-jours') || 30,
-    juridique_prescription_annees:   gvn('param-juridique-prescription-annees')   || 5,
+    juridique_alerte_echeance_jours: gvn0('param-juridique-alerte-echeance-jours', 30),
+    juridique_prescription_annees:   gvn0('param-juridique-prescription-annees', 5),
     juridique_cabinet:               gv('param-juridique-cabinet'),
     juridique_numerotation:          gv('param-juridique-numerotation'),
 
-    locatif_indexation_pct:      gvn('param-locatif-indexation-pct')      || 3,
-    locatif_preavis_jours:       gvn('param-locatif-preavis-jours')       || 90,
-    locatif_penalite_retard_pct: gvn('param-locatif-penalite-retard-pct') || 5,
-    locatif_depot_garantie_mois: gvn('param-locatif-depot-garantie-mois') || 2,
-    locatif_jour_echeance:       gvn('param-locatif-jour-echeance')       || 5,
+    locatif_indexation_pct:      gvn0('param-locatif-indexation-pct', 3),
+    locatif_preavis_jours:       gvn0('param-locatif-preavis-jours', 90),
+    locatif_penalite_retard_pct: gvn0('param-locatif-penalite-retard-pct', 5),
+    locatif_depot_garantie_mois: gvn0('param-locatif-depot-garantie-mois', 2),
+    locatif_jour_echeance:       gvn0('param-locatif-jour-echeance', 5),
 
     copro_frequence_charges:    gv('param-copro-frequence-charges') || 'trimestrielle',
-    copro_taux_interet_retard:  gvn('param-copro-taux-interet-retard') || 1,
-    copro_quorum_ag:            gvn('param-copro-quorum-ag') || 50,
-    copro_fonds_reserve_pct:    gvn('param-copro-fonds-reserve-pct') || 5,
+    copro_taux_interet_retard:  gvn0('param-copro-taux-interet-retard', 1),
+    copro_quorum_ag:            gvn0('param-copro-quorum-ag', 50),
+    copro_fonds_reserve_pct:    gvn0('param-copro-fonds-reserve-pct', 5),
 
-    parcauto_alerte_visite_jours:    gvn('param-parcauto-alerte-visite-jours')    || 30,
-    parcauto_alerte_assurance_jours: gvn('param-parcauto-alerte-assurance-jours') || 30,
-    parcauto_seuil_entretien_km:     gvn('param-parcauto-seuil-entretien-km')     || 500,
-    parcauto_plafond_carburant:      gvn('param-parcauto-plafond-carburant')      || 150000,
+    parcauto_alerte_visite_jours:    gvn0('param-parcauto-alerte-visite-jours', 30),
+    parcauto_alerte_assurance_jours: gvn0('param-parcauto-alerte-assurance-jours', 30),
+    parcauto_seuil_entretien_km:     gvn0('param-parcauto-seuil-entretien-km', 500),
+    parcauto_plafond_carburant:      gvn0('param-parcauto-plafond-carburant', 150000),
 
-    crm_delai_relance_prospect: gvn('param-crm-delai-relance-prospect') || 3,
-    crm_score_min_qualif:       gvn('param-crm-score-min-qualif')       || 50,
+    crm_delai_relance_prospect: gvn0('param-crm-delai-relance-prospect', 3),
+    crm_score_min_qualif:       gvn0('param-crm-score-min-qualif', 50),
     crm_source_defaut:          gv('param-crm-source-defaut') || 'site_web',
     crm_territoires:            gv('param-crm-territoires'),
 
-    agenda_rappel_minutes: gvn('param-agenda-rappel-minutes') || 30,
+    agenda_rappel_minutes: gvn0('param-agenda-rappel-minutes', 30),
     agenda_heure_debut:    gv('param-agenda-heure-debut') || '08:00',
     agenda_heure_fin:      gv('param-agenda-heure-fin') || '18:00',
     agenda_signature:      gv('param-agenda-signature'),
 
     diaspo_devise:                 gv('param-diaspo-devise') || 'EUR',
-    diaspo_taux_change_ref:        gvn('param-diaspo-taux-change-ref') || 655.957,
+    diaspo_taux_change_ref:        gvn0('param-diaspo-taux-change-ref', 655.957),
     diaspo_canal:                  gv('param-diaspo-canal') || 'whatsapp',
-    diaspo_delai_traitement_jours: gvn('param-diaspo-delai-traitement-jours') || 15,
+    diaspo_delai_traitement_jours: gvn0('param-diaspo-delai-traitement-jours', 15),
   });
   await dbPut('params', DATA.params);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
@@ -45349,6 +45627,8 @@ async function saveParams() {
     portail_couleur_secondaire:   gv('param-portail-couleur-secondaire')||'#0077b6',
     portail_couleur_primaire_dark:gv('param-portail-couleur-primaire-dark')||'#001f4f',
     portail_hero_image:           gv('param-portail-hero-image'),
+    portail_hero_video_url:       gv('param-portail-hero-video-url'),
+    portail_hero_slides:          (function(){ try { return JSON.parse(gv('param-portail-hero-slides-json')||'[]'); } catch(e){ return DATA.params && DATA.params.portail_hero_slides || []; } })(),
     portail_hero_titre:           gv('param-portail-hero-titre'),
     hero_texte:                   gv('param-portail-hero-texte'),
     portail_footer_texte:         gv('param-portail-footer-texte'),
@@ -45459,6 +45739,8 @@ function buildPortailBrand(){
     couleur_secondaire:     p.portail_couleur_secondaire || '#0077b6',
     couleur_primaire_dark:  p.portail_couleur_primaire_dark || '#001f4f',
     hero_image:             p.portail_hero_image || '',
+    hero_video_url:         p.portail_hero_video_url || '',
+    hero_slides:            Array.isArray(p.portail_hero_slides) ? p.portail_hero_slides : [],
     hero_titre:             p.portail_hero_titre || '',
     hero_texte:             p.hero_texte || '',
     footer_texte:           p.portail_footer_texte || '',
@@ -45509,6 +45791,14 @@ async function publierParamsPortailManuel(){
 
 async function saveObjectifs() {
   var gv = function(id){ var e=document.getElementById(id); return e?parseFloat(e.value)||0:0; };
+  /* [FIX] gv(id)||défaut écrasait un 0 volontairement saisi (gv() renvoie déjà
+     0 pour un champ vide OU explicitement à 0 — indiscernables — puis
+     "0||70" retombe sur 70) : un gestionnaire voulant un seuil d'immobilisation
+     à 0% (aucune tolérance) ou une réservation invalidée immédiatement (0 jour)
+     voyait sa saisie silencieusement remplacée par la valeur par défaut à
+     chaque enregistrement. gv0() ne retombe sur le défaut que si le champ est
+     vraiment vide/non numérique. */
+  var gv0 = function(id, dflt){ var e=document.getElementById(id); if(!e || e.value==='') return dflt; var n=parseFloat(e.value); return isNaN(n)?dflt:n; };
   DATA.params = Object.assign(DATA.params||{},{
     objectif_ca_mensuel:     gv('param-obj-ca'),
     objectif_ventes_mensuel: gv('param-obj-ventes'),
@@ -45516,8 +45806,8 @@ async function saveObjectifs() {
     objectif_visites_mensuel:gv('param-obj-visites'),
     objectif_recouvrement:   gv('param-obj-recouvrement'),
     objectif_conversion:     gv('param-obj-conversion'),
-    seuil_immobilisation_pct:      gv('param-seuil-immob') || 70,
-    delai_validite_reservation_j:  gv('param-delai-validite-reservation') || 30,
+    seuil_immobilisation_pct:      gv0('param-seuil-immob', 70),
+    delai_validite_reservation_j:  gv0('param-delai-validite-reservation', 30),
     max_sans_rapport:        gv('param-max-sans-rapport'),
     objectif_avancement:     gv('param-obj-avancement'),
     delai_relance:           gv('param-delai-relance'),
@@ -45545,12 +45835,30 @@ async function saveAlerteSeuils() {
 
 async function saveAllParams() {
   if (typeof _paramsToucher === 'function') _paramsToucher();
-  await saveParams();
-  await saveObjectifs();
-  await saveAlerteSeuils();
-  await saveWorkflowParams();
-  await saveModulesAvancesParams();
-  toast('✅ Tous les paramètres enregistrés.','success');
+  /* [FIX] Aucun try/catch : une exception dans l'une des 5 sections
+     interrompait silencieusement TOUTES les suivantes — l'utilisateur ne
+     voyait que l'absence du toast final "Tous les paramètres enregistrés",
+     sans jamais savoir laquelle des sections n'avait pas été sauvée, ni que
+     les autres avaient été sautées. Chaque section est désormais
+     indépendante : un échec sur l'une n'empêche plus les autres d'être
+     enregistrées, et les échecs sont nommés explicitement à l'utilisateur. */
+  var etapes = [
+    ['Société / Portail / Commissions', saveParams],
+    ['Objectifs', saveObjectifs],
+    ['Seuils d\'alerte', saveAlerteSeuils],
+    ['Workflow de validation', saveWorkflowParams],
+    ['Modules avancés', saveModulesAvancesParams]
+  ];
+  var echecs = [];
+  for (var i = 0; i < etapes.length; i++) {
+    try { await etapes[i][1](); }
+    catch(e) { echecs.push(etapes[i][0]); console.error('[saveAllParams] échec section « ' + etapes[i][0] + ' »', e); }
+  }
+  if (echecs.length) {
+    toast('⚠️ Échec de l\'enregistrement pour : ' + echecs.join(', ') + '. Les autres sections ont bien été enregistrées — corrigez puis réessayez pour celle(s) en échec.', 'error', 9000);
+  } else {
+    toast('✅ Tous les paramètres enregistrés.','success');
+  }
 }
 
 function loadParamFields() {
@@ -45586,6 +45894,16 @@ function loadParamFields() {
   sv('param-portail-couleur-primaire-dark', p.portail_couleur_primaire_dark||'#001f4f');
   sv('param-portail-hero-image', p.portail_hero_image||'');
   if (typeof updatePortailHeroPreview === 'function') updatePortailHeroPreview(p.portail_hero_image||'');
+  sv('param-portail-hero-video-url', p.portail_hero_video_url||'');
+  (function(){
+    var statutEl = document.getElementById('portail-hero-video-statut');
+    var clearBtn = document.getElementById('portail-hero-video-clear-btn');
+    if (statutEl) statutEl.innerHTML = p.portail_hero_video_url ? '✅ Vidéo déjà en place' : '';
+    if (clearBtn) clearBtn.style.display = p.portail_hero_video_url ? '' : 'none';
+  })();
+  HERO_SLIDES_STATE = Array.isArray(p.portail_hero_slides) ? JSON.parse(JSON.stringify(p.portail_hero_slides)) : [];
+  sv('param-portail-hero-slides-json', HERO_SLIDES_STATE.length ? JSON.stringify(HERO_SLIDES_STATE) : '');
+  if (typeof renderPortailHeroSlidesGrid === 'function') renderPortailHeroSlidesGrid();
   sv('param-portail-hero-titre', p.portail_hero_titre||'');
   sv('param-portail-hero-texte', p.hero_texte||'');
   sv('param-portail-footer-texte', p.portail_footer_texte||'');
@@ -76957,6 +77275,12 @@ async function saveCommsParams() {
     twilio_from:      gv('param-twilio-from'),
   });
   await dbPut('params', DATA.params);
+  /* [FIX] syncToSupabase absent : les identifiants EmailJS/WhatsApp/Twilio
+     (SID, token, from — nécessaires à l'envoi des SMS) restaient locaux à ce
+     poste, jamais poussés au cloud. Même le bouton « Tout enregistrer »
+     (saveAllParams, patché juste en dessous pour appeler cette fonction en
+     dernier) ne les envoyait donc jamais à Supabase. */
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
   initEmailJS();
   toast('✅ Paramètres communications enregistrés.','success');
 }
@@ -76965,7 +77289,12 @@ async function saveCommsParams() {
 var _origSaveAllParamsComms = saveAllParams;
 saveAllParams = async function() {
   await _origSaveAllParamsComms();
-  await saveCommsParams();
+  /* [FIX] Non protégé : un échec ici (ex. champ invalide) interrompait sans
+     toast, après que le reste de la chaîne (patchée juste au-dessus) ait
+     déjà affiché son propre résultat — incohérent avec la nouvelle
+     résilience par section de saveAllParams(). */
+  try { await saveCommsParams(); }
+  catch(e) { console.error('[saveAllParams] échec section « Communications »', e); toast('⚠️ Échec de l\'enregistrement des paramètres Communications.', 'error', 7000); }
 };
 
 /* ─── Patch loadParamFields ───────────────────────────── */
@@ -81792,6 +82121,11 @@ refreshDashboard = function() {
 function onSelectConventionRapport(){
   var id=document.getElementById('rch-convention').value;if(!id)return;
   var conv=DATA.conventions.find(function(c){return c.id===id;});if(!conv)return;
+  /* [AJOUT portail souscripteur] Lots du programme de cette convention,
+     pour permettre de rattacher chaque photo à la maison d'un souscripteur
+     précis (voir rchRenderPhotosGrid). */
+  RCH_STATE.lotsDisponibles = (DATA.lots||[]).filter(function(l){ return l.programme_id===conv.programme_id; });
+  if (typeof rchRenderPhotosGrid === 'function') rchRenderPhotosGrid();
   document.getElementById('rch-avancement').value=conv.avancement||0;
   var prevPct=Math.round(Math.min(100,conv.date_demarrage&&conv.date_fin_prev?(new Date()-new Date(conv.date_demarrage))/(new Date(conv.date_fin_prev)-new Date(conv.date_demarrage))*100:conv.avancement||0));
   document.getElementById('rch-avancement-prevu').value=prevPct;
@@ -83137,7 +83471,7 @@ function _dqeRecapProgramme(programmeId) {
   }
   var total = lignes.reduce(function(s,l){ return s+l.sousTotal; }, 0);
   var nbLotsReels = DATA.lots.filter(function(l){ return !programmeId || l.programme_id === programmeId; }).length;
-  return { lignes:lignes, total:total, nbLots: modeles.length ? nbLotsReels : nbLotsReels, nbPrevu: modeles.length ? modeles.reduce(function(s,m){ return s+(m.nb_unites||0); },0) : nbLotsReels, source: modeles.length ? 'modeles' : 'lots' };
+  return { lignes:lignes, total:total, nbLots: nbLotsReels, nbPrevu: modeles.length ? modeles.reduce(function(s,m){ return s+(m.nb_unites||0); },0) : nbLotsReels, source: modeles.length ? 'modeles' : 'lots' };
 }
 
 async function genererDQEPourProgramme() {
@@ -83188,22 +83522,37 @@ async function dqeValiderProgramme() {
   var ctx = window._dqeRevueProgramme;
   if (!ctx) return;
   var lots = DATA.lots.filter(function(l){ return l.programme_id === ctx.programmeId; });
-  var maj = 0;
+  var maj = 0, inchange = 0;
   for (var i = 0; i < lots.length; i++) {
     var lot = lots[i];
     var typeKey = _typeKey(lot.type_logement || lot.type);
     var coutDQE = _coutTypeDansProgramme(typeKey, ctx.programmeId);
-    if (!lot.cout_revient && coutDQE > 0) {
-      lot.cout_revient = coutDQE;
-      var idx = DATA.lots.findIndex(function(l){ return l.id===lot.id; });
-      if (idx >= 0) DATA.lots[idx].cout_revient = coutDQE;
-      await dbPut('lots', lot);
-      if (typeof syncToSupabase === 'function') syncToSupabase('pi_lots', lot);
-      maj++;
-    }
+    if (coutDQE <= 0) continue;
+    /* [FIX] L'ancienne garde « if (!lot.cout_revient && coutDQE > 0) »
+       sautait tout lot déjà pourvu d'un coût — y compris l'estimation
+       grossière posée à la création du lot depuis le modèle de logement
+       (genererLotsDepuisModeles → cout_revient: m.cout_revient). Résultat :
+       chiffrer un DQE complet puis cliquer « Valider — appliquer aux lots »
+       pouvait afficher « 0 lot(s) mis à jour » sans qu'aucun coût ne
+       change, alors même que le bouton promet explicitement l'application.
+       Le coût bâti (lot._coutBati) est désormais TOUJOURS rafraîchi avec la
+       valeur DQE courante ; la part foncière déjà ventilée séparément
+       (lot._coutFoncier, voir ventilerCoutFoncierProgramme) est ajoutée
+       telle quelle, jamais écrasée. */
+    var foncierExistant = parseFloat(lot._coutFoncier) || 0;
+    var nouveauCout = coutDQE + foncierExistant;
+    if (lot.cout_revient === nouveauCout && parseFloat(lot._coutBati) === coutDQE) { inchange++; continue; }
+    lot._coutBati = coutDQE;
+    lot.cout_revient = nouveauCout;
+    var idx = DATA.lots.findIndex(function(l){ return l.id===lot.id; });
+    if (idx >= 0) { DATA.lots[idx]._coutBati = coutDQE; DATA.lots[idx].cout_revient = nouveauCout; }
+    await dbPut('lots', lot);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_lots', lot);
+    maj++;
   }
   closeModal('modal-dqe-revue-programme');
-  toast('✅ DQE validé — ' + maj + ' lot(s) mis à jour.','success');
+  toast('✅ DQE validé — ' + maj + ' lot(s) mis à jour'
+    + (inchange ? ' (' + inchange + ' déjà à jour)' : '') + '.','success');
   buildEcartDQE();
 }
 
@@ -91406,9 +91755,10 @@ async function deletePlan(id) {
 
 /* ── État local modal rapport ── */
 var RCH_STATE = {
-  photos: [],       /* photos du rapport en cours { id, data, type, nom, taille, categorie, legende, visible, date } */
+  photos: [],       /* photos du rapport en cours { id, data, type, nom, taille, categorie, legende, visible, date, lot_id } */
   videos: [],       /* [AJOUT] vidéos du rapport — même structure que plr* (lotissement), pour parité avec les autres portails */
-  cameraStream: null
+  cameraStream: null,
+  lotsDisponibles: []  /* [AJOUT portail souscripteur] lots du programme de la convention sélectionnée — permet de rattacher une photo à la maison d'un souscripteur précis plutôt qu'au chantier en général */
 };
 
 var RCH_CAT_LABELS = {
@@ -91452,7 +91802,7 @@ function rchUpdateBadgePhotos() {
    le seul des trois à rejeter toute vidéo malgré un libellé de bouton
    ailleurs dans l'app annonçant "Photos & Vidéos".
 ──────────────────────────────────────────────── */
-var RCH_VIDEO_MAX_MO = 25; /* aligné sur plr* (lotissement) — au-delà, lien YouTube/Vimeo recommandé */
+var RCH_VIDEO_MAX_MO = 50; /* [AJUSTÉ 25→50 Mo] au-delà, lien YouTube/Vimeo toujours recommandé (illimité, pas de coût de stockage) */
 function rchOuvrirVideo(){ var f=document.getElementById('rch-video-form'); if(f){ f.style.display = f.style.display==='none' ? 'block' : 'none'; var u=document.getElementById('rch-video-url'); if(u) u.focus(); } }
 function rchOuvrirVideoFichier(){ var i=document.getElementById('rch-input-video'); if(i){ i.value=''; i.click(); } }
 function rchAjouterVideo(){
@@ -91541,12 +91891,12 @@ function rchOuvrirGalerie() {
 }
 
 function rchTraiterPhotos(files) {
-  var MAX = 5 * 1024 * 1024;
+  var MAX = 15 * 1024 * 1024; /* [AJUSTÉ 5→15 Mo] chaque photo est de toute façon compressée juste après (1600px/JPEG 70%) — le poids réellement stocké reste faible quelle que soit la taille d'origine acceptée ici */
   var catDef = (document.getElementById('rch-photo-categorie-defaut')||{}).value || 'general';
   var legDef = (document.getElementById('rch-photo-legende-defaut')||{}).value || '';
   var loaded = 0;
   files.filter(function(f){ return f.type.startsWith('image/'); }).forEach(function(file) {
-    if (file.size > MAX) { toast('❌ '+file.name+' dépasse 5 Mo.','error'); return; }
+    if (file.size > MAX) { toast('❌ '+file.name+' dépasse 15 Mo.','error'); return; }
     var reader = new FileReader();
     reader.onload = function(e) {
       _compressImage(e.target.result, 1600, 0.7).then(async function(compressed){
@@ -91626,6 +91976,18 @@ function rchRenderPhotosGrid() {
     var catOpts = Object.keys(RCH_CAT_LABELS).map(function(k){
       return '<option value="'+k+'"'+(p.categorie===k?' selected':'')+'>'+RCH_CAT_ICONS[k]+' '+RCH_CAT_LABELS[k]+'</option>';
     }).join('');
+    /* [AJOUT] Rattachement optionnel de la photo à un lot précis du
+       programme : sans quoi elle est "générale" (visible par tous les
+       souscripteurs du programme) — voir rchMajLot(). Si le lot déjà tagué
+       n'est plus dans RCH_STATE.lotsDisponibles (ex. convention changée
+       après coup), on l'ajoute quand même à la liste plutôt que de perdre
+       le tag silencieusement. */
+    var lotsListe = (RCH_STATE.lotsDisponibles||[]).slice();
+    if (p.lot_id && !lotsListe.some(function(l){ return l.id===p.lot_id; })) {
+      lotsListe.push({ id:p.lot_id, numero:'⚠️ '+p.lot_id+' (hors liste)' });
+    }
+    var lotOpts = '<option value=""' + (p.lot_id?'':' selected') + '>🏘️ Général (tout le programme)</option>'
+      + lotsListe.map(function(l){ return '<option value="'+l.id+'"'+(p.lot_id===l.id?' selected':'')+'>'+escHtml(l.numero||l.nom||l.id)+'</option>'; }).join('');
     return '<div class="rch-photo-card">'
       +'<img class="rch-photo-thumb" src="'+p.data+'" alt="'+p.legende+'"'
       +' onclick="rchOuvrirLightbox('+i+')">'
@@ -91638,6 +92000,10 @@ function rchRenderPhotosGrid() {
         +' placeholder="Légende..."'
         +' onchange="rchMajLegende(\''+p.id+'\',this.value)"'
         +' style="font-size:11px;margin-bottom:4px;" onclick="event.stopPropagation();">'
+      +'<select onchange="rchMajLot(\''+p.id+'\',this.value)" title="Maison/lot concerné(e) — la photo n\'apparaîtra que sur le portail du souscripteur de ce lot"'
+        +' class="form-control" style="font-size:10px;padding:2px 4px;min-height:26px;margin-bottom:4px;width:100%;" onclick="event.stopPropagation();">'
+        + lotOpts
+        + '</select>'
       +'<div style="display:flex;gap:4px;align-items:center;">'
       +'<select onchange="rchMajCategorie(\''+p.id+'\',this.value)"'
         +' class="form-control" style="font-size:10px;padding:2px 4px;min-height:28px;" onclick="event.stopPropagation();">'
@@ -91652,6 +92018,7 @@ function rchRenderPhotosGrid() {
 function rchMajLegende(id, val)  { var p=RCH_STATE.photos.find(function(x){return x.id===id;}); if(p) p.legende=val; }
 function rchMajCategorie(id,val) { var p=RCH_STATE.photos.find(function(x){return x.id===id;}); if(p){ p.categorie=val; rchRenderPhotosGrid(); } }
 function rchMajVisible(id,val)   { var p=RCH_STATE.photos.find(function(x){return x.id===id;}); if(p) p.visible=val; }
+function rchMajLot(id,val)       { var p=RCH_STATE.photos.find(function(x){return x.id===id;}); if(p) p.lot_id=val||''; }
 function rchSupprimerPhoto(id)   { RCH_STATE.photos=RCH_STATE.photos.filter(function(x){return x.id!==id;}); rchUpdateBadgePhotos(); rchRenderPhotosGrid(); }
 
 /* ─────────────────────────────────────────────
@@ -91780,9 +92147,21 @@ function rchGenererApercu() {
     var convId = document.getElementById('rch-convention').value;
     if (!convId) { toast('Sélectionnez une convention.','error'); return; }
     var av = parseInt(document.getElementById('rch-avancement').value)||0;
+    /* [FIX portail souscripteur] Le rapport ne portait jamais programme_id :
+       côté portail, sRapportsLies() (portail-unique.html) tente de relier un
+       rapport au souscripteur via son programme (r.programme_id===prog), en
+       plus de r.convention_id/S.conventions — mais aucune convention n'a
+       jamais de client_id renseigné (saveConvention() ne le pose pas), donc
+       cette voie était morte. Sans programme_id sur le rapport lui-même,
+       AUCUNE des conditions de sRapportsLies() ne pouvait matcher : les
+       photos de chantier, pourtant conçues pour apparaître dans le portail
+       (onglet Aperçu souscripteur, case Visibilité), n'y arrivaient jamais.
+       On stocke désormais le programme hérité de la convention. */
+    var convPourProgramme = (DATA.conventions||[]).find(function(c){ return c.id===convId; });
     var r = {
       id: APP.editingId || uid(),
       convention_id: convId,
+      programme_id: convPourProgramme ? (convPourProgramme.programme_id || '') : '',
       numero: document.getElementById('rch-numero').value.trim(),
       date_debut: document.getElementById('rch-date-debut').value,
       date_fin: document.getElementById('rch-date-fin').value,
@@ -91809,7 +92188,7 @@ function rchGenererApercu() {
     await dbPut('rapports_chantier', r);
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_rapports_chantier', r);
     /* Mettre à jour avancement convention */
-    var conv = DATA.conventions.find(function(c){ return c.id===convId; });
+    var conv = convPourProgramme;
     if (conv && av>=(conv.avancement||0)) { conv.avancement=av; await dbPut('conventions',conv); if (typeof syncToSupabase === 'function') syncToSupabase('pi_conventions', conv); }
     closeModal('modal-rapport-chantier');
     rchFermerCamera();
@@ -91845,6 +92224,11 @@ function rchGenererApercu() {
       });
       if (convId) sel.value = convId;
     }
+    /* [AJOUT] Lots disponibles pour le rattachement photo↔maison, quand une
+       convention est déjà présélectionnée à l'ouverture (idem : .value= ne
+       déclenche pas onSelectConventionRapport). */
+    var _convInit = convId ? (DATA.conventions||[]).find(function(c){ return c.id===convId; }) : null;
+    RCH_STATE.lotsDisponibles = _convInit ? (DATA.lots||[]).filter(function(l){ return l.programme_id===_convInit.programme_id; }) : [];
     /* Dates auto */
     var now = new Date();
     var monday = new Date(now); monday.setDate(now.getDate()-now.getDay()+1);
@@ -91897,6 +92281,12 @@ function rchGenererApercu() {
       el('rch-valideur',r.valideur);
       el('rch-statut',r.statut);
       el('rch-visibilite',r.visibilite||'souscripteurs');
+      /* [AJOUT] Lots disponibles pour le rattachement photo↔maison — la
+         sélection programmatique de rch-convention ci-dessus ne déclenche pas
+         son onchange (onSelectConventionRapport), donc RCH_STATE.lotsDisponibles
+         resterait vide sans cet appel explicite. */
+      var _convEdit = DATA.conventions.find(function(c){ return c.id===r.convention_id; });
+      RCH_STATE.lotsDisponibles = _convEdit ? (DATA.lots||[]).filter(function(l){ return l.programme_id===_convEdit.programme_id; }) : [];
       /* Charger photos */
       RCH_STATE.photos = r.photos ? JSON.parse(JSON.stringify(r.photos)) : [];
       RCH_STATE.videos = r.videos ? JSON.parse(JSON.stringify(r.videos)) : [];
@@ -96446,13 +96836,24 @@ function edsImporterDepuisDQE() {
     toast('⚠️ Aucun poste de ce DQE n\'est relié à un ouvrage — rien d\'importable. Utilisez « Créer l\'ouvrage »/« Unifier tous les postes » dans le DQE d\'abord.', 'error');
     return;
   }
-  var n = 0;
+  /* [FIX doublon] Additionnait la quantité DQE à la quantité déjà présente
+     dans _edsLignes à CHAQUE clic sur « Importer depuis le DQE » — recliquer
+     après avoir juste ajouté un nouveau poste au DQE réimportait aussi tous
+     les postes déjà importés, en les AJOUTANT une seconde fois (contraire à
+     edsGenererMetreAuto(), qui remplace et reste idempotent). On calcule
+     donc le total par ouvrage à partir du DQE actuel, puis on REMPLACE la
+     quantité de la ligne existante — un réimport donne le même résultat que
+     le DQE courant, quel que soit le nombre de clics. */
+  var totauxParOuvrage = {};
   avecOuvrage.forEach(function(p){
-    var ex = _edsLignes.find(function(l){ return l.ouvrage_id === p.ouvrage_id; });
-    if (ex) { ex.qte = (parseFloat(ex.qte)||0) + (parseFloat(p.quantite)||0); }
-    else { _edsLignes.push({ id: uid(), ouvrage_id: p.ouvrage_id, qte: parseFloat(p.quantite)||0 }); }
-    n++;
+    totauxParOuvrage[p.ouvrage_id] = (totauxParOuvrage[p.ouvrage_id] || 0) + (parseFloat(p.quantite)||0);
   });
+  Object.keys(totauxParOuvrage).forEach(function(oid){
+    var ex = _edsLignes.find(function(l){ return l.ouvrage_id === oid; });
+    if (ex) { ex.qte = totauxParOuvrage[oid]; }
+    else { _edsLignes.push({ id: uid(), ouvrage_id: oid, qte: totauxParOuvrage[oid] }); }
+  });
+  var n = avecOuvrage.length;
   edsRenderLignes();
   toast('✅ ' + n + ' poste(s) importé(s) depuis le DQE « ' + type + ' »'
     + (sansOuvrage.length ? ' — ' + sansOuvrage.length + ' poste(s) sans ouvrage ignoré(s) (non importables).' : '.'), 'success');
@@ -100783,12 +101184,22 @@ async function annulerCommissionSilencieux(comm) {
 /* Recalcule les commissions d'un versement modifié */
 async function reimpacterCommissionsVersement(versement) {
   var liees = (DATA.commissions || []).filter(function(c) { return c.versement_id === versement.id && c.statut !== 'annulee'; });
-  if (liees.some(function(c) { return c.statut === 'payee'; })) {
-    toast('Commission déjà payée sur ce versement — recalcul bloqué. Extournez d\u2019abord le règlement.', 'error');
-    return false;
-  }
+  /* [FIX] Bloquait TOUT recalcul dès qu’UNE SEULE commission liée était payée
+     (ex. commerciale payée, apporteur pas encore) — même la commission
+     encore recalculable en toute sécurité restait figée sur l’ancien
+     montant, et l’appelant (savePaiement) affichait quand même "commissions
+     réimpactées" malgré ce blocage silencieux. Traité désormais au cas par
+     cas, comme deleteVersement() le fait déjà : annulerCommissionSilencieux()
+     ne touche jamais une commission payée (no-op ci-dessus), et
+     genererCommissionsVersement() ne recrée pas un type déjà présent et non
+     annulé — une commission payée reste donc protégée, seule celle
+     réellement recalculable est régénérée sur le nouveau montant. */
+  var dejaPayees = liees.filter(function(c){ return c.statut === 'payee'; });
   for (var i = 0; i < liees.length; i++) await annulerCommissionSilencieux(liees[i]);
   await genererCommissionsVersement(versement);
+  if (dejaPayees.length) {
+    toast('⚠️ ' + dejaPayees.length + ' commission(s) déjà payée(s) sur ce versement conservée(s) telle(s) quelle(s) (montant non recalculé) — extournez le règlement si elle(s) doi(ven)t changer.', 'info', 8000);
+  }
   if (typeof renderCommissions === 'function') renderCommissions();
   if (typeof filterEcritures === 'function') filterEcritures();
   if (typeof buildBalance === 'function') buildBalance();
@@ -108601,8 +109012,21 @@ function pgmRendrePilotage() {
    les deux options plutôt que d'en imposer une.
    ══════════════════════════════════════════════════════════════════════════ */
 
-function _dqeOrigines(type) {
-  var L = (DATA.nomenclatures || []).filter(function(n){ return n.type_logement === type; });
+function _dqeOrigines(type, programmeId) {
+  /* [FIX] Filtrait uniquement par type_logement, tous programmes confondus :
+     deux programmes partageant le même libellé de type (« F2 », « VILLA »…)
+     voyaient leurs postes fusionnés ici, et dqeSupprimerGenere() pouvait donc
+     effacer les postes _genere_plan/_genere_struct d'un AUTRE programme en
+     supprimant depuis l'écran d'un programme donné — silencieusement. Même
+     correctif que dqeNomenclaturesPourType()/dqeRevueCompletude() : n'exclut
+     que si l'entrée porte un programme_id ET qu'un programme précis est
+     filtré, pour ne pas casser les anciennes lignes sans programme_id. */
+  var progFiltre = programmeId !== undefined ? (programmeId || '') : ((document.getElementById('dqe-filter-programme') || {}).value || '');
+  var L = (DATA.nomenclatures || []).filter(function(n){
+    if (n.type_logement !== type) return false;
+    if (n.programme_id && progFiltre && n.programme_id !== progFiltre) return false;
+    return true;
+  });
   return {
     plan:   L.filter(function(n){ return n._genere_plan; }),
     struct: L.filter(function(n){ return n._genere_struct; }),
@@ -108612,8 +109036,9 @@ function _dqeOrigines(type) {
   };
 }
 
-async function dqeSupprimerGenere(type, origine) {
-  var O = _dqeOrigines(type);
+async function dqeSupprimerGenere(type, origine, programmeId) {
+  var progFiltre = programmeId !== undefined ? (programmeId || '') : ((document.getElementById('dqe-filter-programme') || {}).value || '');
+  var O = _dqeOrigines(type, progFiltre);
   var cible = origine === 'struct' ? O.struct : (origine === 'tout' ? O.plan.concat(O.struct) : O.plan);
   if (!cible.length) { toast('Aucun poste à supprimer.', 'info'); return; }
 
@@ -108625,7 +109050,16 @@ async function dqeSupprimerGenere(type, origine) {
   if (O.cctp.length)   conserve.push(O.cctp.length + ' poste(s) CCTP');
   if (O.manuel.length) conserve.push(O.manuel.length + ' poste(s) saisi(s) à la main');
 
+  /* [FIX] Portée programme rendue explicite dans la confirmation : sans
+     filtre programme actif, la suppression touche potentiellement plusieurs
+     programmes partageant ce libellé de type — ça ne doit plus être silencieux. */
+  var progNom = progFiltre ? (((DATA.programmes||[]).find(function(p){ return p.id === progFiltre; }) || {}).nom || progFiltre) : '';
+  var porteeMsg = progNom
+    ? 'Programme concerné : « ' + progNom + ' » uniquement.\n\n'
+    : '⚠️ Aucun programme filtré — si plusieurs programmes utilisent le type « ' + type + ' », leurs postes seront TOUS supprimés ensemble.\n\n';
+
   var msg = 'Supprimer ' + cible.length + ' poste(s) ' + libelle + ' du type « ' + type + ' » ?\n\n'
+    + porteeMsg
     + (conserve.length ? 'CONSERVÉS : ' + conserve.join(', ') + '.\n\n' : '')
     + 'Ces postes sont régénérables depuis l\'éditeur de plan.';
   if (!confirm(msg)) return;
@@ -110437,36 +110871,47 @@ async function edsCreerOuvragesManquants(type, programmeId) {
 }
 window.edsCreerOuvragesManquants = edsCreerOuvragesManquants;
 
-function dqeCollecterPlans() {
+function dqeCollecterPlans(programmeId) {
+  /* [FIX] Regroupement autrefois par type_logement SEUL : deux programmes
+     partageant le même libellé de type (« F2 », « VILLA »…) voyaient leurs
+     postes et montants fusionnés dans une seule ligne — trompeur — et le
+     bouton 🗑 de cette ligne (dqeSupprimerGenere) supprimait alors les postes
+     des DEUX programmes à la fois. Regroupement désormais par type +
+     programme_id ; le filtre dqe-filter-programme en haut de page s'applique
+     ici comme partout ailleurs dans le module. */
+  var progFiltre = programmeId !== undefined ? (programmeId || '') : ((document.getElementById('dqe-filter-programme') || {}).value || '');
   var parType = {};
   (DATA.nomenclatures || []).forEach(function(n){
+    if (n.programme_id && progFiltre && n.programme_id !== progFiltre) return;
     var t = n.type_logement || '(sans type)';
-    parType[t] = parType[t] || { type:t, plan:[], manuel:[], ajustes:[], le:'', surface:0, pieces:0, niveaux:0, planId:'', planRef:'', planVer:0 };
+    var pid = n.programme_id || '';
+    var key = t + '||' + pid;
+    parType[key] = parType[key] || { type:t, programme_id:pid, plan:[], manuel:[], ajustes:[], le:'', surface:0, pieces:0, niveaux:0, planId:'', planRef:'', planVer:0 };
     if (n._genere_plan) {
-      parType[t].plan.push(n);
-      if (n._ajuste_manuel) parType[t].ajustes.push(n);
+      parType[key].plan.push(n);
+      if (n._ajuste_manuel) parType[key].ajustes.push(n);
       /* On retient la génération la plus récente : régénérer remplace les
          lignes du même type, donc toutes portent normalement la même date —
          mais un import ou une reprise partielle peut en laisser d'anciennes. */
-      if (n._genere_le && n._genere_le > parType[t].le) {
-        parType[t].le      = n._genere_le;
-        parType[t].surface = parseFloat(n._genere_surface) || 0;
-        parType[t].pieces  = parseInt(n._genere_pieces) || 0;
-        parType[t].niveaux = parseInt(n._genere_niveaux) || 0;
-        parType[t].planId  = n._plan_id || '';
-        parType[t].planRef = n._plan_ref || '';
-        parType[t].planVer = parseInt(n._plan_version) || 0;
+      if (n._genere_le && n._genere_le > parType[key].le) {
+        parType[key].le      = n._genere_le;
+        parType[key].surface = parseFloat(n._genere_surface) || 0;
+        parType[key].pieces  = parseInt(n._genere_pieces) || 0;
+        parType[key].niveaux = parseInt(n._genere_niveaux) || 0;
+        parType[key].planId  = n._plan_id || '';
+        parType[key].planRef = n._plan_ref || '';
+        parType[key].planVer = parseInt(n._plan_version) || 0;
       }
     } else if (n._genere_cctp) {
-      parType[t].manuel.push(n);   /* généré par le CCTP : ni plan, ni saisie */
+      parType[key].manuel.push(n);   /* généré par le CCTP : ni plan, ni saisie */
     } else {
-      parType[t].manuel.push(n);
+      parType[key].manuel.push(n);
     }
   });
 
   return Object.keys(parType)
-    .map(function(t){
-      var d = parType[t];
+    .map(function(k){
+      var d = parType[k];
       var cout = function(list){
         return list.reduce(function(s,n){
           return s + ((parseFloat(n.quantite)||0) * (typeof dqeLignePU==='function' ? dqeLignePU(n) : 0)) + (parseFloat(n.prix_forfait)||0);
@@ -110515,8 +110960,12 @@ function dqeListePlans() {
     + '<div class="kpi-card" data-icon="💰"><div class="kpi-label">Montant cumulé</div><div class="kpi-value or" style="font-size:18px;">' + fmtF(totalPlan) + ' F</div><div class="kpi-delta">par unité, hors saisies manuelles</div></div>'
     + '</div>';
 
+  /* [FIX] Colonne Programme ajoutée : depuis que dqeCollecterPlans() groupe
+     par type + programme_id (et non plus par type seul), deux lignes
+     peuvent désormais partager le même libellé de type pour des programmes
+     différents — sans cette colonne, rien ne les distinguerait à l'écran. */
   h += '<div class="table-wrap"><table style="width:100%;font-size:12px;"><thead><tr>'
-    + '<th>Type de logement</th><th>Plan source</th><th>Généré le</th><th style="text-align:right;">Métré</th>'
+    + '<th>Type de logement</th><th>Programme</th><th>Plan source</th><th>Généré le</th><th style="text-align:right;">Métré</th>'
     + '<th style="text-align:right;">Postes</th><th style="text-align:right;">Montant plan</th>'
     + '<th style="text-align:right;">Ajouts manuels</th><th>État</th><th></th></tr></thead><tbody>';
 
@@ -110543,9 +110992,11 @@ function dqeListePlans() {
       etat = '<span style="color:var(--blanc-dim);">dessin non enregistré</span>';
     }
 
+    var progNomLigne = d.programme_id ? (((DATA.programmes||[]).find(function(p){ return p.id === d.programme_id; })||{}).nom || d.programme_id) : '—';
     h += '<tr>'
       + '<td><strong>' + escHtml(d.type) + '</strong>'
       + (d.niveaux > 1 ? '<br><span style="font-size:10px;color:var(--dim);">' + d.niveaux + ' niveaux</span>' : '') + '</td>'
+      + '<td style="font-size:11px;">' + escHtml(progNomLigne) + '</td>'
       + '<td>' + (d.planRef
             ? '<strong>' + escHtml(d.planRef) + '</strong>' + (d.planVer ? '<br><span style="font-size:10px;color:var(--dim);">v' + d.planVer + '</span>' : '')
             : '<span style="color:var(--blanc-dim);font-size:11px;">non enregistré</span>') + '</td>'
@@ -110560,8 +111011,8 @@ function dqeListePlans() {
       + (d.manuel.length ? d.manuel.length + ' poste(s)<br><span style="font-size:10px;">' + fmtF(d.coutManuel) + ' F</span>' : '—') + '</td>'
       + '<td style="font-size:11px;">' + etat + '</td>'
       + '<td style="white-space:nowrap;">'
-      + '<button class="btn btn-secondary btn-sm btn-icon" title="Voir les postes dans le DQE" onclick="dqeVoirType(\'' + escHtml(d.type).replace(/'/g,"\\'") + '\')">🔎</button> '
-      + '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer les postes issus du plan — saisies manuelles et CCTP conservés" onclick="dqeSupprimerGenere(\'' + escHtml(d.type).replace(/'/g,"\\'") + '\',\'plan\')">🗑</button>'
+      + '<button class="btn btn-secondary btn-sm btn-icon" title="Voir les postes dans le DQE" onclick="dqeVoirType(\'' + escHtml(d.type).replace(/'/g,"\\'") + '\',\'' + escHtml(d.programme_id||'').replace(/'/g,"\\'") + '\')">🔎</button> '
+      + '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer les postes issus du plan — saisies manuelles et CCTP conservés" onclick="dqeSupprimerGenere(\'' + escHtml(d.type).replace(/'/g,"\\'") + '\',\'plan\',\'' + escHtml(d.programme_id||'').replace(/'/g,"\\'") + '\')">🗑</button>'
       + '</td></tr>';
   });
   h += '</tbody></table></div>';
@@ -110577,8 +111028,16 @@ function dqeListePlans() {
 
 /* Ouvre le DQE filtré sur ce type : la liste sert de point d'entrée, pas de
    fin en soi. */
-function dqeVoirType(type) {
+function dqeVoirType(type, programmeId) {
   closeModal('modal-dqe-plans');
+  /* [FIX] Applique aussi le programme d'origine de la ligne cliquée : sans
+     ça, ouvrir un type partagé par plusieurs programmes depuis cette liste
+     pouvait retomber sur le programme déjà sélectionné (ou "Tous
+     programmes"), montrant potentiellement les postes d'un AUTRE programme. */
+  if (programmeId) {
+    var selProg = document.getElementById('dqe-filter-programme');
+    if (selProg) selProg.value = programmeId;
+  }
   var sel = document.getElementById('dqe-type-logement') || document.getElementById('nomen-type');
   if (sel) {
     sel.value = type;
@@ -110592,9 +111051,10 @@ function dqeExporterListePlans() {
   var liste = dqeCollecterPlans();
   if (!liste.length) { toast('Aucun DQE issu d\'un plan.', 'info'); return; }
   var e = function(s){ return '"' + String(s==null?'':s).replace(/"/g,'""') + '"'; };
-  var csv = '\uFEFFtype_logement;plan_source;version_plan;genere_le;surface_m2;nb_pieces;niveaux;postes_plan;montant_plan;postes_manuels;montant_manuel;montant_total\n';
+  var csv = '\uFEFFtype_logement;programme;plan_source;version_plan;genere_le;surface_m2;nb_pieces;niveaux;postes_plan;montant_plan;postes_manuels;montant_manuel;montant_total\n';
   liste.forEach(function(d){
-    csv += [e(d.type), e(d.planRef || ''), d.planVer || '',
+    var progNom = d.programme_id ? (((DATA.programmes||[]).find(function(p){ return p.id === d.programme_id; })||{}).nom || d.programme_id) : '';
+    csv += [e(d.type), e(progNom), e(d.planRef || ''), d.planVer || '',
             e(d.le ? d.le.slice(0,16).replace('T',' ') : ''), d.surface, d.pieces, d.niveaux,
             d.plan.length, d.coutPlan, d.manuel.length, d.coutManuel, d.coutTotal].join(';') + '\n';
   });
@@ -111267,14 +111727,15 @@ function _ppSyntheseGoFinitionHtml(nomens) {
 function printPreviewDQE() {
   /* ─ Récupération du type et des données ─ */
   var type = ((document.getElementById('dqe-type-logement') || {}).value) || 'F2';
-  var nomens = (DATA.nomenclatures || []).filter(function(n) { return n.type_logement === type; });
-  if (!nomens.length) {
-    var defaults = (NOMENCLATURES_PAR_DEFAUT && NOMENCLATURES_PAR_DEFAUT[type]) || [];
-    nomens = defaults.map(function(item) {
-      return { id: uid(), type_logement: type, poste: item.poste, materiau: item.materiau,
-               unite: item.unite, quantite: item.quantite, prix_forfait: item.prix_forfait || 0 };
-    });
-  }
+  /* [FIX] Filtrait DATA.nomenclatures directement par type_logement seul,
+     tous programmes confondus — contrairement à l'écran (chargerNomenclature
+     → dqeNomenclaturesPourType, scopée par dqe-filter-programme). Un type
+     partagé par deux programmes (ex. « F3 ») faisait imprimer/exporter un
+     déboursé, coût de revient et prix de vente sommant les DEUX programmes,
+     divergents de ce qui est affiché à l'écran au moment de l'impression.
+     Repasse par le point centralisé, comme calculerCoutParType() et les
+     autres consommateurs déjà corrigés. */
+  var nomens = dqeNomenclaturesPourType(type).nomens;
   /* ─ Regroupement par poste ─ */
   var postes = {}, totalGlobal = 0;
   nomens.forEach(function(n) {
