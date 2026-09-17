@@ -260,6 +260,38 @@ async function fetchAllRows(table: string): Promise<Array<{ id: string; data: an
   return out;
 }
 
+// ── Fiche supprimée : accès révoqué ───────────────────────────────────
+// L'ERP marque une suppression de DEUX façons, et il faut refuser sur l'une
+// comme sur l'autre :
+//   · data._deleted = "true" — suppression logique, la ligne reste en base
+//     pour que la synchro propage l'effacement aux autres postes ;
+//   · pi_suppressions, clé « ts::<store>::<id> » — pierre tombale posée à la
+//     suppression, qui interdit ensuite toute réinjection (trigger
+//     guard_tombstone). La clé est construite exactement comme côté Postgres :
+//     le store se déduit de la table (pi_clients → clients) et l'identifiant
+//     est coalesce(data->>'id', colonne id), dans cet ordre. Les deux valeurs
+//     coïncident sur les neuf tables du portail aujourd'hui ; reprendre la
+//     même précédence évite que le contrôle rate une pierre tombale le jour
+//     où une ligne divergerait.
+// Une fiche peut ne porter que la seconde marque : la ligne subsiste sans
+// _deleted, seule la pierre tombale témoigne de la suppression. Tester un seul
+// des deux marquages ne suffit donc pas.
+function estSupprimeLogique(rec: any): boolean {
+  return String((rec || {})._deleted) === "true";
+}
+async function porteUneTombstone(table: string, id: string): Promise<boolean> {
+  const store = table.replace(/^pi_/, "");
+  const cle = "ts::" + store + "::" + id;
+  const resp = await fetch(
+    `${SB_URL}/rest/v1/pi_suppressions?id=eq.${encodeURIComponent(cle)}&select=id&limit=1`,
+    { headers: { apikey: SB_SERVICE_ROLE, Authorization: `Bearer ${SB_SERVICE_ROLE}` } });
+  // Contrôle indisponible → on refuse. Ouvrir par défaut reviendrait à rendre
+  // l'accès à une fiche supprimée dès la première erreur réseau.
+  if (!resp.ok) throw new Error("server");
+  const rows = await resp.json();
+  return Array.isArray(rows) && rows.length > 0;
+}
+
 // ── Vérification du code ───────────────────────────────────────────────────
 // Le repli en clair est conservé À DESSEIN : des fiches anciennes portent
 // encore code_acces / mot_de_passe sans hash, et les supprimer ici priverait
@@ -297,12 +329,16 @@ async function resolvePortalLogin(kind: string, ident: string, code: string): Pr
 
   for (const row of rows) {
     const base = row.data || {};
+    if (estSupprimeLogique(base)) continue;
     const candidats = cfg.nested
       ? (base[cfg.nested] || []).map((p: any) => ({ rec: p, parentId: row.id }))
       : [{ rec: base, parentId: row.id }];
 
     for (const { rec, parentId } of candidats) {
       if (!rec) continue;
+      // Profil imbriqué (propriétaire terrien) : l'élément du tableau porte sa
+      // propre suppression, indépendamment de l'opération qui le contient.
+      if (estSupprimeLogique(rec)) continue;
       // On accepte n'importe lequel des identifiants présents sur la fiche :
       // l'acteur ne sait pas lequel on attend de lui.
       const matches = cfg.identFields.some((f) => {
@@ -311,6 +347,11 @@ async function resolvePortalLogin(kind: string, ident: string, code: string): Pr
       });
       if (!matches) continue;
       if (!(await codeValide(rec, code))) continue;
+      // Contrôle placé APRÈS la vérification du code : une seule requête, et
+      // seulement quand des identifiants valides viennent d'être présentés.
+      // La pierre tombale porte sur la LIGNE, donc sur parentId, y compris
+      // pour un profil imbriqué.
+      if (await porteUneTombstone(cfg.table, String(base.id ?? parentId))) continue;
 
       return {
         kind,

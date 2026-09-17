@@ -32,6 +32,65 @@
     .tab-link { display:inline-flex; align-items:center; gap:6px; padding:10px 12px; font-size:0.78rem; font-weight:600; letter-spacing:.2px; color:var(--pp-charbon); background:transparent; border:none; border-radius:8px; cursor:pointer; transition:0.2s; }
     .tab-link:hover { background:#f3ede0; }
     .tab-link.active { background:var(--pp-primary); color:white; }
+    /* ── Mot du DG ──────────────────────────────────────────────────────
+       Photo à gauche, texte à droite sur écran large ; empilé sous 860 px,
+       la photo passant au-dessus. La hauteur de la photo suit celle du texte
+       (align-items:stretch) plutôt qu'une hauteur fixe : un mot long ne laisse
+       donc jamais une colonne vide à côté de lui. */
+    .motdg{ margin-bottom:16px; padding:0; overflow:hidden; }
+    .motdg-grid{ display:grid; grid-template-columns:minmax(0,4fr) minmax(0,6fr); align-items:stretch; }
+    .motdg.motdg-sans-photo .motdg-grid{ grid-template-columns:minmax(0,1fr); }
+    .motdg-photo{ margin:0; min-height:280px; background:#efe7d6; }
+    .motdg-photo img{ width:100%; height:100%; min-height:280px; object-fit:cover; object-position:center top; display:block; }
+    .motdg-texte{ padding:26px 28px; }
+    .motdg-sur{ display:flex; align-items:center; gap:10px; font-size:.78rem; font-weight:700; letter-spacing:.12em;
+                text-transform:uppercase; color:var(--pp-primary); margin-bottom:6px; }
+    .motdg-trait{ display:block; width:38px; height:2px; background:var(--pp-primary); border-radius:2px; }
+    .motdg-titre{ font-family:var(--pp-serif); font-weight:600; font-size:1.9rem; line-height:1.15;
+                  color:var(--pp-charbon); margin:0 0 12px; }
+    .motdg-accroche{ font-style:italic; font-weight:600; color:var(--pp-charbon); margin:0 0 14px; line-height:1.7; }
+    .motdg-corps p{ margin:0 0 12px; line-height:1.85; color:#4a4336; }
+    .motdg-corps p:last-child{ margin-bottom:0; }
+    .motdg-signature{ margin-top:16px; padding-top:12px; border-top:1px solid #efe7d6; }
+    .motdg-nom{ display:block; font-weight:700; color:var(--pp-charbon); }
+    .motdg-fonction{ display:block; font-size:.82rem; color:#8a7f6b; }
+    @media (max-width:860px){
+      .motdg-grid{ grid-template-columns:minmax(0,1fr); }
+      .motdg-photo, .motdg-photo img{ min-height:0; }
+      .motdg-photo img{ height:auto; max-height:420px; }
+      .motdg-texte{ padding:20px 18px; }
+      .motdg-titre{ font-size:1.55rem; }
+    }
+
+    /* ── Documents à télécharger ─────────────────────────────────────────
+       Une ligne par document : icône, intitulé, description, poids et date,
+       puis les deux actions. « Consulter » ouvre le PDF dans le lecteur du
+       navigateur — c'est ce que fait un visiteur neuf fois sur dix, et cela
+       évite de lui imposer un téléchargement de plusieurs mégaoctets sur un
+       forfait mobile. Le poids est annoncé avant le clic, pour la même
+       raison. */
+    .doc-liste{ display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+    .doc-carte{ display:flex; align-items:center; gap:14px; background:#fff; border:1px solid #e8e0d0;
+                border-radius:14px; padding:14px 16px; transition:.2s; }
+    .doc-carte:hover{ border-color:var(--pp-primary); box-shadow:0 6px 18px rgba(33,29,24,.07); }
+    .doc-icone{ flex:0 0 auto; width:42px; height:42px; display:flex; align-items:center; justify-content:center;
+                border-radius:10px; background:#fdf1ee; color:#b91c1c; font-size:1.25rem; }
+    .doc-corps{ flex:1 1 auto; min-width:0; }
+    .doc-titre{ font-weight:700; font-size:.94rem; color:var(--pp-charbon); }
+    .doc-desc{ font-size:.82rem; color:#4a4336; line-height:1.6; margin-top:2px; }
+    .doc-meta{ font-size:.72rem; color:#8a7f6b; margin-top:4px; letter-spacing:.02em; }
+    .doc-liens{ flex:0 0 auto; display:flex; gap:8px; }
+    .doc-btn{ display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:9px;
+              font-size:.78rem; font-weight:600; text-decoration:none; white-space:nowrap;
+              background:var(--pp-primary); color:#fff; border:1px solid var(--pp-primary); }
+    .doc-btn:hover{ background:var(--pp-primary-dark); border-color:var(--pp-primary-dark); }
+    .doc-btn-sec{ background:#fff; color:var(--pp-primary); }
+    .doc-btn-sec:hover{ background:#fdf1ee; color:var(--pp-primary-dark); }
+    @media (max-width:700px){
+      .doc-carte{ flex-wrap:wrap; }
+      .doc-liens{ width:100%; }
+      .doc-btn{ flex:1; justify-content:center; }
+    }
     .nav-dropdown{ position:relative; }
     .nav-dropdown-trigger{ display:inline-flex; align-items:center; gap:6px; padding:10px 12px; font-size:0.78rem; font-weight:600; letter-spacing:.2px; color:var(--pp-charbon); background:transparent; border:1px solid #e2d9c4; border-radius:8px; cursor:pointer; transition:0.2s; }
     .nav-dropdown-trigger:hover, .nav-dropdown-trigger.open{ background:#f3ede0; }
@@ -327,6 +386,39 @@
   <div id="activites-pane" class="tab-pane active-pane">
     <h3><i class="fas fa-hard-hat"></i> Nos activités</h3>
     <p id="societe-description"></p>
+
+    <!-- Mot du DG. Entièrement renseigné depuis l'ERP (Paramètres → Site /
+         Portail) : aucun texte, aucune photo, aucun nom n'est codé en dur ici,
+         conformément au principe du gabarit. Le bloc reste masqué tant que ni
+         texte ni photo ne sont fournis, pour ne jamais afficher un cadre vide
+         sur le portail public. -->
+    <div class="card motdg" id="motdg-card" style="display:none;">
+      <div class="motdg-grid">
+        <figure class="motdg-photo" id="motdg-photo-wrap" style="display:none;">
+          <img id="motdg-photo" src="" alt="">
+        </figure>
+        <div class="motdg-texte">
+          <div class="motdg-sur">Bienvenue<span class="motdg-trait"></span></div>
+          <h2 class="motdg-titre" id="motdg-titre">Mot du DG</h2>
+          <p class="motdg-accroche" id="motdg-accroche" style="display:none;"></p>
+          <div class="motdg-corps" id="motdg-corps"></div>
+          <figcaption class="motdg-signature" id="motdg-signature" style="display:none;">
+            <span class="motdg-nom" id="motdg-nom"></span>
+            <span class="motdg-fonction" id="motdg-fonction"></span>
+          </figcaption>
+        </div>
+      </div>
+    </div>
+
+    <!-- Documents publiés depuis l'ERP (Site / Portail → Médias du portail).
+         Ne reçoit que les documents rattachés à « Général (société) » : ceux
+         rattachés à un programme restent dans l'onglet PROGRAMME, au plus près
+         de ce qu'ils décrivent. Masqué tant qu'il n'y en a aucun. -->
+    <div id="accueil-docs-wrap" style="display:none; margin-top:26px;">
+      <h4><i class="fas fa-folder-open"></i> Documents à télécharger</h4>
+      <div class="doc-liste" id="accueil-docs"></div>
+    </div>
+
     <div class="grid-3">
       <div class="card"><i class="fas fa-house-chimney" style="color:var(--pp-secondary); font-size:1.4rem;"></i><h4>Vente & location</h4><p>Appartements, villas, terrains et locaux commerciaux, avec accompagnement à chaque étape.</p></div>
       <div class="card"><i class="fas fa-building-user" style="color:var(--pp-secondary); font-size:1.4rem;"></i><h4>Gestion immobilière</h4><p>Gestion locative, maintenance, syndic de copropriété et gestion d'investissements.</p></div>
@@ -1948,8 +2040,60 @@
           + '<div class="photo-grid">'+gp.items.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('')+'</div>';
       }).join('');
     }
-    var d=document.getElementById('eden-docs'), dw=document.getElementById('eden-docs-wrap');
-    if(d && docs.length){ dw.style.display='block'; d.innerHTML=docs.map(function(m){ return '<a href="'+esc(m.data||m.url||'')+'" download="'+esc(m.nom||m.titre||'document')+'" title="'+esc(m.commentaire||'')+'" style="text-decoration:none;display:inline-flex;align-items:center;gap:10px;border:1px solid #cfdfed;border-radius:12px;padding:10px 14px;color:#0a2b3e;font-size:.88rem;"><i class="fas fa-file-pdf" style="color:#b91c1c;"></i> '+esc(m.titre||m.nom||'Document')+'</a>'; }).join(''); }
+    /* Documents : ceux rattachés à un programme restent ici, au plus près de
+       ce qu'ils décrivent ; ceux rattachés à « Général (société) » vont sur la
+       page d'accueil, où un visiteur les voit sans avoir à ouvrir un onglet. */
+    _rendreDocs('eden-docs',    'eden-docs-wrap',    docs.filter(function(m){ return !!m.ref_type; }), true);
+    _rendreDocs('accueil-docs', 'accueil-docs-wrap', docs.filter(function(m){ return !m.ref_type;  }), false);
+  }
+
+  /* Une URL de média vient de la base : elle n'est pas de confiance. Seuls
+     http(s) et les data:URL de document sont rendus cliquables — sans ce
+     filtre, une URL « javascript:… » enregistrée depuis l'ERP deviendrait du
+     script exécuté chez chaque visiteur du portail public. */
+  function _hrefSur(u){
+    u = String(u == null ? '' : u).trim();
+    if (/^https?:\/\//i.test(u)) return u;
+    if (/^data:application\/pdf[;,]/i.test(u)) return u;
+    return '';
+  }
+  function _poidsLisible(o){
+    o = Number(o) || 0;
+    if (o <= 0) return '';
+    if (o < 1024) return o + ' o';
+    if (o < 1048576) return (o / 1024).toFixed(0).replace('.', ',') + ' Ko';
+    return (o / 1048576).toFixed(1).replace('.', ',') + ' Mo';
+  }
+  function _docCarte(m){
+    var href = _hrefSur(m.url || m.data);
+    if (!href) return '';
+    var ext = String(m.nom || '').split('.').pop().toUpperCase();
+    if (!/^[A-Z0-9]{2,5}$/.test(ext)) ext = /pdf/i.test(m.mime || '') ? 'PDF' : '';
+    var meta = [ext, _poidsLisible(m.taille),
+                 m.date ? new Date(m.date).toLocaleDateString('fr-FR') : ''].filter(Boolean).join(' · ');
+    return '<div class="doc-carte">'
+      + '<span class="doc-icone"><i class="fas ' + (ext === 'PDF' ? 'fa-file-pdf' : 'fa-file') + '"></i></span>'
+      + '<div class="doc-corps">'
+      +   '<div class="doc-titre">' + esc(m.titre || m.nom || 'Document') + '</div>'
+      +   (m.commentaire ? '<div class="doc-desc">' + esc(m.commentaire) + '</div>' : '')
+      +   (meta ? '<div class="doc-meta">' + esc(meta) + '</div>' : '')
+      + '</div>'
+      + '<div class="doc-liens">'
+      +   '<a class="doc-btn" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer"><i class="fas fa-eye"></i> Consulter</a>'
+      +   '<a class="doc-btn doc-btn-sec" href="' + esc(href) + '" download="' + esc(m.nom || m.titre || 'document') + '"><i class="fas fa-download"></i> Télécharger</a>'
+      + '</div></div>';
+  }
+  function _rendreDocs(idListe, idBloc, items, grouper){
+    var l = document.getElementById(idListe), b = document.getElementById(idBloc);
+    if (!l || !b) return;
+    var html = grouper
+      ? _grouperParRef(items).map(function(g){
+          return (g.label ? '<div style="font-weight:700;margin:14px 0 4px;color:var(--pp-primary);">' + esc(g.label) + '</div>' : '')
+            + g.items.map(_docCarte).join('');
+        }).join('')
+      : items.map(_docCarte).join('');
+    l.innerHTML = html;
+    b.style.display = html ? 'block' : 'none';
   }
   chargerMediasPortail();
 
@@ -2190,6 +2334,62 @@
     /* Société — mission / vision / légal */
     var sm=document.getElementById('societe-mission'); if(sm) sm.textContent = BR('mission', 'Fournir des services immobiliers de qualité supérieure, avec des solutions innovantes adaptées aux besoins de nos clients.');
     var svs=document.getElementById('societe-vision'); if(svs) svs.textContent = BR('vision', "Être un acteur immobilier de référence, reconnu pour son intégrité, son expertise et son engagement envers l'excellence.");
+    /* Mot du DG. Le bloc entier reste masque si ni texte ni photo ne sont
+       renseignes : mieux vaut l'absence d'une section que sa coquille vide. */
+    (function(){
+      var carte = document.getElementById('motdg-card');
+      if (!carte) return;
+      var texte  = String(BR('motdg_texte','')  || '').trim();
+      var photo  = String(BR('motdg_photo','')  || '').trim();
+      if (!texte && !photo) { carte.style.display = 'none'; return; }
+      carte.style.display = '';
+
+      var eT = document.getElementById('motdg-titre');
+      if (eT) eT.textContent = BR('motdg_titre', 'Mot du DG');
+
+      var accroche = String(BR('motdg_accroche','') || '').trim();
+      var eA = document.getElementById('motdg-accroche');
+      if (eA) { eA.textContent = accroche; eA.style.display = accroche ? '' : 'none'; }
+
+      /* Un paragraphe par ligne vide, un retour simple devient <br> : c'est la
+         convention de saisie la plus naturelle dans un textarea, et la seule
+         qui rende un mot de direction lisible sans editeur riche. */
+      var eC = document.getElementById('motdg-corps');
+      if (eC) {
+        eC.innerHTML = texte
+          ? texte.split(/\n\s*\n/).map(function(par){
+              return '<p>' + esc(par.trim()).replace(/\n/g, '<br>') + '</p>';
+            }).join('')
+          : '';
+      }
+
+      var nomDG  = String(BR('motdg_nom','')      || '').trim();
+      var foncDG = String(BR('motdg_fonction','') || '').trim();
+      var eW = document.getElementById('motdg-photo-wrap');
+      var eI = document.getElementById('motdg-photo');
+      if (eW && eI) {
+        if (photo) {
+          eI.src = photo;
+          /* Texte alternatif reel : un lecteur d'ecran annonce la personne,
+             pas un nom de fichier. */
+          eI.alt = nomDG ? (nomDG + (foncDG ? ' — ' + foncDG : '')) : 'Direction generale';
+          eW.style.display = '';
+          carte.classList.remove('motdg-sans-photo');
+        } else {
+          eI.removeAttribute('src');
+          eW.style.display = 'none';
+          carte.classList.add('motdg-sans-photo');
+        }
+      }
+
+      var eN = document.getElementById('motdg-nom');
+      var eF = document.getElementById('motdg-fonction');
+      var eS = document.getElementById('motdg-signature');
+      if (eN) eN.textContent = nomDG;
+      if (eF) eF.textContent = foncDG;
+      if (eS) eS.style.display = (nomDG || foncDG) ? '' : 'none';
+    })();
+
     var lg2=[];
     var forme=BR('forme',''); lg2.push('<strong>Raison sociale :</strong> '+esc(nom)+(forme?(' &nbsp;·&nbsp; <strong>Forme :</strong> '+esc(forme)):''));
     var l2=[]; if(BR('capital','')) l2.push('<strong>Capital :</strong> '+esc(BR('capital',''))); if(BR('rccm','')) l2.push('<strong>RCCM :</strong> '+esc(BR('rccm',''))); if(l2.length) lg2.push(l2.join(' &nbsp;·&nbsp; '));
