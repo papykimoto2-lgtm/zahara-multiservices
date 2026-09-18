@@ -67543,8 +67543,16 @@ function showReleveTiersClient(clientId) {
   if (nomEl) nomEl.textContent = c.nom+' '+c.prenoms+' ('+c.dossier+')';
   box.scrollIntoView({behavior:'smooth'});
 
-  var versements = DATA.versements.filter(function(v){return v.client_id===clientId;})
+  /* [FIX SYSCOHADA] Le relevé du compte TIERS 411 ne doit porter que ce qui
+     transite réellement par le 411 (apport, mensualités, régularisations…).
+     Les frais de souscription (non remboursables) sont comptabilisés D 5xx /
+     C 708 (produit) et ne touchent JAMAIS le 411 ; les inclure gonflait le
+     « total versé » et minorait le « solde dû ». Même exclusion que partout
+     ailleurs (_versementSurPrix). Rappelés à part sous le tableau. */
+  var versements = DATA.versements.filter(function(v){return v.client_id===clientId && _versementSurPrix(v);})
     .sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
+  var fraisSous = DATA.versements.filter(function(v){return v.client_id===clientId && v.type==='frais_souscription' && v.statut!=='annule';});
+  var totalFrais = fraisSous.reduce(function(sm,v){return sm+(parseFloat(v.montant)||0);},0);
   var soldeRunning = 0;
   var montantTotal = c.montant_total||0;
   var prog = DATA.programmes.find(function(p){return p.id===c.programme_id;})||{nom:'—'};
@@ -67592,7 +67600,13 @@ function showReleveTiersClient(clientId) {
     +'<div style="display:flex;justify-content:flex-end;gap:24px;padding:12px 0;border-top:1px solid var(--bord);font-weight:700;font-size:13px;margin-top:8px;">'
     +'<span>Total versé : <span style="color:var(--vert);">'+fmtF(soldeRunning)+' FCFA</span></span>'
     +'<span>Solde dû : <span style="color:'+(montantTotal-soldeRunning>0?'var(--rouge)':'var(--vert)')+';font-size:15px;">'+fmtF(Math.abs(montantTotal-soldeRunning))+' FCFA</span></span>'
-    +'</div>';
+    +'</div>'
+    + (totalFrais>0
+        ? '<div style="font-size:11px;color:var(--dim);padding:8px 0 0;border-top:1px dashed var(--bord);margin-top:4px;line-height:1.6;">'
+          + 'ℹ️ <strong>Frais de souscription non remboursables : '+fmtF(totalFrais)+' FCFA</strong> ('+fraisSous.length+' versement'+(fraisSous.length>1?'s':'')+'). '
+          + 'Comptabilisés au crédit d\'un compte de produit (classe 7), ils ne transitent pas par le compte tiers 411 : ils n\'entrent donc pas dans le solde ci-dessus.'
+          + '</div>'
+        : '');
 }
 
 /* [FIX 2026-06-30] Relevé de compte tiers pour les acquéreurs de cessions
