@@ -91,6 +91,25 @@
       .doc-liens{ width:100%; }
       .doc-btn{ flex:1; justify-content:center; }
     }
+    /* ── Espaces divisions : produits & services ─────────────────────────
+       Une grille de cartes produit par division. Prix optionnel : une
+       division vitrine (services sans tarif public) laisse le champ vide et
+       la ligne de prix disparaît, sans trou dans la carte. */
+    .div-intro{ margin:4px 0 18px; }
+    .div-intro .slogan{ color:var(--pp-primary); font-weight:700; font-size:.82rem; letter-spacing:.06em; text-transform:uppercase; }
+    .produit-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:18px; margin-top:14px; }
+    .produit-carte{ display:flex; flex-direction:column; background:#fff; border:1px solid #e8e0d0; border-radius:16px; overflow:hidden; transition:.2s; }
+    .produit-carte:hover{ box-shadow:0 10px 26px rgba(33,29,24,.08); transform:translateY(-2px); }
+    .produit-photo{ width:100%; aspect-ratio:4/3; object-fit:cover; background:#efe7d6; display:block; }
+    .produit-photo-vide{ width:100%; aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; background:#efe7d6; color:#b4a789; font-size:2rem; }
+    .produit-corps{ padding:14px 16px; display:flex; flex-direction:column; gap:6px; flex:1; }
+    .produit-cat{ font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#8a7f6b; }
+    .produit-nom{ font-weight:700; font-size:1rem; color:var(--pp-charbon); line-height:1.3; }
+    .produit-desc{ font-size:.85rem; color:#4a4336; line-height:1.6; }
+    .produit-prix{ margin-top:auto; font-weight:800; color:var(--pp-primary); font-size:1.05rem; }
+    .produit-prix .unite{ font-weight:600; font-size:.78rem; color:#8a7f6b; }
+    .div-vide{ color:#8a7f6b; font-size:.9rem; padding:12px 0; }
+    .div-section-titre{ margin:26px 0 4px; font-family:var(--pp-serif); }
     .nav-dropdown{ position:relative; }
     .nav-dropdown-trigger{ display:inline-flex; align-items:center; gap:6px; padding:10px 12px; font-size:0.78rem; font-weight:600; letter-spacing:.2px; color:var(--pp-charbon); background:transparent; border:1px solid #e2d9c4; border-radius:8px; cursor:pointer; transition:0.2s; }
     .nav-dropdown-trigger:hover, .nav-dropdown-trigger.open{ background:#f3ede0; }
@@ -329,6 +348,9 @@
       <li><button class="tab-link" data-tab="temoignages"><i class="fas fa-star"></i> AVIS</button></li>
       <li><button class="tab-link" data-tab="nous-connaitre"><i class="fas fa-building"></i> SOCIÉTÉ</button></li>
       <li><button class="tab-link" data-tab="nous-contacter"><i class="fas fa-envelope"></i> CONTACT</button></li>
+      <!-- Onglets des divisions publiées sur le portail, injectés depuis
+           divisions_portail (Paramètres → Site / Portail de l'ERP). -->
+      <span id="nav-divisions" style="display:contents;"></span>
       <li class="nav-dropdown">
         <button class="nav-dropdown-trigger" type="button" onclick="toggleEspaceMenu(this)"><i class="fas fa-user-lock"></i> MON ESPACE <i class="fas fa-chevron-down" style="font-size:.65rem;"></i></button>
         <div class="nav-dropdown-menu" id="espace-menu">
@@ -889,6 +911,8 @@
 
 
 
+  <!-- Panes des divisions, un par division publiée. -->
+  <div id="divisions-panes"></div>
 </div></div>
 
 <footer><div class="container">
@@ -1017,23 +1041,29 @@
   window.ppLbClose = ppLbClose; window.ppLbNav = ppLbNav;
   window.ppLbOpenImage = ppLbOpenImage; window.ppLbOpenVideoFromButton = ppLbOpenVideoFromButton;
 
-  /* ───── Onglets vitrine ───── */
-  (function(){
-    var btns=document.querySelectorAll('.tab-link'), panes=document.querySelectorAll('.tab-pane');
-    btns.forEach(function(b){ b.addEventListener('click',function(){
-      var t=b.getAttribute('data-tab');
-      panes.forEach(function(p){ p.classList.remove('active-pane'); });
-      var el=document.getElementById(t+'-pane'); if(el) el.classList.add('active-pane');
-      btns.forEach(function(x){ x.classList.remove('active'); }); b.classList.add('active');
-      /* Leaflet n'est chargé qu'à la première ouverture de la carte, et la
-         taille doit être recalculée : un conteneur masqué mesure 0 px. */
-      if(t==='carte' && typeof initCarte==='function') setTimeout(initCarte,60);
-      if(t==='investir' && typeof chargerInvestir==='function') setTimeout(chargerInvestir,60);
-      if(t==='eden' && typeof chargerListeProgrammes==='function') setTimeout(chargerListeProgrammes,60);
-      if(t==='catalogue' && typeof chargerCatalogueLive==='function') setTimeout(chargerCatalogueLive,60);
-      if(t==='location' && typeof chargerLocationLive==='function') setTimeout(chargerLocationLive,60);
-    }); });
-  })();
+  /* ───── Onglets vitrine ─────
+     Bascule extraite en fonction nommée : les onglets des divisions sont créés
+     après coup (depuis les paramètres) et doivent partager exactement le même
+     comportement. querySelectorAll est relu à chaque bascule pour inclure les
+     onglets ajoutés dynamiquement. */
+  function basculerVersOnglet(t){
+    document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active-pane'); });
+    var el=document.getElementById(t+'-pane'); if(el) el.classList.add('active-pane');
+    document.querySelectorAll('.tab-link').forEach(function(x){ x.classList.remove('active'); });
+    document.querySelectorAll('.tab-link[data-tab="'+t+'"]').forEach(function(x){ x.classList.add('active'); });
+    if(t==='carte' && typeof initCarte==='function') setTimeout(initCarte,60);
+    if(t==='investir' && typeof chargerInvestir==='function') setTimeout(chargerInvestir,60);
+    if(t==='eden' && typeof chargerListeProgrammes==='function') setTimeout(chargerListeProgrammes,60);
+    if(t==='catalogue' && typeof chargerCatalogueLive==='function') setTimeout(chargerCatalogueLive,60);
+    if(t==='location' && typeof chargerLocationLive==='function') setTimeout(chargerLocationLive,60);
+  }
+  function brancherOnglet(btn){
+    if(btn.__branche) return;
+    btn.__branche = true;
+    btn.addEventListener('click', function(){ basculerVersOnglet(btn.getAttribute('data-tab')); });
+  }
+  document.querySelectorAll('.tab-link').forEach(brancherOnglet);
+  window.basculerVersOnglet = basculerVersOnglet;
 
   /* ───── Backend Supabase ─────
      ⚠️ NE JAMAIS modifier ces 2 valeurs à la main. Elles sont injectées
@@ -1975,6 +2005,7 @@
     rendreMediasEden();
     renderCataloguePhoto();
     renderLocationPhotos();
+    if(typeof majEspacesDivisions==='function') majEspacesDivisions();
   }
   /* Lecteur intégré selon l'hébergeur : YouTube (sans cookies), Vimeo, ou
      fichier vidéo direct. Le commentaire saisi dans l'ERP s'affiche en
@@ -2095,6 +2126,116 @@
     l.innerHTML = html;
     b.style.display = html ? 'block' : 'none';
   }
+  /* ═══════════════════════════════════════════════════════════════
+     ESPACES DIVISIONS — un onglet public par division du groupe
+     Les divisions à exposer viennent de divisions_portail (publié par l'ERP
+     dans les paramètres du portail). Les produits/photos/documents viennent
+     de pi_portail_medias, filtrés par division_id. Reconstruction idempotente :
+     appelée à l'arrivée des paramètres ET des médias.
+     ═══════════════════════════════════════════════════════════════ */
+  function _imgSur(u){
+    u=String(u==null?'':u).trim();
+    if(/^https?:\/\//i.test(u)) return u;
+    if(/^data:image\//i.test(u)) return u;   /* jamais data:text/html ni javascript: */
+    return '';
+  }
+  function _fmtPrix(v){
+    var n=Number(v); if(!isFinite(n)||n<=0) return '';
+    return new Intl.NumberFormat('fr-FR').format(n)+' FCFA';
+  }
+  function _iconeDivision(d){
+    var i=String(d.icone||'').trim();
+    if(i) return i.indexOf('fa-')===0 ? i : ('fa-'+i);
+    var sect=String(d.secteur||'').toLowerCase();
+    return { agriculture:'fa-seedling', commerce:'fa-store', imprimerie:'fa-print',
+             industrie:'fa-industry', btp:'fa-helmet-safety' }[sect] || 'fa-briefcase';
+  }
+  function majEspacesDivisions(){
+    var nav=document.getElementById('nav-divisions');
+    var zone=document.getElementById('divisions-panes');
+    if(!nav||!zone) return;
+
+    var divs = BR('divisions_portail', []);
+    if(typeof divs==='string'){ try{ divs=JSON.parse(divs); }catch(e){ divs=[]; } }
+    if(!Array.isArray(divs)) divs=[];
+    divs = divs.filter(function(d){ return d && d.id && String(d.nom||'').trim(); })
+               .sort(function(a,b){ return (a.ordre||0)-(b.ordre||0); });
+
+    /* On mémorise l'onglet actif pour le restaurer après reconstruction : sans
+       cela, l'arrivée asynchrone des médias renverrait le visiteur à l'accueil. */
+    var actEl=document.querySelector('.tab-link.active');
+    var actif=actEl?actEl.getAttribute('data-tab'):'';
+
+    nav.innerHTML=''; zone.innerHTML='';
+    if(!divs.length) return;
+
+    var prods =(MEDIAS||[]).filter(function(m){ return m.type==='produit'; });
+    var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo'; });
+    var docs  =(MEDIAS||[]).filter(function(m){ return m.type==='document'; });
+
+    divs.forEach(function(d){
+      var tab='div-'+d.id, ico=_iconeDivision(d);
+      var li=document.createElement('li');
+      li.innerHTML='<button class="tab-link" data-tab="'+esc(tab)+'"><i class="fas '+esc(ico)+'"></i> '+esc(String(d.nom).toUpperCase())+'</button>';
+      nav.appendChild(li);
+      brancherOnglet(li.querySelector('.tab-link'));
+
+      var mine=function(m){ return String(m.division_id||'')===String(d.id); };
+      var pl=prods.filter(mine), gl=photos.filter(mine), dl=docs.filter(mine);
+
+      var html='<div class="container"><div class="content-section">';
+      html+='<div class="div-intro">';
+      html+= d.slogan ? '<div class="slogan">'+esc(d.slogan)+'</div>' : '';
+      html+='<h3 style="margin-top:6px;"><i class="fas '+esc(ico)+'"></i> '+esc(d.nom)+'</h3>';
+      html+= d.description ? '<p style="margin-top:6px;color:#4a4336;line-height:1.7;">'+esc(d.description)+'</p>' : '';
+      html+='</div>';
+
+      if(pl.length){
+        html+='<div class="produit-grid">'+pl.map(function(m){
+          var img=_imgSur(m.data||m.url), prix=_fmtPrix(m.prix);
+          return '<div class="produit-carte">'
+            + (img?'<img class="produit-photo" loading="lazy" src="'+esc(img)+'" alt="'+esc(m.titre||'')+'">':'<div class="produit-photo-vide"><i class="fas fa-box-open"></i></div>')
+            + '<div class="produit-corps">'
+            +   (m.categorie?'<div class="produit-cat">'+esc(m.categorie)+'</div>':'')
+            +   '<div class="produit-nom">'+esc(m.titre||'Produit')+'</div>'
+            +   (m.commentaire?'<div class="produit-desc">'+esc(m.commentaire)+'</div>':'')
+            +   (prix?'<div class="produit-prix">'+esc(prix)+(m.unite?' <span class="unite">/ '+esc(m.unite)+'</span>':'')+'</div>':'')
+            + '</div></div>';
+        }).join('')+'</div>';
+      }
+
+      if(gl.length){
+        html+='<h4 class="div-section-titre"><i class="fas fa-images"></i> Galerie</h4>';
+        html+='<div class="photo-grid">'+gl.map(function(m){
+          var img=_imgSur(m.data||m.url); if(!img) return '';
+          var cap=(m.titre?'<strong>'+esc(m.titre)+'</strong>':'')+(m.commentaire?((m.titre?' — ':'')+esc(m.commentaire)):'');
+          return '<div class="photo-item"><img src="'+esc(img)+'" loading="lazy" alt="">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>';
+        }).join('')+'</div>';
+      }
+
+      if(dl.length){
+        html+='<h4 class="div-section-titre"><i class="fas fa-folder-open"></i> Documents</h4>';
+        html+='<div class="doc-liste">'+dl.map(_docCarte).join('')+'</div>';
+      }
+
+      if(!pl.length && !gl.length && !dl.length){
+        html+='<div class="div-vide">Contenu en cours de publication.</div>';
+      }
+      html+='</div></div>';
+
+      var pane=document.createElement('div');
+      pane.id=tab+'-pane'; pane.className='tab-pane';
+      pane.innerHTML=html;
+      zone.appendChild(pane);
+    });
+
+    /* Restaure l'onglet division actif s'il existe toujours. */
+    if(actif && actif.indexOf('div-')===0 && document.getElementById(actif+'-pane')){
+      basculerVersOnglet(actif);
+    }
+  }
+  window.majEspacesDivisions = majEspacesDivisions;
+
   chargerMediasPortail();
 
   /* ───── Bandeau défilant ───── */
@@ -2488,6 +2629,7 @@
   async function chargerParamsBandeau(){
     try{ var rows = await sb('pi_params?select=id,data&id=eq.portail&limit=1'); PARAMS = unwrap(rows)[0] || {}; }catch(e){ PARAMS={}; }
     appliquerPersonnalisation();
+    if(typeof majEspacesDivisions==='function') majEspacesDivisions();
     majBandeau(); setInterval(majBandeau, 60000);
   }
   async function majBandeau(){
