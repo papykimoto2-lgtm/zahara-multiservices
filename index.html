@@ -3304,6 +3304,12 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <button class="tab-btn" onclick="switchTab('paiements','lien')"><i>🔗</i>Paiement en ligne</button>
             </div>
           </div>
+          <div class="etape">
+            <div class="etape-hd"><span class="etape-num">3</span>Contrôle</div>
+            <div class="etape-btns">
+              <button class="tab-btn" onclick="switchTab('paiements','auditdoublons')"><i>🧹</i>Audit doublons</button>
+            </div>
+          </div>
         </div>
 
 
@@ -3436,6 +3442,26 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             </div>
             <div id="pol-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0;"></div>
             <div class="table-wrap"><div id="pol-table"></div></div>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-paiements-auditdoublons">
+          <div class="card">
+            <div class="card-title">🧹 Audit &amp; correction des doublons d'importation</div>
+            <div style="font-size:12px;color:var(--dim);margin-bottom:10px;">
+              Détecte les versements en double — même souscripteur et même montant — typiquement issus d'un import répété.
+              Les versements importés sont signalés. Supprimez celui en trop : la suppression est propagée aux autres postes
+              (pierre tombale) et le solde du souscripteur est recalculé.
+            </div>
+            <div class="filters-bar" style="gap:16px;align-items:center;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                <input type="checkbox" id="audit-dbl-import-only" checked onchange="renderAuditDoublons()">
+                N'afficher que les doublons impliquant un import
+              </label>
+              <button class="btn btn-secondary btn-sm" onclick="renderAuditDoublons()">↻ Rafraîchir</button>
+            </div>
+            <div id="audit-doublons-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:12px 0;"></div>
+            <div id="audit-doublons-content"></div>
           </div>
         </div>
       </div>
@@ -29427,6 +29453,7 @@ function switchTab(context, tab) {
   if (context==='conventions' && tab==='cautions' && typeof cauInit==='function') { cauInit(); }
   if (context==='paiements' && tab==='momo' && typeof momoInit==='function') { momoInit(); }
   if (context==='paiements' && tab==='lien' && typeof payOnlineInit==='function') { payOnlineInit(); }
+  if (context==='paiements' && tab==='auditdoublons' && typeof renderAuditDoublons==='function') renderAuditDoublons();
   if (context==='caisse') {
     if (tab==='ventilation' && typeof caisseRenderVentilation==='function') caisseRenderVentilation();
     if (tab==='decaissements' && typeof caisseRenderDecaissementsAFaire==='function') caisseRenderDecaissementsAFaire();
@@ -34415,6 +34442,89 @@ async function savePaiement() {
   showRecu(versement);
   renderVersements();
   refreshDashboard();
+}
+
+/* [Audit doublons] Détection & correction des versements dupliqués par
+   import. Un doublon = même souscripteur (client_id) + même montant + même
+   type. On priorise les groupes impliquant au moins un versement importé. */
+function _auditMontant(v){ return Math.round((parseFloat(v.montant)||0)); }
+function _auditEstImport(v){
+  var id = String(v.id||'');
+  if (/^(imp_|recon_)/.test(id)) return true;
+  var n = (v.notes||v.reference||'') + '';
+  return /import|liste\s*souscript|r[ée]conciliation/i.test(n);
+}
+function renderAuditDoublons(){
+  var wrap = document.getElementById('audit-doublons-content');
+  var kpis = document.getElementById('audit-doublons-kpis');
+  if (!wrap) return;
+  var importOnly = !!(document.getElementById('audit-dbl-import-only')||{}).checked;
+  var groupes = {};
+  (DATA.versements||[]).forEach(function(v){
+    var m = _auditMontant(v);
+    if (!m) return;
+    var k = v.client_id + '|' + m + '|' + (v.type||'autre');
+    (groupes[k] = groupes[k] || []).push(v);
+  });
+  var doublons = Object.keys(groupes).map(function(k){ return groupes[k]; })
+    .filter(function(g){ return g.length >= 2; })
+    .filter(function(g){ return !importOnly || g.some(_auditEstImport); });
+  doublons.sort(function(a,b){ return _auditMontant(b[0]) - _auditMontant(a[0]); });
+
+  var nbGroupes = doublons.length;
+  var nbSurplus = doublons.reduce(function(s,g){ return s + (g.length-1); }, 0);
+  var mtSurplus = doublons.reduce(function(s,g){ return s + _auditMontant(g[0])*(g.length-1); }, 0);
+  kpis.innerHTML =
+    _auditKpi('Groupes en double', nbGroupes, '#f59e0b') +
+    _auditKpi('Versements en trop', nbSurplus, '#ef4444') +
+    _auditKpi('Montant en trop (FCFA)', fmtF(mtSurplus), '#ef4444');
+
+  if (!nbGroupes){
+    wrap.innerHTML = '<div style="text-align:center;color:var(--blanc-dim);padding:32px;">✅ Aucun doublon détecté'+(importOnly?' (filtre import actif)':'')+'.</div>';
+    return;
+  }
+  var typeLbl = { apport:'Apport', mensualite:'Mensualité', frais_souscription:'Frais souscription', regularisation:'Régularisation', autre:'Autre' };
+  var html = doublons.map(function(g){
+    var c = DATA.clients.find(function(x){ return x.id===g[0].client_id; });
+    var nom = c ? escHtml((c.nom+' '+c.prenoms).trim()) : '<em>souscripteur inconnu</em>';
+    var lignes = g.slice().sort(function(a,b){ return (_auditEstImport(b)?1:0)-(_auditEstImport(a)?1:0); }).map(function(v){
+      var imp = _auditEstImport(v);
+      var badge = imp
+        ? '<span style="background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;padding:2px 8px;border-radius:6px;font-size:11px;">Import</span>'
+        : '<span style="background:#10b98122;color:#34d399;border:1px solid #10b98155;padding:2px 8px;border-radius:6px;font-size:11px;">Manuel</span>';
+      return '<tr>'
+        + '<td>'+badge+'</td>'
+        + '<td>'+escHtml(v.date||'—')+'</td>'
+        + '<td>'+escHtml(v.mode||'—')+'</td>'
+        + '<td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escHtml((v.notes||v.reference||'')+'')+'">'+escHtml((v.notes||v.reference||'—')+'')+'</td>'
+        + '<td style="font-family:monospace;font-size:11px;color:var(--blanc-dim);">'+escHtml(String(v.id||''))+'</td>'
+        + '<td style="text-align:right;"><button class="btn btn-danger btn-sm" onclick="auditSupprimerDoublon(\''+String(v.id||'').replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'")+'\')">🗑 Supprimer</button></td>'
+        + '</tr>';
+    }).join('');
+    return '<div class="card" style="margin-bottom:14px;border-left:3px solid #f59e0b;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
+      + '<strong>'+nom+'</strong>'
+      + '<span>'+ (typeLbl[g[0].type]||g[0].type||'Autre') +' — <strong style="color:#f59e0b;">'+fmtF(_auditMontant(g[0]))+' FCFA</strong> × '+g.length+'</span>'
+      + '</div>'
+      + '<table class="data-table" style="width:100%;"><thead><tr>'
+      + '<th>Origine</th><th>Date</th><th>Mode</th><th>Notes</th><th>ID</th><th style="text-align:right;">Action</th>'
+      + '</tr></thead><tbody>'+lignes+'</tbody></table>'
+      + '<div style="font-size:12px;color:var(--blanc-dim);margin-top:6px;">Conservez une ligne, supprimez les autres.</div>'
+      + '</div>';
+  }).join('');
+  wrap.innerHTML = html;
+}
+function _auditKpi(label, valeur, couleur){
+  return '<div class="card" style="text-align:center;padding:14px;border-top:3px solid '+couleur+';">'
+    + '<div style="font-size:22px;font-weight:800;color:'+couleur+';">'+valeur+'</div>'
+    + '<div style="font-size:12px;color:var(--blanc-dim);margin-top:4px;">'+label+'</div>'
+    + '</div>';
+}
+async function auditSupprimerDoublon(id){
+  if (typeof deleteVersement === 'function'){
+    await deleteVersement(id);
+  }
+  if (typeof renderAuditDoublons === 'function') renderAuditDoublons();
 }
 
 function renderVersements() {
