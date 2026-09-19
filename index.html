@@ -40717,7 +40717,7 @@ function _epGrandLivre(){
 function epImprimer(){
   var c=document.getElementById('ep-content');
   if(!c || !c.innerHTML.trim()){ toast('Générez d\'abord l\'état.','error'); return; }
-  var soc=((DATA.params&&DATA.params.societe)||{}).nom || (DATA.params&&DATA.params.raison_sociale) || 'SANIX';
+  var sousTitre = (_epData && _epData.range) ? ('Période : '+_frDate(_epData.range.d1)+' → '+_frDate(_epData.range.d2)) : '';
   var w=window.open('','_blank');
   w.document.write('<html><head><title>État périodique</title><meta charset="utf-8"><style>'
     +'body{font-family:Arial,sans-serif;color:#111;padding:18px;font-size:12px;}'
@@ -40725,7 +40725,7 @@ function epImprimer(){
     +'.card-title{font-weight:700;font-size:14px;margin:16px 0 4px;border-bottom:2px solid #B87333;padding-bottom:3px;}'
     +'.alert{padding:6px 10px;margin-top:6px;border-radius:4px;}.alert-success{background:#e6f4ea;}.alert-error{background:#fde8ec;}'
     +'.card{margin-bottom:14px;}h1{font-size:16px;}</style></head><body>'
-    +'<h1>'+escHtml(soc)+' — État périodique</h1>'
+    +_enteteDocImprime('État périodique', sousTitre)
     +c.innerHTML
     +'<script>window.onload=function(){window.print();}<\/script></body></html>');
   w.document.close();
