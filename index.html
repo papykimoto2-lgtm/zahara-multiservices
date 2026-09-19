@@ -3171,6 +3171,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <button class="tab-btn active" onclick="switchTab('clients','liste')">📋 Liste</button>
           <button class="tab-btn" onclick="switchTab('clients','dashboard')">📊 Tableau de bord</button>
           <button class="tab-btn" onclick="switchTab('clients','doublons')" title="Détecte les souscripteurs potentiellement saisis en double (nom, téléphone, email, pièce d'identité, n° de dossier) et les numéros de téléphone invalides">🧬 Doublons &amp; fiches invalides</button>
+          <button class="tab-btn" onclick="switchTab('clients','desistements')" title="Registre des souscriptions résiliées : montants remboursés, retenus, lots libérés">🚪 Désistements</button>
         </div>
 
         <div class="tab-pane active" id="tab-clients-liste">
@@ -3272,6 +3273,31 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div id="clients-doublons-content"></div>
         </div>
         <!-- /tab-clients-doublons -->
+
+        <div class="tab-pane" id="tab-clients-desistements">
+          <div class="card" style="margin-bottom:16px;padding:14px 16px;">
+            <div style="font-size:12px;color:var(--blanc-dim);line-height:1.6;">
+              🚪 Registre des souscriptions résiliées (désistements et défauts promoteur). Taux de remboursement configurables dans <b>Paramètres → Comptabilité</b>.
+            </div>
+          </div>
+          <div class="filters-bar" style="gap:12px;align-items:center;flex-wrap:wrap;">
+            <input type="text" class="search-input" placeholder="🔍 Nom, dossier..." id="search-desist" oninput="renderRegistreDesistements()">
+            <select class="filter-select" id="filter-desist-motif" onchange="renderRegistreDesistements()">
+              <option value="">Tous les motifs</option>
+              <option value="desistement_client">Désistement souscripteur</option>
+              <option value="faute_promoteur">Faute promoteur</option>
+            </select>
+            <select class="filter-select" id="filter-desist-remb" onchange="renderRegistreDesistements()">
+              <option value="">Remboursement : tous</option>
+              <option value="du">Reste à rembourser</option>
+              <option value="fait">Remboursé</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="exportDesistementsCSV()">⬇ Export CSV</button>
+          </div>
+          <div id="desist-kpi" class="kpi-grid" style="margin:14px 0;"></div>
+          <div id="desist-content"></div>
+        </div>
+        <!-- /tab-clients-desistements -->
       </div>
 
       <!-- ── PAIEMENTS ─────────────────────────────── -->
@@ -6276,6 +6302,14 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div class="form-group">
                   <label>Pénalités retard (%/semaine)</label>
                   <input type="number" id="param-penalites" class="form-control" value="0.5" step="0.1">
+                </div>
+                <div class="form-group">
+                  <label>Désistement souscripteur — remboursement (%)</label>
+                  <input type="number" id="param-resil-taux-desistement" class="form-control" value="60" min="0" max="100" step="1">
+                </div>
+                <div class="form-group">
+                  <label>Faute promoteur — remboursement (%)</label>
+                  <input type="number" id="param-resil-taux-faute" class="form-control" value="100" min="0" max="100" step="1">
                 </div>
                 <div class="form-group">
                   <label>Banque principale (cpt 512)</label>
@@ -17906,10 +17940,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
     <div class="modal-body">
       <input type="hidden" id="rs-client-id">
       <div id="rs-alerte-gele" style="display:none;"></div>
-      <div class="alert alert-info" style="font-size:11.5px;">
-        Clause contractuelle applicable : désistement du souscripteur → remboursement de <b>60%</b> des versements
-        (effectif à la fin du délai de réalisation) ; désistement imputable au promoteur → remboursement <b>total (100%)</b>.
-      </div>
+      <div class="alert alert-info" style="font-size:11.5px;" id="rs-clause"></div>
       <div class="card" style="margin:10px 0;padding:10px 12px;">
         <div id="rs-recap" style="font-size:12.5px;line-height:1.7;"></div>
       </div>
@@ -29615,6 +29646,7 @@ function switchTab(context, tab) {
   }
   if (context === 'clients' && tab === 'doublons' && typeof renderClientsDoublons === 'function') renderClientsDoublons();
   if (context === 'clients' && tab === 'dashboard' && typeof renderClientsDashboard === 'function') renderClientsDashboard();
+  if (context === 'clients' && tab === 'desistements' && typeof renderRegistreDesistements === 'function') renderRegistreDesistements();
 
   /* Mettre à jour les boutons .tab-btn du même contexte */
   document.querySelectorAll('.tab-btn').forEach(function(b) {
@@ -32962,8 +32994,27 @@ function resilierOuvrir(clientId){
   var alerteGele = document.getElementById('rs-alerte-gele');
   alerteGele.style.display='none';
 
+  /* Clause + libellés reflétant les taux paramétrés */
+  var pctDes = Math.round(_resilTaux('desistement_client')*100);
+  var pctFau = Math.round(_resilTaux('faute_promoteur')*100);
+  var clauseEl = document.getElementById('rs-clause');
+  if (clauseEl) clauseEl.innerHTML = 'Clause contractuelle applicable : désistement du souscripteur → remboursement de <b>'+pctDes+'%</b> des versements '
+    +'(effectif à la fin du délai de réalisation) ; défaut imputable au promoteur → remboursement <b>'+pctFau+'%</b>.';
+  if (sel.options[0]) sel.options[0].text = 'Désistement du souscripteur ('+pctDes+'%)';
+  if (sel.options[1]) sel.options[1].text = 'Défaut/retard imputable au promoteur ('+pctFau+'%)';
+
   resilierRecalculer();
   openModal('modal-resiliation');
+}
+/* Taux de remboursement paramétrables (Paramètres → Comptabilité).
+   Valeurs par défaut : désistement 60%, faute promoteur 100%. */
+function _resilTaux(motif){
+  var p = DATA.params || {};
+  var pct = motif === 'faute_promoteur'
+    ? (p.resil_taux_faute!=null ? p.resil_taux_faute : 100)
+    : (p.resil_taux_desistement!=null ? p.resil_taux_desistement : 60);
+  pct = parseFloat(pct); if (!isFinite(pct)||pct<0) pct=0; if (pct>100) pct=100;
+  return pct/100;
 }
 function resilierRecalculer(){
   var clientId = document.getElementById('rs-client-id').value;
@@ -32971,7 +33022,7 @@ function resilierRecalculer(){
   if (!c) return;
   var motif = document.getElementById('rs-motif').value;
   var verse = totalPayePrix(clientId);
-  var taux = motif === 'faute_promoteur' ? 1 : 0.6;
+  var taux = _resilTaux(motif);
   var rembourse = Math.round(verse * taux);
   var retenu = verse - rembourse;
   document.getElementById('rs-montant-verse').value = fcfa(verse);
@@ -33006,7 +33057,7 @@ async function resilierConfirmer(){
   if (!document.getElementById('rs-confirme').checked) { toast('Cochez la case de confirmation avant de valider.','error'); return; }
 
   var verse = totalPayePrix(clientId);
-  var taux = motif === 'faute_promoteur' ? 1 : 0.6;
+  var taux = _resilTaux(motif);
   var rembourse = Math.round(verse * taux);
   var retenu = verse - rembourse;
 
@@ -33084,6 +33135,85 @@ async function resilierConfirmer(){
   toast('Souscription résiliée — '+fcfa(rembourse)+' à rembourser, '+fcfa(retenu)+' retenu, '+lotIds.length+' lot(s) libéré(s) pour réattribution.', 'success');
   resilierImprimerDecompte(clientId);
 }
+/* ─── Registre des désistements / résiliations ─────────────────────── */
+function _desistListe(){
+  return (DATA.clients||[]).filter(function(c){ return c.statut==='resilie' && c.resiliation; });
+}
+function renderRegistreDesistements(){
+  var wrap = document.getElementById('desist-content'); if (!wrap) return;
+  var kpiEl = document.getElementById('desist-kpi');
+  var search = ((document.getElementById('search-desist')||{}).value||'').toLowerCase();
+  var fMotif = (document.getElementById('filter-desist-motif')||{}).value||'';
+  var fRemb  = (document.getElementById('filter-desist-remb')||{}).value||'';
+
+  var list = _desistListe().filter(function(c){
+    var r=c.resiliation;
+    var nom=((c.nom||'')+' '+(c.prenoms||'')+' '+(c.dossier||'')).toLowerCase();
+    if (search && nom.indexOf(search)===-1) return false;
+    if (fMotif && r.motif!==fMotif) return false;
+    var du = (r.montant_rembourse>0 && !r.rembourse);
+    if (fRemb==='du' && !du) return false;
+    if (fRemb==='fait' && !r.rembourse) return false;
+    return true;
+  }).sort(function(a,b){ return (b.resiliation.date||'').localeCompare(a.resiliation.date||''); });
+
+  var tVerse=0,tRemb=0,tRetenu=0,tDu=0,nbDes=0,nbFau=0;
+  list.forEach(function(c){ var r=c.resiliation;
+    tVerse+=r.montant_verse||0; tRemb+=r.montant_rembourse||0; tRetenu+=r.montant_retenu||0;
+    if (r.montant_rembourse>0 && !r.rembourse) tDu+=r.montant_rembourse;
+    if (r.motif==='faute_promoteur') nbFau++; else nbDes++;
+  });
+  if (kpiEl) kpiEl.innerHTML = [
+    ['Résiliations', list.length, 'var(--bleu,#1D4ED8)'],
+    ['Désist. / Faute', nbDes+' / '+nbFau, 'var(--blanc)'],
+    ['Total versé', fmtF(tVerse), 'var(--or,#B87333)'],
+    ['Remboursé (dû)', fmtF(tRemb), 'var(--vert,#0E9F6E)'],
+    ['Retenu (produit)', fmtF(tRetenu), 'var(--or,#B87333)'],
+    ['Reste à rembourser', fmtF(tDu), 'var(--rouge,#DC2626)']
+  ].map(function(k){ return '<div class="kpi-card"><div class="kpi-label">'+k[0]+'</div><div class="kpi-value" style="color:'+k[2]+';">'+k[1]+'</div></div>'; }).join('');
+
+  if (!list.length){ wrap.innerHTML='<div style="text-align:center;color:var(--blanc-dim);padding:32px;">Aucun désistement enregistré.</div>'; return; }
+  var rows = list.map(function(c){ var r=c.resiliation;
+    var etat = r.montant_rembourse<=0 ? '<span class="badge badge-neutre">Rien à rembourser</span>'
+      : (r.rembourse ? '<span class="badge badge-vert">Remboursé '+(r.rembourse_le?dateShort(r.rembourse_le):'')+'</span>'
+                     : '<span class="badge badge-rouge">À rembourser</span>');
+    var motif = r.motif==='faute_promoteur' ? 'Faute promoteur' : 'Désistement';
+    var actionRemb = (r.montant_rembourse>0 && !r.rembourse)
+      ? '<button class="btn btn-primary btn-sm" onclick="resilierOuvrirRemboursement(\''+c.id+'\')">💰 Rembourser</button>' : '';
+    return '<tr>'
+      +'<td>'+escHtml(r.date||'—')+'</td>'
+      +'<td><strong>'+escHtml(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</strong><br><span style="font-size:11px;color:var(--blanc-dim);">'+escHtml(c.dossier||'')+'</span></td>'
+      +'<td>'+motif+' <span style="color:var(--blanc-dim);">('+(r.taux_remboursement!=null?r.taux_remboursement:'')+'%)</span></td>'
+      +'<td style="text-align:right;">'+fmtF(r.montant_verse||0)+'</td>'
+      +'<td style="text-align:right;color:var(--vert);">'+fmtF(r.montant_rembourse||0)+'</td>'
+      +'<td style="text-align:right;color:var(--or,#B87333);">'+fmtF(r.montant_retenu||0)+'</td>'
+      +'<td>'+etat+'</td>'
+      +'<td style="text-align:right;white-space:nowrap;">'+actionRemb
+        +' <button class="btn btn-secondary btn-sm" onclick="resilierImprimerDecompte(\''+c.id+'\')" title="Décompte">📄</button></td>'
+      +'</tr>';
+  }).join('');
+  wrap.innerHTML = '<div class="table-wrap"><table><thead><tr>'
+    +'<th>Date</th><th>Souscripteur</th><th>Motif</th>'
+    +'<th style="text-align:right;">Versé</th><th style="text-align:right;">À rembourser</th><th style="text-align:right;">Retenu</th>'
+    +'<th>État</th><th style="text-align:right;">Actions</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function exportDesistementsCSV(){
+  var list=_desistListe();
+  if(!list.length){ toast('Aucun désistement à exporter.','error'); return; }
+  var rows=[['Date','Nom','Dossier','Motif','Taux %','Verse','Rembourse','Retenu','Rembourse_effectif','Date_remboursement','Lots_liberes','Justification']];
+  list.forEach(function(c){ var r=c.resiliation;
+    rows.push([r.date||'', ((c.nom||'')+' '+(c.prenoms||'')).trim(), c.dossier||'',
+      r.motif==='faute_promoteur'?'Faute promoteur':'Desistement', r.taux_remboursement!=null?r.taux_remboursement:'',
+      r.montant_verse||0, r.montant_rembourse||0, r.montant_retenu||0,
+      r.rembourse?'Oui':'Non', r.rembourse_le||'', (r.lots_liberes||[]).length, (r.justification||'').replace(/[\r\n]+/g,' ')]);
+  });
+  var csv=rows.map(function(r){ return r.map(function(x){ return '"'+String(x).replace(/"/g,'""')+'"'; }).join(';'); }).join('\r\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='registre_desistements.csv'; a.click();
+  toast('Registre des désistements exporté.','success');
+}
+
 function resilierImprimerDecompte(clientId){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;});
   if (!c || !c.resiliation) { toast('Aucune résiliation enregistrée pour ce souscripteur.','error'); return; }
@@ -45969,6 +46099,8 @@ async function saveParams() {
     portail_divisions:               _lireDivisionsPubliees(),
     auto_compta_commissions: document.getElementById('param-auto-compta-comm') ? document.getElementById('param-auto-compta-comm').checked : true,
     penalites_pct: parseFloat(gv('param-penalites'))||0.5,
+    resil_taux_desistement: (function(){ var v=parseFloat(gv('param-resil-taux-desistement')); return (isFinite(v)&&v>=0&&v<=100)?v:60; })(),
+    resil_taux_faute: (function(){ var v=parseFloat(gv('param-resil-taux-faute')); return (isFinite(v)&&v>=0&&v<=100)?v:100; })(),
     banque:      gv('param-banque'),
     exercice:    gv('param-exercice'),
   });
@@ -46285,6 +46417,8 @@ function loadParamFields() {
   if (typeof renderDivisionsPubliees==='function') renderDivisionsPubliees(p.portail_divisions||[]);
   var autoComptaEl = document.getElementById('param-auto-compta-comm');
   if (autoComptaEl) autoComptaEl.checked = p.auto_compta_commissions !== false; sv('param-penalites',p.penalites_pct||0.5);
+  sv('param-resil-taux-desistement', (p.resil_taux_desistement!=null?p.resil_taux_desistement:60));
+  sv('param-resil-taux-faute', (p.resil_taux_faute!=null?p.resil_taux_faute:100));
   sv('param-banque',p.banque); sv('param-exercice',p.exercice||'2025');
   sv('param-obj-ca',p.objectif_ca_mensuel||20000000);
   sv('param-obj-ventes',p.objectif_ventes_mensuel||5);
