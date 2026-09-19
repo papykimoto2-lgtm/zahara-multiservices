@@ -67786,8 +67786,32 @@ function showReleveTiersCession(cessionId) {
     +'</div>';
 }
 
+/* Entête société (logo + coordonnées) pour les documents imprimés type relevé,
+   styles inline autonomes (le document imprimé n'hérite pas des classes .etat-*). */
+function _enteteReleveHTML() {
+  var s = _identiteSociete();
+  var logoSrc = s.logo || (typeof getLogoForPrint==='function' ? getLogoForPrint() : '');
+  var logo = logoSrc
+    ? '<img src="'+logoSrc+'" alt="logo" style="max-height:64px;max-width:160px;object-fit:contain;">'
+    : '<div style="width:56px;height:56px;border-radius:10px;background:#1D4ED8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;">'+escHtml((s.nom||'S').charAt(0).toUpperCase())+'</div>';
+  var sub = [];
+  if (s.forme || s.activite) sub.push(escHtml([s.forme, s.activite].filter(Boolean).join(' · ')));
+  if (s.adresse) sub.push(escHtml(s.adresse));
+  var contact = [s.tel ? 'Tél : '+s.tel : '', s.email].filter(Boolean).join(' · ');
+  if (contact) sub.push(escHtml(contact));
+  var legal = [s.rccm ? 'RCCM : '+s.rccm : '', s.cc ? 'CC : '+s.cc : '', s.agrement ? 'Agrément : '+s.agrement : ''].filter(Boolean).join(' · ');
+  return '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid #1D4ED8;padding-bottom:10px;margin-bottom:14px;">'
+    +   '<div style="display:flex;gap:12px;align-items:center;">'+logo
+    +     '<div><div style="font-size:18px;font-weight:700;color:#1D4ED8;line-height:1.2;">'+escHtml(s.nom)+'</div>'
+    +       (sub.length ? '<div style="font-size:11px;color:#555;margin-top:3px;line-height:1.5;">'+sub.join('<br>')+'</div>' : '')
+    +     '</div>'
+    +   '</div>'
+    +   (legal ? '<div style="font-size:10px;color:#555;text-align:right;max-width:220px;">'+legal+'</div>' : '')
+    + '</div>';
+}
+
 function printReleveTiers() {
-  _printFromElement('releve-tiers-content', 'Relevé de compte tiers');
+  _printFromElement('releve-tiers-content', 'Relevé de compte tiers', '', _enteteReleveHTML());
 }
 
 function exportTiers411CSV() {
@@ -79751,7 +79775,7 @@ var _ppTitle = '';
 /* ── Extraction DOM → aperçu impression ────────────────────────────────────
    Construit un HTML complet (avec les styles de la page) à partir d'un
    élément DOM existant, puis ouvre l'aperçu avant impression.            */
-function _printFromElement(elementId, titre, extraCss) {
+function _printFromElement(elementId, titre, extraCss, prefixHtml) {
   var el = document.getElementById(elementId);
   if (!el) { window.print(); return; }
 
@@ -79786,7 +79810,7 @@ function _printFromElement(elementId, titre, extraCss) {
     + '.modal-overlay,.modal-header,.modal-footer,.btn,.topbar,.sidebar,.bottom-nav{display:none!important;}'
     + (extraCss||'')
     + '</style><style>' + styles + '</style>'
-    + '</head><body>' + el.innerHTML + '</body></html>';
+    + '</head><body>' + (prefixHtml||'') + el.innerHTML + '</body></html>';
 
   openPrintPreview(html, titre||'Document');
 }
