@@ -67788,7 +67788,7 @@ function showReleveTiersCession(cessionId) {
 
 /* Entête société (logo + coordonnées) pour les documents imprimés type relevé,
    styles inline autonomes (le document imprimé n'hérite pas des classes .etat-*). */
-function _enteteReleveHTML() {
+function _enteteReleveHTML(titreDoc, sousTitre) {
   var s = _identiteSociete();
   var logoSrc = s.logo || (typeof getLogoForPrint==='function' ? getLogoForPrint() : '');
   var logo = logoSrc
@@ -67807,11 +67807,17 @@ function _enteteReleveHTML() {
     +     '</div>'
     +   '</div>'
     +   (legal ? '<div style="font-size:10px;color:#555;text-align:right;max-width:220px;">'+legal+'</div>' : '')
-    + '</div>';
+    + '</div>'
+    + (titreDoc ? '<div style="text-align:center;margin:0 0 14px;">'
+        + '<div style="font-size:20px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.5px;">'+escHtml(titreDoc)+'</div>'
+        + (sousTitre ? '<div style="font-size:13px;color:#333;margin-top:2px;">'+escHtml(sousTitre)+'</div>' : '')
+        + '<div style="font-size:11px;color:#777;margin-top:2px;">Édité le '+new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})+'</div>'
+      + '</div>' : '');
 }
 
 function printReleveTiers() {
-  _printFromElement('releve-tiers-content', 'Relevé de compte tiers', '', _enteteReleveHTML());
+  var nom = (document.getElementById('releve-tiers-nom')||{}).textContent || '';
+  _printFromElement('releve-tiers-content', 'Relevé de compte tiers', '', _enteteReleveHTML('Relevé de compte tiers', nom));
 }
 
 function exportTiers411CSV() {
