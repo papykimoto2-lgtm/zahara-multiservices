@@ -67786,9 +67786,11 @@ function showReleveTiersCession(cessionId) {
     +'</div>';
 }
 
-/* Entête société (logo + coordonnées) pour les documents imprimés type relevé,
-   styles inline autonomes (le document imprimé n'hérite pas des classes .etat-*). */
-function _enteteReleveHTML(titreDoc, sousTitre) {
+/* Entête société (logo + coordonnées) + titre pour TOUT document comptable
+   imprimé, styles inline autonomes (le document imprimé n'hérite pas des
+   classes .etat-*). Réutilisable : relevé tiers, tableau d'amortissement,
+   compte d'exploitation prévisionnel, etc. */
+function _enteteDocImprime(titreDoc, sousTitre) {
   var s = _identiteSociete();
   var logoSrc = s.logo || (typeof getLogoForPrint==='function' ? getLogoForPrint() : '');
   var logo = logoSrc
@@ -67817,7 +67819,7 @@ function _enteteReleveHTML(titreDoc, sousTitre) {
 
 function printReleveTiers() {
   var nom = (document.getElementById('releve-tiers-nom')||{}).textContent || '';
-  _printFromElement('releve-tiers-content', 'Relevé de compte tiers', '', _enteteReleveHTML('Relevé de compte tiers', nom));
+  _printFromElement('releve-tiers-content', 'Relevé de compte tiers', '', _enteteDocImprime('Relevé de compte tiers', nom));
 }
 
 function exportTiers411CSV() {
@@ -68677,7 +68679,12 @@ function buildTableauAmort() {
     +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
-function printTableauAmort() { _printFromElement('tableau-amort-box', 'Tableau d\'amortissement'); }
+function printTableauAmort() {
+  var bienId=(document.getElementById('filter-amort-bien')||{}).value||'';
+  var bien = bienId ? _amortTousBiens().find(function(b){return b.id===bienId;}) : null;
+  var sous = bien ? ((bien.dossier?bien.dossier+' — ':'')+(bien.designation||'')) : '';
+  _printFromElement('tableau-amort-box', 'Tableau d\'amortissement', '', _enteteDocImprime('Tableau d\'amortissement', sous));
+}
 
 function exportTableauAmortCSV() {
   var bienId=(document.getElementById('filter-amort-bien')||{}).value||'';
@@ -103845,8 +103852,7 @@ function imprimerCompteExploitationPrevisionnel() {
   w.document.write('<html><head><title>Compte d\'exploitation prévisionnel '+exercice+'</title>'
     + '<style>body{font-family:Arial,sans-serif;padding:24px;color:#111;} table{border-collapse:collapse;width:100%;font-size:10px;} td,th{border:1px solid #ccc;padding:4px 6px;} .kpi-grid{display:none;} h1{font-size:16px;} h2{font-size:12px;color:#555;font-weight:400;}</style>'
     + '</head><body>'
-    + '<h1>Compte d\'exploitation prévisionnel — Exercice '+exercice+'</h1>'
-    + '<h2>Division : '+escHtml(divLabel)+' — édité le '+dateShort(today())+'</h2>'
+    + _enteteDocImprime('Compte d\'exploitation prévisionnel', 'Exercice '+exercice+' — '+divLabel)
     + contenu + '</body></html>');
   w.document.close();
   setTimeout(function(){ w.print(); }, 300);
