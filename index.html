@@ -41235,7 +41235,7 @@ function genererConsolidation() {
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Comptes consolidés ' + annee + '</title><style>' + css + '</style></head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / PDF</button></div>'
-    + '<div class="hdr"><div><b>' + escHtml(p.societe || 'GROUPE') + '</b><br>Périmètre : ' + agr.length + ' entité(s) intégrée(s)</div>'
+    + '<div class="hdr"><div style="display:flex;align-items:center;gap:10px;">' + (getLogoForPrint() ? '<img src="' + getLogoForPrint() + '" style="max-height:48px;max-width:130px;object-fit:contain;">' : '') + '<span><b>' + escHtml(p.societe || 'GROUPE') + '</b><br>Périmètre : ' + agr.length + ' entité(s) intégrée(s)</span></div>'
     + '<div style="text-align:center;"><h1>COMPTES CONSOLIDÉS DU GROUPE</h1>'
     + '<div>SYSCOHADA révisé · Exercice clos le 31/12/' + annee + ' · Montants en FCFA</div></div>'
     + '<div style="text-align:right;font-size:8.5px;">Société mère :<br>' + escHtml(K.mere ? K.mere.nom : '—') + '</div></div>'
@@ -73690,7 +73690,7 @@ function imprimerTdbChantiers() {
     + '.no-print{text-align:center;margin-bottom:10px;} .no-print button{padding:8px 18px;background:#B87333;color:#fff;border:none;border-radius:5px;cursor:pointer;}'
     + '@media print{.no-print{display:none;}}</style></head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer</button></div>'
-    + '<div style="text-align:right;font-size:9.5px;">' + E(p.societe || '') + ' · ' + new Date().toLocaleDateString('fr-FR') + '</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;">' + (getLogoForPrint() ? '<img src="' + getLogoForPrint() + '" style="max-height:50px;max-width:150px;object-fit:contain;">' : '<span></span>') + '<div style="text-align:right;font-size:9.5px;">' + E(p.societe || '') + ' · ' + new Date().toLocaleDateString('fr-FR') + '</div></div>'
     + '<h1>ÉTAT D\'AVANCEMENT DES CHANTIERS</h1>'
     + '<table><thead><tr><th>Marché</th><th>Entreprise</th><th class="num">Montant HT</th><th class="num">Facturé</th>'
     + '<th class="num">Av. fact.</th><th class="num">Av. constaté</th><th class="num">Écart</th>'
@@ -85556,6 +85556,7 @@ function imprimerAnalyse360() {
   var win = window.open('', '_blank');
   win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Analyse 360° — '+soc+'</title>'
     +'<style>body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#1C1C2E;}h1{color:#7C3AED;border-bottom:2px solid #7C3AED;padding-bottom:8px;}h2{color:#2563EB;margin-top:22px;font-size:15px;}table{border-collapse:collapse;width:100%;margin:8px 0;}td,th{border:1px solid #ccc;padding:6px 10px;text-align:left;vertical-align:top;}th{background:#F3F0FF;}ul{margin:4px 0;}</style></head><body>'
+    +(getLogoForPrint()?'<div style="margin-bottom:8px;"><img src="'+getLogoForPrint()+'" style="max-height:54px;max-width:160px;object-fit:contain;"></div>':'')
     +'<h1>Analyse 360° — Diagnostic & Plan d\'action</h1>'
     +'<p>'+soc+' · Édité le '+now+'</p>'
     +'<h2>Indicateurs clés</h2><table>'
