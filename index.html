@@ -67695,7 +67695,7 @@ function showReleveTiersClient(clientId) {
         soldeRunning += v.montant||0;
         var soldeCourant = montantTotal - soldeRunning;
         return '<tr>'
-          +'<td>'+v.date+'</td>'
+          +'<td>'+dateShort(v.date)+'</td>'
           +'<td>Versement — '+(v.type||'mensualité')+(v.ref?' ['+v.ref+']':'')+'</td>'
           +'<td style="font-family:monospace;color:var(--vert);">512/571</td>'
           +'<td style="font-family:monospace;color:var(--or);">411</td>'
@@ -67768,7 +67768,7 @@ function showReleveTiersCession(cessionId) {
         var soldeCourant = montantTotal - soldeRunning;
         var compteTreso = (p.mode === 'especes') ? '571' : (p.mode === 'mobile_money' ? '531' : '521');
         return '<tr>'
-          +'<td>'+p.date+'</td>'
+          +'<td>'+dateShort(p.date)+'</td>'
           +'<td>Versement'+(p.notes?' — '+p.notes:'')+'</td>'
           +'<td style="font-family:monospace;color:var(--vert);">'+compteTreso+'</td>'
           +'<td style="font-family:monospace;color:var(--or);">'+crecCompte()+'</td>'
