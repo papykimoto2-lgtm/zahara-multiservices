@@ -26454,6 +26454,7 @@ async function renderSyncStatus() {
     + '</div>'
     + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
     +   '<button class="btn btn-secondary btn-sm" onclick="pullReinitialiserCurseurs()" title="Force une récupération complète au prochain cycle — si des données semblent manquer">🔄 Resynchro complète</button>'
+    +   '<button class="btn btn-danger btn-sm" onclick="purgerCacheLocalEtRecharger()" title="Supprime toute la base locale (IndexedDB) et recharge : force un rechargement 100% propre depuis le serveur. À utiliser si des lignes fantômes/doublons persistent en cache alors que le serveur est correct. Aucune donnée serveur n\'est supprimée.">🧹 Purger le cache local</button>'
     +   '<button class="btn btn-primary btn-sm" onclick="syncAllToSupabase()" '+(online?'':'disabled')+'>⬆️ Tout envoyer</button>'
     +   '<button class="btn btn-secondary btn-sm" onclick="syncFromSupabase()" '+(online?'':'disabled')+'>⬇️ Tout récupérer</button>'
     +   '<button class="btn btn-secondary btn-sm" onclick="(async function(){try{await flushSyncOutbox();}catch(e){}; renderSyncStatus();})()" '+(online&&outbox?'':'disabled')+'>🔁 Réessayer la file ('+outbox+')</button>'
@@ -27720,6 +27721,33 @@ function _pullCurseurSet(table, iso) {
     localStorage.setItem(PULL_CURSEURS_KEY, JSON.stringify(c));
   } catch(e){}
 }
+/* Purge TOTALE du cache local : supprime la base IndexedDB et recharge, pour
+   forcer un pull complet depuis le serveur. Sert quand des lignes fantômes
+   (issues d'un ancien import jamais tombstoné) persistent en cache local alors
+   que le serveur est propre — cas que « Resynchro complète » (reset curseur)
+   ne peut pas régler, faute de tombstone à appliquer. Ne touche à AUCUNE donnée
+   serveur. */
+async function purgerCacheLocalEtRecharger() {
+  if (!confirm('Purger TOUT le cache local (base IndexedDB) puis recharger ?\n\n• Toutes les données seront re-téléchargées depuis le serveur.\n• AUCUNE donnée serveur n\'est supprimée.\n\nAssurez-vous d\'être EN LIGNE et que la file d\'envoi est vide (sinon des saisies non synchronisées seraient perdues).')) return;
+  try {
+    try { await flushSyncOutbox(); } catch(e){}
+    try { if (db && db.close) db.close(); } catch(e){}
+    try {
+      Object.keys(localStorage).forEach(function(k){
+        if (/sync|curseur|cursor|pull|lastsync|outbox/i.test(k)) { try { localStorage.removeItem(k); } catch(_){} }
+      });
+    } catch(e){}
+    await new Promise(function(resolve){
+      var req = indexedDB.deleteDatabase(DB_NAME);
+      req.onsuccess = req.onerror = req.onblocked = function(){ resolve(); };
+      setTimeout(resolve, 3000);
+    });
+    location.reload();
+  } catch(e) {
+    alert('Échec de la purge automatique : ' + (e && e.message ? e.message : e) + '\n\nFaites-le manuellement : F12 → Application → Clear site data, puis rechargez.');
+  }
+}
+
 async function pullReinitialiserCurseurs() {
   try { localStorage.removeItem(PULL_CURSEURS_KEY); } catch(e){}
   PULL_INCR_INAPTES = {};
