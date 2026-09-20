@@ -3481,7 +3481,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="card">
             <div class="card-title">🧹 Audit &amp; correction des doublons d'importation</div>
             <div style="font-size:12px;color:var(--dim);margin-bottom:10px;">
-              Détecte les versements en double — même souscripteur et même montant — typiquement issus d'un import répété.
+              Détecte les versements en double — même souscripteur, même date exacte et même montant — typiquement issus d'un import répété.
+              Un même montant réglé à des dates différentes (ex. mensualités identiques) n'est pas considéré comme un doublon.
               Les versements importés sont signalés. Supprimez celui en trop : la suppression est propagée aux autres postes
               (pierre tombale) et le solde du souscripteur est recalculé.
             </div>
@@ -34609,8 +34610,13 @@ async function savePaiement() {
 }
 
 /* [Audit doublons] Détection & correction des versements dupliqués par
-   import. Un doublon = même souscripteur (client_id) + même montant + même
-   type. On priorise les groupes impliquant au moins un versement importé. */
+   import. Un doublon = même souscripteur (client_id) + même date exacte +
+   même montant + même type. Un souscripteur qui règle plusieurs fois le
+   même montant à des dates différentes est un cas normal (mensualités
+   identiques) — ce n'est PAS un doublon. En revanche, régler deux fois le
+   même montant le même jour est rare : c'est la signature typique d'un
+   import répété. On priorise les groupes impliquant au moins un versement
+   importé. */
 function _auditMontant(v){ return Math.round((parseFloat(v.montant)||0)); }
 function _auditEstImport(v){
   var id = String(v.id||'');
@@ -34633,8 +34639,8 @@ function renderAuditDoublons(){
   var groupes = {};
   (DATA.versements||[]).forEach(function(v){
     var m = _auditMontant(v);
-    if (!m) return;
-    var k = v.client_id + '|' + m + '|' + (v.type||'autre');
+    if (!m || !v.date) return;
+    var k = v.client_id + '|' + v.date + '|' + m + '|' + (v.type||'autre');
     (groupes[k] = groupes[k] || []).push(v);
   });
   var doublons = Object.keys(groupes).map(function(k){ return groupes[k]; })
@@ -34695,7 +34701,7 @@ function renderAuditDoublons(){
     return '<div class="card" style="margin-bottom:14px;border-left:3px solid #f59e0b;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
       + '<strong>'+nom+'</strong>'
-      + '<span>'+ (typeLbl[g[0].type]||g[0].type||'Autre') +' — <strong style="color:#f59e0b;">'+fmtF(_auditMontant(g[0]))+' FCFA</strong> × '+g.length+'</span>'
+      + '<span>'+ (typeLbl[g[0].type]||g[0].type||'Autre') +' — <strong style="color:#f59e0b;">'+fmtF(_auditMontant(g[0]))+' FCFA</strong> le <strong>'+escHtml(g[0].date||'—')+'</strong> × '+g.length+'</span>'
       + '<button class="btn btn-secondary btn-sm" onclick="auditSelectionnerGroupe('+idx+')">☑️ Sélectionner le surplus</button>'
       + '</div>'
       + '<table class="data-table" style="width:100%;"><thead><tr>'
