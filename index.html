@@ -3364,7 +3364,12 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <option value="montant_asc">Montant — croissant</option>
               </select>
             </div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin:0 0 8px;">
+              <input type="checkbox" id="filter-paiement-non-sync" onchange="filterPaiements()">
+              🔒 Non synchronisés uniquement
+            </label>
           </div>
+          <div id="paiements-sync-summary" style="font-size:12px;color:var(--blanc-dim);margin:-4px 0 10px;"></div>
           <div class="card">
             <div class="table-wrap">
               <table>
@@ -3377,6 +3382,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                     <th>Montant</th>
                     <th>Mode</th>
                     <th>Notes</th>
+                    <th>Synchro</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -34612,6 +34618,13 @@ function _auditEstImport(v){
   var n = (v.notes||v.reference||'') + '';
   return /import|liste\s*souscript|r[ée]conciliation/i.test(n);
 }
+
+/* [Sélection multiple] État de sélection pour la suppression groupée des
+   doublons d'importation — persiste (par id de versement) tant que l'onglet
+   reste affiché, pour survivre aux rafraîchissements du tableau. */
+window._auditDoublonsSelection = window._auditDoublonsSelection || {};
+window._auditDoublonsGroupesActuels = window._auditDoublonsGroupesActuels || [];
+
 function renderAuditDoublons(){
   var wrap = document.getElementById('audit-doublons-content');
   var kpis = document.getElementById('audit-doublons-kpis');
@@ -34628,6 +34641,15 @@ function renderAuditDoublons(){
     .filter(function(g){ return g.length >= 2; })
     .filter(function(g){ return !importOnly || g.some(_auditEstImport); });
   doublons.sort(function(a,b){ return _auditMontant(b[0]) - _auditMontant(a[0]); });
+  window._auditDoublonsGroupesActuels = doublons;
+
+  /* Nettoie la sélection des ids qui ne sont plus affichés (filtre changé,
+     doublon déjà résolu) pour que le compteur reste toujours exact. */
+  var idsAffiches = {};
+  doublons.forEach(function(g){ g.forEach(function(v){ idsAffiches[String(v.id||'')] = true; }); });
+  Object.keys(window._auditDoublonsSelection).forEach(function(id){
+    if (!idsAffiches[id]) delete window._auditDoublonsSelection[id];
+  });
 
   var nbGroupes = doublons.length;
   var nbSurplus = doublons.reduce(function(s,g){ return s + (g.length-1); }, 0);
@@ -34642,35 +34664,48 @@ function renderAuditDoublons(){
     return;
   }
   var typeLbl = { apport:'Apport', mensualite:'Mensualité', frais_souscription:'Frais souscription', regularisation:'Régularisation', autre:'Autre' };
-  var html = doublons.map(function(g){
+  var barreSelection = '<div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:10px 14px;border-left:3px solid var(--bleu);">'
+    + '<div style="font-size:13px;"><strong id="audit-dbl-sel-count">0</strong> sélectionné(s)<span id="audit-dbl-sel-montant"></span></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+    + '<button class="btn btn-secondary btn-sm" onclick="auditSelectionAutoDoublons()">☑️ Sélection auto (garder 1 par groupe)</button>'
+    + '<button class="btn btn-secondary btn-sm" onclick="auditDeselectionnerTout()">✕ Tout désélectionner</button>'
+    + '<button class="btn btn-danger btn-sm" onclick="auditSupprimerSelection()">🗑 Supprimer la sélection</button>'
+    + '</div></div>';
+  var html = doublons.map(function(g, idx){
     var c = DATA.clients.find(function(x){ return x.id===g[0].client_id; });
     var nom = c ? escHtml((c.nom+' '+c.prenoms).trim()) : '<em>souscripteur inconnu</em>';
     var lignes = g.slice().sort(function(a,b){ return (_auditEstImport(b)?1:0)-(_auditEstImport(a)?1:0); }).map(function(v){
       var imp = _auditEstImport(v);
+      var vid = String(v.id||'');
       var badge = imp
         ? '<span style="background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;padding:2px 8px;border-radius:6px;font-size:11px;">Import</span>'
         : '<span style="background:#10b98122;color:#34d399;border:1px solid #10b98155;padding:2px 8px;border-radius:6px;font-size:11px;">Manuel</span>';
+      var coche = window._auditDoublonsSelection[vid] ? ' checked' : '';
       return '<tr>'
+        + '<td style="text-align:center;"><input type="checkbox" class="audit-dbl-chk" data-id="'+escHtml(vid)+'" onchange="auditToggleSelect(this)"'+coche+'></td>'
         + '<td>'+badge+'</td>'
         + '<td>'+escHtml(v.date||'—')+'</td>'
         + '<td>'+escHtml(v.mode||'—')+'</td>'
         + '<td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escHtml((v.notes||v.reference||'')+'')+'">'+escHtml((v.notes||v.reference||'—')+'')+'</td>'
-        + '<td style="font-family:monospace;font-size:11px;color:var(--blanc-dim);">'+escHtml(String(v.id||''))+'</td>'
-        + '<td style="text-align:right;"><button class="btn btn-danger btn-sm" onclick="auditSupprimerDoublon(\''+String(v.id||'').replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'")+'\')">🗑 Supprimer</button></td>'
+        + '<td style="font-family:monospace;font-size:11px;color:var(--blanc-dim);">'+escHtml(vid)+'</td>'
+        + '<td>'+_badgeSyncVersement(v)+'</td>'
+        + '<td style="text-align:right;"><button class="btn btn-danger btn-sm" onclick="auditSupprimerDoublon(\''+vid.replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'")+'\')">🗑 Supprimer</button></td>'
         + '</tr>';
     }).join('');
     return '<div class="card" style="margin-bottom:14px;border-left:3px solid #f59e0b;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
       + '<strong>'+nom+'</strong>'
       + '<span>'+ (typeLbl[g[0].type]||g[0].type||'Autre') +' — <strong style="color:#f59e0b;">'+fmtF(_auditMontant(g[0]))+' FCFA</strong> × '+g.length+'</span>'
+      + '<button class="btn btn-secondary btn-sm" onclick="auditSelectionnerGroupe('+idx+')">☑️ Sélectionner le surplus</button>'
       + '</div>'
       + '<table class="data-table" style="width:100%;"><thead><tr>'
-      + '<th>Origine</th><th>Date</th><th>Mode</th><th>Notes</th><th>ID</th><th style="text-align:right;">Action</th>'
+      + '<th></th><th>Origine</th><th>Date</th><th>Mode</th><th>Notes</th><th>ID</th><th>Synchro</th><th style="text-align:right;">Action</th>'
       + '</tr></thead><tbody>'+lignes+'</tbody></table>'
-      + '<div style="font-size:12px;color:var(--blanc-dim);margin-top:6px;">Conservez une ligne, supprimez les autres.</div>'
+      + '<div style="font-size:12px;color:var(--blanc-dim);margin-top:6px;">Conservez une ligne, supprimez les autres — cochez les lignes en trop puis « Supprimer la sélection », ou traitez-les une à une. Vérifiez la colonne Synchro : évitez de ne garder qu\'une ligne « 📴 Local uniquement ».</div>'
       + '</div>';
   }).join('');
-  wrap.innerHTML = html;
+  wrap.innerHTML = barreSelection + html;
+  _auditRefreshSelectionBar();
 }
 function _auditKpi(label, valeur, couleur){
   return '<div class="card" style="text-align:center;padding:14px;border-top:3px solid '+couleur+';">'
@@ -34682,7 +34717,118 @@ async function auditSupprimerDoublon(id){
   if (typeof deleteVersement === 'function'){
     await deleteVersement(id);
   }
+  delete window._auditDoublonsSelection[String(id)];
   if (typeof renderAuditDoublons === 'function') renderAuditDoublons();
+}
+
+/* Coche/décoche une ligne et met à jour le compteur sans redessiner tout
+   le tableau (conserve la position de scroll pendant la sélection). */
+function auditToggleSelect(cb){
+  var id = cb.getAttribute('data-id');
+  if (cb.checked) window._auditDoublonsSelection[id] = true;
+  else delete window._auditDoublonsSelection[id];
+  _auditRefreshSelectionBar();
+}
+function _auditRefreshSelectionBar(){
+  var ids = Object.keys(window._auditDoublonsSelection);
+  var countEl = document.getElementById('audit-dbl-sel-count');
+  var montantEl = document.getElementById('audit-dbl-sel-montant');
+  if (countEl) countEl.textContent = ids.length;
+  if (montantEl){
+    var total = 0;
+    ids.forEach(function(id){
+      var v = (DATA.versements||[]).find(function(x){ return String(x.id)===id; });
+      if (v) total += (parseFloat(v.montant)||0);
+    });
+    montantEl.textContent = ids.length ? (' — ' + fmtF(total) + ' FCFA') : '';
+  }
+}
+/* Sélectionne le « surplus » d'un groupe (tout sauf une ligne à conserver) :
+   priorité à la conservation d'une ligne saisie manuellement si le groupe en
+   contient une, sinon la première ligne affichée est conservée. */
+function auditSelectionnerGroupe(idx){
+  var g = (window._auditDoublonsGroupesActuels||[])[idx];
+  if (!g || !g.length) return;
+  var tri = g.slice().sort(function(a,b){ return (_auditEstImport(a)?1:0)-(_auditEstImport(b)?1:0); });
+  for (var i=1;i<tri.length;i++){ window._auditDoublonsSelection[String(tri[i].id)] = true; }
+  renderAuditDoublons();
+}
+function auditSelectionAutoDoublons(){
+  (window._auditDoublonsGroupesActuels||[]).forEach(function(g, idx){
+    if (!g || g.length<2) return;
+    var tri = g.slice().sort(function(a,b){ return (_auditEstImport(a)?1:0)-(_auditEstImport(b)?1:0); });
+    for (var i=1;i<tri.length;i++){ window._auditDoublonsSelection[String(tri[i].id)] = true; }
+  });
+  renderAuditDoublons();
+}
+function auditDeselectionnerTout(){
+  window._auditDoublonsSelection = {};
+  renderAuditDoublons();
+}
+/* Suppression groupée : une seule confirmation pour tout le lot (plutôt
+   qu'une popup par ligne), puis appel de deleteVersement en mode silencieux
+   pour chaque id sélectionné — conserve toute la cascade existante
+   (écritures, commissions, paiement en ligne lié). */
+async function auditSupprimerSelection(){
+  var ids = Object.keys(window._auditDoublonsSelection);
+  if (!ids.length){ toast('Aucun versement sélectionné.', 'error'); return; }
+  if (!exigerDroit('Paiements', 's', 'la suppression groupée de doublons')) return;
+  if (!confirm('Supprimer définitivement ' + ids.length + ' versement(s) sélectionné(s) ?\nCette action est irréversible et sera propagée aux écritures et commissions liées.')) return;
+  var ok = 0, ko = 0;
+  for (var i=0;i<ids.length;i++){
+    try { await deleteVersement(ids[i], true); ok++; }
+    catch(e){ ko++; }
+  }
+  window._auditDoublonsSelection = {};
+  renderAuditDoublons();
+  toast(ok + ' versement(s) supprimé(s)' + (ko ? (' · ' + ko + ' échec(s)') : '') + '.', ko ? 'error' : 'success');
+}
+
+/* [Sécurité] État de synchronisation cloud d'un versement — combine les
+   trois files possibles avant de conclure qu'un enregistrement est
+   confirmé en base Supabase :
+   1) _dirtySync : modification locale en attente du prochain cycle d'envoi
+      (toutes les 30 s) ;
+   2) outbox (localStorage, persiste au rechargement) : échec réseau/hors
+      ligne, rejoué automatiquement à la reconnexion ;
+   3) quarantaine : rejet définitif par le cloud (erreur de données),
+      conservé pour audit mais qui ne repart plus tout seul.
+   Un versement présent dans l'une de ces files n'existe QUE dans
+   l'IndexedDB de cet appareil : il serait perdu en cas de purge du cache
+   local ou de panne avant la prochaine synchro réussie — d'où l'intérêt,
+   par mesure de sécurité, de le signaler clairement avant toute action
+   (notamment une suppression depuis l'audit des doublons). */
+function versementNonSynchronise(v){
+  if (!v || v.id === undefined) return false;
+  var id = String(v.id);
+  if (typeof _dirtySync !== 'undefined' && _dirtySync['versements|' + id]) return true;
+  var outbox = (typeof _outboxRead === 'function') ? (_outboxRead()||[]) : [];
+  if (outbox.some(function(e){ return e && e.table === 'pi_versements' && String(e.id) === id; })) return true;
+  var quar = (typeof _quarRead === 'function') ? (_quarRead()||[]) : [];
+  if (quar.some(function(e){ return e && e.table === 'pi_versements' && String(e.id) === id; })) return true;
+  return false;
+}
+function _badgeSyncVersement(v){
+  return versementNonSynchronise(v)
+    ? '<span title="Pas encore confirmé en base cloud — existe uniquement en local sur cet appareil." style="background:#ef444422;color:#f87171;border:1px solid #ef444455;padding:2px 8px;border-radius:6px;font-size:11px;white-space:nowrap;">📴 Local uniquement</span>'
+    : '<span title="Confirmé synchronisé avec la base cloud Supabase." style="background:#10b98122;color:#34d399;border:1px solid #10b98155;padding:2px 8px;border-radius:6px;font-size:11px;white-space:nowrap;">☁️ En base</span>';
+}
+/* Résumé global affiché au-dessus du tableau — porte toujours sur
+   l'ensemble des versements (indépendant des filtres actifs), car c'est un
+   indicateur de sécurité et non une donnée de consultation courante. */
+function _majResumeSyncPaiements(){
+  var host = document.getElementById('paiements-sync-summary');
+  if (!host) return;
+  var tous = DATA.versements || [];
+  var nonSync = tous.filter(versementNonSynchronise);
+  if (!tous.length) { host.innerHTML = ''; return; }
+  if (!nonSync.length) {
+    host.innerHTML = '<span style="color:#34d399;">✅ Les ' + tous.length + ' versement(s) sont confirmés en base cloud.</span>';
+    return;
+  }
+  var montant = nonSync.reduce(function(s,v){ return s + (parseFloat(v.montant)||0); }, 0);
+  host.innerHTML = '<span style="color:#f87171;">📴 ' + nonSync.length + ' versement(s) sur ' + tous.length
+    + ' existent uniquement en local (' + fmtF(montant) + ' FCFA) — non encore confirmés en base cloud.</span>';
 }
 
 function renderVersements() {
@@ -34692,6 +34838,9 @@ function renderVersements() {
   var montantMin = parseFloat((document.getElementById('filter-paiement-montant-min')||{}).value) || null;
   var montantMax = parseFloat((document.getElementById('filter-paiement-montant-max')||{}).value) || null;
   var tri = (document.getElementById('filter-paiement-tri')||{}).value || 'date_desc';
+  var nonSyncOnly = !!(document.getElementById('filter-paiement-non-sync')||{}).checked;
+
+  _majResumeSyncPaiements();
 
   var list = DATA.versements.filter(function(v) {
     var client = DATA.clients.find(function(c) { return c.id === v.client_id; });
@@ -34701,7 +34850,8 @@ function renderVersements() {
     var matchMois = !filterMois || (v.date && v.date.startsWith(filterMois));
     var montant = parseFloat(v.montant) || 0;
     var matchMontant = (montantMin===null || montant >= montantMin) && (montantMax===null || montant <= montantMax);
-    return matchSearch && matchMode && matchMois && matchMontant;
+    var matchSync = !nonSyncOnly || versementNonSynchronise(v);
+    return matchSearch && matchMode && matchMois && matchMontant && matchSync;
   });
 
   /* [Tri] Même modèle que le module Souscripteurs — appliqué après le
@@ -34721,7 +34871,7 @@ function renderVersements() {
 
   var tbody = document.getElementById('tbody-versements');
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun versement</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun versement</td></tr>';
     return;
   }
 
@@ -34738,6 +34888,7 @@ function renderVersements() {
       + '<td style="color:var(--vert);font-weight:bold;">+' + fcfa(v.montant) + '</td>'
       + '<td>' + (modeLabels[v.mode] || v.mode) + '</td>'
       + '<td style="font-size:12px;color:var(--blanc-dim);">' + (v.notes || '—') + '</td>'
+      + '<td>' + _badgeSyncVersement(v) + '</td>'
       + '<td style="white-space:nowrap;">'
       + '<button class="btn btn-secondary btn-sm btn-icon" onclick="editVersement(\'' + v.id + '\')" title="Modifier">✎</button> '
       + '<button class="btn btn-secondary btn-sm btn-icon" onclick="showRecu(DATA.versements.find(function(x){return x.id===\'' + v.id + '\';}))" title="Reçu">🖨️</button> '
@@ -34748,13 +34899,16 @@ function renderVersements() {
 
 function filterPaiements() { renderVersements(); }
 
-async function deleteVersement(id) {
+async function deleteVersement(id, skipConfirm) {
   /* Vérification explicite en plus du filet de deleteRecord (défense en
      profondeur, même pattern que les validations Budget/Caisse) : message
      clair immédiatement, avant même la confirmation, plutôt que de laisser
-     échouer silencieusement après un "OK" de l'utilisateur. */
+     échouer silencieusement après un "OK" de l'utilisateur.
+     skipConfirm=true : utilisé par la suppression groupée de doublons
+     (auditSupprimerSelection), qui affiche une seule confirmation globale
+     avant la boucle plutôt qu'une confirmation par ligne. */
   if (!exigerDroit('Paiements', 's', 'la suppression de ce versement')) return;
-  if (!confirm('Supprimer ce versement ?')) return;
+  if (!skipConfirm && !confirm('Supprimer ce versement ?')) return;
   var v = DATA.versements.find(function(x){ return x.id === id; });
   var clientId = v ? v.client_id : null;
   await logAudit('versements', id, 'delete', v || null, null);
