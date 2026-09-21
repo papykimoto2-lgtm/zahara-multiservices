@@ -33169,6 +33169,7 @@ async function resilierConfirmer(){
 
   closeModal('modal-resiliation');
   renderClients(); if (typeof renderLots==='function') renderLots();
+  if (typeof renderRegistreDesistements === 'function') renderRegistreDesistements();
   refreshDashboard();
   toast('Souscription résiliée — '+fcfa(rembourse)+' à rembourser, '+fcfa(retenu)+' retenu, '+lotIds.length+' lot(s) libéré(s) pour réattribution.', 'success');
   resilierImprimerDecompte(clientId);
@@ -58460,6 +58461,7 @@ async function resilierConfirmerRemboursement(){
 
   closeModal('modal-resiliation-remb');
   renderClients();
+  if (typeof renderRegistreDesistements === 'function') renderRegistreDesistements();
   toast('✅ Remboursement de '+fcfa(montant)+' enregistré et comptabilisé.', 'success');
 }
 
