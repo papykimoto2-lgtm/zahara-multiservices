@@ -1,17 +1,36 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Edge Function : staff-login — ZAHARA MULTISERVICES (v8)
+// Edge Function : staff-login — ZAHARA MULTISERVICES (v9)
 //
-// [FIX v8 — IDENTIFIANT SENSIBLE À LA CASSE]
+// [FIX v9 — RÉGRESSION CRITIQUE DU FIX v8 : PRESQUE PLUS PERSONNE NE POUVAIT
+//  SE CONNECTER]
+// v8 forçait l'identifiant reçu en minuscules puis le comparait par égalité
+// stricte (.eq) à pi_users.login — en supposant, à tort, que les comptes y
+// sont enregistrés en minuscules. Vérifié en base : c'est l'inverse. La
+// quasi-totalité des comptes réels sont en MAJUSCULES ("KESSIE", "AKOU",
+// "DIOMANDE", "KOFFI", "WASSA"...) ; seuls quelques-uns ("patrice", "aabel",
+// "carine", "trasky") sont en minuscules. En forçant l'entrée en minuscules,
+// v8 a donc cassé la connexion de PRESQUE TOUS LES COMPTES — pour corriger
+// celle d'un seul ("patrice"), signalé le jour même. Incident total
+// immédiatement rapporté : "plus aucun mot de passe et login ne passe".
+//
+// Corrigé en comparant réellement SANS CASSE (ILIKE, motif échappé — un
+// identifiant ne contient légitimement aucun des caractères spéciaux % _ \
+// qu'ILIKE interprète) au lieu de forcer une casse d'un côté et d'en
+// supposer une autre de l'autre. Aucune réécriture des logins existants
+// n'est nécessaire : la comparaison s'adapte à leur casse réelle, quelle
+// qu'elle soit — "Patrice", "PATRICE" et "patrice" désignent désormais tous
+// le même compte, sans qu'aucun compte majuscule n'en pâtisse.
+//
+// [FIX v8 — IDENTIFIANT SENSIBLE À LA CASSE, cause du symptôme initial]
 // .eq("login", login) est une égalité stricte Postgres : un compte enregistré
-// "patrice" (minuscules, cas normal côté client — voir createUserFromModal)
-// refusait toute saisie "Patrice" ou "PATRICE", pourtant le réflexe naturel
-// pour taper un prénom. Incident réel : mot de passe réinitialisé par un
-// administrateur, test de connexion immédiat avec le nouveau mot de passe
-// échoué — l'identifiant tapé avec une majuscule ne correspondait à aucune
-// ligne ("Identifiant introuvable"), sans rapport avec le mot de passe.
-// Normalisé ici en minuscules, comme côté client (doLogin,
-// fetchUserFromCloud, createUserFromModal) : les deux se rejoignent
-// désormais toujours, quelle que soit la casse saisie à la connexion.
+// "patrice" (minuscules) refusait toute saisie "Patrice" ou "PATRICE",
+// pourtant le réflexe naturel pour taper un prénom. Incident réel : mot de
+// passe réinitialisé par un administrateur, test de connexion immédiat avec
+// le nouveau mot de passe échoué — l'identifiant tapé avec une majuscule ne
+// correspondait à aucune ligne ("Identifiant introuvable"), sans rapport
+// avec le mot de passe. Le PRINCIPE (comparer sans casse) était le bon ; son
+// IMPLÉMENTATION (forcer une casse supposée) a produit la régression ci-
+// dessus, corrigée en v9.
 //
 // [FIX v7 — DOUBLONS DE LOGIN CASSAIENT TOUTE AUTHENTIFICATION]
 // pi_users contient des doublons (jusqu'à 10 lignes pour login="KESSIE",
@@ -119,16 +138,29 @@ Deno.serve(async (req) => {
     login = body.login || "";
     password = body.password || body.motdepasse || "";
   } catch { return json({ ok: false, error: "payload" }, 400); }
-  login = (login || "").trim().toLowerCase();
+  login = (login || "").trim();
   if (!login || !password) return json({ ok: false, error: "champs" }, 400);
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
   const since = new Date(Date.now() - ATTEMPT_WINDOW_MIN * 60 * 1000).toISOString();
 
+  /* [FIX v9 — RÉGRESSION DU FIX v8] v8 forçait login en minuscules puis
+     comparait par égalité stricte (.eq) — casse en pi_users.login vérifiée :
+     la QUASI-TOTALITÉ des comptes existants sont en MAJUSCULES ("KESSIE",
+     "AKOU", "DIOMANDE"...), quelques-uns seulement en minuscules ("patrice").
+     Comparer une entrée forcée en minuscules à une colonne majoritairement
+     en majuscules ne correspond donc PLUS JAMAIS : v8 a cassé la connexion
+     de PRESQUE TOUS les comptes pour corriger celle d'un seul. Corrigé en
+     comparant réellement sans casse (ILIKE, motif échappé — % _ \ n'ont pas
+     de sens dans un identifiant) au lieu de forcer une casse côté serveur
+     ET de supposer une casse côté données. Aucune réécriture des logins
+     existants n'est nécessaire : la comparaison s'adapte à eux. */
+  const loginIlike = login.replace(/[%_\\]/g, (c) => "\\" + c);
+
   // ── Anti-brute-force : uniquement les échecs vérifiés par CETTE fonction ──
   const { count } = await db.from("pi_logs_connexion")
     .select("id", { count: "exact", head: true })
-    .eq("data->>login", login)
+    .ilike("data->>login", loginIlike)
     .eq("data->>success", "false")
     .eq("data->>src", "srv")
     .gte("data->>date", since);
@@ -150,7 +182,7 @@ Deno.serve(async (req) => {
   // (erreur PGRST116 jamais vérifiée, silencieusement traitée comme "pas
   // trouvé"). On récupère toutes les lignes et on essaie le mot de passe
   // contre chacune — les comptes actifs d'abord.
-  const { data: candidats } = await db.from("pi_users").select("*").eq("login", login);
+  const { data: candidats } = await db.from("pi_users").select("*").ilike("login", loginIlike);
   if (!candidats || candidats.length === 0) {
     await logFail("Identifiant introuvable");
     return json({ ok: false, error: "invalide" }, 401);
