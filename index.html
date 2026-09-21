@@ -25319,7 +25319,12 @@ function getSBConfig() {
 /* Récupère un utilisateur partagé depuis Supabase par identifiant (auth multi-appareils) */
 async function fetchUserFromCloud(login) {
   if (!SB.url || !SB.key || !navigator.onLine) return null;
-  login = (login || '').toLowerCase();  /* [FIX] même normalisation que doLogin/createUserFromModal — sinon un appelant qui n'aurait pas déjà mis en minuscules ne trouverait jamais le compte. */
+  login = (login || '').trim();
+  /* [FIX v9 — RÉGRESSION] Forcer `login` en minuscules puis comparer par
+     eq.<login> ne trouvait plus les comptes enregistrés en majuscules — la
+     quasi-totalité du parc réel ("KESSIE", "AKOU"...). Remplacé par ilike.
+     (motif échappé : % _ n'ont pas de sens dans un identifiant). */
+  var loginIlike = login.replace(/[%_]/g, function(c){ return '\\' + c; });
   try {
     /* [FIX connexion aléatoire] Sans ORDER BY, 'limit=1' renvoie une ligne au
        choix de Postgres — non déterministe — dès qu'un même login existe en
@@ -25332,7 +25337,7 @@ async function fetchUserFromCloud(login) {
        gagne" déjà appliquée juste après par doLogin(). Ne résout pas les
        doublons existants (à nettoyer côté Paramètres → Utilisateurs), mais
        rend le comportement stable au lieu d'aléatoire en attendant. */
-    var rows = await sbFetch('pi_users?login=eq.' + encodeURIComponent(login) + '&select=*&order=updated_at.desc.nullslast&limit=1', 'GET');
+    var rows = await sbFetch('pi_users?login=ilike.' + encodeURIComponent(loginIlike) + '&select=*&order=updated_at.desc.nullslast&limit=1', 'GET');
     return (rows && rows.length) ? rows[0] : null;
   } catch (e) { return null; }
 }
@@ -28681,13 +28686,17 @@ function toggleLoginPass() {
 async function doLogin() {
   var errEl  = document.getElementById('login-error');
   var warnEl = document.getElementById('login-attempts-warning');
-  /* [FIX] Identifiant comparé partout (cache local, cloud, Edge Function)
-     par égalité stricte, sensible à la casse — un identifiant enregistré en
-     minuscules (cas normal, cf. createUserFromModal) refusait donc toute
-     saisie avec une majuscule, y compris un simple prénom tapé comme on
-     l'écrit naturellement ("Patrice"). Normalisé ici en minuscules, comme à
-     la création du compte : les deux se rejoignent désormais toujours. */
-  var u = document.getElementById('login-user').value.trim().toLowerCase();
+  /* [FIX v9 — RÉGRESSION DU FIX PRÉCÉDENT] Le fix précédent forçait `u` en
+     minuscules puis comparait par égalité stricte à x.login — en supposant
+     à tort que les comptes existants sont enregistrés en minuscules.
+     Vérifié en base : la quasi-totalité sont en MAJUSCULES ("KESSIE",
+     "AKOU", "DIOMANDE"...) ; quelques-uns seulement en minuscules
+     ("patrice"). Forcer l'entrée en minuscules cassait donc la connexion de
+     PRESQUE TOUS les comptes pour corriger celle d'un seul. `u` n'est plus
+     recasé ici : chaque comparaison ci-dessous (locale, cloud, Edge
+     Function) est désormais insensible à la casse par elle-même — aucune
+     casse n'est supposée nulle part, ni côté saisie ni côté données. */
+  var u = document.getElementById('login-user').value.trim();
   var p = document.getElementById('login-pass').value;
 
   errEl.style.display  = 'none';  errEl.textContent  = '';
@@ -28711,7 +28720,8 @@ async function doLogin() {
   }
 
   // ── Recherche de l'utilisateur (version la plus récente prioritaire) ──
-  var user = DATA.users.find(function(x){ return x.login === u; });
+  /* Comparaison insensible à la casse — voir la note sur `u` ci-dessus. */
+  var user = DATA.users.find(function(x){ return x.login && x.login.toLowerCase() === u.toLowerCase(); });
   var cloudUser = await fetchUserFromCloud(u);
   if (cloudUser) {
     /* Ne remplacer la version locale que si le cloud est réellement plus récent.
