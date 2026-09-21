@@ -3171,6 +3171,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <button class="tab-btn active" onclick="switchTab('clients','liste')">📋 Liste</button>
           <button class="tab-btn" onclick="switchTab('clients','dashboard')">📊 Tableau de bord</button>
           <button class="tab-btn" onclick="switchTab('clients','doublons')" title="Détecte les souscripteurs potentiellement saisis en double (nom, téléphone, email, pièce d'identité, n° de dossier) et les numéros de téléphone invalides">🧬 Doublons &amp; fiches invalides</button>
+          <button class="tab-btn" onclick="switchTab('clients','desistements')" title="Souscripteurs résiliés — décompte et suivi du remboursement">🚫 Désistements <span class="nav-badge" id="badge-tab-desistements" style="display:none;position:static;margin-left:4px;">0</span></button>
         </div>
 
         <div class="tab-pane active" id="tab-clients-liste">
@@ -3272,6 +3273,18 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div id="clients-doublons-content"></div>
         </div>
         <!-- /tab-clients-doublons -->
+
+        <div class="tab-pane" id="tab-clients-desistements">
+          <div class="card" style="margin-bottom:16px;padding:14px 16px;">
+            <div style="font-size:12px;color:var(--blanc-dim);line-height:1.6;">
+              🚫 Tous les souscripteurs résiliés (désistement ou faute du promoteur) — décompte, lot(s) libéré(s) et suivi du remboursement.
+              Chaque décompte reste imprimable, et un remboursement non encore effectué est signalé jusqu'à ce qu'il soit enregistré.
+            </div>
+          </div>
+          <div id="clients-desistements-kpi" class="kpi-grid" style="margin-bottom:16px;"></div>
+          <div id="clients-desistements-content"></div>
+        </div>
+        <!-- /tab-clients-desistements -->
       </div>
 
       <!-- ── PAIEMENTS ─────────────────────────────── -->
@@ -29490,6 +29503,7 @@ function switchTab(context, tab) {
   }
   if (context === 'clients' && tab === 'doublons' && typeof renderClientsDoublons === 'function') renderClientsDoublons();
   if (context === 'clients' && tab === 'dashboard' && typeof renderClientsDashboard === 'function') renderClientsDashboard();
+  if (context === 'clients' && tab === 'desistements' && typeof renderClientsDesistements === 'function') renderClientsDesistements();
 
   /* Mettre à jour les boutons .tab-btn du même contexte */
   document.querySelectorAll('.tab-btn').forEach(function(b) {
@@ -32947,6 +32961,7 @@ async function resilierConfirmer(){
 
   closeModal('modal-resiliation');
   renderClients(); if (typeof renderLots==='function') renderLots();
+  if (typeof renderClientsDesistements === 'function') renderClientsDesistements();
   refreshDashboard();
   toast('Souscription résiliée — '+fcfa(rembourse)+' à rembourser, '+fcfa(retenu)+' retenu, '+lotIds.length+' lot(s) libéré(s) pour réattribution.', 'success');
   resilierImprimerDecompte(clientId);
@@ -57699,7 +57714,71 @@ async function resilierConfirmerRemboursement(){
 
   closeModal('modal-resiliation-remb');
   renderClients();
+  if (typeof renderClientsDesistements === 'function') renderClientsDesistements();
   toast('✅ Remboursement de '+fcfa(montant)+' enregistré et comptabilisé.', 'success');
+}
+
+/* ── Onglet Souscripteurs → Désistements : tous les résiliés, décompte et
+   suivi du remboursement en un seul endroit (au lieu de les retrouver un
+   par un via le filtre Statut de l'onglet Liste). ─────────────────────── */
+function renderClientsDesistements() {
+  var box = document.getElementById('clients-desistements-content');
+  var kpiBox = document.getElementById('clients-desistements-kpi');
+  if (!box) return;
+  var liste = (DATA.clients || []).filter(function(c){ return c && c.resiliation; })
+    .sort(function(a,b){ return (b.resiliation.date||'').localeCompare(a.resiliation.date||''); });
+
+  var badge = document.getElementById('badge-tab-desistements');
+  var enAttente = liste.filter(function(c){ return !c.resiliation.rembourse && (c.resiliation.montant_rembourse||0) > 0; }).length;
+  if (badge) { badge.textContent = enAttente; badge.style.display = enAttente ? 'inline-block' : 'none'; }
+
+  if (kpiBox) {
+    var totalRembourse = liste.reduce(function(s,c){ return s + (c.resiliation.montant_rembourse||0); }, 0);
+    var totalRetenu = liste.reduce(function(s,c){ return s + (c.resiliation.montant_retenu||0); }, 0);
+    var totalAttente = liste.filter(function(c){ return !c.resiliation.rembourse; })
+      .reduce(function(s,c){ return s + (c.resiliation.montant_rembourse||0); }, 0);
+    kpiBox.innerHTML =
+      '<div class="kpi-card" data-icon="🚫"><div class="kpi-label">Désistements</div><div class="kpi-value">'+liste.length+'</div><div class="kpi-delta">dossier(s)</div></div>'
+      + '<div class="kpi-card" data-icon="⏳"><div class="kpi-label">Remboursements en attente</div><div class="kpi-value" style="color:var(--rouge);">'+fcfa(totalAttente)+'</div><div class="kpi-delta">'+enAttente+' dossier(s)</div></div>'
+      + '<div class="kpi-card" data-icon="✅"><div class="kpi-label">Total remboursé</div><div class="kpi-value">'+fcfa(totalRembourse)+'</div></div>'
+      + '<div class="kpi-card" data-icon="🏦"><div class="kpi-label">Total retenu (produit)</div><div class="kpi-value or">'+fcfa(totalRetenu)+'</div></div>';
+  }
+
+  if (!liste.length) {
+    box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:24px;">Aucun désistement enregistré pour l\'instant.</div>';
+    return;
+  }
+
+  var html = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>'
+    + '<th>Dossier</th><th>Souscripteur</th><th>Date</th><th>Motif</th>'
+    + '<th style="text-align:right;">Versé</th><th style="text-align:right;">Remboursé</th><th style="text-align:right;">Retenu</th>'
+    + '<th>Remboursement</th><th></th></tr></thead><tbody>';
+  liste.forEach(function(c){
+    var r = c.resiliation;
+    var motifLbl = r.motif === 'faute_promoteur' ? 'Faute du promoteur (100%)' : 'Désistement du souscripteur (60%)';
+    var statutRemb = r.montant_rembourse <= 0
+      ? '<span class="badge badge-neutre">Rien à rembourser</span>'
+      : (r.rembourse
+          ? '<span class="badge" style="color:var(--vert);">✅ Remboursé le '+dateShort(r.rembourse_le)+'</span>'
+          : '<span class="badge" style="color:var(--rouge);">⏳ À rembourser</span>');
+    var actions = '<button class="btn btn-secondary btn-sm btn-icon" title="Imprimer le décompte" onclick="resilierImprimerDecompte(\''+c.id+'\')">🖨️</button>';
+    if (r.montant_rembourse > 0 && !r.rembourse) {
+      actions += ' <button class="btn btn-primary btn-sm" onclick="resilierOuvrirRemboursement(\''+c.id+'\')">💰 Enregistrer le remboursement</button>';
+    }
+    html += '<tr>'
+      + '<td>'+escHtml(c.dossier||'—')+'</td>'
+      + '<td>'+escHtml(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</td>'
+      + '<td>'+dateShort(r.date)+'</td>'
+      + '<td style="font-size:11px;">'+motifLbl+'</td>'
+      + '<td style="text-align:right;">'+fcfa(r.montant_verse||0)+'</td>'
+      + '<td style="text-align:right;font-weight:700;">'+fcfa(r.montant_rembourse||0)+'</td>'
+      + '<td style="text-align:right;color:var(--blanc-dim);">'+fcfa(r.montant_retenu||0)+'</td>'
+      + '<td>'+statutRemb+'</td>'
+      + '<td style="white-space:nowrap;">'+actions+'</td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  box.innerHTML = html;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
