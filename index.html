@@ -124092,7 +124092,15 @@ async function caisseTransfererFonds() {
   if (!sessionSource) { toast('La caisse source a été clôturée entre-temps.', 'error'); closeModal('modal-caisse-transfert'); return; }
   if (!sessionDest) { toast('La caisse de destination a été clôturée entre-temps.', 'error'); closeModal('modal-caisse-transfert'); return; }
   if (!caisseSessionEstOperable(sessionSource)) { toast('🔒 Caisse source désormais tenue par un(e) autre utilisateur(rice).', 'error'); return; }
-  if (!caisseSessionEstOperable(sessionDest)) { toast('🔒 Caisse de destination désormais tenue par un(e) autre utilisateur(rice).', 'error'); return; }
+  /* [FIX] L'exclusivité opérateur ne s'applique qu'à la caisse SOURCE, dont
+     l'auteur retire physiquement des fonds. La caisse de destination est
+     presque toujours tenue par sa propre titulaire, pas par l'auteur du
+     transfert : exiger qu'il/elle en soit aussi l'opérateur bloquait donc
+     tout transfert entre deux caisses distinctes, dans la quasi-totalité
+     des cas. Le bon créé côté destination n'est qu'une proposition en
+     attente de validation (requiert_validation: true) — ce n'est pas une
+     saisie « au nom » de la titulaire, qui garde la main pour le valider
+     ou le rejeter. */
 
   var soldeSource = caisseSoldeSession(sessionSource);
   if (montant > soldeSource) {
@@ -124312,9 +124320,16 @@ async function reapSupprimer(id) {
 }
 
 /* Versement effectif : crée le bon d'entrée dans la caisse destinataire.
-   Exige une session ouverte ET opérable — un mouvement sans session n'a
-   pas de brouillard où atterrir, et une caisse tenue par quelqu'un d'autre
-   ne doit pas être mouvementée dans son dos. */
+   Exige une session ouverte — un mouvement sans session n'a pas de
+   brouillard où atterrir.
+   [FIX] N'exige PLUS que le servant soit l'opérateur de CETTE session : le
+   réapprovisionnement est par nature servi par quelqu'un d'autre que la
+   titulaire de la caisse (trésorerie/DAF central, pas la caissière de
+   division) — exiger l'exclusivité opérateur ici bloquait donc la quasi-
+   totalité des versements, y compris une demande déjà validée par la
+   hiérarchie. Le bon créé reste une proposition en attente de validation
+   (requiert_validation: true) : la titulaire garde la main pour la valider
+   ou la rejeter, ce n'est pas une saisie faite « dans son dos ». */
 async function reapServir(id) {
   var d = (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }); if (!d) return;
   if (!exigerDroit('Caisse', 'c', 'le versement de cette demande de réapprovisionnement')) return;
@@ -124323,9 +124338,6 @@ async function reapServir(id) {
   if (!caisse) { toast('Caisse introuvable — elle a peut-être été supprimée depuis la demande.', 'error'); return; }
   var session = caisseGetSessionOuverte(d.caisse_id);
   if (!session) { toast('🔒 La caisse « ' + (caisse.nom||'') + ' » est fermée — ouvrez-la avant de servir la demande.', 'error', 6000); return; }
-  if (typeof caisseSessionEstOperable === 'function' && !caisseSessionEstOperable(session)) {
-    toast('🔒 Cette caisse est actuellement tenue par un(e) autre utilisateur(rice).', 'error'); return;
-  }
   var montant = parseFloat(d.montant_accorde) || 0;
   if (!(montant > 0)) { toast('Montant accordé invalide.', 'error'); return; }
   if (!confirm('Verser ' + fmtF(montant) + ' FCFA dans la caisse « ' + (caisse.nom||'') + ' » ?\n\nUn bon d\'entrée sera créé et suivra le circuit de validation habituel de la caisse.')) return;
