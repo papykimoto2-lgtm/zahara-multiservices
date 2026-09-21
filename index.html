@@ -12386,7 +12386,10 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div class="card-title" style="margin-bottom:2px;">🏦 Demandes de réapprovisionnement de fonds</div>
                 <div style="font-size:11px;color:var(--dim);">Circuit : brouillon → soumise → validée par la hiérarchie → servie (entrée en caisse). Le montant accordé peut être inférieur au montant demandé.</div>
               </div>
-              <button class="btn btn-primary btn-sm" onclick="reapOuvrirModal(null)">➕ Nouvelle demande</button>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-secondary btn-sm" onclick="openModal('modal-reappro-flux')" title="Voir le circuit de validation, étape par étape">ℹ️ Comment ça marche</button>
+                <button class="btn btn-primary btn-sm" onclick="reapOuvrirModal(null)">➕ Nouvelle demande</button>
+              </div>
             </div>
             <div id="caisse-reappro-box" style="margin-top:12px;"></div>
           </div>
@@ -131177,6 +131180,101 @@ goTo = function(page) {
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-reappro')">Annuler</button>
       <button class="btn btn-primary" onclick="reapSauver()">💾 Enregistrer le brouillon</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : schéma du circuit de validation d'une demande de réapprovisionnement -->
+<div class="modal-overlay" id="modal-reappro-flux">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>🏦 Réapprovisionnement — comment ça marche</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-reappro-flux')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="overflow-x:auto;">
+        <svg viewBox="0 0 860 560" style="display:block;width:100%;min-width:640px;height:auto;" role="img"
+          aria-label="Une demande passe de Brouillon à Soumise, puis la hiérarchie la valide ou la rejette — jamais la caissière. Une fois validée, servir la demande crée un bon d'entrée qui doit lui-même être validé par la hiérarchie avant que le montant ne soit crédité au solde de la caisse. Un rejet, à n'importe quelle étape, n'impacte jamais le solde.">
+          <defs>
+            <marker id="rfArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+            <marker id="rfArrowOr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--or)"/>
+            </marker>
+          </defs>
+          <g font-family="var(--fb)" fill="var(--blanc)">
+
+            <!-- Rangée 1 : la demande -->
+            <rect x="20" y="40" width="230" height="90" rx="10" fill="var(--card)" stroke="var(--blanc)" stroke-width="2"/>
+            <text x="135" y="78" text-anchor="middle" font-family="var(--fh)" font-weight="700" font-size="17">Brouillon</text>
+            <text x="135" y="98" text-anchor="middle" font-size="10.5" fill="var(--blanc-dim)">modifiable librement</text>
+
+            <rect x="315" y="40" width="230" height="90" rx="10" fill="var(--card)" stroke="var(--blanc)" stroke-width="2"/>
+            <text x="430" y="78" text-anchor="middle" font-family="var(--fh)" font-weight="700" font-size="17">Soumise</text>
+            <text x="430" y="98" text-anchor="middle" font-size="10.5" fill="var(--blanc-dim)">en attente d'arbitrage</text>
+
+            <rect x="610" y="40" width="230" height="90" rx="10" fill="var(--card)" stroke="var(--blanc)" stroke-width="2"/>
+            <text x="725" y="78" text-anchor="middle" font-family="var(--fh)" font-weight="700" font-size="17">Validée</text>
+            <text x="725" y="98" text-anchor="middle" font-size="10.5" fill="var(--blanc-dim)">montant accordé ≤ demandé</text>
+
+            <rect x="315" y="160" width="230" height="50" rx="8" fill="none" stroke="var(--blanc-dim)" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="430" y="190" text-anchor="middle" font-size="12" font-weight="700" fill="var(--blanc-dim)">Rejetée — terminal</text>
+
+            <line x1="250" y1="85" x2="312" y2="85" stroke="var(--blanc)" stroke-width="2" marker-end="url(#rfArrow)"/>
+            <text x="281" y="72" text-anchor="middle" font-size="10.5" font-weight="600">soumettre</text>
+
+            <line x1="545" y1="85" x2="607" y2="85" stroke="var(--blanc)" stroke-width="2" marker-end="url(#rfArrow)"/>
+            <text x="576" y="62" text-anchor="middle" font-size="10.5" font-weight="700">🔒 hiérarchie</text>
+            <text x="576" y="74" text-anchor="middle" font-size="9.5" fill="var(--blanc-dim)">(jamais la caissière)</text>
+
+            <line x1="430" y1="130" x2="430" y2="157" stroke="var(--blanc-dim)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#rfArrow)"/>
+            <text x="442" y="146" font-size="9.5" fill="var(--blanc-dim)">🔒 rejette</text>
+
+            <!-- lien vers la rangée 2 -->
+            <line x1="725" y1="130" x2="725" y2="257" stroke="var(--blanc)" stroke-width="2" marker-end="url(#rfArrow)"/>
+            <text x="737" y="185" font-size="10.5" font-weight="600">servir</text>
+            <text x="737" y="199" font-size="9.5" fill="var(--blanc-dim)">→ bon d'entrée créé</text>
+            <text x="737" y="211" font-size="9.5" fill="var(--blanc-dim)">(a_ventiler)</text>
+
+            <!-- Rangée 2 : le bon de caisse -->
+            <rect x="610" y="260" width="230" height="90" rx="10" fill="var(--card)" stroke="var(--blanc)" stroke-width="2"/>
+            <text x="725" y="298" text-anchor="middle" font-family="var(--fh)" font-weight="700" font-size="17">Bon créé</text>
+            <text x="725" y="318" text-anchor="middle" font-size="10.5" fill="var(--blanc-dim)">n'impacte pas encore le solde</text>
+
+            <rect x="315" y="260" width="230" height="90" rx="10" fill="var(--card)" stroke="var(--blanc)" stroke-width="2"/>
+            <text x="430" y="298" text-anchor="middle" font-family="var(--fh)" font-weight="700" font-size="17">Validé</text>
+            <text x="430" y="318" text-anchor="middle" font-size="10.5" fill="var(--blanc-dim)">plafond du validateur suffisant</text>
+
+            <rect x="20" y="260" width="230" height="90" rx="10" fill="var(--or-glow)" stroke="var(--or)" stroke-width="2.5"/>
+            <text x="135" y="298" text-anchor="middle" font-family="var(--fh)" font-weight="700" font-size="17">Solde crédité</text>
+            <text x="135" y="318" text-anchor="middle" font-size="10.5" fill="var(--blanc-dim)">montant disponible en caisse</text>
+
+            <rect x="610" y="380" width="230" height="50" rx="8" fill="none" stroke="var(--blanc-dim)" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="725" y="410" text-anchor="middle" font-size="12" font-weight="700" fill="var(--blanc-dim)">Rejeté — solde inchangé</text>
+
+            <line x1="610" y1="305" x2="548" y2="305" stroke="var(--blanc)" stroke-width="2" marker-end="url(#rfArrow)"/>
+            <text x="579" y="282" text-anchor="middle" font-size="10.5" font-weight="700">🔒 hiérarchie</text>
+            <text x="579" y="294" text-anchor="middle" font-size="9.5" fill="var(--blanc-dim)">(+ plafond suffisant)</text>
+
+            <line x1="725" y1="350" x2="725" y2="377" stroke="var(--blanc-dim)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#rfArrow)"/>
+            <text x="737" y="366" font-size="9.5" fill="var(--blanc-dim)">🔒 rejette</text>
+
+            <line x1="315" y1="305" x2="253" y2="305" stroke="var(--or)" stroke-width="2.25" marker-end="url(#rfArrowOr)"/>
+            <text x="284" y="282" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--or-dark)">+ montant crédité</text>
+
+            <!-- note de bas de page -->
+            <rect x="20" y="450" width="820" height="90" rx="10" fill="var(--card2)" stroke="var(--bord)" stroke-width="1"/>
+            <text x="430" y="475" text-anchor="middle" font-size="12" font-weight="700">🔒 Les deux verrous « Valider » exigent le droit Caisse:v</text>
+            <text x="430" y="495" text-anchor="middle" font-size="11" fill="var(--blanc-dim)">jamais accordé au rôle Caissière, quelle que soit sa configuration —</text>
+            <text x="430" y="512" text-anchor="middle" font-size="11" fill="var(--blanc-dim)">elle peut créer et servir une demande pour SA caisse, mais ne valide</text>
+            <text x="430" y="529" text-anchor="middle" font-size="11" fill="var(--blanc-dim)">ni la demande, ni le bon qui en résulte.</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-reappro-flux')">Fermer</button>
     </div>
   </div>
 </div>
