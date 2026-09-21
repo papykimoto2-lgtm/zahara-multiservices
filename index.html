@@ -46779,7 +46779,11 @@ var SYSTEM_ROLES = {
        (Valider). La caissière saisit ses bons de caisse mais ne doit jamais
        pouvoir valider son propre mouvement : la validation revient à un
        responsable habilité (plafond de rôle), sinon aucun contrôle réel
-       n'existe sur les sorties de fonds. */
+       n'existe sur les sorties de fonds. Ce réglage est désormais doublé
+       d'un verrou au niveau du code (userPeut : module==='Caisse' &&
+       action==='v' && role==='caissiere' ⇒ false, quoi que porte "droits")
+       et l'éditeur de rôles grise la case V correspondante — la caissière
+       ne peut donc plus jamais obtenir ce droit, même par erreur de config. */
     droits: { Caisse: 'cm' },
     permissions: Object.fromEntries(ALL_MODULES.map(function(m){
       return [m, ['Caisse','Messagerie','Comptabilite'].includes(m)]; })) },
@@ -46955,6 +46959,16 @@ function userPeut(module, action) {
     if (_roleId !== 'admin' && _roleId !== 'manager') return false;
     if (r.peut_supprimer === false) return false;
   }
+  /* [Règle absolue] La Caissière ne valide jamais un mouvement de caisse ni
+     une demande de réapprovisionnement, quelle que soit sa caisse — la
+     validation revient à un responsable habilité (plafond de rôle), sinon
+     aucun contrôle réel n'existe sur les sorties de fonds qu'elle saisit
+     elle-même. Comme pour le droit de suppression ci-dessus, appliqué au
+     niveau du code plutôt que du seul réglage droits.Caisse : un admin qui
+     cocherait « V » par erreur dans l'éditeur de rôles (case verrouillée
+     côté UI, cf. buildModulesGrid) ne pourrait de toute façon pas rouvrir
+     cette brèche. */
+  if (module === 'Caisse' && action === 'v' && APP.currentUser.role === 'caissiere') return false;
   var d = r.droits && module ? r.droits[module] : null;
   if (d === undefined || d === null) return true;      /* non restreint */
   return String(d).indexOf(action) !== -1;
@@ -47882,7 +47896,7 @@ function openRoleModal(roleId) {
        explicitement fixé à 0 en réouvrant le formulaire — l'admin le
        croyait alors non enregistré. */
     if (pl) pl.value = (r && r.plafond_validation !== undefined && r.plafond_validation !== null) ? r.plafond_validation : '';
-    if (typeof buildModulesGrid === 'function' && r) buildModulesGrid(r.permissions, r.droits);
+    if (typeof buildModulesGrid === 'function' && r) buildModulesGrid(r.permissions, r.droits, roleId);
     if (typeof _rolesMajDroits === 'function') _rolesMajDroits();
   }, 30);
   if (!hasRole('admin')) { toast('Reserve aux administrateurs.', 'error'); return; }
@@ -47907,7 +47921,7 @@ function openRoleModal(roleId) {
   sv('role-preset', '');
   sv('role-description', isEdit ? (r.description||'') : '');
 
-  buildModulesGrid(isEdit ? r.permissions : {});
+  buildModulesGrid(isEdit ? r.permissions : {}, isEdit ? r.droits : null, roleId);
   document.getElementById('modal-role-editor').classList.add('open');
 }
 
@@ -47941,7 +47955,7 @@ function _collecterDroits() {
   Object.keys(out).forEach(function(m){ if (out[m] !== 'cmsv') net[m] = out[m]; });
   return net;
 }
-function buildModulesGrid(permissions, droits) {
+function buildModulesGrid(permissions, droits, roleId) {
   _DROITS_COURANTS = droits || {};
   var grid = document.getElementById('role-modules-grid'); if (!grid) return;
   permissions = permissions || {};
@@ -47972,10 +47986,18 @@ function buildModulesGrid(permissions, droits) {
         +'<div class="actrow" data-actmod="'+_modAttr(mod)+'" style="display:flex;gap:6px;padding:2px 0 6px 12px;'
         + (chkd ? '' : 'opacity:.35;pointer-events:none;') + '">'
         + ['c','m','s','v'].map(function(a){
-            var on = _droitActif(mod, a);
-            return '<label title="'+ACTIONS_LIB[a]+'" style="display:flex;align-items:center;gap:3px;font-size:10px;color:#64748B;cursor:pointer;">'
-              +'<input type="checkbox" class="actchk" data-mod="'+_modAttr(mod)+'" data-act="'+a+'" '+(on?'checked':'')
-              +' style="width:11px;height:11px;accent-color:'+color+';">'+a.toUpperCase()+'</label>';
+            /* [Verrou] La Caissière ne valide jamais un mouvement de caisse
+               (ni une demande de réapprovisionnement, même circuit) — règle
+               absolue appliquée dans userPeut(), qu'un admin coche cette
+               case ou non. On la grise ici pour ne pas laisser croire
+               qu'elle a un effet : l'éditeur de rôles ne doit jamais
+               suggérer une possibilité que le code refuse ensuite en
+               silence. */
+            var verrouille = (roleId === 'caissiere' && mod === 'Caisse' && a === 'v');
+            var on = verrouille ? false : _droitActif(mod, a);
+            return '<label title="'+(verrouille ? 'Verrouillé — la Caissière ne peut jamais valider un mouvement de caisse (séparation des tâches).' : ACTIONS_LIB[a])+'" style="display:flex;align-items:center;gap:3px;font-size:10px;color:'+(verrouille?'#CBD5E1':'#64748B')+';cursor:'+(verrouille?'not-allowed':'pointer')+';">'
+              +'<input type="checkbox" class="actchk" data-mod="'+_modAttr(mod)+'" data-act="'+a+'" '+(on?'checked':'')+(verrouille?' disabled':'')
+              +' style="width:11px;height:11px;accent-color:'+color+';">'+a.toUpperCase()+(verrouille?' 🔒':'')+'</label>';
           }).join('')
         +'</div>';
     });
@@ -123249,7 +123271,12 @@ function reapSoldeCaisse(caisseId) {
 function reapRemplirCaisses() {
   var sel = document.getElementById('rea-caisse'); if (!sel) return;
   var divId = (document.getElementById('rea-division')||{}).value || '';
-  var liste = (DATA.caisses||[]).filter(function(c){ return (c.division_id||'') === divId; });
+  /* [Cloisonnement] caissesVisibles() applique déjà le même filtrage que le
+     reste du module Caisse (division + caissiere_ids), avec vue complète
+     pour les rôles admin-like — une caissière ne doit demander un
+     réapprovisionnement que pour une caisse qui lui est rattachée. */
+  var base = (typeof caissesVisibles === 'function') ? caissesVisibles() : (DATA.caisses||[]);
+  var liste = base.filter(function(c){ return (c.division_id||'') === divId; });
   sel.innerHTML = liste.length
     ? liste.map(function(c){ return '<option value="'+c.id+'">'+escHtml(c.nom||c.id)+'</option>'; }).join('')
     : '<option value="">— Aucune caisse rattachée à cette division —</option>';
@@ -123271,8 +123298,19 @@ function reapOuvrirModal(id) {
   if (id && !d) return;
   if (d && d.statut !== 'brouillon') { toast('Seule une demande en brouillon peut être modifiée.', 'error'); return; }
   var selDiv = document.getElementById('rea-division'); if (!selDiv) return;
-  selDiv.innerHTML = (DATA.divisions||[]).length
-    ? (DATA.divisions||[]).map(function(x){ return '<option value="'+x.id+'">'+escHtml(x.nom||x.libelle||x.id)+'</option>'; }).join('')
+  /* [Cloisonnement] Une caissière ne doit se voir proposer que les divisions
+     portant une caisse qui lui est rattachée — sinon elle pourrait soumettre
+     une demande pour une caisse hors de son périmètre, qui échouerait de
+     toute façon plus tard (reapSauver/reapServir, cf. caisseUserPeut). Les
+     rôles admin-like gardent la liste complète des divisions. */
+  var _divisionsListe = DATA.divisions || [];
+  if (typeof caisseRoleAdminLike === 'function' && !caisseRoleAdminLike() && typeof caissesVisibles === 'function') {
+    var _divOk = {};
+    caissesVisibles().forEach(function(c){ if (c.division_id) _divOk[c.division_id] = true; });
+    _divisionsListe = _divisionsListe.filter(function(x){ return _divOk[x.id]; });
+  }
+  selDiv.innerHTML = _divisionsListe.length
+    ? _divisionsListe.map(function(x){ return '<option value="'+x.id+'">'+escHtml(x.nom||x.libelle||x.id)+'</option>'; }).join('')
     : '<option value="">— Aucune division enregistrée —</option>';
   document.getElementById('rea-id').value = d ? d.id : '';
   document.getElementById('rea-titre').textContent = d ? ('🏦 Demande ' + (d.numero||'')) : '🏦 Demande de réapprovisionnement';
@@ -123297,6 +123335,12 @@ async function reapSauver() {
   var montant = parseFloat(document.getElementById('rea-montant').value) || 0;
   var motif = (document.getElementById('rea-motif').value || '').trim();
   if (!divisionId || !caisseId) { toast('Division et caisse à réapprovisionner sont obligatoires.', 'error'); return; }
+  /* [Cloisonnement] Défense en profondeur : le sélecteur ne propose déjà que
+     les caisses rattachées (reapRemplirCaisses), mais rien n'empêche un
+     appel direct avec un caisseId arbitraire. */
+  if (typeof caisseUserPeut === 'function' && !caisseUserPeut(caisseId)) {
+    toast('🔒 Cette caisse ne vous est pas rattachée.', 'error'); return;
+  }
   if (montant <= 0) { toast('Le montant demandé doit être supérieur à zéro.', 'error'); return; }
   if (!motif) { toast('Le motif est obligatoire — c\'est lui que la hiérarchie lit pour décider.', 'error'); return; }
 
@@ -123393,6 +123437,13 @@ async function reapServir(id) {
   if (d.statut !== 'validee') { toast('Seule une demande validée peut être servie.', 'error'); return; }
   var caisse = (DATA.caisses||[]).find(function(c){ return c.id === d.caisse_id; });
   if (!caisse) { toast('Caisse introuvable — elle a peut-être été supprimée depuis la demande.', 'error'); return; }
+  /* [Cloisonnement] Servir une demande, ce n'est pas la valider (déjà fait
+     par la hiérarchie), mais c'est tout de même une écriture dans une
+     caisse : elle doit rester rattachée à celui/celle qui l'exécute, comme
+     partout ailleurs dans le module. */
+  if (typeof caisseUserPeut === 'function' && !caisseUserPeut(d.caisse_id)) {
+    toast('🔒 Cette caisse ne vous est pas rattachée.', 'error'); return;
+  }
   var session = caisseGetSessionOuverte(d.caisse_id);
   if (!session) { toast('🔒 La caisse « ' + (caisse.nom||'') + ' » est fermée — ouvrez-la avant de servir la demande.', 'error', 6000); return; }
   var montant = parseFloat(d.montant_accorde) || 0;
@@ -123442,6 +123493,15 @@ function reapRender() {
   var liste = (DATA.demandes_reappro||[]).slice().sort(function(a,b){
     return (b.demande_le||b.created_at||'').localeCompare(a.demande_le||a.created_at||'');
   });
+  /* [Cloisonnement] Même règle que le reste du module Caisse : une
+     caissière ne voit que les demandes portant sur une caisse qui lui est
+     rattachée. caisseUserPeut renvoie déjà true sans condition pour les
+     rôles admin-like, qui gardent la vue complète nécessaire au pilotage
+     (cf. _pilotageRenderValidReappro, qui reste, lui, volontairement
+     transversal). */
+  if (typeof caisseUserPeut === 'function') {
+    liste = liste.filter(function(d){ return caisseUserPeut(d.caisse_id); });
+  }
   var badge = document.getElementById('badge-tab-reappro');
   var nbAction = liste.filter(function(d){ return d.statut==='soumise' || d.statut==='validee'; }).length;
   if (badge) { badge.textContent = nbAction; badge.style.display = nbAction ? 'inline-block' : 'none'; }
@@ -126016,6 +126076,18 @@ function caisseRenderValidations() {
   var box = document.getElementById('caisse-validation-box');
   if (!box) return;
   var liste = caisseDecaissementsEnAttente();
+  /* [Cloisonnement] caisseDecaissementsEnAttente() liste volontairement TOUS
+     les mouvements en attente, toutes divisions confondues — nécessaire à un
+     validateur habilité (cf. son propre commentaire). Cet écran-ci est en
+     revanche celui du module Caisse au quotidien, vu aussi par une
+     caissière : elle ne doit voir que les mouvements des caisses auxquelles
+     elle est rattachée, même ceux qu'elle ne peut pas approuver. caisseUserPeut
+     renvoie déjà true sans condition pour les rôles admin-like (admin/
+     manager/comptable) : cette restriction ne change rien pour un
+     validateur, seulement pour un rôle cloisonné par division/caisse. */
+  if (typeof caisseUserPeut === 'function') {
+    liste = liste.filter(function(m){ return caisseUserPeut(m.caisse_id); });
+  }
   if (!liste.length) { box.innerHTML = ''; return; }
 
   var monPlafond = (typeof userPlafond === 'function') ? userPlafond() : Infinity;
