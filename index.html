@@ -25471,6 +25471,7 @@ function getSBConfig() {
 /* Récupère un utilisateur partagé depuis Supabase par identifiant (auth multi-appareils) */
 async function fetchUserFromCloud(login) {
   if (!SB.url || !SB.key || !navigator.onLine) return null;
+  login = (login || '').toLowerCase();  /* [FIX] même normalisation que doLogin/createUserFromModal — sinon un appelant qui n'aurait pas déjà mis en minuscules ne trouverait jamais le compte. */
   try {
     /* [FIX connexion aléatoire] Sans ORDER BY, 'limit=1' renvoie une ligne au
        choix de Postgres — non déterministe — dès qu'un même login existe en
@@ -28860,7 +28861,13 @@ function toggleLoginPass() {
 async function doLogin() {
   var errEl  = document.getElementById('login-error');
   var warnEl = document.getElementById('login-attempts-warning');
-  var u = document.getElementById('login-user').value.trim();
+  /* [FIX] Identifiant comparé partout (cache local, cloud, Edge Function)
+     par égalité stricte, sensible à la casse — un identifiant enregistré en
+     minuscules (cas normal, cf. createUserFromModal) refusait donc toute
+     saisie avec une majuscule, y compris un simple prénom tapé comme on
+     l'écrit naturellement ("Patrice"). Normalisé ici en minuscules, comme à
+     la création du compte : les deux se rejoignent désormais toujours. */
+  var u = document.getElementById('login-user').value.trim().toLowerCase();
   var p = document.getElementById('login-pass').value;
 
   errEl.style.display  = 'none';  errEl.textContent  = '';
@@ -49034,7 +49041,14 @@ async function createUserFromModal() {
   var role  = (document.getElementById('new-user-role')||{}).value||'commercial';
   if (!nom.trim())   { toast('⚠️ Nom obligatoire.', 'error'); return; }
   if (!login.trim()) { toast('⚠️ Identifiant obligatoire.', 'error'); return; }
-  if (DATA.users.find(function(u){ return u.login === login.trim(); })) {
+  /* [FIX] Normalisé en minuscules — la connexion (doLogin, fetchUserFromCloud,
+     l'Edge Function staff-login) compare l'identifiant en minuscules ; le
+     stocker tel quel aurait pu créer un compte que son titulaire ne pourrait
+     jamais atteindre en tapant son prénom naturellement ("Patrice"), et le
+     test d'unicité ci-dessous n'aurait pas empêché un doublon "Patrice" /
+     "patrice" — deux comptes distincts pour le même identifiant apparent. */
+  login = login.trim().toLowerCase();
+  if (DATA.users.find(function(u){ return u.login === login; })) {
     toast('⚠️ Cet identifiant est déjà utilisé.', 'error'); return;
   }
   if (!pwd) { toast('⚠️ Mot de passe obligatoire.', 'error'); return; }
