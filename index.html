@@ -6257,6 +6257,18 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                   <label>Commission commerciale (%)</label>
                   <input type="number" id="param-commission" class="form-control" value="3" min="0" max="10">
                 </div>
+                <div class="form-group span-2" style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:12px;">
+                  <label>🧮 Système de calcul des commissions</label>
+                  <select id="param-commission-mode" class="form-control">
+                    <option value="versement">Par versement — taux du commercial / de l'apporteur appliqué à chaque versement encaissé</option>
+                    <option value="bien">Sur la valeur du bien vendu — taux fixé sur la fiche du lot (logement ou terrain) × prix de vente</option>
+                  </select>
+                  <div style="font-size:11px;color:var(--blanc-dim);margin-top:6px;line-height:1.5;">
+                    <b>Par versement</b> : utilise les taux ci-dessous (commercial) et ceux de la fiche apporteur, souscription ou régulier selon le versement.<br>
+                    <b>Sur la valeur du bien</b> : la commission = prix du lot × taux saisi à la création du lot. Elle est générée en une fois au 1er versement sur le prix. Si le lot n'a pas de taux, on retombe sur le taux « régulier » du commercial ou de la fiche apporteur.<br>
+                    Changer de système ne recalcule pas les commissions déjà générées. En passant « sur la valeur du bien », les commissions déjà générées pour un souscripteur sont déduites, pour ne jamais payer deux fois.
+                  </div>
+                </div>
                 <div class="form-group">
                   <label>🏦 Comm. commercial — Souscription (%)</label>
                   <input type="number" id="param-comm-souscription" class="form-control" value="10" min="0" max="30" step="0.5">
@@ -12343,6 +12355,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <button class="btn btn-secondary btn-sm" id="btn-caisse-nouvelle" onclick="caisseConfigModal(null)" style="display:none;">➕ Nouvelle caisse</button>
           <button class="btn btn-secondary btn-sm" onclick="caisseAuditDoublonsModal()">🔍 Audit doublons</button>
           <button class="btn btn-secondary btn-sm" onclick="caisseControleIntegrite()">🩺 Contrôle d'intégrité</button>
+          <button class="btn btn-secondary btn-sm" onclick="vrsEspecesControle()" title="Versements souscripteurs en espèces sans bon de caisse rattaché">💵 Versements espèces</button>
           <button class="btn btn-secondary btn-sm" onclick="caisseSnapshotsModal()">♻️ Points de restauration</button>
         </div>
 
@@ -17915,12 +17928,17 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         </div>
         <div class="form-group">
           <label>Mode de paiement</label>
-          <select class="form-control" id="v-mode">
+          <select class="form-control" id="v-mode" onchange="vrsMajCaisse()">
             <option value="especes">Espèces</option>
             <option value="virement">Virement bancaire</option>
             <option value="cheque">Chèque</option>
             <option value="mobile_money">Mobile Money</option>
           </select>
+        </div>
+        <div class="form-group" id="v-caisse-grp">
+          <label>💰 Caisse qui reçoit les espèces *</label>
+          <select class="form-control" id="v-caisse"></select>
+          <div id="v-caisse-info" style="font-size:11px;color:var(--blanc-dim);margin-top:4px;"></div>
         </div>
         <div class="form-group">
           <label>Référence / N° Chèque</label>
@@ -19281,6 +19299,15 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <label>Prix de vente (FCFA)</label>
           <input type="number" class="form-control" id="l-prix">
           <div id="l-prix-note" style="font-size:11px;color:var(--blanc-dim);margin-top:4px;"></div>
+        </div>
+        <div class="form-group">
+          <label>🏦 Taux commission commercial (%)</label>
+          <input type="number" class="form-control" id="l-taux-comm-commercial" min="0" max="100" step="0.1" placeholder="Taux du commercial">
+        </div>
+        <div class="form-group">
+          <label>🤝 Taux commission apporteur (%)</label>
+          <input type="number" class="form-control" id="l-taux-comm-apporteur" min="0" max="100" step="0.1" placeholder="Taux de l'apporteur">
+          <div id="l-comm-note" style="font-size:11px;color:var(--blanc-dim);margin-top:4px;"></div>
         </div>
         <div class="form-group span-2" id="l-grp-terrain-tva" style="display:none;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -32979,6 +33006,7 @@ function openPaiementModal(clientId) {
     document.getElementById('v-client').value = clientId;
     updateClientSolde();
   }
+  vrsMajCaisse();
   openModal('modal-paiement');
 }
 
@@ -33320,6 +33348,91 @@ function getTauxCommissions() {
   };
 }
 
+/** Système de calcul actif : 'versement' (historique) ou 'bien' (valeur du bien vendu). */
+function commissionMode() {
+  return (DATA.params && DATA.params.commission_mode === 'bien') ? 'bien' : 'versement';
+}
+
+/* Taux explicitement renseigné (0 compris) ou valeur par défaut. */
+function _commTauxOu(v, dflt) { return (v !== undefined && v !== null && v !== '') ? (parseFloat(v) || 0) : dflt; }
+
+/* Premier versement « sur prix » d'un client (hors frais de souscription),
+   chronologiquement — même règle de départage que isVersementSouscription. */
+function _premierVersementPrix(clientId) {
+  return (DATA.versements || []).filter(function(v){ return v.client_id === clientId && _versementSurPrix(v); })
+    .sort(function(a, b){ return (a.date || '').localeCompare(b.date || '') || String(a.id).localeCompare(String(b.id)); })[0] || null;
+}
+
+/* ── Système « valeur du bien vendu » ─────────────────────────────────────
+   Commission = Σ (prix du lot × taux du lot) sur tous les lots du
+   souscripteur (multi-lots : client.lot_ids). Générée en UNE fois, rattachée
+   au versement qui la déclenche (versement_id), pour rester compatible avec
+   les outils existants (suppression/modification de versement, vérification,
+   régénération). On déduit ce qui a déjà été généré pour ce souscripteur et
+   ce bénéficiaire, quel que soit le système (payé compris) : un changement de
+   système en cours de vente, ou une hausse du prix du lot, ne génère que la
+   différence — jamais un double paiement. */
+async function _genererCommissionsBien(versement, client) {
+  if (!_versementSurPrix(versement)) return [];
+  var lots = _lotIdsDeClient(client).map(function(id){ return (DATA.lots || []).find(function(l){ return l.id === id; }); })
+    .filter(function(l){ return l && (parseFloat(l.prix) || 0) > 0; });
+  if (!lots.length) {
+    toast('⚠️ Commission « valeur du bien » non calculée pour ' + ((client.prenoms || '') + ' ' + (client.nom || '')).trim() + ' : aucun lot avec un prix de vente.', 'error', 7000);
+    return [];
+  }
+  var taux = getTauxCommissions();
+  var baseTotale = lots.reduce(function(s, l){ return s + (parseFloat(l.prix) || 0); }, 0);
+  var dejaGenere = function(typeB){
+    return (DATA.commissions || []).filter(function(c){ return c.client_id === client.id && c.type_beneficiaire === typeB && c.statut !== 'annulee'; })
+      .reduce(function(s, c){ return s + (parseFloat(c.montant_comm) || 0); }, 0);
+  };
+  var nouvelles = [];
+  var creer = async function(typeB, tauxDefaut, benef){
+    var detail = [], du = 0, defaut = false;
+    lots.forEach(function(l){
+      var brut = typeB === 'commercial' ? l.taux_comm_commercial : l.taux_comm_apporteur;
+      var t = _commTauxOu(brut, tauxDefaut);
+      if (brut === undefined || brut === null || brut === '') defaut = true;
+      var m = Math.round((parseFloat(l.prix) || 0) * t / 100);
+      du += m;
+      detail.push('Lot ' + (l.numero || l.id) + ' : ' + fmtF(l.prix) + ' F × ' + t + '%' + (brut === undefined || brut === null || brut === '' ? ' (taux par défaut)' : ''));
+    });
+    var reste = du - dejaGenere(typeB);
+    if (reste <= 0) return;
+    var c = Object.assign({
+      id: uid(), versement_id: versement.id, client_id: client.id,
+      client_nom: client.prenoms + ' ' + client.nom,
+      type_beneficiaire: typeB, type_versement: 'valeur_bien', mode_calcul: 'bien',
+      lot_ids: lots.map(function(l){ return l.id; }),
+      taux: baseTotale ? Math.round(du / baseTotale * 10000) / 100 : 0,
+      montant_base: baseTotale, montant_comm: reste,
+      date_versement: versement.date, date_generation: today(), statut: 'a_payer',
+      programme_id: client.programme_id || '',
+      notes: 'Sur valeur du bien — ' + detail.join(' ; ') + (reste !== du ? ' — déjà généré déduit : ' + fmtF(du - reste) + ' F' : '') + (defaut ? ' — ⚠️ taux par défaut utilisé (pas de taux sur le lot)' : '')
+    }, benef);
+    nouvelles.push(c);
+    if (!DATA.commissions) DATA.commissions = [];
+    DATA.commissions.push(c);
+    await dbPut('commissions', c);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', c);
+  };
+
+  var commEmpC = client.commercial_id ? DATA.employes.find(function(e){ return e.id === client.commercial_id; }) : null;
+  var commNomC = commEmpC ? ((commEmpC.prenoms || '') + ' ' + commEmpC.nom).trim() : (client.commercial || '');
+  if (commNomC || client.commercial_id) {
+    await creer('commercial', taux.commercial_regulier, { beneficiaire: commNomC, beneficiaire_id: client.commercial_id || '' });
+  }
+  if (client.apporteur || client.apporteur_id) {
+    var apObj = client.apporteur_id ? DATA.apporteurs.find(function(a){ return a.id === client.apporteur_id; }) : null;
+    await creer('apporteur', apObj ? _commTauxOu(apObj.taux_regulier, taux.apporteur_regulier) : taux.apporteur_regulier, {
+      apporteur_id: apObj ? apObj.id : (client.apporteur_id || ''),
+      beneficiaire: apObj ? ((apObj.prenoms ? apObj.prenoms + ' ' : '') + apObj.nom) : (client.apporteur || ''),
+      beneficiaire_tel: apObj ? (apObj.tel || '') : (client.apporteur_tel || '')
+    });
+  }
+  return nouvelles;
+}
+
 /** Détermine si un versement est le 1er (souscription) ou régulier */
 function isVersementSouscription(versement) {
   if (versement.type === 'frais_souscription') return true; // frais → taux souscription
@@ -33547,15 +33660,25 @@ async function genererCommissionsVersement(versement) {
      bien vendu, contrairement à tous les autres versements sur prix. */
   if (versement.type === 'frais_souscription' && !(DATA.params && DATA.params.commission_sur_frais_souscription)) return;
 
+  var nouvelles = [];
+  if (commissionMode() === 'bien') {
+    nouvelles = await _genererCommissionsBien(versement, client);
+  } else {
+
   // Anti-doublon : types de commission déjà présents pour ce versement (hors annulées)
   var existTypes = (DATA.commissions||[]).filter(function(c){
     return c.versement_id === versement.id && c.statut !== 'annulee';
   }).map(function(c){ return c.type_beneficiaire; });
+  /* Système « par versement » : un bénéficiaire déjà commissionné sur la
+     valeur du bien pour ce souscripteur (avant un retour à ce système) a
+     déjà reçu sa commission totale — on n'en rajoute pas par versement. */
+  (DATA.commissions||[]).forEach(function(c){
+    if (c.client_id === client.id && c.mode_calcul === 'bien' && c.statut !== 'annulee' && existTypes.indexOf(c.type_beneficiaire) === -1) existTypes.push(c.type_beneficiaire);
+  });
 
   var taux = getTauxCommissions();
   var isSouscription = isVersementSouscription(versement);
   var montant = parseFloat(versement.montant) || 0;
-  var nouvelles = [];
 
   // ── Commission commerciale ──────────────────────────────────────────────────
   var commEmpC = client.commercial_id ? DATA.employes.find(function(e){return e.id===client.commercial_id;}) : null;
@@ -33632,6 +33755,7 @@ async function genererCommissionsVersement(versement) {
       if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', commAp);
     }
   }
+  } /* fin système « par versement » */
 
   if (nouvelles.length > 0) {
     var total = nouvelles.reduce(function(s,c){ return s+c.montant_comm; }, 0);
@@ -33800,11 +33924,18 @@ async function verifierCommissionsVersements(reparer) {
   });
 
   // Manquantes : versement éligible sans commission du type attendu
+  var _modeBien = commissionMode() === 'bien';
   DATA.versements.forEach(function(v){
     var cl = DATA.clients.find(function(c){ return c.id === v.client_id; });
     if (!cl) return;
+    /* Système « valeur du bien » : une commission par souscripteur (pas par
+       versement), attendue sur son 1er versement sur prix uniquement. */
+    if (_modeBien) {
+      var _p1 = _premierVersementPrix(cl.id);
+      if (!_p1 || _p1.id !== v.id) return;
+    }
     var present = (DATA.commissions||[]).filter(function(c){
-      return c.versement_id === v.id && c.statut !== 'annulee';
+      return (_modeBien ? c.client_id === cl.id : c.versement_id === v.id) && c.statut !== 'annulee';
     }).map(function(c){ return c.type_beneficiaire; });
     var attendCommercial = !!(cl.commercial_id || cl.commercial);
     var attendApporteur  = !!(cl.apporteur_id || cl.apporteur);
@@ -33994,6 +34125,8 @@ function renderCommissions() {
   var versTypeMeta = {
     souscription: { lbl:'Souscription', col:'#B87333' },
     regulier:     { lbl:'Régulier',     col:'#3B82F6' },
+    valeur_bien:  { lbl:'Valeur du bien', col:'#10B981' },
+    cession:      { lbl:'Cession',      col:'#8B5CF6' },
   };
 
   if (!comms.length) {
@@ -34514,20 +34647,245 @@ async function backfillEcrituresVersements() {
   toast(manquants.length + ' écriture(s) générée(s) — Grand Livre et Balance mis à jour.', 'success');
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   VERSEMENT EN ESPÈCES ↔ CAISSE
+   Un versement souscripteur en espèces est saisi UNE fois (Paiements ou
+   Souscripteurs) ; l'argent, lui, est remis au caissier. Sans lien, la caisse
+   ne le voyait jamais : son solde était faux et les dépenses faites avec cet
+   argent n'avaient pas de contrepartie. On crée donc automatiquement, dans la
+   caisse choisie, un bon d'entrée RATTACHÉ au versement (versement_id) :
+   - effectif tout de suite (le reçu remis au client fait office de pièce) ;
+   - déjà « ventilé » sur l'écriture du versement (ecr_vrs_<id>, Débit 571 /
+     Crédit client) : AUCUNE seconde écriture comptable ;
+   - exclu des encaissements de trésorerie (déjà filtré sur versement_id) ;
+   - modifié / supprimé avec le versement, jamais séparément.
+   ══════════════════════════════════════════════════════════════════════ */
+function _vrsMvtLie(versementId) {
+  return (DATA.caisse_mouvements || []).find(function(m){ return m.versement_id === versementId && !m.rejete; }) || null;
+}
+function _vrsCaissesOuvertes() {
+  return (DATA.caisses || []).filter(function(c){ return c.actif !== false && typeof caisseGetSessionOuverte === 'function' && caisseGetSessionOuverte(c.id); });
+}
+function _vrsSessionDe(mvt) {
+  return (DATA.caisse_sessions || []).find(function(x){ return x.id === mvt.session_id; }) || null;
+}
+function vrsMajCaisse() {
+  var grp = document.getElementById('v-caisse-grp'), sel = document.getElementById('v-caisse'), info = document.getElementById('v-caisse-info');
+  if (!grp || !sel) return;
+  var especes = ((document.getElementById('v-mode') || {}).value || '') === 'especes';
+  grp.style.display = especes ? '' : 'none';
+  if (!especes) return;
+  var lie = APP._editVersementId ? _vrsMvtLie(APP._editVersementId) : null;
+  if (lie) {
+    var cl = (DATA.caisses || []).find(function(c){ return c.id === lie.caisse_id; });
+    sel.innerHTML = '<option value="' + lie.caisse_id + '">' + escHtml(cl ? cl.nom : '?') + '</option>';
+    sel.disabled = true;
+    var sess = _vrsSessionDe(lie);
+    info.innerHTML = 'Rattaché au bon <b>' + escHtml(lie.numero || '') + '</b>' + ((sess && sess.statut !== 'ouverte') ? ' — ⚠️ session clôturée : montant, mode et client ne sont plus modifiables.' : ' — mis à jour avec le versement.');
+    return;
+  }
+  sel.disabled = false;
+  var ouvertes = _vrsCaissesOuvertes();
+  var defaut = '';
+  try { defaut = localStorage.getItem('vrs_caisse_defaut') || ''; } catch(e){}
+  if (!ouvertes.some(function(c){ return c.id === defaut; })) defaut = ouvertes.length === 1 ? ouvertes[0].id : '';
+  sel.innerHTML = '<option value="">— Choisir la caisse —</option>' + ouvertes.map(function(c){
+    return '<option value="' + c.id + '"' + (c.id === defaut ? ' selected' : '') + '>' + escHtml(c.nom || c.id) + '</option>';
+  }).join('');
+  info.textContent = ouvertes.length
+    ? 'Un bon d\'entrée sera créé automatiquement dans cette caisse (aucune saisie en caisse à faire).'
+    : '⚠️ Aucune caisse ouverte : faites ouvrir la caisse avant d\'encaisser des espèces.';
+}
+function _vrsCompteCredit(versement) {
+  try {
+    return versement.type === 'frais_souscription'
+      ? requireParamCompte('compte_frais_souscription', 'Compte produit des frais de souscription')
+      : requireCompteDefaut('client_lots');
+  } catch(e) { return ''; }
+}
+function _vrsMotif(versement) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === versement.client_id; }) || {};
+  var nom = ((c.nom || '') + ' ' + (c.prenoms || '')).trim();
+  var lib = { apport:'apport', mensualite:'mensualité', regularisation:'régularisation', frais_souscription:'frais de souscription' }[versement.type] || 'versement';
+  return { nom: nom, motif: 'Versement souscripteur ' + (versement.ref || '') + ' — ' + nom + ' (' + lib + (versement.date && versement.date !== today() ? ', du ' + dateShort(versement.date) : '') + ')' };
+}
+async function _vrsCreerBonCaisse(versement, caisseId) {
+  var caisse = (DATA.caisses || []).find(function(c){ return c.id === caisseId; });
+  var session = caisse ? caisseGetSessionOuverte(caisseId) : null;
+  if (!caisse || !session) return null;
+  var d = today();
+  var numero = await caisseProchainNumero(caisseId, 'entree', d, caisse.compte);
+  var auteur = (APP.currentUser && APP.currentUser.nom) || '—';
+  var lib = _vrsMotif(versement);
+  var mvt = {
+    id: uid(), session_id: session.id, caisse_id: caisseId,
+    date: d + 'T' + new Date().toISOString().slice(11, 19), numero: numero,
+    type: 'entree', montant: parseFloat(versement.montant) || 0,
+    motif: lib.motif, beneficiaire: lib.nom, piece_ref: versement.ref || '',
+    statut: 'ventile', compte_ventile: _vrsCompteCredit(versement),
+    ecriture_id: 'ecr_vrs_' + versement.id, ventile_par: auteur, ventile_le: new Date().toISOString(), ventile_auto: false,
+    requiert_validation: false, valide: true, rejete: false,
+    valide_par: 'Versement ' + (versement.ref || ''), valide_le: new Date().toISOString(),
+    versement_id: versement.id, client_id: versement.client_id,
+    created_by: auteur, created_at: new Date().toISOString()
+  };
+  DATA.caisse_mouvements.push(mvt);
+  mvt._baseModifie = mvt._modifie || null;
+  await dbPut('caisse_mouvements', mvt);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
+  try { localStorage.setItem('vrs_caisse_defaut', caisseId); } catch(e){}
+  return mvt;
+}
+async function _vrsMajBonCaisse(versement, mvt) {
+  var lib = _vrsMotif(versement);
+  mvt.montant = parseFloat(versement.montant) || 0;
+  mvt.motif = lib.motif; mvt.beneficiaire = lib.nom; mvt.piece_ref = versement.ref || '';
+  mvt.client_id = versement.client_id; mvt.compte_ventile = _vrsCompteCredit(versement);
+  mvt.ecriture_id = 'ecr_vrs_' + versement.id;
+  mvt._baseModifie = mvt._modifie || null;
+  await dbPut('caisse_mouvements', mvt);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
+}
+function _vrsRafraichirCaisse() {
+  if (typeof caisseRenderListe === 'function') caisseRenderListe();
+  if (typeof caisseRenderDashboard === 'function') caisseRenderDashboard();
+}
+
+/* ── Contrôle : versements en espèces sans bon de caisse ─────────────────── */
+function vrsEspecesSansBon(depuis) {
+  var lies = {};
+  (DATA.caisse_mouvements || []).forEach(function(m){ if (m.versement_id && !m.rejete) lies[m.versement_id] = true; });
+  return (DATA.versements || []).filter(function(v){
+    return v.mode === 'especes' && !lies[v.id] && v.statut !== 'annule' && (!depuis || (v.date || '') >= depuis);
+  }).sort(function(a, b){ return (b.date || '').localeCompare(a.date || ''); });
+}
+/* Bon d'entrée déjà saisi en caisse qui correspond probablement au versement :
+   même montant, ±3 jours, pas encore rattaché ; le nom du client dans le
+   motif/bénéficiaire départage (et marque la correspondance comme sûre). */
+function _vrsBonCandidat(v, dejaPris) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === v.client_id; }) || {};
+  var nom = sfcNormalise(c.nom || ''), mt = Math.round(parseFloat(v.montant) || 0), dV = new Date(v.date);
+  var cands = (DATA.caisse_mouvements || []).filter(function(m){
+    if (m.type !== 'entree' || m.versement_id || m.rejete || dejaPris[m.id]) return false;
+    if (Math.round(parseFloat(m.montant) || 0) !== mt) return false;
+    var dM = new Date((m.date || '').slice(0, 10));
+    return !isNaN(dM) && !isNaN(dV) && Math.abs(dM - dV) <= 3 * 86400000;
+  }).map(function(m){
+    var hay = sfcNormalise((m.motif || '') + ' ' + (m.beneficiaire || ''));
+    return { m: m, nomOk: !!(nom && nom.length > 2 && hay.indexOf(nom) !== -1) };
+  }).sort(function(a, b){ return (b.nomOk ? 1 : 0) - (a.nomOk ? 1 : 0); });
+  return cands[0] || null;
+}
+function vrsEspecesControle() {
+  var d = document.getElementById('vrs-ctl-depuis');
+  if (d && !d.value) d.value = new Date().getFullYear() + '-01-01';
+  var sel = document.getElementById('vrs-ctl-caisse');
+  if (sel) {
+    var ouv = _vrsCaissesOuvertes();
+    sel.innerHTML = ouv.length ? ouv.map(function(c){ return '<option value="' + c.id + '">' + escHtml(c.nom || c.id) + '</option>'; }).join('') : '<option value="">— Aucune caisse ouverte —</option>';
+  }
+  vrsEspecesRender();
+  openModal('modal-vrs-especes');
+}
+function vrsEspecesRender() {
+  var box = document.getElementById('vrs-ctl-table'); if (!box) return;
+  var depuis = (document.getElementById('vrs-ctl-depuis') || {}).value || '';
+  var liste = vrsEspecesSansBon(depuis);
+  var total = liste.reduce(function(s, v){ return s + (parseFloat(v.montant) || 0); }, 0);
+  var res = document.getElementById('vrs-ctl-resume');
+  if (res) res.innerHTML = liste.length ? '<b style="color:var(--rouge);">' + liste.length + ' versement(s) — ' + fmtF(total) + ' F</b> non rattaché(s) à la caisse' : '<b style="color:var(--vert);">✅ Tous les versements en espèces de la période sont rattachés à un bon de caisse.</b>';
+  if (!liste.length) { box.innerHTML = ''; return; }
+  var pris = {};
+  var ouverte = _vrsCaissesOuvertes().length > 0;
+  box.innerHTML = '<div style="overflow-x:auto;max-height:60vh;"><table class="data-table"><thead><tr><th>Date</th><th>Réf.</th><th>Souscripteur</th><th style="text-align:right;">Montant</th><th>Bon de caisse correspondant</th><th></th></tr></thead><tbody>'
+    + liste.slice(0, 400).map(function(v){
+      var c = (DATA.clients || []).find(function(x){ return x.id === v.client_id; }) || {};
+      var cand = _vrsBonCandidat(v, pris);
+      if (cand) pris[cand.m.id] = true;
+      var caisseC = cand ? (DATA.caisses || []).find(function(x){ return x.id === cand.m.caisse_id; }) : null;
+      var candHtml = cand
+        ? (cand.nomOk ? '✅ ' : '❓ ') + '<b>' + escHtml(cand.m.numero || '') + '</b> · ' + escHtml(caisseC ? caisseC.nom : '') + ' · ' + dateShort((cand.m.date || '').slice(0, 10))
+          + '<div style="font-size:10px;color:var(--blanc-dim);">' + escHtml((cand.m.motif || '').slice(0, 80)) + (cand.nomOk ? '' : ' — nom du client absent du bon, à vérifier') + '</div>'
+        : '<span style="color:var(--blanc-dim);">Aucun bon d\'entrée de même montant à ±3 jours</span>';
+      return '<tr><td>' + dateShort(v.date) + '</td><td>' + escHtml(v.ref || '') + '</td><td>' + escHtml(((c.nom || '') + ' ' + (c.prenoms || '')).trim() || '—') + '</td>'
+        + '<td style="text-align:right;font-weight:700;">' + fmtF(v.montant) + ' F</td><td style="font-size:11px;">' + candHtml + '</td>'
+        + '<td style="white-space:nowrap;">'
+        + (cand ? '<button class="btn btn-primary btn-sm" onclick="vrsRattacherBon(\'' + v.id + '\',\'' + cand.m.id + '\')">🔗 Rattacher</button> ' : '')
+        + (ouverte ? '<button class="btn btn-secondary btn-sm" onclick="vrsCreerBonDepuisControle(\'' + v.id + '\')">➕ Créer le bon</button>' : '')
+        + '</td></tr>';
+    }).join('') + '</tbody></table></div>'
+    + (liste.length > 400 ? '<div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">400 premières lignes affichées sur ' + liste.length + ' — avancez la date « Depuis le ».</div>' : '');
+}
+async function vrsRattacherBon(versementId, mvtId) {
+  if (!exigerDroit('Caisse', 'm', 'le rattachement d\'un bon de caisse à un versement')) return;
+  var v = (DATA.versements || []).find(function(x){ return x.id === versementId; });
+  var m = (DATA.caisse_mouvements || []).find(function(x){ return x.id === mvtId; });
+  if (!v || !m || m.versement_id) return;
+  var ecrPropre = (m.ecriture_id && m.ecriture_id !== 'ecr_vrs_' + v.id) ? (DATA.ecritures || []).find(function(e){ return e.id === m.ecriture_id; }) : null;
+  if (!confirm('Rattacher le bon ' + (m.numero || '') + ' (' + fmtF(m.montant) + ' F) au versement ' + (v.ref || '') + ' ?'
+    + (ecrPropre ? '\n\nL\'écriture propre à ce bon (' + (ecrPropre.compte_debit || '') + ' / ' + (ecrPropre.compte_credit || '') + ') sera supprimée : l\'écriture du versement enregistre déjà cet encaissement (sinon il serait comptabilisé deux fois).' : ''))) return;
+  if (ecrPropre && await deleteRecord('ecritures', ecrPropre.id) === false) { toast('🔒 Exercice clôturé — l\'écriture du bon ne peut plus être supprimée : rattachement annulé.', 'error'); return; }
+  if (!(DATA.ecritures || []).some(function(e){ return e.id === 'ecr_vrs_' + v.id; })) { try { await genererEcritureVersement(v); } catch(e) {} }
+  m.versement_id = v.id; m.client_id = v.client_id;
+  m.statut = 'ventile'; m.ecriture_id = 'ecr_vrs_' + v.id; m.compte_ventile = _vrsCompteCredit(v);
+  m.ventile_auto = false; m.ventile_par = (APP.currentUser && APP.currentUser.nom) || '—'; m.ventile_le = new Date().toISOString();
+  m._baseModifie = m._modifie || null;
+  await dbPut('caisse_mouvements', m);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', m);
+  toast('🔗 Bon ' + (m.numero || '') + ' rattaché au versement ' + (v.ref || '') + '.', 'success');
+  vrsEspecesRender(); _vrsRafraichirCaisse();
+  if (typeof buildBalance === 'function') buildBalance();
+}
+async function vrsCreerBonDepuisControle(versementId) {
+  if (!exigerDroit('Caisse', 'c', 'la création d\'un bon de caisse')) return;
+  var v = (DATA.versements || []).find(function(x){ return x.id === versementId; });
+  var caisseId = (document.getElementById('vrs-ctl-caisse') || {}).value || '';
+  if (!v || !caisseId) { toast('Choisissez une caisse ouverte.', 'error'); return; }
+  var c = (DATA.caisses || []).find(function(x){ return x.id === caisseId; });
+  if (!confirm('Créer dans « ' + (c ? c.nom : '') + ' » un bon d\'entrée de ' + fmtF(v.montant) + ' F pour le versement ' + (v.ref || '') + ' du ' + dateShort(v.date) + ' ?\n\nÀ faire uniquement si ces espèces sont bien dans cette caisse aujourd\'hui (le bon est daté du jour).')) return;
+  if (!(DATA.ecritures || []).some(function(e){ return e.id === 'ecr_vrs_' + v.id; })) { try { await genererEcritureVersement(v); } catch(e) {} }
+  var mvt = await _vrsCreerBonCaisse(v, caisseId);
+  if (!mvt) { toast('Caisse fermée entre-temps.', 'error'); return; }
+  toast('💰 Bon ' + mvt.numero + ' créé pour le versement ' + (v.ref || '') + '.', 'success');
+  vrsEspecesRender(); _vrsRafraichirCaisse();
+}
+
 async function savePaiement() {
   var cid = document.getElementById('v-client').value;
   var montant = parseFloat(document.getElementById('v-montant').value);
   var date = document.getElementById('v-date').value;
   if (!cid || !montant || !date) { toast('Client, montant et date sont obligatoires.', 'error'); return; }
+  /* [FIX] Une date tapée au clavier pouvait donner « 82025-02-20 » ou
+     « 0203-06-06 » : versement, écriture et commission se retrouvaient sur
+     un exercice fantôme. */
+  var _anSaisi = parseInt(String(date).slice(0, 4), 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || _anSaisi < 2000 || _anSaisi > new Date().getFullYear() + 1) {
+    toast('⛔ Date invalide (' + date + ') : vérifiez l\'année saisie.', 'error'); return;
+  }
   if (typeof sfcTiersEstGele==='function' && sfcTiersEstGele('client', cid)) {
     toast('⛔ Ce client est gelé (SFC) — l\'enregistrement d\'un versement est interdit tant que la mesure de gel est active.', 'error');
     return;
   }
 
   // ── MODE ÉDITION : mise à jour + ré-impact des commissions + ré-écriture comptable ──
+  var _modeSaisi = document.getElementById('v-mode').value;
+  var _caisseSaisie = (document.getElementById('v-caisse') || {}).value || '';
   if (APP._editVersementId) {
     var vEdit = DATA.versements.find(function(x){ return x.id === APP._editVersementId; });
     if (vEdit) {
+      /* [Caisse] Bon d'entrée rattaché : on vérifie AVANT toute modification
+         qu'il peut suivre (session encore ouverte), sinon la caisse clôturée
+         et le versement divergeraient. */
+      var _mvtLie = _vrsMvtLie(vEdit.id);
+      var _sessLie = _mvtLie ? _vrsSessionDe(_mvtLie) : null;
+      var _touche = Math.round(parseFloat(vEdit.montant)||0) !== Math.round(montant) || _modeSaisi !== vEdit.mode || cid !== vEdit.client_id;
+      if (_mvtLie && _touche && (!_sessLie || _sessLie.statut !== 'ouverte')) {
+        toast('🔒 Ce versement est rattaché au bon de caisse ' + (_mvtLie.numero||'') + ' d\'une session déjà clôturée : montant, mode et client ne peuvent plus changer. Régularisez par un bon en caisse.', 'error', 9000);
+        return;
+      }
+      var _creerBon = !_mvtLie && _modeSaisi === 'especes' && vEdit.mode !== 'especes';
+      if (_creerBon && !_caisseSaisie) { toast('Choisissez la caisse qui reçoit les espèces.', 'error'); return; }
+      if (_creerBon && !caisseGetSessionOuverte(_caisseSaisie)) { toast('Cette caisse est fermée — faites-la ouvrir avant d\'encaisser des espèces.', 'error'); return; }
       var _vAvant = JSON.parse(JSON.stringify(vEdit));
       vEdit.client_id = cid;
       vEdit.date      = date;
@@ -34543,6 +34901,10 @@ async function savePaiement() {
       await logAudit('versements', vEdit.id, 'update', _vAvant, vEdit);
       await reimpacterCommissionsVersement(vEdit);
       await genererEcritureVersement(vEdit);
+      if (_mvtLie && vEdit.mode === 'especes') await _vrsMajBonCaisse(vEdit, _mvtLie);
+      else if (_mvtLie) await _caisseDelMvt(_mvtLie, { depuisVersement: true });
+      else if (_creerBon) await _vrsCreerBonCaisse(vEdit, _caisseSaisie);
+      if (_mvtLie || _creerBon) _vrsRafraichirCaisse();
       if (typeof majStatutLotClient === 'function') await majStatutLotClient(vEdit.client_id);
       APP._editVersementId = null;
       closeModal('modal-paiement');
@@ -34554,6 +34916,10 @@ async function savePaiement() {
     return;
   }
 
+  if (_modeSaisi === 'especes') {
+    if (!_caisseSaisie) { toast('Choisissez la caisse qui reçoit les espèces.', 'error'); return; }
+    if (!caisseGetSessionOuverte(_caisseSaisie)) { toast('Cette caisse est fermée — faites-la ouvrir avant d\'encaisser des espèces.', 'error'); return; }
+  }
   var _anVrs = String(new Date().getFullYear());
   /* [Anti-doublon import caisse ↔ saisie Paiements] L'historique importé est
      constitué de mouvements de CAISSE (DATA.caisse_mouvements, import
@@ -34582,7 +34948,7 @@ async function savePaiement() {
       + 'Confirmer que ce nouveau versement est bien DIFFÉRENT (et non une ressaisie du même paiement) ?')) return;
   }
   var mvtCaisseProche = nomClientPaiement ? (DATA.caisse_mouvements || []).find(function(m) {
-    if (m.type !== 'entree') return false;
+    if (m.type !== 'entree' || m.versement_id) return false;
     if (Math.round(parseFloat(m.montant) || 0) !== Math.round(montant)) return false;
     var dM = new Date((m.date||'').slice(0,10)), dN = new Date(date);
     if (isNaN(dM) || isNaN(dN) || Math.abs(dM-dN) > 2*86400000) return false;
@@ -34616,12 +34982,17 @@ async function savePaiement() {
 
   // ── Écriture comptable automatique (Débit Trésorerie / Crédit Client) ──────
   await genererEcritureVersement(versement);
+  // ── Espèces : bon d'entrée automatique dans la caisse qui reçoit l'argent ──
+  var _bon = (versement.mode === 'especes') ? await _vrsCreerBonCaisse(versement, _caisseSaisie) : null;
+  if (_bon) _vrsRafraichirCaisse();
+  else if (versement.mode === 'especes') toast('⚠️ Versement enregistré, mais le bon de caisse n\'a pas pu être créé (caisse fermée entre-temps) — utilisez Caisse → « 💵 Versements espèces » pour le rattacher.', 'error', 9000);
   // ── Génération automatique des commissions ─────────────────────────────────
   await genererCommissionsVersement(versement);
   // ── Statut du lot : passe « vendu » dès que le seuil d'immobilisation est atteint ──
   if (typeof majStatutLotClient === 'function') await majStatutLotClient(versement.client_id);
 
   closeModal('modal-paiement');
+  if (_bon) toast('💰 Bon d\'entrée ' + _bon.numero + ' créé dans la caisse — solde de caisse à jour.', 'success', 6000);
   toast('Versement enregistré — écriture ' + _compteTresoVersement(versement.mode) + '/' + (versement.type === 'frais_souscription' ? requireParamCompte('compte_frais_souscription', 'Compte produit des frais de souscription') : requireCompteDefaut('client_lots')) + ' créée.', 'success');
 
   // Afficher reçu
@@ -34935,13 +35306,22 @@ async function deleteVersement(id, skipConfirm) {
      (auditSupprimerSelection), qui affiche une seule confirmation globale
      avant la boucle plutôt qu'une confirmation par ligne. */
   if (!exigerDroit('Paiements', 's', 'la suppression de ce versement')) return;
-  if (!skipConfirm && !confirm('Supprimer ce versement ?')) return;
+  var _mvtLieDel = _vrsMvtLie(id);
+  if (_mvtLieDel) {
+    var _sessDel = _vrsSessionDe(_mvtLieDel);
+    if (!_sessDel || _sessDel.statut !== 'ouverte') {
+      toast('🔒 Versement rattaché au bon de caisse ' + (_mvtLieDel.numero||'') + ' d\'une session clôturée : suppression impossible. Régularisez par un bon de sortie en caisse, puis contactez le comptable.', 'error', 9000);
+      return;
+    }
+  }
+  if (!skipConfirm && !confirm('Supprimer ce versement ?' + (_mvtLieDel ? '\n\nLe bon de caisse ' + (_mvtLieDel.numero||'') + ' rattaché sera supprimé aussi.' : ''))) return;
   var v = DATA.versements.find(function(x){ return x.id === id; });
   var clientId = v ? v.client_id : null;
   await logAudit('versements', id, 'delete', v || null, null);
   DATA.versements = DATA.versements.filter(function(v) { return v.id !== id; });
   await deleteRecord('versements', id);
   await supprimerEcritureVersement(id);
+  if (_mvtLieDel) { await _caisseDelMvt(_mvtLieDel, { depuisVersement: true }); _vrsRafraichirCaisse(); }
   /* [FIX] Un versement supprimé (doublon, erreur de saisie) laissait ses
      commissions générées automatiquement (genererCommissionsVersement) en
      orphelines — invisibles ici, mais toujours comptées dans le total des
@@ -36688,16 +37068,28 @@ function openLotModal(id) {
     setSelectValue('l-mode-livraison', l.mode_livraison || 'gros_oeuvre');
     document.getElementById('l-numero-tf').value = l.numero_tf || '';
     document.getElementById('l-frais-notaire').value = l.frais_notaire || '';
+    var _v = function(x){ return (x === null || x === undefined) ? '' : x; };
+    document.getElementById('l-taux-comm-commercial').value = _v(l.taux_comm_commercial);
+    document.getElementById('l-taux-comm-apporteur').value = _v(l.taux_comm_apporteur);
     lotNatureUI(); lotRecalcPrixM2(); lotRecalcCoutM2();
   } else {
     document.getElementById('modal-lot-title').textContent = 'Nouveau Lot';
     populateTypeLogementOptions();
+    /* Taux de commission fixés à la création du bien : pré-remplis avec les
+       taux « régulier » des Paramètres, modifiables lot par lot. */
+    var _tx = getTauxCommissions();
+    document.getElementById('l-taux-comm-commercial').value = _tx.commercial_regulier;
+    document.getElementById('l-taux-comm-apporteur').value = _tx.apporteur_regulier;
   }
+  var _cn = document.getElementById('l-comm-note');
+  if (_cn) _cn.textContent = (commissionMode() === 'bien')
+    ? 'Système actif : commission = prix du lot × ces taux.'
+    : 'Système actif : par versement — ces taux ne servent que si vous passez au calcul « sur la valeur du bien » (Paramètres).';
   openModal('modal-lot');
 }
 
 function clearLotForm() {
-  ['l-numero','l-ilot','l-surface','l-surface-mesuree','l-pieces','l-prix','l-prix-m2','l-cout-revient','l-cout-m2','l-notes','l-numero-tf','l-frais-notaire'].forEach(function(id) {
+  ['l-numero','l-ilot','l-surface','l-surface-mesuree','l-pieces','l-prix','l-prix-m2','l-cout-revient','l-cout-m2','l-notes','l-numero-tf','l-frais-notaire','l-taux-comm-commercial','l-taux-comm-apporteur'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -36826,6 +37218,13 @@ function populateTypeLogementOptions(selectedType) {
   sel.value = selectedType || '';
 }
 
+function _tauxLotSaisi(id) {
+  var v = ((document.getElementById(id) || {}).value || '').trim();
+  if (v === '') return null;
+  var n = parseFloat(v);
+  return isNaN(n) ? null : Math.max(0, n);
+}
+
 async function saveLot() {
   var numero = document.getElementById('l-numero').value.trim();
   if (!numero) { toast('Numéro de lot obligatoire.', 'error'); return; }
@@ -36863,6 +37262,9 @@ async function saveLot() {
     mode_livraison: document.getElementById('l-mode-livraison').value,
     numero_tf: document.getElementById('l-numero-tf').value.trim(),
     frais_notaire: parseFloat(document.getElementById('l-frais-notaire').value) || 0,
+    /* Vide = pas de taux propre au lot (null), distinct d'un 0 explicite. */
+    taux_comm_commercial: _tauxLotSaisi('l-taux-comm-commercial'),
+    taux_comm_apporteur: _tauxLotSaisi('l-taux-comm-apporteur'),
     nature: _lotNature,
     statut: document.getElementById('l-statut').value,
     notes: document.getElementById('l-notes').value,
@@ -39398,7 +39800,7 @@ function loadComptabilite() {
      grand livre. Le système de permissions ne descend qu'au niveau du
      module, pas de l'onglet — restriction posée ici pour ne pas exposer
      tout le reste de la comptabilité à un rôle de caisse. */
-  if (APP.currentUser && APP.currentUser.role === 'caissiere') {
+  if (APP.currentUser && roleEstCaissiere(APP.currentUser.role)) {
     var tabs = document.getElementById('compta-tabs');
     if (tabs) {
       tabs.querySelectorAll('.tab-btn').forEach(function(b) {
@@ -41627,9 +42029,22 @@ var CONV_REG_TYPES = {
   autre: 'Autre convention'
 };
 
+/* [FIX] Une écriture mal datée (ex. « 82025-02-20 » ou « 0203-06-06 »,
+   saisie clavier dans un champ date) faisait apparaître des exercices
+   fantômes « 8202 » / « 0203 » dans la liste. Seules les années plausibles
+   sont proposées ; les écritures mal datées sont signalées à part. */
+function _intragAnneePlausible(a) {
+  var y = parseInt(a, 10), cur = new Date().getFullYear();
+  return /^\d{4}$/.test(String(a)) && y >= 2000 && y <= cur + 1;
+}
+function _intragDatesInvalides() {
+  return (DATA.ecritures || []).filter(function(e){
+    return e.date && (!/^\d{4}-\d{2}-\d{2}/.test(e.date) || !_intragAnneePlausible(e.date.slice(0,4)));
+  });
+}
 function _intragAnnees() {
   var set = {};
-  (DATA.ecritures || []).forEach(function(e){ if (e.date) set[e.date.slice(0,4)] = true; });
+  (DATA.ecritures || []).forEach(function(e){ if (e.date && /^\d{4}-/.test(e.date) && _intragAnneePlausible(e.date.slice(0,4))) set[e.date.slice(0,4)] = true; });
   var arr = Object.keys(set).sort().reverse();
   if (!arr.length) arr = [String(new Date().getFullYear())];
   return arr;
@@ -41676,6 +42091,12 @@ function _intragFluxFiltres(annee) {
 function _intragMatrice(annee) {
   var flux = _intragFlux(annee);
   var divs = _consoDivisions();
+  /* [FIX revue] Une écriture sans division (ou d'une division supprimée)
+     n'était comptée dans AUCUNE colonne : son montant disparaissait du
+     total et pouvait masquer — ou créer — un écart de réciprocité. */
+  var connues = {}; divs.forEach(function(d){ connues[d.id] = true; });
+  if (flux.some(function(x){ return !connues[x.division]; })) divs = divs.concat([{ id: '__sans__', nom: 'Sans division / inconnue' }]);
+  flux = flux.map(function(x){ return connues[x.division] ? x : Object.assign({}, x, { division: '__sans__' }); });
   var comptes = {};
   flux.forEach(function(x){
     if (!comptes[x.compte]) comptes[x.compte] = {};
@@ -41687,6 +42108,78 @@ function _intragMatrice(annee) {
     return { compte: compte, parDiv: parDiv, total: total };
   });
   return { divs: divs, lignes: lignes };
+}
+
+/* ── Flux de caisse entre divisions ─────────────────────────────────────
+   Le registre ne lit que les ÉCRITURES sur comptes de liaison. Or les
+   mouvements d'argent entre divisions passent par la caisse (transfert
+   entre caisses, réapprovisionnement servi) et sont ventilés sur 585
+   « virement interne » — ou pas encore ventilés : ils n'y apparaissaient
+   jamais. On les reconstitue ici directement depuis les bons de caisse. */
+function _intragDivCaisse(caisseId) {
+  var c = (DATA.caisses || []).find(function(x){ return x.id === caisseId; });
+  return c ? (c.division_id || '') : '';
+}
+function _intragFluxCaisseInterDiv(annee) {
+  var liaison = _consoCfg().liaison;
+  var out = [];
+  (DATA.caisse_mouvements || []).forEach(function(m){
+    if (m.type !== 'sortie' || !m.transfert_id || m.rejete) return;
+    if (annee && (m.date || '').slice(0,4) !== String(annee)) return;
+    var destId = m.transfert_vers;
+    var divS = _intragDivCaisse(m.caisse_id), divD = _intragDivCaisse(destId);
+    if (!divS || !divD || divS === divD) return;
+    var e = (DATA.caisse_mouvements || []).find(function(x){ return x.id !== m.id && x.transfert_id === m.transfert_id; }) || null;
+    var effectif = function(x){ return x && !x.rejete && (!x.requiert_validation || x.valide === true); };
+    var surLiaison = function(x){ return x && x.compte_ventile && liaison.some(function(pf){ return String(x.compte_ventile).indexOf(pf) === 0; }); };
+    var cS = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; }), cD = (DATA.caisses || []).find(function(x){ return x.id === destId; });
+    var reap = m.reappro_id ? (DATA.demandes_reappro || []).find(function(r){ return r.id === m.reappro_id; }) : null;
+    out.push({
+      date: (m.date || '').slice(0,10), montant: parseFloat(m.montant) || 0,
+      divSource: divS, divDest: divD, caisseSource: cS ? cS.nom : '?', caisseDest: cD ? cD.nom : '?',
+      bonSortie: m.numero || '', bonEntree: e ? (e.numero || '') : '— manquant',
+      origine: reap ? ('Réappro ' + (reap.numero || '')) : 'Transfert entre caisses',
+      statut: !e ? 'incomplet' : (effectif(m) && effectif(e)) ? 'effectif' : 'en attente',
+      comptes: [m.compte_ventile || 'non ventilé', e ? (e.compte_ventile || 'non ventilé') : '—'].join(' / '),
+      horsLiaison: !(surLiaison(m) && surLiaison(e))
+    });
+  });
+  return out.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+}
+function _intragReapNonServies(annee) {
+  return (DATA.demandes_reappro || []).filter(function(r){
+    return r.statut === 'validee' && (!annee || (r.valide_le || r.demande_le || '').slice(0,4) === String(annee));
+  });
+}
+function _intragRenderFluxCaisse(annee) {
+  var flux = _intragFluxCaisseInterDiv(annee);
+  var nonServies = _intragReapNonServies(annee);
+  var html = '<h4 style="margin:18px 0 6px;">💰 Flux de caisse entre divisions — exercice ' + escHtml(annee) + '</h4>'
+    + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:6px;">Transferts entre caisses et réapprovisionnements servis dont la caisse source et la caisse destinataire appartiennent à <b>deux divisions différentes</b>, reconstitués depuis les bons de caisse (ils ne passent pas par les comptes de liaison ci-dessus).</div>';
+  if (!flux.length) html += '<div class="alert alert-info" style="font-size:12px;">Aucun transfert de caisse entre deux divisions enregistré sur cet exercice.</div>';
+  else {
+    var nbHors = flux.filter(function(x){ return x.horsLiaison; }).length;
+    if (nbHors) html += '<div class="alert alert-warn" style="margin-bottom:8px;font-size:12px;">⚠️ ' + nbHors + ' flux entre divisions ventilé(s) sur un compte qui n\'est pas un compte de liaison (souvent 585 « virement interne », prévu pour deux caisses d\'une même entité) ou non ventilé(s) : ils n\'entrent ni dans la matrice de réciprocité ni dans l\'élimination de consolidation.</div>';
+    html += '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Origine</th><th>De (division · caisse)</th><th>Vers (division · caisse)</th><th class="num">Montant</th><th>Bons</th><th>Statut</th><th>Comptes ventilés (sortie / entrée)</th></tr></thead><tbody>'
+      + flux.map(function(x){
+        return '<tr' + (x.horsLiaison ? ' style="background:rgba(184,115,51,.08);"' : '') + '><td>' + dateShort(x.date) + '</td><td>' + escHtml(x.origine) + '</td>'
+          + '<td>' + escHtml(_nomDivision(x.divSource)) + ' · ' + escHtml(x.caisseSource) + '</td><td>' + escHtml(_nomDivision(x.divDest)) + ' · ' + escHtml(x.caisseDest) + '</td>'
+          + '<td class="num">' + fmtF(x.montant) + '</td><td style="font-family:monospace;font-size:10.5px;">' + escHtml(x.bonSortie) + ' → ' + escHtml(x.bonEntree) + '</td>'
+          + '<td>' + (x.statut === 'effectif' ? '✅ effectif' : x.statut === 'en attente' ? '🔐 en attente' : '⚠️ incomplet') + '</td>'
+          + '<td style="font-family:monospace;font-size:10.5px;">' + escHtml(x.comptes) + (x.horsLiaison ? ' ⚠️' : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  if (nonServies.length) {
+    html += '<h4 style="margin:14px 0 6px;">🏦 Demandes de réapprovisionnement validées mais jamais servies</h4>'
+      + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:6px;">Validées par la hiérarchie, mais aucun versement n\'a été enregistré dans l\'application (bouton « 🏦 Servir » jamais utilisé) : <b>aucun bon de caisse n\'existe pour elles</b>. Si l\'argent a réellement été remis, il l\'a été hors de ce circuit (bon de caisse saisi à la main, retrait bancaire…) : servez la demande pour tracer le flux, ou rejetez-la si elle n\'a plus lieu d\'être.</div>'
+      + '<div class="table-wrap"><table><thead><tr><th>N°</th><th>Division</th><th>Caisse à réapprovisionner</th><th class="num">Montant accordé</th><th>Validée par / le</th><th>Motif</th></tr></thead><tbody>'
+      + nonServies.map(function(r){
+        var c = (DATA.caisses || []).find(function(x){ return x.id === r.caisse_id; });
+        return '<tr><td>' + escHtml(r.numero || '') + '</td><td>' + escHtml(_nomDivision(r.division_id)) + '</td><td>' + escHtml(c ? c.nom : '?') + '</td>'
+          + '<td class="num">' + fmtF(r.montant_accorde || r.montant_demande) + '</td><td>' + escHtml(r.valide_par || '—') + ' · ' + dateShort((r.valide_le || '').slice(0,10)) + '</td><td>' + escHtml(r.motif || '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  return html;
 }
 
 /* ── Aperçu caisse avant ventilation ──────────────────────────────────
@@ -41702,10 +42195,13 @@ function _intragCaisseTermesListe() {
     .map(function(t){ return sfcNormalise(t.trim()); }).filter(Boolean);
 }
 function _intragCaisseClasser(motifNorm) {
-  if (motifNorm.indexOf('retour') !== -1) return 'retour';
-  if (motifNorm.indexOf('appro') !== -1) return 'appro';
-  if (motifNorm.indexOf('reserv') !== -1) return 'reserve';
-  if (motifNorm.indexOf('associ') !== -1) return 'associe';
+  /* [FIX revue] sfcNormalise() renvoie du texte en MAJUSCULES : les tests en
+     minuscules ne trouvaient jamais rien et TOUT tombait en « Autre ». */
+  var t = String(motifNorm || '').toUpperCase();
+  if (t.indexOf('RETOUR') !== -1) return 'retour';
+  if (t.indexOf('APPRO') !== -1) return 'appro';
+  if (t.indexOf('RESERV') !== -1) return 'reserve';
+  if (t.indexOf('ASSOCI') !== -1) return 'associe';
   return 'autre';
 }
 function _intragCaisseCandidats() {
@@ -41713,6 +42209,8 @@ function _intragCaisseCandidats() {
   if (!termes.length) return [];
   var out = [];
   (DATA.caisse_mouvements || []).forEach(function(m){
+    /* [FIX revue] Un bon rejeté n'a jamais eu lieu : il gonflait les totaux. */
+    if (m.rejete) return;
     var hay = sfcNormalise([m.motif, m.beneficiaire].filter(Boolean).join(' '));
     if (!termes.some(function(t){ return hay.indexOf(t) !== -1; })) return;
     var caisse = (DATA.caisses || []).find(function(c){ return c.id === m.caisse_id; });
@@ -41720,7 +42218,8 @@ function _intragCaisseCandidats() {
       id: m.id, date: (m.date || '').slice(0,10), division: caisse ? (caisse.division_id || '') : '',
       caisse: caisse ? (caisse.nom || '') : '—', type: m.type, montant: parseFloat(m.montant) || 0,
       motif: m.motif || '', beneficiaire: m.beneficiaire || '',
-      statut: m.statut || (m.compte_ventile ? 'ventile' : 'a_ventiler'), compte_ventile: m.compte_ventile || '',
+      /* Un bon en attente de validation n'est pas encore effectif (cf. caisseSoldeSession). */
+      statut: (m.requiert_validation && m.valide !== true) ? 'en_attente' : (m.statut || (m.compte_ventile ? 'ventile' : 'a_ventiler')), compte_ventile: m.compte_ventile || '',
       categorie: _intragCaisseClasser(hay)
     });
   });
@@ -41743,7 +42242,7 @@ function _intragRenderCaisseApercu() {
   if (!el) return;
   var divs = _consoDivisions();
   var toutes = _intragCaisseCandidats();
-  var annees = Array.from(new Set(toutes.map(function(x){ return x.date.slice(0,4); }).filter(Boolean))).sort().reverse();
+  var annees = Array.from(new Set(toutes.map(function(x){ return x.date.slice(0,4); }).filter(_intragAnneePlausible))).sort().reverse();
   if (!annees.length) annees = [String(new Date().getFullYear())];
   var list = _intragCaisseFiltres();
 
@@ -41758,6 +42257,7 @@ function _intragRenderCaisseApercu() {
     + divs.map(function(d){ return '<option value="' + d.id + '"' + (d.id === _intragCaisseDiv ? ' selected' : '') + '>' + escHtml(d.nom) + '</option>'; }).join('')
     + '</select>'
     + '<select class="filter-select" id="intrag-caisse-statut" onchange="_intragCaisseSetStatut()"><option value="">Tous statuts</option>'
+    + '<option value="en_attente"' + (_intragCaisseStatut === 'en_attente' ? ' selected' : '') + '>🔐 En attente de validation</option>'
     + '<option value="a_ventiler"' + (_intragCaisseStatut === 'a_ventiler' ? ' selected' : '') + '>⏳ À ventiler</option>'
     + '<option value="ventile"' + (_intragCaisseStatut === 'ventile' ? ' selected' : '') + '>✓ Ventilé</option></select>'
     + '<button class="btn btn-secondary btn-sm" onclick="_intragCaisseExportCSV()">⬇ CSV</button>'
@@ -41774,7 +42274,8 @@ function _intragRenderCaisseApercu() {
 
   var rows = list.slice(0, 300).map(function(x){
     var cat = INTRAG_CAISSE_CATEGORIES[x.categorie];
-    var statutHtml = x.statut === 'ventile' ? ('✓ ventilé' + (x.compte_ventile ? ' (' + escHtml(x.compte_ventile) + ')' : '')) : '⏳ à ventiler';
+    var statutHtml = x.statut === 'ventile' ? ('✓ ventilé' + (x.compte_ventile ? ' (' + escHtml(x.compte_ventile) + ')' : ''))
+      : x.statut === 'en_attente' ? '🔐 en attente de validation' : '⏳ à ventiler';
     return '<tr><td>' + dateShort(x.date) + '</td><td>' + escHtml(_nomDivision(x.division)) + '</td><td>' + escHtml(x.caisse) + '</td>'
       + '<td style="text-align:center;">' + (x.type === 'entree' ? '📥' : '📤') + '</td>'
       + '<td class="num">' + fmtF(x.montant) + '</td>'
@@ -41791,17 +42292,29 @@ function _intragRenderCaisseApercu() {
   el.innerHTML = filtres + resume + tbl;
 }
 
+/* [FIX revue] Export CSV lisible par Excel en français : séparateur « ; »,
+   champs entre guillemets, BOM UTF-8. Avant, seules les virgules du libellé
+   étaient remplacées : une virgule dans une pièce ou un journal décalait les
+   colonnes, et Excel FR affichait tout sur une seule colonne. */
+function _intragCsv(lignes) {
+  return '\uFEFF' + lignes.map(function(r){
+    return r.map(function(v){ v = (v === null || v === undefined) ? '' : String(v); return '"' + v.replace(/"/g, '""') + '"'; }).join(';');
+  }).join('\r\n');
+}
+function _intragTelecharger(csv, nom) {
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = nom; a.click();
+  toast('Export CSV téléchargé.', 'success');
+}
+
 function _intragCaisseExportCSV() {
   var list = _intragCaisseFiltres();
-  var rows = ['Date,Division,Caisse,Type,Montant,Motif,Categorie,Statut,CompteVentile'];
+  var rows = [['Date','Division','Caisse','Type','Montant','Motif','Categorie','Statut','CompteVentile']];
   list.forEach(function(x){
-    rows.push([x.date, _nomDivision(x.division), x.caisse, x.type, x.montant, (x.motif||'').replace(/,/g,';'), INTRAG_CAISSE_CATEGORIES[x.categorie].label, x.statut, x.compte_ventile].join(','));
+    rows.push([x.date, _nomDivision(x.division), x.caisse, x.type, x.montant, x.motif || '', INTRAG_CAISSE_CATEGORIES[x.categorie].label, x.statut, x.compte_ventile]);
   });
-  var blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'apercu_caisse_intragroupe_' + (new Date().toISOString().slice(0,10)) + '.csv';
-  a.click();
-  toast('Export CSV téléchargé.', 'success');
+  _intragTelecharger(_intragCsv(rows), 'apercu_caisse_intragroupe_' + (new Date().toISOString().slice(0,10)) + '.csv');
 }
 
 function _intragRender() {
@@ -41868,20 +42381,39 @@ function _intragRenderFlux() {
       + '<div class="table-wrap"><table><thead>' + thMat + '</thead><tbody>' + rowsMat + '</tbody></table></div>';
   }
 
-  el.innerHTML = filtres + tbl + matriceHtml;
+  /* [FIX revue] Un registre vide n'est PAS un registre sain : il signifie
+     qu'aucun flux intragroupe n'a été comptabilisé sur les comptes de
+     liaison surveillés — la matrice ne contrôle alors rien. */
+  var tousFlux = _intragFlux(_intragAnnee);
+  var alerte = '';
+  if (!tousFlux.length) {
+    var nbCaisse = _intragCaisseCandidats().filter(function(x){ return x.date.slice(0,4) === String(_intragAnnee); }).length;
+    alerte = '<div class="alert alert-warn" style="margin-bottom:10px;font-size:12px;">⚠️ <strong>Aucune écriture de l\'exercice ' + escHtml(_intragAnnee) + ' ne touche les comptes de liaison surveillés (' + escHtml(_consoCfg().liaison.join(', ')) + ').</strong> '
+      + 'Le contrôle de réciprocité ci-dessous ne vérifie donc rien.'
+      + (nbCaisse ? ' Pourtant, <strong>' + nbCaisse + ' mouvement(s) de caisse</strong> de cet exercice ressemblent à des flux intragroupe (onglet 🔍 Aperçu caisse) : ils ont été ventilés sur d\'autres comptes (4621 associés, 422 personnel, charges…) ou ne sont pas encore ventilés.' : '')
+      + ' Vérifiez la liste des comptes de liaison (🏛️ Périmètre groupe) et le plan de ventilation des flux entre divisions.</div>';
+  } else {
+    var sansDiv = tousFlux.filter(function(x){ return !x.division || !_consoDivisions().some(function(d){ return d.id === x.division; }); }).length;
+    if (sansDiv) alerte = '<div class="alert alert-warn" style="margin-bottom:10px;font-size:12px;">⚠️ ' + sansDiv + ' ligne(s) sur comptes de liaison sans division valide : impossible de savoir quelle entité porte la créance ou la dette. Voir la colonne « Sans division » de la matrice.</div>';
+  }
+
+  var datesKo = _intragDatesInvalides();
+  if (datesKo.length) {
+    alerte += '<div class="alert alert-warn" style="margin-bottom:10px;font-size:12px;">⚠️ <b>' + datesKo.length + ' écriture(s) avec une date invalide</b>, exclue(s) de tous les exercices (d\'où les années « ' + escHtml(Array.from(new Set(datesKo.map(function(e){ return String(e.date).slice(0,4); }))).join(' », « ')) + ' » vues auparavant) : '
+      + datesKo.slice(0, 8).map(function(e){ return escHtml((e.ref || e.piece || e.id) + ' (' + e.date + ')'); }).join(', ') + (datesKo.length > 8 ? '…' : '')
+      + '. Corrigez la date du versement ou de la pièce d\'origine : l\'écriture sera régénérée à la bonne date.</div>';
+  }
+
+  el.innerHTML = filtres + alerte + tbl + matriceHtml + _intragRenderFluxCaisse(_intragAnnee);
 }
 
 function _intragExportCSV() {
   var flux = _intragFluxFiltres(_intragAnnee);
-  var rows = ['Date,Division,Journal,Piece,Compte,Sens,Montant,Libelle'];
+  var rows = [['Date','Division','Journal','Piece','Compte','Sens','Montant','Libelle']];
   flux.forEach(function(x){
-    rows.push([x.date, _nomDivision(x.division), x.journal, x.piece, x.compte, x.sens, x.montant, (x.libelle || '').replace(/,/g, ';')].join(','));
+    rows.push([x.date, x.division ? _nomDivision(x.division) : 'Sans division', x.journal, x.piece, x.compte, x.sens, x.montant, x.libelle || '']);
   });
-  var blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'flux_intragroupe_' + _intragAnnee + '.csv';
-  a.click();
-  toast('Export CSV téléchargé.', 'success');
+  _intragTelecharger(_intragCsv(rows), 'flux_intragroupe_' + _intragAnnee + '.csv');
 }
 
 function _intragExportPDF() {
@@ -42071,7 +42603,12 @@ function _intragExportCACPdf() {
   }).join('');
 
   var comptesKo = mat.lignes.filter(function(l){ return Math.abs(l.total) >= 1; });
-  var alerte = comptesKo.length
+  /* [FIX revue] Sans aucune écriture sur les comptes de liaison, le dossier
+     affichait « ✔ Aucun écart de réciprocité » — une fausse assurance
+     remise au commissaire aux comptes : le contrôle n'avait rien vérifié. */
+  var alerte = !flux.length
+    ? '<p style="color:#b45309;font-weight:700;">⚠ Aucune écriture de l\'exercice sur les comptes de liaison surveillés (' + escHtml(_consoCfg().liaison.join(', ')) + ') : le contrôle de réciprocité n\'a porté sur aucune opération. Les flux entre divisions éventuels ont été comptabilisés sur d\'autres comptes et doivent être justifiés séparément.</p>'
+    : comptesKo.length
     ? '<p style="color:#b91c1c;font-weight:700;">⚠ ' + comptesKo.length + ' compte(s) de liaison présentent un écart de réciprocité non nul — voir matrice ci-dessous.</p>'
     : '<p style="color:#0a7a3d;font-weight:700;">✔ Aucun écart de réciprocité détecté sur les comptes de liaison intra-groupe.</p>';
 
@@ -42092,18 +42629,17 @@ function _intragExportCACCsv() {
   var annee = (document.getElementById('intrag-export-annee')||{}).value || _intragAnnee;
   var flux = _intragFlux(annee);
   var conventions = DATA.conventions_reglementees || [];
-  var rows = ['=== FLUX INTRAGROUPE ===', 'Date,Division,Journal,Piece,Compte,Sens,Montant,Libelle'];
-  flux.forEach(function(x){ rows.push([x.date, _nomDivision(x.division), x.journal, x.piece, x.compte, x.sens, x.montant, (x.libelle || '').replace(/,/g, ';')].join(',')); });
-  rows.push(''); rows.push('=== CONVENTIONS REGLEMENTEES ===');
-  rows.push('Type,DivisionA,DivisionB_Tiers,Date,Montant,Objet,ApprouveeCA,Statut');
-  conventions.forEach(function(c){
-    rows.push([CONV_REG_TYPES[c.type] || c.type, _nomDivision(c.division_a), c.division_b === '__tiers__' ? c.tiers_lie : _nomDivision(c.division_b), c.date_signature, c.montant, (c.objet || '').replace(/,/g, ';'), c.approuvee_ca ? 'Oui' : 'Non', c.statut].join(','));
+  var rows = [['=== FLUX INTRAGROUPE ==='], ['Date','Division','Journal','Piece','Compte','Sens','Montant','Libelle']];
+  flux.forEach(function(x){ rows.push([x.date, x.division ? _nomDivision(x.division) : 'Sans division', x.journal, x.piece, x.compte, x.sens, x.montant, x.libelle || '']); });
+  if (!flux.length) rows.push(['AUCUNE ECRITURE SUR LES COMPTES DE LIAISON (' + _consoCfg().liaison.join(', ') + ') : aucun controle de reciprocite n\'a pu etre effectue']);
+  rows.push([]); rows.push(['=== CONVENTIONS REGLEMENTEES ===']);
+  rows.push(['Type','DivisionA','DivisionB_Tiers','Date','Montant','Objet','ApprouveeCA','Statut']);
+  /* [FIX revue] Même périmètre que le PDF : seules les conventions signées au
+     plus tard pendant l'exercice exporté (le CSV les exportait toutes). */
+  conventions.filter(function(c){ return (c.date_signature || '').slice(0,4) <= annee; }).forEach(function(c){
+    rows.push([CONV_REG_TYPES[c.type] || c.type, _nomDivision(c.division_a), c.division_b === '__tiers__' ? c.tiers_lie : _nomDivision(c.division_b), c.date_signature, c.montant, c.objet || '', c.approuvee_ca ? 'Oui' : 'Non', c.statut]);
   });
-  var blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'dossier_cac_intragroupe_' + annee + '.csv';
-  a.click();
-  toast('Export CSV téléchargé.', 'success');
+  _intragTelecharger(_intragCsv(rows), 'dossier_cac_intragroupe_' + annee + '.csv');
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -46263,6 +46799,7 @@ async function saveParams() {
     frais_souscription:           parseFloat(gv('param-frais-souscription'))||0,
     compte_frais_souscription:    gv('param-frais-souscription-compte')||'',
     commission_sur_frais_souscription: gv('param-commission-sur-frais')==='oui',
+    commission_mode:              gv('param-commission-mode')==='bien' ? 'bien' : 'versement',
     bandeau_couleur:              gv('param-bandeau-couleur')||'#003366',
     bandeau_texte:                gv('param-bandeau-texte')||'',
     portail_nom:                  gv('param-portail-nom'),
@@ -46570,6 +47107,7 @@ function loadParamFields() {
   sv('param-frais-souscription', p.frais_souscription||0);
   sv('param-frais-souscription-compte', p.compte_frais_souscription||'');
   sv('param-commission-sur-frais', p.commission_sur_frais_souscription ? 'oui' : 'non');
+  sv('param-commission-mode', p.commission_mode === 'bien' ? 'bien' : 'versement');
   sv('param-bandeau-couleur', p.bandeau_couleur||'#003366');
   sv('param-bandeau-texte', p.bandeau_texte||'');
   sv('param-portail-nom', p.portail_nom||'');
@@ -47633,6 +48171,23 @@ var STORE_MODULE = {
   relances_locatives:'Gestion Locative', biens_locatifs:'Gestion Locative', demarcheurs:'Gestion Locative',
   etats_lieux_bail:'Gestion Locative', restitutions_caution:'Gestion Locative'
 };
+/* [INC-0005] Un rôle « caissière » ne se reconnaît pas qu'à son identifiant
+   système 'caissiere' : l'éditeur permet de le CLONER (« Caissière (Copie) »,
+   id caissi_re_copie__…), et toutes les règles absolues ci-dessous — pas de
+   validation, cloisonnement à ses caisses — sautaient alors silencieusement.
+   C'est ainsi qu'une caissière a pu valider elle-même un réapprovisionnement
+   de 750 000 F. Est caissière : le rôle système, tout rôle cloné depuis lui
+   (base_role), ou tout rôle dont l'id/le libellé contient « caissi(er/ère) ». */
+function roleEstCaissiere(roleId) {
+  if (roleId === undefined) roleId = APP.currentUser && APP.currentUser.role;
+  if (!roleId) return false;
+  if (roleId === 'caissiere') return true;
+  var r = (typeof getAllRoles === 'function') ? getAllRoles()[roleId] : null;
+  if (r && r.base_role === 'caissiere') return true;
+  var txt = (String(roleId) + ' ' + ((r && r.label) || '')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return /caissi/.test(txt);
+}
+
 function userPeut(module, action) {
   if (!APP.currentUser) return false;
   var r = getAllRoles()[APP.currentUser.role];
@@ -47659,7 +48214,10 @@ function userPeut(module, action) {
      cocherait « V » par erreur dans l'éditeur de rôles (case verrouillée
      côté UI, cf. buildModulesGrid) ne pourrait de toute façon pas rouvrir
      cette brèche. */
-  if (module === 'Caisse' && action === 'v' && APP.currentUser.role === 'caissiere') return false;
+  if (module === 'Caisse' && action === 'v' && roleEstCaissiere(APP.currentUser.role)) return false;
+  /* Le module « Validations » (circuit d'approbation transversal) lui est
+     fermé pour la même raison, quelle que soit la case cochée. */
+  if (module === 'Validations' && roleEstCaissiere(APP.currentUser.role)) return false;
   var d = r.droits && module ? r.droits[module] : null;
   if (d === undefined || d === null) return true;      /* non restreint */
   return String(d).indexOf(action) !== -1;
@@ -47855,6 +48413,9 @@ function userCanAccess(module) {
   /* L'administrateur conserve l'accès complet même si sa surcharge enregistrée
      est antérieure à l'ajout d'un module (cohérent avec hasRole). */
   if (role === 'admin') return true;
+  /* [INC-0005] Le circuit de validation n'est jamais visible d'une caissière
+     (rôle système ou copie), même si la case du module est cochée. */
+  if (module === 'Validations' && typeof roleEstCaissiere === 'function' && roleEstCaissiere(role)) return false;
   var allRoles = getAllRoles();
   if (!allRoles[role]) {
     /* Rôle inconnu de ce poste — presque toujours un rôle personnalisé pas
@@ -48575,6 +49136,7 @@ function renderRolesList() {
 
 // ══ MODAL RÔLE : OUVRIR ═══════════════════════════════════════════════════════
 function openRoleModal(roleId) {
+  window._roleCloneBase = '';
   setTimeout(function(){
     var cb = document.getElementById('role-peut-supprimer');
     if (!cb) return;
@@ -48684,7 +49246,7 @@ function buildModulesGrid(permissions, droits, roleId) {
                qu'elle a un effet : l'éditeur de rôles ne doit jamais
                suggérer une possibilité que le code refuse ensuite en
                silence. */
-            var verrouille = (roleId === 'caissiere' && mod === 'Caisse' && a === 'v');
+            var verrouille = (roleId && roleEstCaissiere(roleId) && mod === 'Caisse' && a === 'v');
             var on = verrouille ? false : _droitActif(mod, a);
             return '<label title="'+(verrouille ? 'Verrouillé — la Caissière ne peut jamais valider un mouvement de caisse (séparation des tâches).' : ACTIONS_LIB[a])+'" style="display:flex;align-items:center;gap:3px;font-size:10px;color:'+(verrouille?'#CBD5E1':'#64748B')+';cursor:'+(verrouille?'not-allowed':'pointer')+';">'
               +'<input type="checkbox" class="actchk" data-mod="'+_modAttr(mod)+'" data-act="'+a+'" '+(on?'checked':'')+(verrouille?' disabled':'')
@@ -48768,7 +49330,17 @@ async function saveRoleFromModal() {
 
   var rid = editId || nom.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/__+/g,'_');
   if (!editId && (SYSTEM_ROLES[rid] || CUSTOM_ROLES[rid])) rid = rid+'_'+Date.now().toString(36);
-  var roleObj = { id:rid, label:nom, icon:icon||'👤', level:level, description:desc, system:false, permissions:permissions };
+  /* [INC-0005] Les cases C/M/S/V, le plafond de validation, le périmètre
+     division et le droit de suppression n'étaient enregistrés QUE pour les
+     rôles système : un rôle personnalisé perdait tout ça et devenait « non
+     restreint » (userPeut autorise tout quand droits est absent) — y compris
+     la validation, sans plafond. */
+  var _existant = editId ? CUSTOM_ROLES[editId] : null;
+  var _base = (_existant && _existant.base_role) || window._roleCloneBase || '';
+  var roleObj = { id:rid, label:nom, icon:icon||'👤', level:level, description:desc, system:false, permissions:permissions,
+    peut_supprimer:_peutSup, droits:_droits, scope_division:_scope, plafond_validation:_plafond };
+  if (_base) roleObj.base_role = _base;
+  window._roleCloneBase = '';
   CUSTOM_ROLES[rid] = roleObj;
   await dbPut('custom_roles', roleObj);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_custom_roles', roleObj);
@@ -48985,6 +49557,10 @@ function clonerRole() {
   /* Vider le role-edit-id pour créer un nouveau */
   var editEl = document.getElementById('role-edit-id');
   if (editEl) editEl.textContent = '';
+  /* [INC-0005] La copie hérite du rôle d'origine (base_role) : les règles
+     absolues attachées au rôle système (ex. Caissière → jamais de
+     validation) s'appliquent aussi à ses clones. */
+  window._roleCloneBase = r.base_role || (r.system ? r.id : '') || '';
   var warn = document.getElementById('role-system-warning');
   if (warn) warn.style.display = 'none';
   var btnCloner = document.getElementById('btn-cloner-role');
@@ -94743,7 +95319,7 @@ function togglePwdVisibility(inputId, eyeId) {
 
     /* Code PIN de caisse : obligatoire à la création d'une caissière (attribué
        à ce moment, comme demandé), optionnel en modification (vide = inchangé). */
-    if (role === 'caissiere') {
+    if (roleEstCaissiere(role)) {
       if (!isEdit && !pin) { toast('⚠️ Le code PIN de caisse est obligatoire pour le rôle Caissière.', 'error'); return; }
       if (pin && !/^[0-9]{4}$/.test(pin)) { toast('⚠️ Le code PIN doit comporter exactement 4 chiffres.', 'error'); return; }
     }
@@ -102235,6 +102811,7 @@ function editVersement(id) {
   set('v-mois', v.mois); set('v-notes', v.notes);
   if (typeof onTypeVersementChange === 'function') onTypeVersementChange();
   if (typeof updateClientSolde === 'function') updateClientSolde();
+  vrsMajCaisse();
   var t = document.querySelector('#modal-paiement .modal-header h3'); if (t) t.textContent = 'Modifier le versement';
   var b = document.getElementById('btn-save-paiement'); if (b) b.textContent = '💾 Enregistrer les modifications';
   openModal('modal-paiement');
@@ -122317,7 +122894,7 @@ function caisseRoleAdminLike() {
      cloisonnement par division ne s'applique jamais à ces rôles. */
   if (role === 'admin' || role === 'manager' || role === 'comptable') return true;
   /* La Caissière reste toujours cloisonnée à ses caisses assignées / sa division. */
-  if (role === 'caissiere') return false;
+  if (roleEstCaissiere(role)) return false;
   /* [FIX] Rôle personnalisé : traité comme admin-like dès lors qu'il a un droit
      de vue non limité à sa propre division sur le module Caisse — qu'il ait ou
      non une chaîne de droits (c/m/s/v) définie pour ce module. Se baser sur la
@@ -123303,7 +123880,20 @@ async function caisseEnter() {
    Le verrou d'exercice clos (deleteRecord/ecritures) bloque toute suppression
    d'un mouvement ventilé sur un exercice comptable clôturé. */
 
-async function _caisseDelMvt(mvt) {
+async function _caisseDelMvt(mvt, opts) {
+  /* [Versement ↔ caisse] Le bon rattaché à un versement partage l'écriture
+     du versement (ecr_vrs_<id>) : il ne se supprime qu'avec le versement,
+     et on ne supprime jamais cette écriture d'ici. */
+  if (mvt && mvt.versement_id) {
+    var _vExiste = (DATA.versements || []).some(function(v){ return v.id === mvt.versement_id; });
+    if (!(opts && opts.depuisVersement) && _vExiste) {
+      toast('🔗 Le bon ' + (mvt.numero||'') + ' est rattaché à un versement souscripteur : supprimez ou modifiez le versement (Paiements), pas le bon.', 'error', 8000);
+      return false;
+    }
+    await deleteRecord('caisse_mouvements', mvt.id);
+    DATA.caisse_mouvements = (DATA.caisse_mouvements || []).filter(function(x){ return x.id !== mvt.id; });
+    return true;
+  }
   /* [FIX] Filet de sécurité : certains mouvements (import historique) n'ont
      jamais eu leur champ ecriture_id renseigné, alors qu'une écriture liée
      existe bel et bien sous l'id déterministe ecr_cse_<mouvementId>. Sans ce
@@ -123342,10 +123932,14 @@ async function caisseSupprimerMouvement(mvtId) {
   var m = (DATA.caisse_mouvements||[]).find(function(x){ return x.id===mvtId; });
   if (!m) return;
   if (!caisseRoleAdminLike()) { toast('Droit refusé.','error'); return; }
+  if (m.versement_id && (DATA.versements||[]).some(function(v){ return v.id === m.versement_id; })) { _caisseDelMvt(m); return; }
+  var jumeau = _caisseMvtJumeau(m);
   if (!confirm('Supprimer le mouvement ' + (m.numero||'') + ' (' + fmtF(m.montant) + ' FCFA) ?'
-    + (m.ecriture_id ? '\nL\'écriture comptable liée sera aussi supprimée.' : ''))) return;
+    + (m.ecriture_id ? '\nL\'écriture comptable liée sera aussi supprimée.' : '')
+    + (jumeau ? '\n\n🔄 Transfert entre caisses : le bon lié ' + (jumeau.numero||'') + ' (' + _caisseNomCaisse(jumeau.caisse_id) + ') sera supprimé aussi, pour ne pas laisser un seul côté du transfert.' : ''))) return;
   if (await _caisseDelMvt(m) === false) { toast('🔒 Exercice clôturé — suppression bloquée.','error'); return; }
-  toast('Mouvement supprimé.','info');
+  if (jumeau && await _caisseDelMvt(jumeau) === false) { toast('⚠️ ' + (m.numero||'') + ' supprimé, mais le bon lié ' + (jumeau.numero||'') + ' n\'a pas pu l\'être (exercice clôturé) — à régulariser.','error', 9000); return; }
+  toast(jumeau ? 'Mouvement et bon lié supprimés.' : 'Mouvement supprimé.','info');
   caisseRenderListe();
   if (typeof caisseRenderDashboard==='function') caisseRenderDashboard();
   if (CAISSE_UI.brouillardCaisseId===m.caisse_id) caisseAfficherBrouillard(m.caisse_id);
@@ -123817,6 +124411,7 @@ function cbRenderSuggestions(type) {
    - à ventiler, clôturé→ comptabilité seule (session déjà transmise) */
 function caisseCanEditBon(mvt) {
   if (!mvt || !APP.currentUser) return false;
+  if (mvt.versement_id) return false; /* se modifie via le versement (Paiements) */
   if (caisseRoleAdminLike()) return true;
   if (mvt.statut === 'ventile') return false;
   var s = (DATA.caisse_sessions||[]).find(function(x){ return x.id===mvt.session_id; });
@@ -124351,6 +124946,14 @@ async function reapValider(id, montantAccorde) {
   var d = (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }); if (!d) return;
   if (!exigerDroit('Caisse', 'v', 'la validation de cette demande de réapprovisionnement')) return;
   if (d.statut !== 'soumise') { toast('Seule une demande soumise peut être validée.', 'error'); return; }
+  /* [INC-0005] Séparation des tâches : REAP-2026-0009 (750 000 F) a été
+     demandée, validée puis servie par la même personne en 11 secondes (soumission → versement).
+     Le demandeur ne peut pas être son propre validateur. */
+  var _moi = (APP.currentUser && APP.currentUser.nom) || '';
+  if (_moi && d.demande_par && String(d.demande_par).trim().toLowerCase() === _moi.trim().toLowerCase()) {
+    toast('🔒 Vous êtes l\'auteur(e) de la demande ' + (d.numero||'') + ' : elle doit être validée par un autre responsable habilité.', 'error', 7000);
+    return;
+  }
   var demande = parseFloat(d.montant_demande) || 0;
   var montant = (montantAccorde === undefined || montantAccorde === null || montantAccorde === '') ? demande : parseFloat(montantAccorde);
   if (!(montant > 0)) { toast('Le montant accordé doit être supérieur à zéro.', 'error'); return; }
@@ -124403,7 +125006,50 @@ async function reapSupprimer(id) {
    hiérarchie. Le bon créé reste une proposition en attente de validation
    (requiert_validation: true) : la titulaire garde la main pour la valider
    ou la rejeter, ce n'est pas une saisie faite « dans son dos ». */
-async function reapServir(id) {
+/* [INC-0005] Provenance des fonds obligatoire.
+   Avant ce correctif, « Servir » ne créait QUE le bon d'entrée de la caisse
+   destinataire : aucune caisse n'était débitée. Utilisé pour un transfert
+   Caisse Souscripteurs → Caisse Principale (REAP-2026-0009, 750 000 F), il a
+   gonflé la principale sans aucune trace côté souscripteurs. Désormais, la
+   personne qui sert doit dire d'où viennent les fonds :
+   - d'une autre caisse → un bon de sortie y est créé en miroir, lié au bon
+     d'entrée (transfert_id), ventilé sur le compte 585 comme tout virement
+     interne, et les deux bons sont validés/rejetés ensemble ;
+   - de l'extérieur (banque, DG, apport) → justification obligatoire, tracée
+     sur le bon d'entrée (provenance_externe). */
+function reapServir(id) {
+  var d = (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }); if (!d) return;
+  if (!exigerDroit('Caisse', 'c', 'le versement de cette demande de réapprovisionnement')) return;
+  if (d.statut !== 'validee') { toast('Seule une demande validée peut être servie.', 'error'); return; }
+  var caisse = (DATA.caisses||[]).find(function(c){ return c.id === d.caisse_id; });
+  if (!caisse) { toast('Caisse introuvable — elle a peut-être été supprimée depuis la demande.', 'error'); return; }
+  var sel = document.getElementById('rsv-source');
+  var sources = (DATA.caisses||[]).filter(function(c){
+    return c.id !== d.caisse_id && c.actif !== false && caisseGetSessionOuverte(c.id)
+      && (typeof caisseUserPeut !== 'function' || caisseUserPeut(c.id));
+  });
+  sel.innerHTML = '<option value="">— Choisir la provenance des fonds —</option>'
+    + sources.map(function(c){
+        var s = caisseSoldeSession(caisseGetSessionOuverte(c.id));
+        return '<option value="'+c.id+'">📤 Caisse : '+escHtml(c.nom||'')+' (solde '+fmtF(s)+' F)</option>';
+      }).join('')
+    + '<option value="__externe__">🏛️ Hors caisse (banque, DG, apport externe…)</option>';
+  document.getElementById('rsv-id').value = d.id;
+  document.getElementById('rsv-info').innerHTML = 'Demande <strong>' + escHtml(d.numero||'') + '</strong> — versement de <strong>'
+    + fmtF(d.montant_accorde) + ' FCFA</strong> dans la caisse « ' + escHtml(caisse.nom||'') + ' ».';
+  document.getElementById('rsv-justif').value = '';
+  reapServirMaj();
+  openModal('modal-reappro-servir');
+}
+
+function reapServirMaj() {
+  var v = (document.getElementById('rsv-source')||{}).value || '';
+  var box = document.getElementById('rsv-justif-box');
+  if (box) box.style.display = (v === '__externe__') ? '' : 'none';
+}
+
+async function reapServirConfirmer() {
+  var id = document.getElementById('rsv-id').value;
   var d = (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }); if (!d) return;
   if (!exigerDroit('Caisse', 'c', 'le versement de cette demande de réapprovisionnement')) return;
   if (d.statut !== 'validee') { toast('Seule une demande validée peut être servie.', 'error'); return; }
@@ -124420,31 +125066,90 @@ async function reapServir(id) {
   if (!session) { toast('🔒 La caisse « ' + (caisse.nom||'') + ' » est fermée — ouvrez-la avant de servir la demande.', 'error', 6000); return; }
   var montant = parseFloat(d.montant_accorde) || 0;
   if (!(montant > 0)) { toast('Montant accordé invalide.', 'error'); return; }
-  if (!confirm('Verser ' + fmtF(montant) + ' FCFA dans la caisse « ' + (caisse.nom||'') + ' » ?\n\nUn bon d\'entrée sera créé et suivra le circuit de validation habituel de la caisse.')) return;
+
+  var sourceId = document.getElementById('rsv-source').value || '';
+  var justif = (document.getElementById('rsv-justif').value || '').trim();
+  if (!sourceId) { toast('Indiquez la provenance des fonds.', 'error'); return; }
+  var externe = sourceId === '__externe__';
+  var source = null, sessionSource = null, compte585 = '';
+  if (externe) {
+    if (justif.length < 5) { toast('Précisez l\'origine des fonds (banque, chèque n°, remise du DG…).', 'error'); return; }
+  } else {
+    source = (DATA.caisses||[]).find(function(c){ return c.id === sourceId; });
+    if (!source) { toast('Caisse source introuvable.', 'error'); return; }
+    if (typeof caisseUserPeut === 'function' && !caisseUserPeut(sourceId)) { toast('🔒 La caisse source ne vous est pas rattachée.', 'error'); return; }
+    sessionSource = caisseGetSessionOuverte(sourceId);
+    if (!sessionSource) { toast('La caisse source « ' + (source.nom||'') + ' » est fermée — ouvrez-la avant de servir.', 'error', 6000); return; }
+    compte585 = (DATA.params && DATA.params.comptes_defaut && DATA.params.comptes_defaut.virement_interne) || '';
+    if (!compte585) { toast('⚠️ Compte "Virement interne entre caisses" non paramétré — Paramètres → Comptes par défaut.', 'error', 7000); return; }
+    var soldeSource = caisseSoldeSession(sessionSource);
+    if (montant > soldeSource && !confirm('⚠️ Solde de la caisse source insuffisant (' + fmtF(soldeSource) + ' FCFA pour ' + fmtF(montant) + ' FCFA).\n\nConfirmer tout de même ?')) return;
+  }
+  if (!confirm('Verser ' + fmtF(montant) + ' FCFA dans la caisse « ' + (caisse.nom||'') + ' »'
+    + (externe ? ' (fonds hors caisse : ' + justif + ')' : ' depuis la caisse « ' + (source.nom||'') + ' »') + ' ?\n\n'
+    + (externe ? 'Un bon d\'entrée sera créé' : 'Un bon de sortie (caisse source) et un bon d\'entrée (caisse destinataire) liés seront créés')
+    + ' et suivront le circuit de validation habituel de la caisse.')) return;
+
+  if (!externe) {
+    var map = (DATA.params && DATA.params.caisse_ventilation_map) || {};
+    if (map[CAISSE_TRANSFERT_MOTCLE] !== compte585) { await _caisseAjouterRegle(CAISSE_TRANSFERT_MOTCLE, compte585); }
+  }
 
   var dat = today();
-  var numero = await caisseProchainNumero(d.caisse_id, 'entree', dat, caisse.compte);
   var auteurNom = (APP.currentUser && APP.currentUser.nom) || '—';
+  var auteurRole = (APP.currentUser && APP.currentUser.role) || '';
+  var plafond = (typeof userPlafond === 'function') ? userPlafond() : Infinity;
+  var transfertId = externe ? null : uid();
+  var libelle = 'Réapprovisionnement ' + d.numero + (d.motif ? ' — ' + d.motif : '');
+  var numero = await caisseProchainNumero(d.caisse_id, 'entree', dat, caisse.compte);
   var mvt = {
     id: uid(), session_id: session.id, caisse_id: d.caisse_id,
     date: dat + 'T' + new Date().toISOString().slice(11, 19), numero: numero,
     type: 'entree', montant: montant,
-    motif: 'Réapprovisionnement ' + d.numero + (d.motif ? ' — ' + d.motif : ''),
-    beneficiaire: '', piece_ref: d.numero,
+    motif: externe ? libelle + ' — provenance : ' + justif
+                   : CAISSE_TRANSFERT_MOTCLE + ' : reçu de ' + (source.nom||'') + ' — ' + libelle,
+    beneficiaire: externe ? '' : (source.nom||''), piece_ref: d.numero,
     statut: 'a_ventiler', compte_ventile: null, ecriture_id: null,
     ventile_par: null, ventile_le: null,
     requiert_validation: true, valide: false, rejete: false,
-    plafond_demandeur: (typeof userPlafond === 'function') ? userPlafond() : Infinity,
-    demande_par: auteurNom, demande_role: (APP.currentUser && APP.currentUser.role) || '', demande_le: new Date().toISOString(),
+    plafond_demandeur: plafond,
+    demande_par: auteurNom, demande_role: auteurRole, demande_le: new Date().toISOString(),
     reappro_id: d.id,
     created_by: auteurNom, created_at: new Date().toISOString()
   };
+  if (externe) mvt.provenance_externe = justif;
+  else { mvt.transfert_id = transfertId; mvt.transfert_depuis = sourceId; }
+
+  var mvtSortie = null;
+  if (!externe) {
+    var numeroSortie = await caisseProchainNumero(sourceId, 'sortie', dat, source.compte);
+    mvtSortie = {
+      id: uid(), session_id: sessionSource.id, caisse_id: sourceId,
+      date: dat + 'T' + new Date().toISOString().slice(11, 19), numero: numeroSortie,
+      type: 'sortie', montant: montant,
+      motif: CAISSE_TRANSFERT_MOTCLE + ' : vers ' + (caisse.nom||'') + ' — ' + libelle,
+      beneficiaire: caisse.nom || '', piece_ref: d.numero,
+      statut: 'a_ventiler', compte_ventile: null, ecriture_id: null,
+      ventile_par: null, ventile_le: null, transfert_id: transfertId, transfert_vers: d.caisse_id,
+      requiert_validation: true, valide: false, rejete: false,
+      plafond_demandeur: plafond,
+      demande_par: auteurNom, demande_role: auteurRole, demande_le: new Date().toISOString(),
+      reappro_id: d.id,
+      created_by: auteurNom, created_at: new Date().toISOString()
+    };
+    DATA.caisse_mouvements.push(mvtSortie);
+    mvtSortie._baseModifie = mvtSortie._modifie || null;
+    await dbPut('caisse_mouvements', mvtSortie);
+    await caisseSyncEtAlerter('pi_caisse_mouvements', mvtSortie);
+  }
   DATA.caisse_mouvements.push(mvt);
   mvt._baseModifie = mvt._modifie || null;
   await dbPut('caisse_mouvements', mvt);
   await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
 
   d.statut = 'servie'; d.mouvement_id = mvt.id;
+  if (mvtSortie) { d.mouvement_source_id = mvtSortie.id; d.caisse_source_id = sourceId; }
+  else d.provenance_externe = justif;
   d.servi_par = auteurNom; d.servi_le = new Date().toISOString(); d._modifie = new Date().toISOString();
   /* forceRole : les fonds viennent d'entrer en caisse. Si ce passage à
      « servie » échouait sur un contrôle de droit, la demande resterait
@@ -124452,12 +125157,18 @@ async function reapServir(id) {
   await dbPut('demandes_reappro', d, { forceRole: true });
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_demandes_reappro', d);
 
-  toast('🏦 ' + fmtF(montant) + ' FCFA versés — bon d\'entrée ' + numero + ' créé, en attente de validation comme tout mouvement de caisse.', 'success', 7000);
+  closeModal('modal-reappro-servir');
+  toast('🏦 ' + fmtF(montant) + ' FCFA versés — bon d\'entrée ' + numero
+    + (mvtSortie ? ' et bon de sortie ' + mvtSortie.numero + ' (' + (source.nom||'') + ')' : '')
+    + ' créé' + (mvtSortie ? 's' : '') + ', en attente de validation comme tout mouvement de caisse.', 'success', 8000);
   reapRender();
   if (typeof caisseRenderListe === 'function') caisseRenderListe();
   if (typeof caisseRenderDashboard === 'function') caisseRenderDashboard();
   if (typeof caisseRenderValidations === 'function') caisseRenderValidations();
-  if (typeof caisseNotifierValidation === 'function') caisseNotifierValidation(mvt, 'demande');
+  if (typeof caisseNotifierValidation === 'function') {
+    if (mvtSortie) caisseNotifierValidation(mvtSortie, 'demande');
+    caisseNotifierValidation(mvt, 'demande');
+  }
 }
 
 function reapRender() {
@@ -124492,6 +125203,8 @@ function reapRender() {
       actions = '<button class="btn btn-secondary btn-sm btn-icon" title="Modifier" onclick="reapOuvrirModal(\''+d.id+'\')">✏️</button> '
               + '<button class="btn btn-primary btn-sm" onclick="reapSoumettre(\''+d.id+'\')">📤 Soumettre</button> '
               + '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer" onclick="reapSupprimer(\''+d.id+'\')">🗑</button>';
+    } else if (d.statut === 'soumise' && !(typeof userPeut === 'function' ? userPeut('Caisse', 'v') : true)) {
+      actions = '<span style="font-size:11px;color:var(--blanc-dim);">🕓 En attente d\'un responsable</span>';
     } else if (d.statut === 'soumise') {
       actions = '<button class="btn btn-primary btn-sm" onclick="(function(){var m=prompt(\'Montant accordé (FCFA) :\', \''+(d.montant_demande||0)+'\');if(m!==null)reapValider(\''+d.id+'\', m);})()">✅ Valider</button> '
               + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)reapRejeter(\''+d.id+'\', m);})()">❌ Rejeter</button>';
@@ -124500,7 +125213,12 @@ function reapRender() {
     }
     var detail = '';
     if (d.statut === 'rejetee' && d.motif_rejet) detail = '<div style="font-size:10px;color:var(--rouge);">Motif : '+escHtml(d.motif_rejet)+'</div>';
-    else if (d.statut === 'servie') detail = '<div style="font-size:10px;color:var(--blanc-dim);">par '+escHtml(d.servi_par||'—')+' le '+dateShort(d.servi_le)+'</div>';
+    else if (d.statut === 'servie') {
+      var _src = d.caisse_source_id ? (DATA.caisses||[]).find(function(c){ return c.id===d.caisse_source_id; }) : null;
+      var _prov = _src ? 'depuis ' + (_src.nom||'') : (d.provenance_externe ? 'hors caisse : ' + d.provenance_externe : '⚠️ provenance non tracée');
+      detail = '<div style="font-size:10px;color:var(--blanc-dim);">par '+escHtml(d.servi_par||'—')+' le '+dateShort(d.servi_le)+'</div>'
+             + '<div style="font-size:10px;color:'+(_src||d.provenance_externe?'var(--blanc-dim)':'var(--rouge)')+';">'+escHtml(_prov)+'</div>';
+    }
     else if (d.statut === 'validee' || d.statut === 'rejetee') detail = '<div style="font-size:10px;color:var(--blanc-dim);">par '+escHtml(d.valide_par||'—')+'</div>';
     html += '<tr>'
       + '<td><b>'+escHtml(d.numero||'')+'</b><div style="font-size:10px;color:var(--blanc-dim);">'+escHtml(d.demande_par||'')+'</div></td>'
@@ -126641,6 +127359,36 @@ function caisseControleIntegrite() {
       + '\n   → bouton « 🔀 Fusionner les sessions en double » pour rattacher les mouvements à la session la plus ancienne et clôturer les doublons.');
   } else ok.push('✅ Aucune caisse avec sessions ouvertes en double.');
 
+  /* 13. [INC-0005] Transferts entre caisses déséquilibrés : un seul des deux
+     bons liés (transfert_id) existe, ou un seul impacte le solde. */
+  var parTransfert = {};
+  mvts.forEach(function(m){ if (m.transfert_id) (parTransfert[m.transfert_id] = parTransfert[m.transfert_id] || []).push(m); });
+  var effectif = function(m){ return !m.rejete && (!m.requiert_validation || m.valide === true); };
+  var transfertsKo = [];
+  Object.keys(parTransfert).forEach(function(k){
+    var g = parTransfert[k];
+    var e = g.find(function(m){ return m.type==='entree'; }), so = g.find(function(m){ return m.type==='sortie'; });
+    if (!e || !so) transfertsKo.push(g[0].numero + ' (' + fmtF(g[0].montant) + ' F, ' + (idxCaisse[g[0].caisse_id]||{}).nom + ') : bon ' + (e ? 'de sortie' : 'd\'entrée') + ' lié introuvable');
+    else if (effectif(e) !== effectif(so)) transfertsKo.push(e.numero + ' / ' + so.numero + ' (' + fmtF(e.montant) + ' F) : ' + (effectif(e) ? 'entrée comptée, sortie non' : 'sortie comptée, entrée non'));
+  });
+  if (transfertsKo.length) pb.push('❌ ' + transfertsKo.length + ' transfert(s) entre caisses déséquilibré(s) :\n   ' + transfertsKo.slice(0,10).join('\n   '));
+  else ok.push('✅ Transferts entre caisses équilibrés (sortie ↔ entrée).');
+
+  /* 13 bis. Versements souscripteurs en espèces (année en cours) sans bon de
+     caisse rattaché : argent remis au caissier que la caisse ignore. */
+  var vrsSansBon = (typeof vrsEspecesSansBon === 'function') ? vrsEspecesSansBon(new Date().getFullYear() + '-01-01') : [];
+  if (vrsSansBon.length) pb.push('⚠️ ' + vrsSansBon.length + ' versement(s) souscripteur en espèces de l\'année sans bon de caisse rattaché ('
+    + fmtF(vrsSansBon.reduce(function(s, v){ return s + (parseFloat(v.montant) || 0); }, 0)) + ' F) — bouton « 💵 Versements espèces » pour les rattacher.');
+  else ok.push('✅ Versements en espèces de l\'année tous rattachés à un bon de caisse.');
+
+  /* 14. [INC-0005] Réapprovisionnements servis sans provenance tracée : une
+     entrée en caisse sans aucune caisse débitée ni origine externe déclarée
+     (servis avant le correctif — ex. REAP-2026-0009, 750 000 F). */
+  var reapSansSource = mvts.filter(function(m){ return m.reappro_id && m.type==='entree' && !m.transfert_id && !m.provenance_externe && !m.rejete; });
+  if (reapSansSource.length) pb.push('⚠️ ' + reapSansSource.length + ' réapprovisionnement(s) entré(s) en caisse sans provenance tracée (aucune caisse débitée) — vérifier d\'où viennent les fonds :\n   '
+    + reapSansSource.slice(0,10).map(function(m){ return (m.numero||m.id) + ' — ' + ((idxCaisse[m.caisse_id]||{}).nom||'?') + ' — ' + fmtF(m.montant) + ' F — ' + (m.motif||''); }).join('\n   '));
+  else ok.push('✅ Tous les réapprovisionnements ont une provenance tracée.');
+
   var stats = document.getElementById('cci-stats');
   var rapport = document.getElementById('cci-rapport');
   if (stats) {
@@ -127064,6 +127812,10 @@ function caisseRenderValidations() {
 
   var monPlafond = (typeof userPlafond === 'function') ? userPlafond() : Infinity;
   var jePeuxValider = (typeof userPeut === 'function') ? userPeut('Caisse', 'v') : true;
+  /* [INC-0005] Un profil sans droit de validation (caissière) ne voit plus du
+     tout le panneau de validation : il suit ses bons dans l'onglet « Mes
+     demandes de validation ». */
+  if (!jePeuxValider) { box.innerHTML = ''; return; }
   var nbSorties = liste.filter(function(m){ return m.type==='sortie'; }).length;
   var nbEntrees = liste.filter(function(m){ return m.type==='entree'; }).length;
 
@@ -127296,13 +128048,35 @@ function _majBadgeValidationsPilotage() {
   badge.style.display = n ? 'inline-block' : 'none';
 }
 
+/* [INC-0005] Un transfert entre caisses = deux bons liés par transfert_id
+   (sortie côté source, entrée côté destination). Validés séparément, l'un
+   pouvait impacter un solde sans l'autre : entrée validée dans la caisse
+   destinataire, sortie jamais validée (ou rejetée, ou supprimée) dans la
+   caisse source → écart inexpliqué. Les deux bons vivent désormais ensemble. */
+function _caisseMvtJumeau(mvt) {
+  if (!mvt || !mvt.transfert_id) return null;
+  return (DATA.caisse_mouvements || []).find(function(m){ return m.id !== mvt.id && m.transfert_id === mvt.transfert_id; }) || null;
+}
+function _caisseNomCaisse(id) {
+  var c = (DATA.caisses || []).find(function(x){ return x.id === id; });
+  return c ? (c.nom || '') : '?';
+}
+
 async function caisseValiderDecaissement(mvtId) {
   var mvt = (DATA.caisse_mouvements || []).find(function(m){ return m.id === mvtId; });
   if (!mvt) return;
   if (!exigerDroit('Caisse', 'v', 'la validation de ce décaissement')) return;
   var montant = parseFloat(mvt.montant) || 0;
   if (!exigerPlafond(montant, 'Cette validation')) return;
-  if (!confirm('Valider ' + (mvt.type==='entree'?'l\'entrée':'la sortie') + ' de ' + fmtF(montant) + ' FCFA (' + (mvt.motif||'') + ') ?\n\nLe montant sera immédiatement ' + (mvt.type==='entree'?'ajouté au':'déduit du') + ' solde de caisse.')) return;
+  var jumeau = _caisseMvtJumeau(mvt);
+  if (mvt.transfert_id) {
+    if (!jumeau) { toast('⛔ Bon de transfert orphelin : son bon ' + (mvt.type==='entree'?'de sortie (caisse source)':'d\'entrée (caisse destinataire)') + ' est introuvable. Validation bloquée — contactez le comptable.', 'error', 8000); return; }
+    if (jumeau.rejete) { toast('⛔ Le bon lié ' + (jumeau.numero||'') + ' (' + _caisseNomCaisse(jumeau.caisse_id) + ') a été rejeté — ce transfert ne peut plus être validé.', 'error', 8000); return; }
+    if (Math.round(parseFloat(jumeau.montant)||0) !== Math.round(montant)) { toast('⛔ Montants incohérents entre ' + (mvt.numero||'') + ' et ' + (jumeau.numero||'') + ' — validation bloquée.', 'error', 8000); return; }
+  }
+  var jumeauAValider = jumeau && jumeau.requiert_validation && !jumeau.valide;
+  if (!confirm('Valider ' + (mvt.type==='entree'?'l\'entrée':'la sortie') + ' de ' + fmtF(montant) + ' FCFA (' + (mvt.motif||'') + ') ?\n\nLe montant sera immédiatement ' + (mvt.type==='entree'?'ajouté au':'déduit du') + ' solde de caisse.'
+    + (jumeauAValider ? '\n\n🔄 Transfert entre caisses : le bon lié ' + (jumeau.numero||'') + ' (' + (jumeau.type==='entree'?'entrée':'sortie') + ' — ' + _caisseNomCaisse(jumeau.caisse_id) + ') sera validé en même temps.' : ''))) return;
 
   mvt.valide = true;
   mvt.valide_par = (APP.currentUser && APP.currentUser.nom) || '—';
@@ -127327,12 +128101,19 @@ async function caisseValiderDecaissement(mvtId) {
   mvt._baseModifie = mvt._modifie || null;
   await dbPut('caisse_mouvements', mvt);
   await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
-  toast('✅ ' + (mvt.type==='entree'?'Entrée':'Décaissement') + ' de ' + fmtF(montant) + ' FCFA validé' + (mvt.type==='entree'?'e':'') + '.', 'success');
+  if (jumeauAValider) {
+    jumeau.valide = true; jumeau.valide_par = mvt.valide_par; jumeau.valide_role = mvt.valide_role; jumeau.valide_le = mvt.valide_le;
+    jumeau._baseModifie = jumeau._modifie || null;
+    await dbPut('caisse_mouvements', jumeau);
+    await caisseSyncEtAlerter('pi_caisse_mouvements', jumeau);
+  }
+  toast('✅ ' + (mvt.type==='entree'?'Entrée':'Décaissement') + ' de ' + fmtF(montant) + ' FCFA validé' + (mvt.type==='entree'?'e':'') + (jumeauAValider ? ' (avec le bon lié ' + (jumeau.numero||'') + ')' : '') + '.', 'success');
   caisseRenderValidations();
   caisseRenderListe();
   if (typeof caisseRenderDashboard === 'function') caisseRenderDashboard();
   if (CAISSE_UI.brouillardCaisseId === mvt.caisse_id) caisseAfficherBrouillard(mvt.caisse_id);
   caisseNotifierValidation(mvt, 'validee');
+  if (jumeauAValider) caisseNotifierValidation(jumeau, 'validee');
 }
 
 async function caisseRejeterDecaissement(mvtId) {
@@ -127341,7 +128122,10 @@ async function caisseRejeterDecaissement(mvtId) {
   if (!exigerDroit('Caisse', 'v', 'le rejet de ce décaissement')) return;
   var montant = parseFloat(mvt.montant) || 0;
   if (!exigerPlafond(montant, 'Ce rejet')) return;
-  var motif = prompt('Motif du rejet (visible par l\'auteur du bon « ' + (mvt.numero||'') + ' ») :', '');
+  var jumeau = _caisseMvtJumeau(mvt);
+  if (jumeau && jumeau.valide) { toast('⛔ Le bon lié ' + (jumeau.numero||'') + ' (' + _caisseNomCaisse(jumeau.caisse_id) + ') est déjà validé : rejeter celui-ci déséquilibrerait le transfert. Contactez le comptable pour une contre-passation.', 'error', 9000); return; }
+  var motif = prompt('Motif du rejet (visible par l\'auteur du bon « ' + (mvt.numero||'') + ' »)'
+    + (jumeau && !jumeau.rejete ? ' — le bon lié ' + (jumeau.numero||'') + ' (' + _caisseNomCaisse(jumeau.caisse_id) + ') sera rejeté aussi' : '') + ' :', '');
   if (motif === null) return;
 
   mvt.rejete = true;
@@ -127351,12 +128135,22 @@ async function caisseRejeterDecaissement(mvtId) {
   mvt._baseModifie = mvt._modifie || null;
   await dbPut('caisse_mouvements', mvt);
   await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
+  var jumeauRejete = false;
+  if (jumeau && !jumeau.rejete) {
+    jumeau.rejete = true; jumeau.motif_rejet = mvt.motif_rejet + ' (rejet du bon lié ' + (mvt.numero||'') + ')';
+    jumeau.rejete_par = mvt.rejete_par; jumeau.rejete_le = mvt.rejete_le;
+    jumeau._baseModifie = jumeau._modifie || null;
+    await dbPut('caisse_mouvements', jumeau);
+    await caisseSyncEtAlerter('pi_caisse_mouvements', jumeau);
+    jumeauRejete = true;
+  }
   toast('✖ Décaissement rejeté — le bon reste tracé mais n\'affecte pas le solde.', 'info');
   caisseRenderValidations();
   caisseRenderListe();
   if (typeof caisseRenderDashboard === 'function') caisseRenderDashboard();
   if (CAISSE_UI.brouillardCaisseId === mvt.caisse_id) caisseAfficherBrouillard(mvt.caisse_id);
   caisseNotifierValidation(mvt, 'rejetee');
+  if (jumeauRejete) caisseNotifierValidation(jumeau, 'rejetee');
 }
 
 /* Notification interne (messagerie caisse déjà utilisée pour les brouillards)
@@ -131182,6 +131976,30 @@ goTo = function(page) {
   </div>
 </div>
 
+<!-- Modal : contrôle des versements en espèces sans bon de caisse -->
+<div class="modal-overlay" id="modal-vrs-especes">
+  <div class="modal" style="max-width:1100px;">
+    <div class="modal-header">
+      <h3>💵 Versements en espèces sans bon de caisse</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-vrs-especes')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;line-height:1.5;">
+        Versements souscripteurs en <b>espèces</b> saisis dans Paiements/Souscripteurs mais qui ne sont rattachés à <b>aucun bon de caisse</b> : l'argent a été remis au caissier sans que la caisse le sache.
+        <b>🔗 Rattacher</b> relie le versement à un bon d'entrée déjà saisi en caisse (même montant, date proche) — l'écriture propre à ce bon est supprimée car celle du versement la remplace (pas de double comptabilisation).
+        <b>➕ Créer le bon</b> enregistre l'entrée dans une caisse ouverte, datée d'aujourd'hui.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+        <label style="font-size:12px;">Depuis le</label><input type="date" class="form-control" id="vrs-ctl-depuis" style="width:160px;" onchange="vrsEspecesRender()">
+        <label style="font-size:12px;">Caisse pour « Créer »</label><select class="form-control" id="vrs-ctl-caisse" style="width:220px;"></select>
+        <span id="vrs-ctl-resume" style="font-size:12px;"></span>
+      </div>
+      <div id="vrs-ctl-table"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-vrs-especes')">Fermer</button></div>
+  </div>
+</div>
+
 <!-- Modal : demande de réapprovisionnement de fonds d'une caisse de division -->
 <div class="modal-overlay" id="modal-reappro">
   <div class="modal">
@@ -131206,6 +132024,31 @@ goTo = function(page) {
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-reappro')">Annuler</button>
       <button class="btn btn-primary" onclick="reapSauver()">💾 Enregistrer le brouillon</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : versement (service) d'une demande de réapprovisionnement — provenance obligatoire (INC-0005) -->
+<div class="modal-overlay" id="modal-reappro-servir">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🏦 Servir la demande — provenance des fonds</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-reappro-servir')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="rsv-id">
+      <div id="rsv-info" style="font-size:12px;margin-bottom:10px;"></div>
+      <div class="alert alert-info" style="font-size:11.5px;margin-bottom:10px;">
+        Si les fonds sortent d'une autre caisse (ex. Caisse Souscripteurs → Caisse Principale), choisissez-la : un <strong>bon de sortie</strong> y sera créé en miroir, lié au bon d'entrée. Les deux bons sont validés ou rejetés <strong>ensemble</strong>.
+      </div>
+      <div class="form-grid">
+        <div class="form-group span-2"><label>Provenance des fonds *</label><select class="form-control" id="rsv-source" onchange="reapServirMaj()"></select></div>
+        <div class="form-group span-2" id="rsv-justif-box" style="display:none;"><label>Origine précise (banque, n° de chèque, remise DG…) *</label><input class="form-control" id="rsv-justif" placeholder="Ex : retrait UBA chèque n°0000123"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-reappro-servir')">Annuler</button>
+      <button class="btn btn-primary" onclick="reapServirConfirmer()">🏦 Servir</button>
     </div>
   </div>
 </div>
