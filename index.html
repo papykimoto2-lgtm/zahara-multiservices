@@ -6257,6 +6257,18 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                   <label>Commission commerciale (%)</label>
                   <input type="number" id="param-commission" class="form-control" value="3" min="0" max="10">
                 </div>
+                <div class="form-group span-2" style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:12px;">
+                  <label>🧮 Système de calcul des commissions</label>
+                  <select id="param-commission-mode" class="form-control">
+                    <option value="versement">Par versement — taux du commercial / de l'apporteur appliqué à chaque versement encaissé</option>
+                    <option value="bien">Sur la valeur du bien vendu — taux fixé sur la fiche du lot (logement ou terrain) × prix de vente</option>
+                  </select>
+                  <div style="font-size:11px;color:var(--blanc-dim);margin-top:6px;line-height:1.5;">
+                    <b>Par versement</b> : utilise les taux ci-dessous (commercial) et ceux de la fiche apporteur, souscription ou régulier selon le versement.<br>
+                    <b>Sur la valeur du bien</b> : la commission = prix du lot × taux saisi à la création du lot. Elle est générée en une fois au 1er versement sur le prix. Si le lot n'a pas de taux, on retombe sur le taux « régulier » du commercial ou de la fiche apporteur.<br>
+                    Changer de système ne recalcule pas les commissions déjà générées. En passant « sur la valeur du bien », les commissions déjà générées pour un souscripteur sont déduites, pour ne jamais payer deux fois.
+                  </div>
+                </div>
                 <div class="form-group">
                   <label>🏦 Comm. commercial — Souscription (%)</label>
                   <input type="number" id="param-comm-souscription" class="form-control" value="10" min="0" max="30" step="0.5">
@@ -19281,6 +19293,15 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <label>Prix de vente (FCFA)</label>
           <input type="number" class="form-control" id="l-prix">
           <div id="l-prix-note" style="font-size:11px;color:var(--blanc-dim);margin-top:4px;"></div>
+        </div>
+        <div class="form-group">
+          <label>🏦 Taux commission commercial (%)</label>
+          <input type="number" class="form-control" id="l-taux-comm-commercial" min="0" max="100" step="0.1" placeholder="Taux du commercial">
+        </div>
+        <div class="form-group">
+          <label>🤝 Taux commission apporteur (%)</label>
+          <input type="number" class="form-control" id="l-taux-comm-apporteur" min="0" max="100" step="0.1" placeholder="Taux de l'apporteur">
+          <div id="l-comm-note" style="font-size:11px;color:var(--blanc-dim);margin-top:4px;"></div>
         </div>
         <div class="form-group span-2" id="l-grp-terrain-tva" style="display:none;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -33320,6 +33341,91 @@ function getTauxCommissions() {
   };
 }
 
+/** Système de calcul actif : 'versement' (historique) ou 'bien' (valeur du bien vendu). */
+function commissionMode() {
+  return (DATA.params && DATA.params.commission_mode === 'bien') ? 'bien' : 'versement';
+}
+
+/* Taux explicitement renseigné (0 compris) ou valeur par défaut. */
+function _commTauxOu(v, dflt) { return (v !== undefined && v !== null && v !== '') ? (parseFloat(v) || 0) : dflt; }
+
+/* Premier versement « sur prix » d'un client (hors frais de souscription),
+   chronologiquement — même règle de départage que isVersementSouscription. */
+function _premierVersementPrix(clientId) {
+  return (DATA.versements || []).filter(function(v){ return v.client_id === clientId && _versementSurPrix(v); })
+    .sort(function(a, b){ return (a.date || '').localeCompare(b.date || '') || String(a.id).localeCompare(String(b.id)); })[0] || null;
+}
+
+/* ── Système « valeur du bien vendu » ─────────────────────────────────────
+   Commission = Σ (prix du lot × taux du lot) sur tous les lots du
+   souscripteur (multi-lots : client.lot_ids). Générée en UNE fois, rattachée
+   au versement qui la déclenche (versement_id), pour rester compatible avec
+   les outils existants (suppression/modification de versement, vérification,
+   régénération). On déduit ce qui a déjà été généré pour ce souscripteur et
+   ce bénéficiaire, quel que soit le système (payé compris) : un changement de
+   système en cours de vente, ou une hausse du prix du lot, ne génère que la
+   différence — jamais un double paiement. */
+async function _genererCommissionsBien(versement, client) {
+  if (!_versementSurPrix(versement)) return [];
+  var lots = _lotIdsDeClient(client).map(function(id){ return (DATA.lots || []).find(function(l){ return l.id === id; }); })
+    .filter(function(l){ return l && (parseFloat(l.prix) || 0) > 0; });
+  if (!lots.length) {
+    toast('⚠️ Commission « valeur du bien » non calculée pour ' + ((client.prenoms || '') + ' ' + (client.nom || '')).trim() + ' : aucun lot avec un prix de vente.', 'error', 7000);
+    return [];
+  }
+  var taux = getTauxCommissions();
+  var baseTotale = lots.reduce(function(s, l){ return s + (parseFloat(l.prix) || 0); }, 0);
+  var dejaGenere = function(typeB){
+    return (DATA.commissions || []).filter(function(c){ return c.client_id === client.id && c.type_beneficiaire === typeB && c.statut !== 'annulee'; })
+      .reduce(function(s, c){ return s + (parseFloat(c.montant_comm) || 0); }, 0);
+  };
+  var nouvelles = [];
+  var creer = async function(typeB, tauxDefaut, benef){
+    var detail = [], du = 0, defaut = false;
+    lots.forEach(function(l){
+      var brut = typeB === 'commercial' ? l.taux_comm_commercial : l.taux_comm_apporteur;
+      var t = _commTauxOu(brut, tauxDefaut);
+      if (brut === undefined || brut === null || brut === '') defaut = true;
+      var m = Math.round((parseFloat(l.prix) || 0) * t / 100);
+      du += m;
+      detail.push('Lot ' + (l.numero || l.id) + ' : ' + fmtF(l.prix) + ' F × ' + t + '%' + (brut === undefined || brut === null || brut === '' ? ' (taux par défaut)' : ''));
+    });
+    var reste = du - dejaGenere(typeB);
+    if (reste <= 0) return;
+    var c = Object.assign({
+      id: uid(), versement_id: versement.id, client_id: client.id,
+      client_nom: client.prenoms + ' ' + client.nom,
+      type_beneficiaire: typeB, type_versement: 'valeur_bien', mode_calcul: 'bien',
+      lot_ids: lots.map(function(l){ return l.id; }),
+      taux: baseTotale ? Math.round(du / baseTotale * 10000) / 100 : 0,
+      montant_base: baseTotale, montant_comm: reste,
+      date_versement: versement.date, date_generation: today(), statut: 'a_payer',
+      programme_id: client.programme_id || '',
+      notes: 'Sur valeur du bien — ' + detail.join(' ; ') + (reste !== du ? ' — déjà généré déduit : ' + fmtF(du - reste) + ' F' : '') + (defaut ? ' — ⚠️ taux par défaut utilisé (pas de taux sur le lot)' : '')
+    }, benef);
+    nouvelles.push(c);
+    if (!DATA.commissions) DATA.commissions = [];
+    DATA.commissions.push(c);
+    await dbPut('commissions', c);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', c);
+  };
+
+  var commEmpC = client.commercial_id ? DATA.employes.find(function(e){ return e.id === client.commercial_id; }) : null;
+  var commNomC = commEmpC ? ((commEmpC.prenoms || '') + ' ' + commEmpC.nom).trim() : (client.commercial || '');
+  if (commNomC || client.commercial_id) {
+    await creer('commercial', taux.commercial_regulier, { beneficiaire: commNomC, beneficiaire_id: client.commercial_id || '' });
+  }
+  if (client.apporteur || client.apporteur_id) {
+    var apObj = client.apporteur_id ? DATA.apporteurs.find(function(a){ return a.id === client.apporteur_id; }) : null;
+    await creer('apporteur', apObj ? _commTauxOu(apObj.taux_regulier, taux.apporteur_regulier) : taux.apporteur_regulier, {
+      apporteur_id: apObj ? apObj.id : (client.apporteur_id || ''),
+      beneficiaire: apObj ? ((apObj.prenoms ? apObj.prenoms + ' ' : '') + apObj.nom) : (client.apporteur || ''),
+      beneficiaire_tel: apObj ? (apObj.tel || '') : (client.apporteur_tel || '')
+    });
+  }
+  return nouvelles;
+}
+
 /** Détermine si un versement est le 1er (souscription) ou régulier */
 function isVersementSouscription(versement) {
   if (versement.type === 'frais_souscription') return true; // frais → taux souscription
@@ -33547,15 +33653,25 @@ async function genererCommissionsVersement(versement) {
      bien vendu, contrairement à tous les autres versements sur prix. */
   if (versement.type === 'frais_souscription' && !(DATA.params && DATA.params.commission_sur_frais_souscription)) return;
 
+  var nouvelles = [];
+  if (commissionMode() === 'bien') {
+    nouvelles = await _genererCommissionsBien(versement, client);
+  } else {
+
   // Anti-doublon : types de commission déjà présents pour ce versement (hors annulées)
   var existTypes = (DATA.commissions||[]).filter(function(c){
     return c.versement_id === versement.id && c.statut !== 'annulee';
   }).map(function(c){ return c.type_beneficiaire; });
+  /* Système « par versement » : un bénéficiaire déjà commissionné sur la
+     valeur du bien pour ce souscripteur (avant un retour à ce système) a
+     déjà reçu sa commission totale — on n'en rajoute pas par versement. */
+  (DATA.commissions||[]).forEach(function(c){
+    if (c.client_id === client.id && c.mode_calcul === 'bien' && c.statut !== 'annulee' && existTypes.indexOf(c.type_beneficiaire) === -1) existTypes.push(c.type_beneficiaire);
+  });
 
   var taux = getTauxCommissions();
   var isSouscription = isVersementSouscription(versement);
   var montant = parseFloat(versement.montant) || 0;
-  var nouvelles = [];
 
   // ── Commission commerciale ──────────────────────────────────────────────────
   var commEmpC = client.commercial_id ? DATA.employes.find(function(e){return e.id===client.commercial_id;}) : null;
@@ -33632,6 +33748,7 @@ async function genererCommissionsVersement(versement) {
       if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', commAp);
     }
   }
+  } /* fin système « par versement » */
 
   if (nouvelles.length > 0) {
     var total = nouvelles.reduce(function(s,c){ return s+c.montant_comm; }, 0);
@@ -33800,11 +33917,18 @@ async function verifierCommissionsVersements(reparer) {
   });
 
   // Manquantes : versement éligible sans commission du type attendu
+  var _modeBien = commissionMode() === 'bien';
   DATA.versements.forEach(function(v){
     var cl = DATA.clients.find(function(c){ return c.id === v.client_id; });
     if (!cl) return;
+    /* Système « valeur du bien » : une commission par souscripteur (pas par
+       versement), attendue sur son 1er versement sur prix uniquement. */
+    if (_modeBien) {
+      var _p1 = _premierVersementPrix(cl.id);
+      if (!_p1 || _p1.id !== v.id) return;
+    }
     var present = (DATA.commissions||[]).filter(function(c){
-      return c.versement_id === v.id && c.statut !== 'annulee';
+      return (_modeBien ? c.client_id === cl.id : c.versement_id === v.id) && c.statut !== 'annulee';
     }).map(function(c){ return c.type_beneficiaire; });
     var attendCommercial = !!(cl.commercial_id || cl.commercial);
     var attendApporteur  = !!(cl.apporteur_id || cl.apporteur);
@@ -33994,6 +34118,8 @@ function renderCommissions() {
   var versTypeMeta = {
     souscription: { lbl:'Souscription', col:'#B87333' },
     regulier:     { lbl:'Régulier',     col:'#3B82F6' },
+    valeur_bien:  { lbl:'Valeur du bien', col:'#10B981' },
+    cession:      { lbl:'Cession',      col:'#8B5CF6' },
   };
 
   if (!comms.length) {
@@ -36688,16 +36814,28 @@ function openLotModal(id) {
     setSelectValue('l-mode-livraison', l.mode_livraison || 'gros_oeuvre');
     document.getElementById('l-numero-tf').value = l.numero_tf || '';
     document.getElementById('l-frais-notaire').value = l.frais_notaire || '';
+    var _v = function(x){ return (x === null || x === undefined) ? '' : x; };
+    document.getElementById('l-taux-comm-commercial').value = _v(l.taux_comm_commercial);
+    document.getElementById('l-taux-comm-apporteur').value = _v(l.taux_comm_apporteur);
     lotNatureUI(); lotRecalcPrixM2(); lotRecalcCoutM2();
   } else {
     document.getElementById('modal-lot-title').textContent = 'Nouveau Lot';
     populateTypeLogementOptions();
+    /* Taux de commission fixés à la création du bien : pré-remplis avec les
+       taux « régulier » des Paramètres, modifiables lot par lot. */
+    var _tx = getTauxCommissions();
+    document.getElementById('l-taux-comm-commercial').value = _tx.commercial_regulier;
+    document.getElementById('l-taux-comm-apporteur').value = _tx.apporteur_regulier;
   }
+  var _cn = document.getElementById('l-comm-note');
+  if (_cn) _cn.textContent = (commissionMode() === 'bien')
+    ? 'Système actif : commission = prix du lot × ces taux.'
+    : 'Système actif : par versement — ces taux ne servent que si vous passez au calcul « sur la valeur du bien » (Paramètres).';
   openModal('modal-lot');
 }
 
 function clearLotForm() {
-  ['l-numero','l-ilot','l-surface','l-surface-mesuree','l-pieces','l-prix','l-prix-m2','l-cout-revient','l-cout-m2','l-notes','l-numero-tf','l-frais-notaire'].forEach(function(id) {
+  ['l-numero','l-ilot','l-surface','l-surface-mesuree','l-pieces','l-prix','l-prix-m2','l-cout-revient','l-cout-m2','l-notes','l-numero-tf','l-frais-notaire','l-taux-comm-commercial','l-taux-comm-apporteur'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -36826,6 +36964,13 @@ function populateTypeLogementOptions(selectedType) {
   sel.value = selectedType || '';
 }
 
+function _tauxLotSaisi(id) {
+  var v = ((document.getElementById(id) || {}).value || '').trim();
+  if (v === '') return null;
+  var n = parseFloat(v);
+  return isNaN(n) ? null : Math.max(0, n);
+}
+
 async function saveLot() {
   var numero = document.getElementById('l-numero').value.trim();
   if (!numero) { toast('Numéro de lot obligatoire.', 'error'); return; }
@@ -36863,6 +37008,9 @@ async function saveLot() {
     mode_livraison: document.getElementById('l-mode-livraison').value,
     numero_tf: document.getElementById('l-numero-tf').value.trim(),
     frais_notaire: parseFloat(document.getElementById('l-frais-notaire').value) || 0,
+    /* Vide = pas de taux propre au lot (null), distinct d'un 0 explicite. */
+    taux_comm_commercial: _tauxLotSaisi('l-taux-comm-commercial'),
+    taux_comm_apporteur: _tauxLotSaisi('l-taux-comm-apporteur'),
     nature: _lotNature,
     statut: document.getElementById('l-statut').value,
     notes: document.getElementById('l-notes').value,
@@ -46305,6 +46453,7 @@ async function saveParams() {
     frais_souscription:           parseFloat(gv('param-frais-souscription'))||0,
     compte_frais_souscription:    gv('param-frais-souscription-compte')||'',
     commission_sur_frais_souscription: gv('param-commission-sur-frais')==='oui',
+    commission_mode:              gv('param-commission-mode')==='bien' ? 'bien' : 'versement',
     bandeau_couleur:              gv('param-bandeau-couleur')||'#003366',
     bandeau_texte:                gv('param-bandeau-texte')||'',
     portail_nom:                  gv('param-portail-nom'),
@@ -46612,6 +46761,7 @@ function loadParamFields() {
   sv('param-frais-souscription', p.frais_souscription||0);
   sv('param-frais-souscription-compte', p.compte_frais_souscription||'');
   sv('param-commission-sur-frais', p.commission_sur_frais_souscription ? 'oui' : 'non');
+  sv('param-commission-mode', p.commission_mode === 'bien' ? 'bien' : 'versement');
   sv('param-bandeau-couleur', p.bandeau_couleur||'#003366');
   sv('param-bandeau-texte', p.bandeau_texte||'');
   sv('param-portail-nom', p.portail_nom||'');
