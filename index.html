@@ -34855,6 +34855,13 @@ async function savePaiement() {
   var montant = parseFloat(document.getElementById('v-montant').value);
   var date = document.getElementById('v-date').value;
   if (!cid || !montant || !date) { toast('Client, montant et date sont obligatoires.', 'error'); return; }
+  /* [FIX] Une date tapée au clavier pouvait donner « 82025-02-20 » ou
+     « 0203-06-06 » : versement, écriture et commission se retrouvaient sur
+     un exercice fantôme. */
+  var _anSaisi = parseInt(String(date).slice(0, 4), 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || _anSaisi < 2000 || _anSaisi > new Date().getFullYear() + 1) {
+    toast('⛔ Date invalide (' + date + ') : vérifiez l\'année saisie.', 'error'); return;
+  }
   if (typeof sfcTiersEstGele==='function' && sfcTiersEstGele('client', cid)) {
     toast('⛔ Ce client est gelé (SFC) — l\'enregistrement d\'un versement est interdit tant que la mesure de gel est active.', 'error');
     return;
@@ -42022,9 +42029,22 @@ var CONV_REG_TYPES = {
   autre: 'Autre convention'
 };
 
+/* [FIX] Une écriture mal datée (ex. « 82025-02-20 » ou « 0203-06-06 »,
+   saisie clavier dans un champ date) faisait apparaître des exercices
+   fantômes « 8202 » / « 0203 » dans la liste. Seules les années plausibles
+   sont proposées ; les écritures mal datées sont signalées à part. */
+function _intragAnneePlausible(a) {
+  var y = parseInt(a, 10), cur = new Date().getFullYear();
+  return /^\d{4}$/.test(String(a)) && y >= 2000 && y <= cur + 1;
+}
+function _intragDatesInvalides() {
+  return (DATA.ecritures || []).filter(function(e){
+    return e.date && (!/^\d{4}-\d{2}-\d{2}/.test(e.date) || !_intragAnneePlausible(e.date.slice(0,4)));
+  });
+}
 function _intragAnnees() {
   var set = {};
-  (DATA.ecritures || []).forEach(function(e){ if (e.date) set[e.date.slice(0,4)] = true; });
+  (DATA.ecritures || []).forEach(function(e){ if (e.date && /^\d{4}-/.test(e.date) && _intragAnneePlausible(e.date.slice(0,4))) set[e.date.slice(0,4)] = true; });
   var arr = Object.keys(set).sort().reverse();
   if (!arr.length) arr = [String(new Date().getFullYear())];
   return arr;
@@ -42090,6 +42110,78 @@ function _intragMatrice(annee) {
   return { divs: divs, lignes: lignes };
 }
 
+/* ── Flux de caisse entre divisions ─────────────────────────────────────
+   Le registre ne lit que les ÉCRITURES sur comptes de liaison. Or les
+   mouvements d'argent entre divisions passent par la caisse (transfert
+   entre caisses, réapprovisionnement servi) et sont ventilés sur 585
+   « virement interne » — ou pas encore ventilés : ils n'y apparaissaient
+   jamais. On les reconstitue ici directement depuis les bons de caisse. */
+function _intragDivCaisse(caisseId) {
+  var c = (DATA.caisses || []).find(function(x){ return x.id === caisseId; });
+  return c ? (c.division_id || '') : '';
+}
+function _intragFluxCaisseInterDiv(annee) {
+  var liaison = _consoCfg().liaison;
+  var out = [];
+  (DATA.caisse_mouvements || []).forEach(function(m){
+    if (m.type !== 'sortie' || !m.transfert_id || m.rejete) return;
+    if (annee && (m.date || '').slice(0,4) !== String(annee)) return;
+    var destId = m.transfert_vers;
+    var divS = _intragDivCaisse(m.caisse_id), divD = _intragDivCaisse(destId);
+    if (!divS || !divD || divS === divD) return;
+    var e = (DATA.caisse_mouvements || []).find(function(x){ return x.id !== m.id && x.transfert_id === m.transfert_id; }) || null;
+    var effectif = function(x){ return x && !x.rejete && (!x.requiert_validation || x.valide === true); };
+    var surLiaison = function(x){ return x && x.compte_ventile && liaison.some(function(pf){ return String(x.compte_ventile).indexOf(pf) === 0; }); };
+    var cS = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; }), cD = (DATA.caisses || []).find(function(x){ return x.id === destId; });
+    var reap = m.reappro_id ? (DATA.demandes_reappro || []).find(function(r){ return r.id === m.reappro_id; }) : null;
+    out.push({
+      date: (m.date || '').slice(0,10), montant: parseFloat(m.montant) || 0,
+      divSource: divS, divDest: divD, caisseSource: cS ? cS.nom : '?', caisseDest: cD ? cD.nom : '?',
+      bonSortie: m.numero || '', bonEntree: e ? (e.numero || '') : '— manquant',
+      origine: reap ? ('Réappro ' + (reap.numero || '')) : 'Transfert entre caisses',
+      statut: !e ? 'incomplet' : (effectif(m) && effectif(e)) ? 'effectif' : 'en attente',
+      comptes: [m.compte_ventile || 'non ventilé', e ? (e.compte_ventile || 'non ventilé') : '—'].join(' / '),
+      horsLiaison: !(surLiaison(m) && surLiaison(e))
+    });
+  });
+  return out.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+}
+function _intragReapNonServies(annee) {
+  return (DATA.demandes_reappro || []).filter(function(r){
+    return r.statut === 'validee' && (!annee || (r.valide_le || r.demande_le || '').slice(0,4) === String(annee));
+  });
+}
+function _intragRenderFluxCaisse(annee) {
+  var flux = _intragFluxCaisseInterDiv(annee);
+  var nonServies = _intragReapNonServies(annee);
+  var html = '<h4 style="margin:18px 0 6px;">💰 Flux de caisse entre divisions — exercice ' + escHtml(annee) + '</h4>'
+    + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:6px;">Transferts entre caisses et réapprovisionnements servis dont la caisse source et la caisse destinataire appartiennent à <b>deux divisions différentes</b>, reconstitués depuis les bons de caisse (ils ne passent pas par les comptes de liaison ci-dessus).</div>';
+  if (!flux.length) html += '<div class="alert alert-info" style="font-size:12px;">Aucun transfert de caisse entre deux divisions enregistré sur cet exercice.</div>';
+  else {
+    var nbHors = flux.filter(function(x){ return x.horsLiaison; }).length;
+    if (nbHors) html += '<div class="alert alert-warn" style="margin-bottom:8px;font-size:12px;">⚠️ ' + nbHors + ' flux entre divisions ventilé(s) sur un compte qui n\'est pas un compte de liaison (souvent 585 « virement interne », prévu pour deux caisses d\'une même entité) ou non ventilé(s) : ils n\'entrent ni dans la matrice de réciprocité ni dans l\'élimination de consolidation.</div>';
+    html += '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Origine</th><th>De (division · caisse)</th><th>Vers (division · caisse)</th><th class="num">Montant</th><th>Bons</th><th>Statut</th><th>Comptes ventilés (sortie / entrée)</th></tr></thead><tbody>'
+      + flux.map(function(x){
+        return '<tr' + (x.horsLiaison ? ' style="background:rgba(184,115,51,.08);"' : '') + '><td>' + dateShort(x.date) + '</td><td>' + escHtml(x.origine) + '</td>'
+          + '<td>' + escHtml(_nomDivision(x.divSource)) + ' · ' + escHtml(x.caisseSource) + '</td><td>' + escHtml(_nomDivision(x.divDest)) + ' · ' + escHtml(x.caisseDest) + '</td>'
+          + '<td class="num">' + fmtF(x.montant) + '</td><td style="font-family:monospace;font-size:10.5px;">' + escHtml(x.bonSortie) + ' → ' + escHtml(x.bonEntree) + '</td>'
+          + '<td>' + (x.statut === 'effectif' ? '✅ effectif' : x.statut === 'en attente' ? '🔐 en attente' : '⚠️ incomplet') + '</td>'
+          + '<td style="font-family:monospace;font-size:10.5px;">' + escHtml(x.comptes) + (x.horsLiaison ? ' ⚠️' : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  if (nonServies.length) {
+    html += '<h4 style="margin:14px 0 6px;">🏦 Demandes de réapprovisionnement validées mais jamais servies</h4>'
+      + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:6px;">Validées par la hiérarchie, mais aucun versement n\'a été enregistré dans l\'application (bouton « 🏦 Servir » jamais utilisé) : <b>aucun bon de caisse n\'existe pour elles</b>. Si l\'argent a réellement été remis, il l\'a été hors de ce circuit (bon de caisse saisi à la main, retrait bancaire…) : servez la demande pour tracer le flux, ou rejetez-la si elle n\'a plus lieu d\'être.</div>'
+      + '<div class="table-wrap"><table><thead><tr><th>N°</th><th>Division</th><th>Caisse à réapprovisionner</th><th class="num">Montant accordé</th><th>Validée par / le</th><th>Motif</th></tr></thead><tbody>'
+      + nonServies.map(function(r){
+        var c = (DATA.caisses || []).find(function(x){ return x.id === r.caisse_id; });
+        return '<tr><td>' + escHtml(r.numero || '') + '</td><td>' + escHtml(_nomDivision(r.division_id)) + '</td><td>' + escHtml(c ? c.nom : '?') + '</td>'
+          + '<td class="num">' + fmtF(r.montant_accorde || r.montant_demande) + '</td><td>' + escHtml(r.valide_par || '—') + ' · ' + dateShort((r.valide_le || '').slice(0,10)) + '</td><td>' + escHtml(r.motif || '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  return html;
+}
+
 /* ── Aperçu caisse avant ventilation ──────────────────────────────────
    Le "Registre des flux" ci-dessous ne voit que ce qui est déjà passé en
    écriture sur un compte de liaison — or les flux inter-divisions réels
@@ -42150,7 +42242,7 @@ function _intragRenderCaisseApercu() {
   if (!el) return;
   var divs = _consoDivisions();
   var toutes = _intragCaisseCandidats();
-  var annees = Array.from(new Set(toutes.map(function(x){ return x.date.slice(0,4); }).filter(Boolean))).sort().reverse();
+  var annees = Array.from(new Set(toutes.map(function(x){ return x.date.slice(0,4); }).filter(_intragAnneePlausible))).sort().reverse();
   if (!annees.length) annees = [String(new Date().getFullYear())];
   var list = _intragCaisseFiltres();
 
@@ -42305,7 +42397,14 @@ function _intragRenderFlux() {
     if (sansDiv) alerte = '<div class="alert alert-warn" style="margin-bottom:10px;font-size:12px;">⚠️ ' + sansDiv + ' ligne(s) sur comptes de liaison sans division valide : impossible de savoir quelle entité porte la créance ou la dette. Voir la colonne « Sans division » de la matrice.</div>';
   }
 
-  el.innerHTML = filtres + alerte + tbl + matriceHtml;
+  var datesKo = _intragDatesInvalides();
+  if (datesKo.length) {
+    alerte += '<div class="alert alert-warn" style="margin-bottom:10px;font-size:12px;">⚠️ <b>' + datesKo.length + ' écriture(s) avec une date invalide</b>, exclue(s) de tous les exercices (d\'où les années « ' + escHtml(Array.from(new Set(datesKo.map(function(e){ return String(e.date).slice(0,4); }))).join(' », « ')) + ' » vues auparavant) : '
+      + datesKo.slice(0, 8).map(function(e){ return escHtml((e.ref || e.piece || e.id) + ' (' + e.date + ')'); }).join(', ') + (datesKo.length > 8 ? '…' : '')
+      + '. Corrigez la date du versement ou de la pièce d\'origine : l\'écriture sera régénérée à la bonne date.</div>';
+  }
+
+  el.innerHTML = filtres + alerte + tbl + matriceHtml + _intragRenderFluxCaisse(_intragAnnee);
 }
 
 function _intragExportCSV() {
