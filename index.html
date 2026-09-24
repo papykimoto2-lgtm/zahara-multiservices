@@ -12355,6 +12355,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <button class="btn btn-secondary btn-sm" id="btn-caisse-nouvelle" onclick="caisseConfigModal(null)" style="display:none;">➕ Nouvelle caisse</button>
           <button class="btn btn-secondary btn-sm" onclick="caisseAuditDoublonsModal()">🔍 Audit doublons</button>
           <button class="btn btn-secondary btn-sm" onclick="caisseControleIntegrite()">🩺 Contrôle d'intégrité</button>
+          <button class="btn btn-secondary btn-sm" onclick="vrsEspecesControle()" title="Versements souscripteurs en espèces sans bon de caisse rattaché">💵 Versements espèces</button>
           <button class="btn btn-secondary btn-sm" onclick="caisseSnapshotsModal()">♻️ Points de restauration</button>
         </div>
 
@@ -17927,12 +17928,17 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         </div>
         <div class="form-group">
           <label>Mode de paiement</label>
-          <select class="form-control" id="v-mode">
+          <select class="form-control" id="v-mode" onchange="vrsMajCaisse()">
             <option value="especes">Espèces</option>
             <option value="virement">Virement bancaire</option>
             <option value="cheque">Chèque</option>
             <option value="mobile_money">Mobile Money</option>
           </select>
+        </div>
+        <div class="form-group" id="v-caisse-grp">
+          <label>💰 Caisse qui reçoit les espèces *</label>
+          <select class="form-control" id="v-caisse"></select>
+          <div id="v-caisse-info" style="font-size:11px;color:var(--blanc-dim);margin-top:4px;"></div>
         </div>
         <div class="form-group">
           <label>Référence / N° Chèque</label>
@@ -33000,6 +33006,7 @@ function openPaiementModal(clientId) {
     document.getElementById('v-client').value = clientId;
     updateClientSolde();
   }
+  vrsMajCaisse();
   openModal('modal-paiement');
 }
 
@@ -34640,6 +34647,209 @@ async function backfillEcrituresVersements() {
   toast(manquants.length + ' écriture(s) générée(s) — Grand Livre et Balance mis à jour.', 'success');
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   VERSEMENT EN ESPÈCES ↔ CAISSE
+   Un versement souscripteur en espèces est saisi UNE fois (Paiements ou
+   Souscripteurs) ; l'argent, lui, est remis au caissier. Sans lien, la caisse
+   ne le voyait jamais : son solde était faux et les dépenses faites avec cet
+   argent n'avaient pas de contrepartie. On crée donc automatiquement, dans la
+   caisse choisie, un bon d'entrée RATTACHÉ au versement (versement_id) :
+   - effectif tout de suite (le reçu remis au client fait office de pièce) ;
+   - déjà « ventilé » sur l'écriture du versement (ecr_vrs_<id>, Débit 571 /
+     Crédit client) : AUCUNE seconde écriture comptable ;
+   - exclu des encaissements de trésorerie (déjà filtré sur versement_id) ;
+   - modifié / supprimé avec le versement, jamais séparément.
+   ══════════════════════════════════════════════════════════════════════ */
+function _vrsMvtLie(versementId) {
+  return (DATA.caisse_mouvements || []).find(function(m){ return m.versement_id === versementId && !m.rejete; }) || null;
+}
+function _vrsCaissesOuvertes() {
+  return (DATA.caisses || []).filter(function(c){ return c.actif !== false && typeof caisseGetSessionOuverte === 'function' && caisseGetSessionOuverte(c.id); });
+}
+function _vrsSessionDe(mvt) {
+  return (DATA.caisse_sessions || []).find(function(x){ return x.id === mvt.session_id; }) || null;
+}
+function vrsMajCaisse() {
+  var grp = document.getElementById('v-caisse-grp'), sel = document.getElementById('v-caisse'), info = document.getElementById('v-caisse-info');
+  if (!grp || !sel) return;
+  var especes = ((document.getElementById('v-mode') || {}).value || '') === 'especes';
+  grp.style.display = especes ? '' : 'none';
+  if (!especes) return;
+  var lie = APP._editVersementId ? _vrsMvtLie(APP._editVersementId) : null;
+  if (lie) {
+    var cl = (DATA.caisses || []).find(function(c){ return c.id === lie.caisse_id; });
+    sel.innerHTML = '<option value="' + lie.caisse_id + '">' + escHtml(cl ? cl.nom : '?') + '</option>';
+    sel.disabled = true;
+    var sess = _vrsSessionDe(lie);
+    info.innerHTML = 'Rattaché au bon <b>' + escHtml(lie.numero || '') + '</b>' + ((sess && sess.statut !== 'ouverte') ? ' — ⚠️ session clôturée : montant, mode et client ne sont plus modifiables.' : ' — mis à jour avec le versement.');
+    return;
+  }
+  sel.disabled = false;
+  var ouvertes = _vrsCaissesOuvertes();
+  var defaut = '';
+  try { defaut = localStorage.getItem('vrs_caisse_defaut') || ''; } catch(e){}
+  if (!ouvertes.some(function(c){ return c.id === defaut; })) defaut = ouvertes.length === 1 ? ouvertes[0].id : '';
+  sel.innerHTML = '<option value="">— Choisir la caisse —</option>' + ouvertes.map(function(c){
+    return '<option value="' + c.id + '"' + (c.id === defaut ? ' selected' : '') + '>' + escHtml(c.nom || c.id) + '</option>';
+  }).join('');
+  info.textContent = ouvertes.length
+    ? 'Un bon d\'entrée sera créé automatiquement dans cette caisse (aucune saisie en caisse à faire).'
+    : '⚠️ Aucune caisse ouverte : faites ouvrir la caisse avant d\'encaisser des espèces.';
+}
+function _vrsCompteCredit(versement) {
+  try {
+    return versement.type === 'frais_souscription'
+      ? requireParamCompte('compte_frais_souscription', 'Compte produit des frais de souscription')
+      : requireCompteDefaut('client_lots');
+  } catch(e) { return ''; }
+}
+function _vrsMotif(versement) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === versement.client_id; }) || {};
+  var nom = ((c.nom || '') + ' ' + (c.prenoms || '')).trim();
+  var lib = { apport:'apport', mensualite:'mensualité', regularisation:'régularisation', frais_souscription:'frais de souscription' }[versement.type] || 'versement';
+  return { nom: nom, motif: 'Versement souscripteur ' + (versement.ref || '') + ' — ' + nom + ' (' + lib + (versement.date && versement.date !== today() ? ', du ' + dateShort(versement.date) : '') + ')' };
+}
+async function _vrsCreerBonCaisse(versement, caisseId) {
+  var caisse = (DATA.caisses || []).find(function(c){ return c.id === caisseId; });
+  var session = caisse ? caisseGetSessionOuverte(caisseId) : null;
+  if (!caisse || !session) return null;
+  var d = today();
+  var numero = await caisseProchainNumero(caisseId, 'entree', d, caisse.compte);
+  var auteur = (APP.currentUser && APP.currentUser.nom) || '—';
+  var lib = _vrsMotif(versement);
+  var mvt = {
+    id: uid(), session_id: session.id, caisse_id: caisseId,
+    date: d + 'T' + new Date().toISOString().slice(11, 19), numero: numero,
+    type: 'entree', montant: parseFloat(versement.montant) || 0,
+    motif: lib.motif, beneficiaire: lib.nom, piece_ref: versement.ref || '',
+    statut: 'ventile', compte_ventile: _vrsCompteCredit(versement),
+    ecriture_id: 'ecr_vrs_' + versement.id, ventile_par: auteur, ventile_le: new Date().toISOString(), ventile_auto: false,
+    requiert_validation: false, valide: true, rejete: false,
+    valide_par: 'Versement ' + (versement.ref || ''), valide_le: new Date().toISOString(),
+    versement_id: versement.id, client_id: versement.client_id,
+    created_by: auteur, created_at: new Date().toISOString()
+  };
+  DATA.caisse_mouvements.push(mvt);
+  mvt._baseModifie = mvt._modifie || null;
+  await dbPut('caisse_mouvements', mvt);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
+  try { localStorage.setItem('vrs_caisse_defaut', caisseId); } catch(e){}
+  return mvt;
+}
+async function _vrsMajBonCaisse(versement, mvt) {
+  var lib = _vrsMotif(versement);
+  mvt.montant = parseFloat(versement.montant) || 0;
+  mvt.motif = lib.motif; mvt.beneficiaire = lib.nom; mvt.piece_ref = versement.ref || '';
+  mvt.client_id = versement.client_id; mvt.compte_ventile = _vrsCompteCredit(versement);
+  mvt.ecriture_id = 'ecr_vrs_' + versement.id;
+  mvt._baseModifie = mvt._modifie || null;
+  await dbPut('caisse_mouvements', mvt);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
+}
+function _vrsRafraichirCaisse() {
+  if (typeof caisseRenderListe === 'function') caisseRenderListe();
+  if (typeof caisseRenderDashboard === 'function') caisseRenderDashboard();
+}
+
+/* ── Contrôle : versements en espèces sans bon de caisse ─────────────────── */
+function vrsEspecesSansBon(depuis) {
+  var lies = {};
+  (DATA.caisse_mouvements || []).forEach(function(m){ if (m.versement_id && !m.rejete) lies[m.versement_id] = true; });
+  return (DATA.versements || []).filter(function(v){
+    return v.mode === 'especes' && !lies[v.id] && v.statut !== 'annule' && (!depuis || (v.date || '') >= depuis);
+  }).sort(function(a, b){ return (b.date || '').localeCompare(a.date || ''); });
+}
+/* Bon d'entrée déjà saisi en caisse qui correspond probablement au versement :
+   même montant, ±3 jours, pas encore rattaché ; le nom du client dans le
+   motif/bénéficiaire départage (et marque la correspondance comme sûre). */
+function _vrsBonCandidat(v, dejaPris) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === v.client_id; }) || {};
+  var nom = sfcNormalise(c.nom || ''), mt = Math.round(parseFloat(v.montant) || 0), dV = new Date(v.date);
+  var cands = (DATA.caisse_mouvements || []).filter(function(m){
+    if (m.type !== 'entree' || m.versement_id || m.rejete || dejaPris[m.id]) return false;
+    if (Math.round(parseFloat(m.montant) || 0) !== mt) return false;
+    var dM = new Date((m.date || '').slice(0, 10));
+    return !isNaN(dM) && !isNaN(dV) && Math.abs(dM - dV) <= 3 * 86400000;
+  }).map(function(m){
+    var hay = sfcNormalise((m.motif || '') + ' ' + (m.beneficiaire || ''));
+    return { m: m, nomOk: !!(nom && nom.length > 2 && hay.indexOf(nom) !== -1) };
+  }).sort(function(a, b){ return (b.nomOk ? 1 : 0) - (a.nomOk ? 1 : 0); });
+  return cands[0] || null;
+}
+function vrsEspecesControle() {
+  var d = document.getElementById('vrs-ctl-depuis');
+  if (d && !d.value) d.value = new Date().getFullYear() + '-01-01';
+  var sel = document.getElementById('vrs-ctl-caisse');
+  if (sel) {
+    var ouv = _vrsCaissesOuvertes();
+    sel.innerHTML = ouv.length ? ouv.map(function(c){ return '<option value="' + c.id + '">' + escHtml(c.nom || c.id) + '</option>'; }).join('') : '<option value="">— Aucune caisse ouverte —</option>';
+  }
+  vrsEspecesRender();
+  openModal('modal-vrs-especes');
+}
+function vrsEspecesRender() {
+  var box = document.getElementById('vrs-ctl-table'); if (!box) return;
+  var depuis = (document.getElementById('vrs-ctl-depuis') || {}).value || '';
+  var liste = vrsEspecesSansBon(depuis);
+  var total = liste.reduce(function(s, v){ return s + (parseFloat(v.montant) || 0); }, 0);
+  var res = document.getElementById('vrs-ctl-resume');
+  if (res) res.innerHTML = liste.length ? '<b style="color:var(--rouge);">' + liste.length + ' versement(s) — ' + fmtF(total) + ' F</b> non rattaché(s) à la caisse' : '<b style="color:var(--vert);">✅ Tous les versements en espèces de la période sont rattachés à un bon de caisse.</b>';
+  if (!liste.length) { box.innerHTML = ''; return; }
+  var pris = {};
+  var ouverte = _vrsCaissesOuvertes().length > 0;
+  box.innerHTML = '<div style="overflow-x:auto;max-height:60vh;"><table class="data-table"><thead><tr><th>Date</th><th>Réf.</th><th>Souscripteur</th><th style="text-align:right;">Montant</th><th>Bon de caisse correspondant</th><th></th></tr></thead><tbody>'
+    + liste.slice(0, 400).map(function(v){
+      var c = (DATA.clients || []).find(function(x){ return x.id === v.client_id; }) || {};
+      var cand = _vrsBonCandidat(v, pris);
+      if (cand) pris[cand.m.id] = true;
+      var caisseC = cand ? (DATA.caisses || []).find(function(x){ return x.id === cand.m.caisse_id; }) : null;
+      var candHtml = cand
+        ? (cand.nomOk ? '✅ ' : '❓ ') + '<b>' + escHtml(cand.m.numero || '') + '</b> · ' + escHtml(caisseC ? caisseC.nom : '') + ' · ' + dateShort((cand.m.date || '').slice(0, 10))
+          + '<div style="font-size:10px;color:var(--blanc-dim);">' + escHtml((cand.m.motif || '').slice(0, 80)) + (cand.nomOk ? '' : ' — nom du client absent du bon, à vérifier') + '</div>'
+        : '<span style="color:var(--blanc-dim);">Aucun bon d\'entrée de même montant à ±3 jours</span>';
+      return '<tr><td>' + dateShort(v.date) + '</td><td>' + escHtml(v.ref || '') + '</td><td>' + escHtml(((c.nom || '') + ' ' + (c.prenoms || '')).trim() || '—') + '</td>'
+        + '<td style="text-align:right;font-weight:700;">' + fmtF(v.montant) + ' F</td><td style="font-size:11px;">' + candHtml + '</td>'
+        + '<td style="white-space:nowrap;">'
+        + (cand ? '<button class="btn btn-primary btn-sm" onclick="vrsRattacherBon(\'' + v.id + '\',\'' + cand.m.id + '\')">🔗 Rattacher</button> ' : '')
+        + (ouverte ? '<button class="btn btn-secondary btn-sm" onclick="vrsCreerBonDepuisControle(\'' + v.id + '\')">➕ Créer le bon</button>' : '')
+        + '</td></tr>';
+    }).join('') + '</tbody></table></div>'
+    + (liste.length > 400 ? '<div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">400 premières lignes affichées sur ' + liste.length + ' — avancez la date « Depuis le ».</div>' : '');
+}
+async function vrsRattacherBon(versementId, mvtId) {
+  if (!exigerDroit('Caisse', 'm', 'le rattachement d\'un bon de caisse à un versement')) return;
+  var v = (DATA.versements || []).find(function(x){ return x.id === versementId; });
+  var m = (DATA.caisse_mouvements || []).find(function(x){ return x.id === mvtId; });
+  if (!v || !m || m.versement_id) return;
+  var ecrPropre = (m.ecriture_id && m.ecriture_id !== 'ecr_vrs_' + v.id) ? (DATA.ecritures || []).find(function(e){ return e.id === m.ecriture_id; }) : null;
+  if (!confirm('Rattacher le bon ' + (m.numero || '') + ' (' + fmtF(m.montant) + ' F) au versement ' + (v.ref || '') + ' ?'
+    + (ecrPropre ? '\n\nL\'écriture propre à ce bon (' + (ecrPropre.compte_debit || '') + ' / ' + (ecrPropre.compte_credit || '') + ') sera supprimée : l\'écriture du versement enregistre déjà cet encaissement (sinon il serait comptabilisé deux fois).' : ''))) return;
+  if (ecrPropre && await deleteRecord('ecritures', ecrPropre.id) === false) { toast('🔒 Exercice clôturé — l\'écriture du bon ne peut plus être supprimée : rattachement annulé.', 'error'); return; }
+  if (!(DATA.ecritures || []).some(function(e){ return e.id === 'ecr_vrs_' + v.id; })) { try { await genererEcritureVersement(v); } catch(e) {} }
+  m.versement_id = v.id; m.client_id = v.client_id;
+  m.statut = 'ventile'; m.ecriture_id = 'ecr_vrs_' + v.id; m.compte_ventile = _vrsCompteCredit(v);
+  m.ventile_auto = false; m.ventile_par = (APP.currentUser && APP.currentUser.nom) || '—'; m.ventile_le = new Date().toISOString();
+  m._baseModifie = m._modifie || null;
+  await dbPut('caisse_mouvements', m);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', m);
+  toast('🔗 Bon ' + (m.numero || '') + ' rattaché au versement ' + (v.ref || '') + '.', 'success');
+  vrsEspecesRender(); _vrsRafraichirCaisse();
+  if (typeof buildBalance === 'function') buildBalance();
+}
+async function vrsCreerBonDepuisControle(versementId) {
+  if (!exigerDroit('Caisse', 'c', 'la création d\'un bon de caisse')) return;
+  var v = (DATA.versements || []).find(function(x){ return x.id === versementId; });
+  var caisseId = (document.getElementById('vrs-ctl-caisse') || {}).value || '';
+  if (!v || !caisseId) { toast('Choisissez une caisse ouverte.', 'error'); return; }
+  var c = (DATA.caisses || []).find(function(x){ return x.id === caisseId; });
+  if (!confirm('Créer dans « ' + (c ? c.nom : '') + ' » un bon d\'entrée de ' + fmtF(v.montant) + ' F pour le versement ' + (v.ref || '') + ' du ' + dateShort(v.date) + ' ?\n\nÀ faire uniquement si ces espèces sont bien dans cette caisse aujourd\'hui (le bon est daté du jour).')) return;
+  if (!(DATA.ecritures || []).some(function(e){ return e.id === 'ecr_vrs_' + v.id; })) { try { await genererEcritureVersement(v); } catch(e) {} }
+  var mvt = await _vrsCreerBonCaisse(v, caisseId);
+  if (!mvt) { toast('Caisse fermée entre-temps.', 'error'); return; }
+  toast('💰 Bon ' + mvt.numero + ' créé pour le versement ' + (v.ref || '') + '.', 'success');
+  vrsEspecesRender(); _vrsRafraichirCaisse();
+}
+
 async function savePaiement() {
   var cid = document.getElementById('v-client').value;
   var montant = parseFloat(document.getElementById('v-montant').value);
@@ -34651,9 +34861,24 @@ async function savePaiement() {
   }
 
   // ── MODE ÉDITION : mise à jour + ré-impact des commissions + ré-écriture comptable ──
+  var _modeSaisi = document.getElementById('v-mode').value;
+  var _caisseSaisie = (document.getElementById('v-caisse') || {}).value || '';
   if (APP._editVersementId) {
     var vEdit = DATA.versements.find(function(x){ return x.id === APP._editVersementId; });
     if (vEdit) {
+      /* [Caisse] Bon d'entrée rattaché : on vérifie AVANT toute modification
+         qu'il peut suivre (session encore ouverte), sinon la caisse clôturée
+         et le versement divergeraient. */
+      var _mvtLie = _vrsMvtLie(vEdit.id);
+      var _sessLie = _mvtLie ? _vrsSessionDe(_mvtLie) : null;
+      var _touche = Math.round(parseFloat(vEdit.montant)||0) !== Math.round(montant) || _modeSaisi !== vEdit.mode || cid !== vEdit.client_id;
+      if (_mvtLie && _touche && (!_sessLie || _sessLie.statut !== 'ouverte')) {
+        toast('🔒 Ce versement est rattaché au bon de caisse ' + (_mvtLie.numero||'') + ' d\'une session déjà clôturée : montant, mode et client ne peuvent plus changer. Régularisez par un bon en caisse.', 'error', 9000);
+        return;
+      }
+      var _creerBon = !_mvtLie && _modeSaisi === 'especes' && vEdit.mode !== 'especes';
+      if (_creerBon && !_caisseSaisie) { toast('Choisissez la caisse qui reçoit les espèces.', 'error'); return; }
+      if (_creerBon && !caisseGetSessionOuverte(_caisseSaisie)) { toast('Cette caisse est fermée — faites-la ouvrir avant d\'encaisser des espèces.', 'error'); return; }
       var _vAvant = JSON.parse(JSON.stringify(vEdit));
       vEdit.client_id = cid;
       vEdit.date      = date;
@@ -34669,6 +34894,10 @@ async function savePaiement() {
       await logAudit('versements', vEdit.id, 'update', _vAvant, vEdit);
       await reimpacterCommissionsVersement(vEdit);
       await genererEcritureVersement(vEdit);
+      if (_mvtLie && vEdit.mode === 'especes') await _vrsMajBonCaisse(vEdit, _mvtLie);
+      else if (_mvtLie) await _caisseDelMvt(_mvtLie, { depuisVersement: true });
+      else if (_creerBon) await _vrsCreerBonCaisse(vEdit, _caisseSaisie);
+      if (_mvtLie || _creerBon) _vrsRafraichirCaisse();
       if (typeof majStatutLotClient === 'function') await majStatutLotClient(vEdit.client_id);
       APP._editVersementId = null;
       closeModal('modal-paiement');
@@ -34680,6 +34909,10 @@ async function savePaiement() {
     return;
   }
 
+  if (_modeSaisi === 'especes') {
+    if (!_caisseSaisie) { toast('Choisissez la caisse qui reçoit les espèces.', 'error'); return; }
+    if (!caisseGetSessionOuverte(_caisseSaisie)) { toast('Cette caisse est fermée — faites-la ouvrir avant d\'encaisser des espèces.', 'error'); return; }
+  }
   var _anVrs = String(new Date().getFullYear());
   /* [Anti-doublon import caisse ↔ saisie Paiements] L'historique importé est
      constitué de mouvements de CAISSE (DATA.caisse_mouvements, import
@@ -34708,7 +34941,7 @@ async function savePaiement() {
       + 'Confirmer que ce nouveau versement est bien DIFFÉRENT (et non une ressaisie du même paiement) ?')) return;
   }
   var mvtCaisseProche = nomClientPaiement ? (DATA.caisse_mouvements || []).find(function(m) {
-    if (m.type !== 'entree') return false;
+    if (m.type !== 'entree' || m.versement_id) return false;
     if (Math.round(parseFloat(m.montant) || 0) !== Math.round(montant)) return false;
     var dM = new Date((m.date||'').slice(0,10)), dN = new Date(date);
     if (isNaN(dM) || isNaN(dN) || Math.abs(dM-dN) > 2*86400000) return false;
@@ -34742,12 +34975,17 @@ async function savePaiement() {
 
   // ── Écriture comptable automatique (Débit Trésorerie / Crédit Client) ──────
   await genererEcritureVersement(versement);
+  // ── Espèces : bon d'entrée automatique dans la caisse qui reçoit l'argent ──
+  var _bon = (versement.mode === 'especes') ? await _vrsCreerBonCaisse(versement, _caisseSaisie) : null;
+  if (_bon) _vrsRafraichirCaisse();
+  else if (versement.mode === 'especes') toast('⚠️ Versement enregistré, mais le bon de caisse n\'a pas pu être créé (caisse fermée entre-temps) — utilisez Caisse → « 💵 Versements espèces » pour le rattacher.', 'error', 9000);
   // ── Génération automatique des commissions ─────────────────────────────────
   await genererCommissionsVersement(versement);
   // ── Statut du lot : passe « vendu » dès que le seuil d'immobilisation est atteint ──
   if (typeof majStatutLotClient === 'function') await majStatutLotClient(versement.client_id);
 
   closeModal('modal-paiement');
+  if (_bon) toast('💰 Bon d\'entrée ' + _bon.numero + ' créé dans la caisse — solde de caisse à jour.', 'success', 6000);
   toast('Versement enregistré — écriture ' + _compteTresoVersement(versement.mode) + '/' + (versement.type === 'frais_souscription' ? requireParamCompte('compte_frais_souscription', 'Compte produit des frais de souscription') : requireCompteDefaut('client_lots')) + ' créée.', 'success');
 
   // Afficher reçu
@@ -35061,13 +35299,22 @@ async function deleteVersement(id, skipConfirm) {
      (auditSupprimerSelection), qui affiche une seule confirmation globale
      avant la boucle plutôt qu'une confirmation par ligne. */
   if (!exigerDroit('Paiements', 's', 'la suppression de ce versement')) return;
-  if (!skipConfirm && !confirm('Supprimer ce versement ?')) return;
+  var _mvtLieDel = _vrsMvtLie(id);
+  if (_mvtLieDel) {
+    var _sessDel = _vrsSessionDe(_mvtLieDel);
+    if (!_sessDel || _sessDel.statut !== 'ouverte') {
+      toast('🔒 Versement rattaché au bon de caisse ' + (_mvtLieDel.numero||'') + ' d\'une session clôturée : suppression impossible. Régularisez par un bon de sortie en caisse, puis contactez le comptable.', 'error', 9000);
+      return;
+    }
+  }
+  if (!skipConfirm && !confirm('Supprimer ce versement ?' + (_mvtLieDel ? '\n\nLe bon de caisse ' + (_mvtLieDel.numero||'') + ' rattaché sera supprimé aussi.' : ''))) return;
   var v = DATA.versements.find(function(x){ return x.id === id; });
   var clientId = v ? v.client_id : null;
   await logAudit('versements', id, 'delete', v || null, null);
   DATA.versements = DATA.versements.filter(function(v) { return v.id !== id; });
   await deleteRecord('versements', id);
   await supprimerEcritureVersement(id);
+  if (_mvtLieDel) { await _caisseDelMvt(_mvtLieDel, { depuisVersement: true }); _vrsRafraichirCaisse(); }
   /* [FIX] Un versement supprimé (doublon, erreur de saisie) laissait ses
      commissions générées automatiquement (genererCommissionsVersement) en
      orphelines — invisibles ici, mais toujours comptées dans le total des
@@ -102465,6 +102712,7 @@ function editVersement(id) {
   set('v-mois', v.mois); set('v-notes', v.notes);
   if (typeof onTypeVersementChange === 'function') onTypeVersementChange();
   if (typeof updateClientSolde === 'function') updateClientSolde();
+  vrsMajCaisse();
   var t = document.querySelector('#modal-paiement .modal-header h3'); if (t) t.textContent = 'Modifier le versement';
   var b = document.getElementById('btn-save-paiement'); if (b) b.textContent = '💾 Enregistrer les modifications';
   openModal('modal-paiement');
@@ -123533,7 +123781,20 @@ async function caisseEnter() {
    Le verrou d'exercice clos (deleteRecord/ecritures) bloque toute suppression
    d'un mouvement ventilé sur un exercice comptable clôturé. */
 
-async function _caisseDelMvt(mvt) {
+async function _caisseDelMvt(mvt, opts) {
+  /* [Versement ↔ caisse] Le bon rattaché à un versement partage l'écriture
+     du versement (ecr_vrs_<id>) : il ne se supprime qu'avec le versement,
+     et on ne supprime jamais cette écriture d'ici. */
+  if (mvt && mvt.versement_id) {
+    var _vExiste = (DATA.versements || []).some(function(v){ return v.id === mvt.versement_id; });
+    if (!(opts && opts.depuisVersement) && _vExiste) {
+      toast('🔗 Le bon ' + (mvt.numero||'') + ' est rattaché à un versement souscripteur : supprimez ou modifiez le versement (Paiements), pas le bon.', 'error', 8000);
+      return false;
+    }
+    await deleteRecord('caisse_mouvements', mvt.id);
+    DATA.caisse_mouvements = (DATA.caisse_mouvements || []).filter(function(x){ return x.id !== mvt.id; });
+    return true;
+  }
   /* [FIX] Filet de sécurité : certains mouvements (import historique) n'ont
      jamais eu leur champ ecriture_id renseigné, alors qu'une écriture liée
      existe bel et bien sous l'id déterministe ecr_cse_<mouvementId>. Sans ce
@@ -123572,6 +123833,7 @@ async function caisseSupprimerMouvement(mvtId) {
   var m = (DATA.caisse_mouvements||[]).find(function(x){ return x.id===mvtId; });
   if (!m) return;
   if (!caisseRoleAdminLike()) { toast('Droit refusé.','error'); return; }
+  if (m.versement_id && (DATA.versements||[]).some(function(v){ return v.id === m.versement_id; })) { _caisseDelMvt(m); return; }
   var jumeau = _caisseMvtJumeau(m);
   if (!confirm('Supprimer le mouvement ' + (m.numero||'') + ' (' + fmtF(m.montant) + ' FCFA) ?'
     + (m.ecriture_id ? '\nL\'écriture comptable liée sera aussi supprimée.' : '')
@@ -124050,6 +124312,7 @@ function cbRenderSuggestions(type) {
    - à ventiler, clôturé→ comptabilité seule (session déjà transmise) */
 function caisseCanEditBon(mvt) {
   if (!mvt || !APP.currentUser) return false;
+  if (mvt.versement_id) return false; /* se modifie via le versement (Paiements) */
   if (caisseRoleAdminLike()) return true;
   if (mvt.statut === 'ventile') return false;
   var s = (DATA.caisse_sessions||[]).find(function(x){ return x.id===mvt.session_id; });
@@ -127011,6 +127274,13 @@ function caisseControleIntegrite() {
   });
   if (transfertsKo.length) pb.push('❌ ' + transfertsKo.length + ' transfert(s) entre caisses déséquilibré(s) :\n   ' + transfertsKo.slice(0,10).join('\n   '));
   else ok.push('✅ Transferts entre caisses équilibrés (sortie ↔ entrée).');
+
+  /* 13 bis. Versements souscripteurs en espèces (année en cours) sans bon de
+     caisse rattaché : argent remis au caissier que la caisse ignore. */
+  var vrsSansBon = (typeof vrsEspecesSansBon === 'function') ? vrsEspecesSansBon(new Date().getFullYear() + '-01-01') : [];
+  if (vrsSansBon.length) pb.push('⚠️ ' + vrsSansBon.length + ' versement(s) souscripteur en espèces de l\'année sans bon de caisse rattaché ('
+    + fmtF(vrsSansBon.reduce(function(s, v){ return s + (parseFloat(v.montant) || 0); }, 0)) + ' F) — bouton « 💵 Versements espèces » pour les rattacher.');
+  else ok.push('✅ Versements en espèces de l\'année tous rattachés à un bon de caisse.');
 
   /* 14. [INC-0005] Réapprovisionnements servis sans provenance tracée : une
      entrée en caisse sans aucune caisse débitée ni origine externe déclarée
@@ -131604,6 +131874,30 @@ goTo = function(page) {
       <button class="btn btn-secondary" onclick="closeModal('modal-caisse-transfert')">Annuler</button>
       <button class="btn btn-primary" onclick="caisseTransfererFonds()">🔄 Effectuer le transfert</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal : contrôle des versements en espèces sans bon de caisse -->
+<div class="modal-overlay" id="modal-vrs-especes">
+  <div class="modal" style="max-width:1100px;">
+    <div class="modal-header">
+      <h3>💵 Versements en espèces sans bon de caisse</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-vrs-especes')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;line-height:1.5;">
+        Versements souscripteurs en <b>espèces</b> saisis dans Paiements/Souscripteurs mais qui ne sont rattachés à <b>aucun bon de caisse</b> : l'argent a été remis au caissier sans que la caisse le sache.
+        <b>🔗 Rattacher</b> relie le versement à un bon d'entrée déjà saisi en caisse (même montant, date proche) — l'écriture propre à ce bon est supprimée car celle du versement la remplace (pas de double comptabilisation).
+        <b>➕ Créer le bon</b> enregistre l'entrée dans une caisse ouverte, datée d'aujourd'hui.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+        <label style="font-size:12px;">Depuis le</label><input type="date" class="form-control" id="vrs-ctl-depuis" style="width:160px;" onchange="vrsEspecesRender()">
+        <label style="font-size:12px;">Caisse pour « Créer »</label><select class="form-control" id="vrs-ctl-caisse" style="width:220px;"></select>
+        <span id="vrs-ctl-resume" style="font-size:12px;"></span>
+      </div>
+      <div id="vrs-ctl-table"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-vrs-especes')">Fermer</button></div>
   </div>
 </div>
 
