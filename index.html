@@ -27924,6 +27924,15 @@ async function _pullBatchViaRPC() {
   for (var k = 0; k < tablesConcernees.length; k++) {
     var t = tablesConcernees[k][0], s = tablesConcernees[k][1];
     var rows = data && data[t];
+    /* [FIX réappro invisibles] La fonction serveur pull_incremental() avait
+       une liste FIGÉE de tables : une table créée après sa génération
+       (pi_demandes_reappro, pi_incidents…) n'apparaissait pas dans la
+       réponse, et ses lignes ne redescendaient JAMAIS sur les autres postes
+       (la demande d'une caissière restait invisible des validateurs). Toute
+       table absente de la réponse est désormais récupérée à part. */
+    if (data && !Object.prototype.hasOwnProperty.call(data, t)) {
+      try { var _resManq = await _pullTable(t); rows = _resManq.rows; } catch(eM) { rows = null; }
+    }
     if (rows && rows.length) total += await _appliquerLignesPullTable(t, s, rows);
   }
   try { total += await _syncUsersSeul(); } catch(e) { console.warn('[Sync] pi_users non synchronisée ce cycle :', e); }
@@ -28059,6 +28068,7 @@ async function pullFromCloudSilent() {
         if (typeof renderCompteExploitationPrevisionnel === 'function') renderCompteExploitationPrevisionnel();
       }
       if (pageActive === 'parc-auto' && typeof paRenderAlertes === 'function') paRenderAlertes();
+      if (typeof _rtRefreshCaisseValidations === 'function') _rtRefreshCaisseValidations();
       if (pageActive === 'relances' && typeof detectRelances === 'function') detectRelances();
       if (pageActive === 'commercialisation' && typeof renderCommercialisation === 'function') renderCommercialisation();
       /* [FIX même famille] Sélecteurs de lots ouverts au moment d'un pull —
@@ -80602,9 +80612,25 @@ var RT_STORE_PAGE = {
 };
 
 var RT_COLLAB_STORES = ['messages','conversations','evenements_calendrier','reunions_direction','actions_reunion'];
+/* [FIX] Caisse & circuit de validation : ces stores n'avaient aucune
+   fonction de rafraîchissement — une demande de réapprovisionnement ou un
+   bon de caisse reçu d'un autre poste arrivait bien en mémoire, mais l'écran
+   ouvert (Caisse, Validations) et le badge du menu restaient figés. */
+var RT_CAISSE_STORES = ['demandes_reappro','caisse_mouvements','caisse_sessions','caisses','fiches_engagement_depense','transferts_budgetaires','caisse_budgets','validations'];
+function _rtRefreshCaisseValidations() {
+  try { if (typeof _majBadgeValidationsPilotage === 'function') _majBadgeValidationsPilotage(); } catch(e){}
+  if (APP.currentPage === 'caisse') {
+    ['caisseRenderListe','caisseRenderValidations','reapRender','caisseRenderMesDemandes','caisseRenderDashboard','caisseRenderDecaissementsAFaire']
+      .forEach(function(fn){ try { if (typeof window[fn] === 'function') window[fn](); } catch(e){} });
+  }
+  if (APP.currentPage === 'validations') {
+    try { if (typeof renderPageValidations === 'function') renderPageValidations(); } catch(e){}
+  }
+}
 function _rtRefreshPage(store){
   /* Toute donnée reçue peut alimenter une liste déroulante ouverte ailleurs. */
   try { if (typeof repeuplerListes === 'function') repeuplerListes(); } catch(e){}
+  if (RT_CAISSE_STORES.indexOf(store) !== -1) _rtRefreshCaisseValidations();
   /* Collaboration : le compteur de messages non lus et les alertes d'agenda
      doivent se mettre à jour quelle que soit la page consultée, sinon un
      utilisateur ne sait pas qu'on lui a écrit tant qu'il n'ouvre pas le module. */
@@ -124878,8 +124904,16 @@ var REAPPRO_STATUTS = {
 
 function reapGenererNumero() {
   var annee = new Date().getFullYear();
-  var n = (DATA.demandes_reappro||[]).filter(function(d){ return (d.numero||'').indexOf('REAP-'+annee) === 0; }).length + 1;
-  return 'REAP-' + annee + '-' + String(n).padStart(4,'0');
+  /* [FIX] Le numéro était le NOMBRE de demandes connues + 1 : un poste qui
+     n'avait pas reçu toutes les demandes (cf. synchro) réattribuait un
+     numéro déjà pris (deux REAP-2026-0001 en base). On part désormais du
+     plus grand numéro existant. */
+  var max = 0;
+  (DATA.demandes_reappro||[]).forEach(function(d){
+    var m = String(d.numero||'').match(new RegExp('^REAP-' + annee + '-(\\d+)$'));
+    if (m) max = Math.max(max, parseInt(m[1], 10) || 0);
+  });
+  return 'REAP-' + annee + '-' + String(max + 1).padStart(4,'0');
 }
 
 /* Solde constatable d'une caisse : celui de sa session ouverte. Null quand
@@ -124988,6 +125022,22 @@ async function reapSauver() {
   reapRender();
 }
 
+/* Message interne (conversation de la caisse : titulaires, destinataires et
+   validateurs) à chaque étape — même mécanisme que les bons de caisse.
+   Best-effort : n'empêche jamais l'action elle-même. */
+async function _reapNotifier(d, etape) {
+  try {
+    var c = (DATA.caisses || []).find(function(x){ return x.id === d.caisse_id; });
+    if (!c || typeof caisseEnvoyerMessageInterne !== 'function') return;
+    var texte = etape === 'soumise'
+      ? '🏦 Demande de réapprovisionnement ' + (d.numero||'') + ' — ' + fmtF(d.montant_demande) + ' FCFA pour « ' + (c.nom||'') + ' », soumise par ' + (d.demande_par||'—') + '.\nMotif : ' + (d.motif||'—') + '\nÀ valider ou rejeter : Pilotage → Validations → Réapprovisionnement (ou Caisse → Réapprovisionnement).'
+      : etape === 'validee'
+      ? '✅ Demande ' + (d.numero||'') + ' validée par ' + (d.valide_par||'—') + ' pour ' + fmtF(d.montant_accorde) + ' FCFA — à servir (bouton « Servir »).'
+      : '✖ Demande ' + (d.numero||'') + ' rejetée par ' + (d.valide_par||'—') + '.\nMotif : ' + (d.motif_rejet||'—');
+    await caisseEnvoyerMessageInterne(c, texte);
+  } catch(e) {}
+}
+
 async function reapSoumettre(id) {
   var d = (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }); if (!d) return;
   if (d.statut !== 'brouillon') { toast('Seule une demande en brouillon peut être soumise.', 'error'); return; }
@@ -124996,6 +125046,7 @@ async function reapSoumettre(id) {
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_demandes_reappro', d);
   toast('📤 Demande ' + d.numero + ' soumise pour validation.', 'success');
   reapRender();
+  _reapNotifier(d, 'soumise');
 }
 
 async function reapValider(id, montantAccorde) {
@@ -125027,6 +125078,7 @@ async function reapValider(id, montantAccorde) {
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_demandes_reappro', d);
   toast('✅ Demande ' + d.numero + ' validée pour ' + fmtF(montant) + ' F — reste à la servir pour que les fonds entrent en caisse.', 'success', 6000);
   reapRender();
+  _reapNotifier(d, 'validee');
 }
 
 async function reapRejeter(id, motif) {
@@ -125039,6 +125091,7 @@ async function reapRejeter(id, motif) {
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_demandes_reappro', d);
   toast('❌ Demande ' + d.numero + ' rejetée.', 'info');
   reapRender();
+  _reapNotifier(d, 'rejetee');
 }
 
 async function reapSupprimer(id) {
@@ -128099,7 +128152,10 @@ function _majBadgeValidationsPilotage() {
     + ((typeof caisseDecaissementsEnAttente === 'function') ? caisseDecaissementsEnAttente().length : 0)
     + (DATA.fiches_engagement_depense||[]).filter(function(d){ return d.statut === 'soumise'; }).length
     + (DATA.transferts_budgetaires||[]).filter(function(t){ return t.statut === 'soumis'; }).length
-    + (DATA.caisse_budgets||[]).filter(function(b){ return b.statut === 'soumis'; }).length;
+    + (DATA.caisse_budgets||[]).filter(function(b){ return b.statut === 'soumis'; }).length
+    /* [FIX] Les demandes de réapprovisionnement en attente n'étaient pas
+       comptées : aucun signal côté validateurs. */
+    + (DATA.demandes_reappro||[]).filter(function(d){ return d.statut === 'soumise'; }).length;
   badge.textContent = n;
   badge.style.display = n ? 'inline-block' : 'none';
 }
@@ -128245,6 +128301,7 @@ function _utilisateursValidateursCaisse() {
   var roles = (typeof getAllRoles === 'function') ? getAllRoles() : {};
   return (DATA.users || []).filter(function(u){
     if (!u || u.actif === false) return false;
+    if (typeof roleEstCaissiere === 'function' && roleEstCaissiere(u.role)) return false;
     var r = roles[u.role]; if (!r) return false;
     if (r.permissions && r.permissions.Caisse === false) return false;
     var d = r.droits && r.droits.Caisse;
