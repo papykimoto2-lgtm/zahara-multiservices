@@ -126587,10 +126587,21 @@ function caisseUpdateEcartPreview() {
 }
 
 async function caisseCloturer() {
-  if (!exigerDroit('Caisse','v','la clôture de caisse')) return;
+  /* [FIX INC-0006 / INC-0007] La clôture exigeait le droit « V » (valider).
+     Or clôturer sa caisse (compter, constater l'écart) est la tâche
+     quotidienne de la caissière — pas une validation — et un rôle de
+     caissière ne peut jamais détenir « V » (séparation des tâches, INC-0005).
+     Remise sur le rôle Caissière, la titulaire ne pouvait donc plus clôturer.
+     Désormais : droit de saisie sur Caisse + être la personne qui tient la
+     session (ou un administrateur), exactement comme pour l'ouverture. */
+  if (!exigerDroit('Caisse','m','la clôture de caisse')) return;
   var caisseId = document.getElementById('ccl-caisse-id').value;
   var session = caisseGetSessionOuverte(caisseId);
   if (!session) { toast('Session introuvable.', 'error'); closeModal('modal-caisse-cloturer'); return; }
+  if (!caisseSessionEstOperable(session)) {
+    toast('🔒 Cette caisse est tenue par ' + (session.ouverte_par || 'un(e) autre utilisateur(rice)') + ' : seul(e) elle/lui ou un administrateur peut la clôturer.', 'error', 6000);
+    return;
+  }
   var soldeTheorique = caisseSoldeSession(session);
   /* [FIX] Le contrôle de plafond était doublement inopérant :
      1) il cherchait la PREMIÈRE session ouverte toutes caisses confondues, pas
@@ -126947,13 +126958,27 @@ function caisseOuvrirEnvoiModal(sessionId) {
   var session = (DATA.caisse_sessions || []).find(function(s){ return s.id === sessionId; });
   if (!session) { toast('Session introuvable.', 'error'); return; }
   var c = (DATA.caisses || []).find(function(x){ return x.id === session.caisse_id; });
+  if (CAISSE_UI.envoiSessionId !== sessionId) CAISSE_UI.envoiTous = false;
   CAISSE_UI.envoiSessionId = sessionId;
 
   document.getElementById('ce-titre').textContent = '✉️ Envoyer l\'état — ' + (c?c.nom:'') + ' · ' + session.date;
 
   /* Destinataires internes (users) — défaut = config caisse + caissières + moi */
   var defautInt = [].concat(c.destinataires_internes||[], c.caissiere_ids||[], (APP.currentUser?[APP.currentUser.id]:[]));
-  document.getElementById('ce-internes').innerHTML = (DATA.users||[]).map(function(u){
+  /* [FIX INC-0006] La liste affichait TOUS les comptes de l'application
+     (inactifs, doublons, comptes de test…) : la caissière y voyait des noms
+     sans rapport avec sa caisse. On ne propose que les destinataires utiles
+     — configurés sur la caisse, ses caissières, les validateurs, soi-même —
+     les autres restant accessibles via « Afficher tous les utilisateurs ». */
+  var _valid = (typeof _utilisateursValidateursCaisse === 'function') ? _utilisateursValidateursCaisse() : [];
+  var _utiles = {}; defautInt.concat(_valid).forEach(function(id){ _utiles[id] = 1; });
+  var _vus = {};
+  var _usersListe = (DATA.users||[]).filter(function(u){
+    if (!u || u.actif === false || u.statut === 'inactif') return false;
+    var cle = String(u.nom||'').trim().toLowerCase(); if (_vus[cle]) return false; _vus[cle] = 1;
+    return CAISSE_UI.envoiTous || _utiles[u.id];
+  });
+  document.getElementById('ce-internes').innerHTML = (CAISSE_UI.envoiTous ? '' : '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:4px;">Destinataires de la caisse et validateurs · <a href="javascript:void(0)" onclick="CAISSE_UI.envoiTous=true;caisseOuvrirEnvoiModal(CAISSE_UI.envoiSessionId)">Afficher tous les utilisateurs</a></div>') + _usersListe.map(function(u){
     var chk = defautInt.indexOf(u.id) >= 0 ? ' checked' : '';
     return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;cursor:pointer;">'
       + '<input type="checkbox" class="ce-int" value="'+u.id+'"'+chk+'> '
