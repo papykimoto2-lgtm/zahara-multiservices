@@ -12378,6 +12378,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <button class="tab-btn" onclick="switchTab('caisse','tiers')">💰 Comptabilité tiers</button>
             <button class="tab-btn" onclick="switchTab('caisse','mesdemandes')">📋 Mes demandes de validation <span class="nav-badge" id="badge-tab-mesdemandes" style="display:none;position:static;margin-left:4px;">0</span></button>
             <button class="tab-btn" onclick="switchTab('caisse','reappro')">🏦 Réapprovisionnement <span class="nav-badge" id="badge-tab-reappro" style="display:none;position:static;margin-left:4px;">0</span></button>
+            <button class="tab-btn" onclick="switchTab('caisse','visas');cvRender()" title="Circuit de visas papier : impression, bordereaux, visa final du Gérant Holding">🖋️ Visas Gérant <span class="nav-badge" id="badge-tab-visas" style="display:none;position:static;margin-left:4px;">0</span></button>
             <button class="tab-btn" id="caisse-tab-btn-audit" onclick="switchTab('caisse','audit')" style="display:none;" title="Réservé aux administrateurs">🔍 Audit</button>
           </div>
         </div>
@@ -12392,6 +12393,14 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
 
         <!-- ══ Réapprovisionnement de fonds : une division à court de liquidités
              demande une dotation, validée par la hiérarchie puis versée dans sa caisse ══ -->
+        <div class="tab-pane" id="tab-caisse-visas">
+          <div class="card" style="margin-bottom:10px;">
+            <div class="card-title" style="margin-bottom:2px;">🖋️ Circuit de visas des pièces de caisse</div>
+            <div style="font-size:11px;color:var(--dim);">Bon validé → imprimé et signé (bénéficiaire ou déposant, caissière) → comptabilisé (visa comptable) → transmis par bordereau → liasse signée par le Gérant Holding, scannée et jointe → <b>le Gérant clique « Viser »</b>. Sans ce visa, l'écriture de caisse ne peut pas être rendue définitive en comptabilité, ni l'exercice clôturé.</div>
+          </div>
+          <div id="caisse-visas-box"></div>
+        </div>
+
         <div class="tab-pane" id="tab-caisse-reappro">
           <div class="card">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -24074,6 +24083,7 @@ var DATA = {
   caisse_budgets: [],
   /* v148 — Demandes de réapprovisionnement de fonds des caisses de division */
   demandes_reappro: [],
+  bordereaux_caisse: [],
   /* v147 — Circuit budgétaire complet : budget prévisionnel annuel par
      division/compte, validé par le DG, décrémenté par les Demandes d'Achat
      validées, avec transferts de ligne à ligne */
@@ -24085,7 +24095,8 @@ var DATA = {
    INDEXEDDB
 ────────────────────────────────────────────────────── */
 var DB_NAME = 'ImmoSuiteDB';
-var DB_VERSION = 153; /* v153: store 'conventions_reglementees' — registre des conventions
+var DB_VERSION = 154; /* v154: store 'bordereaux_caisse' — circuit de visas papier des pièces de caisse (visa final du Gérant Holding). Migration additive.
+                          v153: store 'conventions_reglementees' — registre des conventions
                           réglementées intra-groupe (AUSCGIE art. 438+), pièce exigée par le
                           commissaire aux comptes ; n'existait pas du tout auparavant.
                           Migration additive, aucune perte.
@@ -24239,6 +24250,8 @@ var ALL_STORES = [
   'caisse_budgets',
   /* v148 — Réapprovisionnement des caisses de division */
   'demandes_reappro',
+  /* v154 — Bordereaux de transmission des pièces de caisse au Gérant (visa final) */
+  'bordereaux_caisse',
   /* v147 — Circuit budgétaire : DA + transferts */
   'fiches_engagement_depense', 'transferts_budgetaires',
   /* [FIX] Demandes de versement du portail souscripteur — n'était même pas
@@ -26281,6 +26294,7 @@ var SUPA_STORE_MAP = [
   ['pi_caisse_sessions',  'caisse_sessions'],
   ['pi_caisse_mouvements','caisse_mouvements'],
   ['pi_demandes_reappro', 'demandes_reappro'],
+  ['pi_bordereaux_caisse', 'bordereaux_caisse'],
   ['pi_users',           'users'],
   ['pi_portail_medias',  'portail_medias'],
   ['pi_portail_messages','portail_messages'],
@@ -40015,10 +40029,16 @@ function _visaPerimetre() {
 /* Contrôles bloquants avant visa — une pièce fausse ne doit jamais être figée */
 function _visaControles(list) {
   var ko = [];
+  var _cvIdx = (typeof _cvIndexMvtParEcriture === 'function') ? _cvIndexMvtParEcriture() : {};
   list.forEach(function(e){
     if (ecrEstValidee(e)) return;
     var l = ecrLignes(e);
     var d = 0, c = 0, pb = [];
+    /* [Circuit de visas] Écriture issue d'un bon de caisse soumis au circuit
+       et pas encore visé par le Gérant Holding : elle ne peut pas devenir
+       définitive (elle reste au brouillard). */
+    var _cvM = _cvIdx[e.id];
+    if (_cvM && typeof _cvConcerne === 'function' && _cvConcerne(_cvM) && !_cvM.visa_dg) pb.push('visa Gérant manquant (bon ' + (_cvM.numero || '') + ')');
     l.forEach(function(x){
       var m = parseFloat(x.montant) || 0;
       if (x.sens === 'D') d += m; else c += m;
@@ -40059,6 +40079,7 @@ function _visaClasserAnomalie(k) {
     else if (/^compte de regroupement/.test(p)) types.push('regroupement');
     else if (p === 'ligne sans compte') types.push('sans_compte');
     else if (p === 'aucune ligne') types.push('aucune_ligne');
+    else if (/^visa Gérant manquant/.test(p)) types.push('visa_gerant');
     else types.push('autre');
   });
   return { types: types, ecart: ecart };
@@ -40069,6 +40090,7 @@ var VISA_ANOM_TYPES = {
   regroupement:  { label: 'Compte de regroupement', icone: '🔗' },
   sans_compte:   { label: 'Ligne sans compte',       icone: '❓' },
   aucune_ligne:  { label: 'Aucune ligne',            icone: '📭' },
+  visa_gerant:   { label: 'Visa Gérant manquant',    icone: '🖋️' },
   autre:         { label: 'Autre',                   icone: '⚠️' }
 };
 
@@ -48191,7 +48213,7 @@ var ACTIONS_LIB = { c:'Créer', m:'Modifier', s:'Supprimer', v:'Valider' };
 /* Rattachement des stores sensibles à leur module, pour appliquer les droits
    au niveau des données et pas seulement de l'écran. */
 var STORE_MODULE = {
-  caisse_mouvements:'Caisse', caisse_sessions:'Caisse', caisses:'Caisse', demandes_reappro:'Caisse',
+  caisse_mouvements:'Caisse', caisse_sessions:'Caisse', caisses:'Caisse', demandes_reappro:'Caisse', bordereaux_caisse:'Caisse',
   ecritures:'Comptabilite', versements:'Paiements', factures_client:'Paiements',
   employes:'Paie', bulletins:'Paie', pointages:'Journaliers & Temporaires',
   clients:'Souscripteurs', lots:'Lots & Reservations', programmes:'Programmes',
@@ -67946,6 +67968,13 @@ async function cloturerExercice(annee, divisionId) {
   var divLabel = divisionId ? (_nomDivision ? _nomDivision(divisionId) : divisionId) : 'Toutes divisions (consolidé)';
   if (!exigerDroit('Comptabilite','v','la clôture de l\'exercice')) return;
   if (!hasRole('admin')) { toast('Réservé à l\'administrateur.', 'error'); return; }
+  /* [Circuit de visas] Pas de clôture tant que des pièces de caisse de
+     l'exercice attendent le visa du Gérant Holding. */
+  var _cvManq = (typeof _cvBonsSansVisaAnnee === 'function') ? _cvBonsSansVisaAnnee(annee) : [];
+  if (_cvManq.length) {
+    toast('🔒 Clôture impossible : ' + _cvManq.length + ' pièce(s) de caisse ' + annee + ' sans visa du Gérant Holding (Caisse → Visas Gérant).', 'error', 9000);
+    return;
+  }
   /* [FIX cohérence multi-exercices] Les à-nouveaux d'une clôture ne portent
      que le solde des comptes de bilan MOUVEMENTÉS DURANT CETTE ANNÉE-LÀ
      (voir soldesCptBilan plus bas). Un client dont la vente a été reconnue
@@ -80616,11 +80645,11 @@ var RT_COLLAB_STORES = ['messages','conversations','evenements_calendrier','reun
    fonction de rafraîchissement — une demande de réapprovisionnement ou un
    bon de caisse reçu d'un autre poste arrivait bien en mémoire, mais l'écran
    ouvert (Caisse, Validations) et le badge du menu restaient figés. */
-var RT_CAISSE_STORES = ['demandes_reappro','caisse_mouvements','caisse_sessions','caisses','fiches_engagement_depense','transferts_budgetaires','caisse_budgets','validations'];
+var RT_CAISSE_STORES = ['bordereaux_caisse','demandes_reappro','caisse_mouvements','caisse_sessions','caisses','fiches_engagement_depense','transferts_budgetaires','caisse_budgets','validations'];
 function _rtRefreshCaisseValidations() {
   try { if (typeof _majBadgeValidationsPilotage === 'function') _majBadgeValidationsPilotage(); } catch(e){}
   if (APP.currentPage === 'caisse') {
-    ['caisseRenderListe','caisseRenderValidations','reapRender','caisseRenderMesDemandes','caisseRenderDashboard','caisseRenderDecaissementsAFaire']
+    ['caisseRenderListe','caisseRenderValidations','reapRender','caisseRenderMesDemandes','caisseRenderDashboard','caisseRenderDecaissementsAFaire','cvRender']
       .forEach(function(fn){ try { if (typeof window[fn] === 'function') window[fn](); } catch(e){} });
   }
   if (APP.currentPage === 'validations') {
@@ -124015,6 +124044,7 @@ async function caisseSupprimerMouvement(mvtId) {
   if (!m) return;
   if (!caisseRoleAdminLike()) { toast('Droit refusé.','error'); return; }
   if (m.versement_id && (DATA.versements||[]).some(function(v){ return v.id === m.versement_id; })) { _caisseDelMvt(m); return; }
+  if (m.visa_dg || m.bordereau_id) { toast('🔒 Le bon ' + (m.numero||'') + ' est ' + (m.visa_dg ? 'visé par le Gérant Holding' : 'dans le bordereau ' + (m.bordereau_numero||'')) + ' : suppression impossible. Régularisez par un mouvement inverse.', 'error', 8000); return; }
   var jumeau = _caisseMvtJumeau(m);
   if (!confirm('Supprimer le mouvement ' + (m.numero||'') + ' (' + fmtF(m.montant) + ' FCFA) ?'
     + (m.ecriture_id ? '\nL\'écriture comptable liée sera aussi supprimée.' : '')
@@ -124494,6 +124524,8 @@ function cbRenderSuggestions(type) {
 function caisseCanEditBon(mvt) {
   if (!mvt || !APP.currentUser) return false;
   if (mvt.versement_id) return false; /* se modifie via le versement (Paiements) */
+  /* [Circuit de visas] Pièce transmise au Gérant ou visée : figée. */
+  if (mvt.visa_dg || (typeof _cvBordereauDe === 'function' && _cvBordereauDe(mvt) && _cvBordereauDe(mvt).statut !== 'vise')) return false;
   if (caisseRoleAdminLike()) return true;
   if (mvt.statut === 'ventile') return false;
   var s = (DATA.caisse_sessions||[]).find(function(x){ return x.id===mvt.session_id; });
@@ -125343,6 +125375,352 @@ function reapRender() {
   });
   html += '</tbody></table></div>';
   box.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   CIRCUIT DE VISAS PAPIER DES PIÈCES DE CAISSE — décision DG du 26/09/2026
+   Chaque bon (entrée / sortie) validé dans le système est imprimé, visé
+   physiquement par le bénéficiaire ou le déposant, la caissière et le
+   comptable, puis transmis au Gérant Holding (signataire final, toutes
+   caisses de toutes divisions) au moyen d'un BORDEREAU. Le Gérant signe la
+   liasse ; le scan de la liasse signée est joint au bordereau ; le Gérant
+   clique LUI-MÊME « Viser » dans le logiciel. Verrou : tant qu'un bon n'a
+   pas ce visa, l'écriture de caisse correspondante ne peut pas être visée
+   (rendue intangible) en comptabilité, et l'exercice ne peut pas être clos.
+   La ventilation (écriture au brouillard) reste possible. Ne s'applique
+   qu'aux bons datés à partir de la date de mise en service du circuit.
+   ══════════════════════════════════════════════════════════════════════ */
+var CIRCUIT_VISA_DEPUIS_DEFAUT = '2026-09-26';
+var CV_UI = { caisse: '', du: '', au: '' };
+
+function _cvDepuis() { return (DATA.params && DATA.params.circuit_visa_depuis) || CIRCUIT_VISA_DEPUIS_DEFAUT; }
+function _cvSignataires() {
+  var p = DATA.params || {};
+  return [p.caisse_signataire_final_id, p.caisse_signataire_suppleant_id].filter(Boolean);
+}
+function _cvEstSignataire() {
+  return !!(APP.currentUser && _cvSignataires().indexOf(APP.currentUser.id) !== -1);
+}
+function _cvNomUser(id) {
+  var u = (DATA.users || []).find(function(x){ return x.id === id; });
+  return u ? (u.nom || u.login || id) : '—';
+}
+/* Bon soumis au circuit : daté à partir de la mise en service, réellement
+   effectif (validé ou sans validation requise), non rejeté. */
+function _cvConcerne(m) {
+  if (!m || m.rejete) return false;
+  if (m.requiert_validation && m.valide !== true) return false;
+  return String(m.date || '').slice(0, 10) >= _cvDepuis();
+}
+function _cvBordereauDe(m) {
+  return m && m.bordereau_id ? (DATA.bordereaux_caisse || []).find(function(b){ return b.id === m.bordereau_id; }) : null;
+}
+function _cvEtat(m) {
+  if (m.visa_dg) return 'vise';
+  var b = _cvBordereauDe(m);
+  if (b && b.statut !== 'vise') return 'en_bordereau';
+  if (m.visa_dg_refus) return 'refuse';
+  if (!(m.impressions && m.impressions.length)) return 'a_imprimer';
+  if (m.statut !== 'ventile') return 'a_ventiler';
+  return 'a_transmettre';
+}
+var CV_ETATS = {
+  a_imprimer:    { lib: 'À imprimer et faire signer',            ico: '🖨️' },
+  a_ventiler:    { lib: 'Imprimé — à comptabiliser (ventiler)',  ico: '🧾' },
+  a_transmettre: { lib: 'Comptabilisé — à transmettre au Gérant', ico: '📤' },
+  en_bordereau:  { lib: 'Transmis — en attente du visa',          ico: '⏳' },
+  refuse:        { lib: 'Refusé par le Gérant',                   ico: '✖' },
+  vise:          { lib: 'Visé par le Gérant',                     ico: '✅' }
+};
+
+/* Montant en toutes lettres (FCFA, entiers). */
+function _montantEnLettres(n) {
+  n = Math.round(Math.abs(parseFloat(n) || 0));
+  if (n === 0) return 'zéro';
+  var U = ['','un','deux','trois','quatre','cinq','six','sept','huit','neuf','dix','onze','douze','treize','quatorze','quinze','seize','dix-sept','dix-huit','dix-neuf'];
+  var D = ['','dix','vingt','trente','quarante','cinquante','soixante','soixante','quatre-vingt','quatre-vingt'];
+  function cent(x) { /* 0..999 */
+    var c = Math.floor(x / 100), r = x % 100, s = '';
+    if (c) s = (c > 1 ? U[c] + ' cent' + (r === 0 ? 's' : '') : 'cent');
+    if (r) s += (s ? ' ' : '') + dizaine(r);
+    return s;
+  }
+  function dizaine(x) {
+    if (x < 20) return U[x];
+    var d = Math.floor(x / 10), u = x % 10;
+    if (d === 7 || d === 9) return D[d] + (d === 7 && u === 1 ? ' et ' : '-') + U[10 + u];
+    if (u === 0) return D[d] + (d === 8 ? 's' : '');
+    return D[d] + (u === 1 && d !== 8 ? ' et un' : '-' + U[u]);
+  }
+  var parts = [], ms = Math.floor(n / 1e9), mi = Math.floor(n / 1e6) % 1000, k = Math.floor(n / 1000) % 1000, r = n % 1000;
+  if (ms) parts.push(cent(ms) + ' milliard' + (ms > 1 ? 's' : ''));
+  if (mi) parts.push(cent(mi) + ' million' + (mi > 1 ? 's' : ''));
+  if (k) parts.push(k === 1 ? 'mille' : cent(k).replace(/cents$/, 'cent') + ' mille');
+  if (r) parts.push(cent(r));
+  return parts.join(' ');
+}
+
+function _cvQrDataUrl(texte) {
+  try { var q = qrcode(0, 'M'); q.addData(texte); q.make(); return q.createDataURL(3, 4); } catch(e) { return ''; }
+}
+
+/* ── Rendu de l'onglet ── */
+function cvRender() {
+  var box = document.getElementById('caisse-visas-box'); if (!box) return;
+  var p = DATA.params || {};
+  var admin = typeof caisseRoleAdminLike === 'function' && caisseRoleAdminLike();
+  var signataire = _cvEstSignataire();
+  var mvts = (DATA.caisse_mouvements || []).filter(_cvConcerne);
+  var parEtat = {}; Object.keys(CV_ETATS).forEach(function(k){ parEtat[k] = 0; });
+  mvts.forEach(function(m){ parEtat[_cvEtat(m)]++; });
+  var html = '';
+
+  if (!p.caisse_signataire_final_id) {
+    html += '<div class="alert alert-warn" style="font-size:12px;margin-bottom:10px;">⚠️ <b>Signataire final non désigné.</b> Un administrateur doit désigner le Gérant Holding ci-dessous : sans lui, aucun bordereau ne peut être visé.</div>';
+  }
+  html += '<div class="kpi-grid" style="margin-bottom:12px;">' + Object.keys(CV_ETATS).map(function(k){
+    return '<div class="kpi-card" data-icon="' + CV_ETATS[k].ico + '"><div class="kpi-label">' + CV_ETATS[k].lib + '</div><div class="kpi-value">' + parEtat[k] + '</div></div>';
+  }).join('') + '</div>';
+
+  if (admin) {
+    var opts = function(sel){ return '<option value="">— Aucun —</option>' + (DATA.users || []).filter(function(u){ return u.actif !== false; }).map(function(u){
+      return '<option value="' + u.id + '"' + (u.id === sel ? ' selected' : '') + '>' + escHtml(u.nom || u.login || u.id) + ' (' + escHtml(u.role || '') + ')</option>'; }).join(''); };
+    html += '<details style="margin-bottom:12px;"' + (p.caisse_signataire_final_id ? '' : ' open') + '><summary style="cursor:pointer;font-weight:700;font-size:12.5px;">⚙️ Paramètres du circuit (administrateur)</summary>'
+      + '<div class="form-grid" style="margin-top:8px;">'
+      + '<div class="form-group"><label>Signataire final — Gérant Holding (toutes caisses)</label><select class="form-control" id="cv-signataire">' + opts(p.caisse_signataire_final_id) + '</select></div>'
+      + '<div class="form-group"><label>Suppléant en cas d\'absence</label><select class="form-control" id="cv-suppleant">' + opts(p.caisse_signataire_suppleant_id) + '</select></div>'
+      + '<div class="form-group"><label>Circuit applicable aux bons datés à partir du</label><input type="date" class="form-control" id="cv-depuis" value="' + escHtml(_cvDepuis()) + '"></div>'
+      + '</div><button class="btn btn-primary btn-sm" onclick="cvSauverParams()">💾 Enregistrer</button></details>';
+  }
+
+  /* Bons à transmettre */
+  var caisses = (typeof caissesVisibles === 'function') ? caissesVisibles() : (DATA.caisses || []);
+  var aTrans = mvts.filter(function(m){ var e = _cvEtat(m); return e === 'a_transmettre' || e === 'refuse'; })
+    .filter(function(m){ return (!CV_UI.caisse || m.caisse_id === CV_UI.caisse) && (!CV_UI.du || m.date.slice(0,10) >= CV_UI.du) && (!CV_UI.au || m.date.slice(0,10) <= CV_UI.au); })
+    .sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  html += '<div class="card" style="margin-bottom:12px;"><div class="card-title">📤 Bons comptabilisés à transmettre au Gérant</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0;">'
+    + '<select class="filter-select" onchange="CV_UI.caisse=this.value;cvRender()"><option value="">Toutes caisses</option>' + caisses.map(function(c){ return '<option value="' + c.id + '"' + (c.id === CV_UI.caisse ? ' selected' : '') + '>' + escHtml(c.nom) + '</option>'; }).join('') + '</select>'
+    + '<label style="font-size:12px;">Du</label><input type="date" class="form-control" style="width:150px;" value="' + escHtml(CV_UI.du) + '" onchange="CV_UI.du=this.value;cvRender()">'
+    + '<label style="font-size:12px;">au</label><input type="date" class="form-control" style="width:150px;" value="' + escHtml(CV_UI.au) + '" onchange="CV_UI.au=this.value;cvRender()">'
+    + (admin ? '<button class="btn btn-primary btn-sm" onclick="cvCreerBordereau()">📋 Créer le bordereau avec la sélection</button>' : '')
+    + '</div>'
+    + (aTrans.length ? '<div class="table-wrap" style="max-height:45vh;overflow:auto;"><table class="data-table"><thead><tr><th><input type="checkbox" onchange="document.querySelectorAll(\'.cv-chk\').forEach(function(c){c.checked=this.checked;}.bind(this))"></th><th>Date</th><th>Bon</th><th>Caisse</th><th>Type</th><th style="text-align:right;">Montant</th><th>Motif</th><th>Compte</th><th>État</th></tr></thead><tbody>'
+      + aTrans.map(function(m){
+        var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
+        return '<tr><td><input type="checkbox" class="cv-chk" value="' + m.id + '"></td><td>' + dateShort(m.date.slice(0,10)) + '</td><td style="font-family:monospace;">' + escHtml(m.numero || '') + '</td><td>' + escHtml(c ? c.nom : '') + '</td>'
+          + '<td>' + (m.type === 'entree' ? '📥 Entrée' : '📤 Sortie') + '</td><td style="text-align:right;font-weight:700;">' + fmtF(m.montant) + '</td><td style="font-size:11px;">' + escHtml((m.motif || '').slice(0, 70)) + '</td>'
+          + '<td style="font-family:monospace;font-size:11px;">' + escHtml(m.compte_ventile || '') + '</td>'
+          + '<td style="font-size:11px;">' + (m.visa_dg_refus ? '<span style="color:var(--rouge);">✖ refusé : ' + escHtml(m.visa_dg_refus.motif || '') + '</span>' : '—') + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+      : '<div style="font-size:12px;color:var(--blanc-dim);">Aucun bon comptabilisé en attente de transmission pour ces critères.</div>')
+    + '</div>';
+
+  /* Bordereaux */
+  var bords = (DATA.bordereaux_caisse || []).slice().sort(function(a,b){ return (b.cree_le||'').localeCompare(a.cree_le||''); });
+  html += '<div class="card"><div class="card-title">📋 Bordereaux de transmission</div>'
+    + (bords.length ? '<div class="table-wrap"><table class="data-table"><thead><tr><th>N°</th><th>Créé le</th><th>Bons</th><th style="text-align:right;">Entrées</th><th style="text-align:right;">Sorties</th><th>Statut</th><th></th></tr></thead><tbody>'
+      + bords.map(function(b){
+        var st = b.statut === 'vise' ? '✅ Visé par ' + escHtml(b.vise_par || '') + ' le ' + dateShort((b.vise_le || '').slice(0,10)) + (b.nb_refuses ? ' — ' + b.nb_refuses + ' refusé(s)' : '')
+          : (b.scan_joint ? '📎 Liasse signée jointe — <b>en attente du clic du Gérant</b>' : '📝 Émis — faire signer, puis joindre le scan');
+        return '<tr><td style="font-family:monospace;font-weight:700;">' + escHtml(b.numero) + '</td><td>' + dateShort((b.cree_le || '').slice(0,10)) + '<div style="font-size:10px;color:var(--blanc-dim);">' + escHtml(b.cree_par || '') + '</div></td>'
+          + '<td>' + (b.mvt_ids || []).length + '</td><td style="text-align:right;">' + fmtF(b.total_entrees || 0) + '</td><td style="text-align:right;">' + fmtF(b.total_sorties || 0) + '</td><td style="font-size:11.5px;">' + st + '</td>'
+          + '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="cvImprimerBordereau(\'' + b.id + '\')">🖨️</button> '
+          + (b.statut !== 'vise' && admin ? '<button class="btn btn-secondary btn-sm" onclick="cvJoindreScan(\'' + b.id + '\')">📎 Scan</button> ' : '')
+          + (b.scan_joint ? '<button class="btn btn-secondary btn-sm" onclick="cvVoirScan(\'' + b.id + '\')">👁️</button> ' : '')
+          + (b.statut !== 'vise' && signataire ? '<button class="btn btn-primary btn-sm" onclick="cvOuvrirVisa(\'' + b.id + '\')"' + (b.scan_joint ? '' : ' disabled title="Joindre d\'abord le scan de la liasse signée"') + '>🖋️ Viser</button> ' : '')
+          + (b.statut !== 'vise' && admin ? '<button class="btn btn-danger btn-sm btn-icon" title="Annuler le bordereau (les bons redeviennent à transmettre)" onclick="cvAnnulerBordereau(\'' + b.id + '\')">🗑</button>' : '')
+          + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+      : '<div style="font-size:12px;color:var(--blanc-dim);">Aucun bordereau pour l\'instant.</div>')
+    + '<input type="file" id="cv-scan-input" accept="application/pdf,image/*" style="display:none;" onchange="cvScanChoisi(this)"></div>';
+  box.innerHTML = html;
+  var badge = document.getElementById('badge-tab-visas');
+  var nbAction = signataire ? bords.filter(function(b){ return b.statut !== 'vise' && b.scan_joint; }).length : parEtat.a_transmettre;
+  if (badge) { badge.textContent = nbAction; badge.style.display = nbAction ? 'inline-block' : 'none'; }
+}
+
+async function cvSauverParams() {
+  if (!caisseRoleAdminLike()) { toast('Réservé à l\'administrateur.', 'error'); return; }
+  var sig = document.getElementById('cv-signataire').value, sup = document.getElementById('cv-suppleant').value, dep = document.getElementById('cv-depuis').value;
+  if (sig && sup && sig === sup) { toast('Le suppléant doit être une autre personne que le signataire.', 'error'); return; }
+  DATA.params = DATA.params || {};
+  DATA.params.caisse_signataire_final_id = sig || '';
+  DATA.params.caisse_signataire_suppleant_id = sup || '';
+  DATA.params.circuit_visa_depuis = dep || CIRCUIT_VISA_DEPUIS_DEFAUT;
+  await dbPut('params', DATA.params);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
+  toast('✅ Circuit de visas enregistré.', 'success');
+  cvRender();
+}
+
+async function _cvSauverMvt(m) {
+  m._baseModifie = m._modifie || null;
+  await dbPut('caisse_mouvements', m, { forceRole: true });
+  if (typeof caisseSyncEtAlerter === 'function') await caisseSyncEtAlerter('pi_caisse_mouvements', m);
+}
+async function _cvSauverBordereau(b) {
+  b._modifie = new Date().toISOString();
+  await dbPut('bordereaux_caisse', b, { forceRole: true });
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_bordereaux_caisse', b);
+}
+
+function _cvNumeroBordereau() {
+  var an = new Date().getFullYear(), max = 0;
+  (DATA.bordereaux_caisse || []).forEach(function(b){ var m = String(b.numero || '').match(new RegExp('^BRD-' + an + '-(\\d+)$')); if (m) max = Math.max(max, parseInt(m[1], 10)); });
+  return 'BRD-' + an + '-' + String(max + 1).padStart(4, '0');
+}
+
+async function cvCreerBordereau() {
+  if (!caisseRoleAdminLike()) { toast('Réservé au comptable / administrateur.', 'error'); return; }
+  var ids = Array.from(document.querySelectorAll('.cv-chk:checked')).map(function(c){ return c.value; });
+  if (!ids.length) { toast('Cochez les bons à transmettre.', 'error'); return; }
+  /* Transfert entre caisses : les deux bons liés voyagent ensemble. */
+  ids.slice().forEach(function(id){
+    var m = (DATA.caisse_mouvements || []).find(function(x){ return x.id === id; });
+    var j = m && typeof _caisseMvtJumeau === 'function' ? _caisseMvtJumeau(m) : null;
+    if (j && ids.indexOf(j.id) === -1 && _cvConcerne(j) && ['a_transmettre','refuse'].indexOf(_cvEtat(j)) !== -1) ids.push(j.id);
+  });
+  var mvts = ids.map(function(id){ return (DATA.caisse_mouvements || []).find(function(x){ return x.id === id; }); }).filter(Boolean);
+  var te = 0, ts = 0; mvts.forEach(function(m){ if (m.type === 'entree') te += parseFloat(m.montant) || 0; else ts += parseFloat(m.montant) || 0; });
+  if (!confirm('Créer un bordereau de ' + mvts.length + ' bon(s) — entrées ' + fmtF(te) + ' F, sorties ' + fmtF(ts) + ' F ?')) return;
+  var b = { id: uid(), numero: _cvNumeroBordereau(), cree_le: new Date().toISOString(), cree_par: (APP.currentUser && APP.currentUser.nom) || '—',
+    mvt_ids: mvts.map(function(m){ return m.id; }), total_entrees: te, total_sorties: ts, statut: 'emis', scan_joint: false };
+  if (!DATA.bordereaux_caisse) DATA.bordereaux_caisse = [];
+  DATA.bordereaux_caisse.push(b);
+  await _cvSauverBordereau(b);
+  for (var i = 0; i < mvts.length; i++) { mvts[i].bordereau_id = b.id; mvts[i].bordereau_numero = b.numero; await _cvSauverMvt(mvts[i]); }
+  toast('📋 Bordereau ' + b.numero + ' créé — imprimez-le avec les bons, faites signer le Gérant, puis joignez le scan.', 'success', 8000);
+  cvRender();
+  cvImprimerBordereau(b.id);
+}
+
+async function cvAnnulerBordereau(id) {
+  if (!caisseRoleAdminLike()) return;
+  var b = (DATA.bordereaux_caisse || []).find(function(x){ return x.id === id; }); if (!b || b.statut === 'vise') return;
+  if (!confirm('Annuler le bordereau ' + b.numero + ' ? Ses bons redeviennent « à transmettre ».')) return;
+  for (var i = 0; i < (b.mvt_ids || []).length; i++) {
+    var m = (DATA.caisse_mouvements || []).find(function(x){ return x.id === b.mvt_ids[i]; });
+    if (m && m.bordereau_id === b.id) { delete m.bordereau_id; delete m.bordereau_numero; await _cvSauverMvt(m); }
+  }
+  await deleteRecord('bordereaux_caisse', id, { skipIntegrity: true });
+  DATA.bordereaux_caisse = (DATA.bordereaux_caisse || []).filter(function(x){ return x.id !== id; });
+  toast('Bordereau annulé.', 'info');
+  cvRender();
+}
+
+function cvImprimerBordereau(id) {
+  var b = (DATA.bordereaux_caisse || []).find(function(x){ return x.id === id; }); if (!b) return;
+  var p = DATA.params || {};
+  var rows = (b.mvt_ids || []).map(function(mid, i){
+    var m = (DATA.caisse_mouvements || []).find(function(x){ return x.id === mid; }) || {};
+    var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
+    return '<tr><td>' + (i + 1) + '</td><td>' + dateShort(String(m.date || '').slice(0,10)) + '</td><td>' + escHtml(m.numero || '') + '</td><td>' + escHtml(c ? c.nom : '') + '</td>'
+      + '<td>' + (m.type === 'entree' ? 'Entrée' : 'Sortie') + '</td><td>' + escHtml((m.motif || '').slice(0, 60)) + '</td><td>' + escHtml(m.compte_ventile || '') + '</td>'
+      + '<td style="text-align:right;">' + fmtF(m.montant) + '</td><td style="width:70px;"></td></tr>';
+  }).join('');
+  var qr = _cvQrDataUrl('BORDEREAU|' + b.numero + '|' + b.id);
+  var html = '<div style="font-family:Georgia,serif;font-size:12px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><div style="font-size:15px;font-weight:800;">' + escHtml(p.societe || '') + '</div>'
+    + '<div style="font-size:18px;font-weight:800;margin-top:6px;">BORDEREAU DE TRANSMISSION DES PIÈCES DE CAISSE</div>'
+    + '<div>N° <b>' + escHtml(b.numero) + '</b> — émis le ' + dateShort(b.cree_le.slice(0,10)) + ' par ' + escHtml(b.cree_par) + '</div></div>'
+    + (qr ? '<img src="' + qr + '" style="width:90px;height:90px;">' : '') + '</div>'
+    + '<table style="width:100%;border-collapse:collapse;margin-top:12px;" border="1" cellpadding="4"><thead><tr><th>#</th><th>Date</th><th>Bon</th><th>Caisse</th><th>Type</th><th>Motif</th><th>Compte</th><th>Montant (F)</th><th>Visa Gérant</th></tr></thead><tbody>' + rows + '</tbody></table>'
+    + '<div style="margin-top:8px;">Total entrées : <b>' + fmtF(b.total_entrees) + ' F</b> — Total sorties : <b>' + fmtF(b.total_sorties) + ' F</b> — ' + (b.mvt_ids || []).length + ' pièce(s) jointe(s)</div>'
+    + '<div style="display:flex;justify-content:space-between;margin-top:40px;">'
+    + '<div>Transmis par (comptable)<br><br><br>____________________</div>'
+    + '<div>Visa du Gérant Holding — « Approuvé »<br>Date : ____/____/________<br><br>____________________</div></div>'
+    + '<div style="font-size:10px;color:#555;margin-top:18px;">Retourner la liasse signée à la comptabilité : elle est scannée et jointe au bordereau, puis le Gérant valide le visa dans le logiciel. Rayer et parapher tout bon refusé.</div></div>';
+  openPrintPreview(html, 'Bordereau ' + b.numero);
+}
+
+var _cvScanPour = null;
+function cvJoindreScan(id) { _cvScanPour = id; var inp = document.getElementById('cv-scan-input'); if (inp) { inp.value = ''; inp.click(); } }
+function cvScanChoisi(input) {
+  var f = input.files && input.files[0]; if (!f || !_cvScanPour) return;
+  if (f.size > 15 * 1024 * 1024) { toast('Fichier trop volumineux (max 15 Mo).', 'error'); return; }
+  var id = _cvScanPour, r = new FileReader();
+  r.onload = async function(e) {
+    var b = (DATA.bordereaux_caisse || []).find(function(x){ return x.id === id; }); if (!b) return;
+    var doc = { id: uid(), entity_type: 'bordereau_caisse', entity_id: id, doc_categorie: 'liasse_signee', name: f.name, type: f.type || 'application/pdf', size: f.size,
+      blob: e.target.result, upload_date: today(), description: 'Liasse signée — bordereau ' + b.numero };
+    try { await dbPut('documents', doc); if (typeof syncToSupabase === 'function') syncToSupabase('pi_documents', doc); }
+    catch(err) { toast('Enregistrement du scan impossible.', 'error'); return; }
+    b.scan_joint = true; b.scan_doc_id = doc.id; b.scan_joint_par = (APP.currentUser && APP.currentUser.nom) || '—'; b.scan_joint_le = new Date().toISOString();
+    await _cvSauverBordereau(b);
+    toast('📎 Scan joint au bordereau ' + b.numero + ' — le Gérant peut maintenant viser.', 'success', 7000);
+    cvRender();
+  };
+  r.readAsDataURL(f);
+}
+async function cvVoirScan(id) {
+  var b = (DATA.bordereaux_caisse || []).find(function(x){ return x.id === id; }); if (!b) return;
+  var all = []; try { all = await dbGetAll('documents'); } catch(e){}
+  var d = (all || []).find(function(x){ return x.id === b.scan_doc_id; }) || (all || []).find(function(x){ return x.entity_type === 'bordereau_caisse' && x.entity_id === id; });
+  if (!d || !d.blob) { toast('Scan introuvable sur ce poste (synchronisation en cours ?).', 'error'); return; }
+  var w = window.open(''); if (w) w.document.write('<iframe src="' + d.blob + '" style="border:0;width:100%;height:100vh;"></iframe>');
+}
+
+/* ── Visa du Gérant : c'est LUI qui clique ── */
+function cvOuvrirVisa(id) {
+  if (!_cvEstSignataire()) { toast('🔒 Seul le Gérant Holding désigné (ou son suppléant) peut viser.', 'error'); return; }
+  var b = (DATA.bordereaux_caisse || []).find(function(x){ return x.id === id; }); if (!b) return;
+  if (!b.scan_joint) { toast('Joindre d\'abord le scan de la liasse signée.', 'error'); return; }
+  var box = document.getElementById('cv-visa-liste');
+  document.getElementById('cv-visa-id').value = id;
+  document.getElementById('cv-visa-titre').textContent = '🖋️ Viser le bordereau ' + b.numero;
+  box.innerHTML = '<div style="font-size:12px;margin-bottom:8px;">Décochez un bon pour le <b>refuser</b> (il restera bloqué et reviendra à la comptabilité avec votre motif).</div>'
+    + '<table class="data-table"><thead><tr><th>Viser</th><th>Bon</th><th>Type</th><th style="text-align:right;">Montant</th><th>Motif</th><th>Motif du refus</th></tr></thead><tbody>'
+    + (b.mvt_ids || []).map(function(mid){
+      var m = (DATA.caisse_mouvements || []).find(function(x){ return x.id === mid; }) || {};
+      return '<tr><td><input type="checkbox" class="cv-visa-ok" value="' + mid + '" checked></td><td style="font-family:monospace;">' + escHtml(m.numero || '') + '</td><td>' + (m.type === 'entree' ? 'Entrée' : 'Sortie') + '</td>'
+        + '<td style="text-align:right;">' + fmtF(m.montant) + '</td><td style="font-size:11px;">' + escHtml((m.motif || '').slice(0, 60)) + '</td>'
+        + '<td><input class="form-control cv-visa-motif" data-id="' + mid + '" placeholder="si refusé" style="font-size:11px;"></td></tr>';
+    }).join('') + '</tbody></table>';
+  openModal('modal-cv-visa');
+}
+async function cvConfirmerVisa() {
+  if (!_cvEstSignataire()) { toast('🔒 Seul le Gérant Holding désigné (ou son suppléant) peut viser.', 'error'); return; }
+  var id = document.getElementById('cv-visa-id').value;
+  var b = (DATA.bordereaux_caisse || []).find(function(x){ return x.id === id; }); if (!b || b.statut === 'vise') return;
+  var ok = {}; document.querySelectorAll('.cv-visa-ok').forEach(function(c){ ok[c.value] = c.checked; });
+  var motifs = {}; document.querySelectorAll('.cv-visa-motif').forEach(function(i){ motifs[i.getAttribute('data-id')] = (i.value || '').trim(); });
+  var refus = Object.keys(ok).filter(function(k){ return !ok[k]; });
+  for (var r = 0; r < refus.length; r++) if (!motifs[refus[r]]) { toast('Indiquez le motif de chaque bon refusé.', 'error'); return; }
+  /* Transfert entre caisses : les deux bons liés ont toujours le même sort. */
+  refus.slice().forEach(function(id){
+    var m = (DATA.caisse_mouvements || []).find(function(x){ return x.id === id; });
+    var j = m && typeof _caisseMvtJumeau === 'function' ? _caisseMvtJumeau(m) : null;
+    if (j && ok[j.id]) { ok[j.id] = false; motifs[j.id] = motifs[id] + ' (bon lié ' + (m.numero || '') + ' refusé)'; refus.push(j.id); }
+  });
+  if (!confirm('Viser le bordereau ' + b.numero + ' : ' + (Object.keys(ok).length - refus.length) + ' bon(s) approuvé(s)' + (refus.length ? ', ' + refus.length + ' refusé(s)' : '') + ' ?\n\nCe visa est enregistré à votre nom.')) return;
+  var qui = (APP.currentUser && APP.currentUser.nom) || '—', quand = new Date().toISOString();
+  for (var i = 0; i < (b.mvt_ids || []).length; i++) {
+    var m = (DATA.caisse_mouvements || []).find(function(x){ return x.id === b.mvt_ids[i]; }); if (!m) continue;
+    if (ok[m.id]) { m.visa_dg = { par: qui, par_id: APP.currentUser.id, le: quand, bordereau_id: b.id, bordereau_numero: b.numero }; delete m.visa_dg_refus; }
+    else { m.visa_dg_refus = { motif: motifs[m.id], par: qui, le: quand, bordereau_numero: b.numero }; delete m.bordereau_id; delete m.bordereau_numero; }
+    await _cvSauverMvt(m);
+  }
+  b.statut = 'vise'; b.vise_par = qui; b.vise_par_id = APP.currentUser.id; b.vise_le = quand; b.nb_refuses = refus.length;
+  await _cvSauverBordereau(b);
+  closeModal('modal-cv-visa');
+  toast('✅ Bordereau ' + b.numero + ' visé' + (refus.length ? ' — ' + refus.length + ' bon(s) refusé(s) renvoyé(s) à la comptabilité' : '') + '.', 'success', 7000);
+  cvRender();
+}
+
+/* Verrou comptable : écritures de caisse dont le bon n'a pas le visa. */
+function _cvIndexMvtParEcriture() {
+  var idx = {};
+  (DATA.caisse_mouvements || []).forEach(function(m){
+    if (m.ecriture_id) idx[m.ecriture_id] = m;
+    idx['ecr_cse_' + m.id] = m;
+  });
+  return idx;
+}
+function _cvBonsSansVisaAnnee(annee) {
+  return (DATA.caisse_mouvements || []).filter(function(m){
+    return _cvConcerne(m) && !m.visa_dg && String(m.date || '').slice(0,4) === String(annee);
+  });
 }
 
 /* ── PIÈCES JUSTIFICATIVES DES MOUVEMENTS DE CAISSE ──────────────────
@@ -126438,30 +126816,40 @@ function caisseImprimerBon(mvtId) {
   var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
   var p = DATA.params || {};
   var titre = m.type === 'entree' ? 'Bon d\'entrée de caisse' : 'Bon de sortie de caisse';
-  var visaHtml = m.requiert_validation === true && m.valide === true
-    ? '<div style="margin-top:14px;padding:8px 12px;background:#F0FDF4;border:1px solid #16A34A;border-radius:6px;font-size:12px;">'
-      + '<b>✅ Visa de la hiérarchie</b> — validé par ' + escHtml(m.valide_par||'—') + ' le ' + (m.valide_le ? (m.valide_le||'').replace('T',' ').slice(0,16) : '—')
-      + '</div>'
-    : '';
-  var html = '<div style="font-family:Georgia,serif;max-width:640px;margin:0 auto;">'
-    + '<div style="text-align:center;margin-bottom:18px;">'
-    + '<div style="font-size:16px;font-weight:800;">' + escHtml(p.societe || 'ImmoSuite ERP') + '</div>'
-    + '<div style="font-size:11px;color:#666;">' + escHtml(p.adresse||'') + '</div></div>'
-    + '<div style="text-align:center;font-size:18px;font-weight:800;border:2px solid #333;padding:8px;margin-bottom:16px;">' + titre + '</div>'
-    + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
-    + '<tr><td style="padding:6px 0;width:40%;color:#666;">N° du bon</td><td style="padding:6px 0;font-weight:700;">' + escHtml(m.numero) + '</td></tr>'
-    + '<tr><td style="padding:6px 0;color:#666;">N° pièce justificative</td><td style="padding:6px 0;">' + escHtml(m.piece_ref || '—') + '</td></tr>'
-    + '<tr><td style="padding:6px 0;color:#666;">Caisse</td><td style="padding:6px 0;">' + escHtml(c ? c.nom : '') + ' (compte ' + escHtml(c ? c.compte : '') + ')</td></tr>'
-    + '<tr><td style="padding:6px 0;color:#666;">Date</td><td style="padding:6px 0;">' + (m.date||'').replace('T',' ').slice(0,16) + '</td></tr>'
-    + '<tr><td style="padding:6px 0;color:#666;">Motif</td><td style="padding:6px 0;">' + escHtml(m.motif) + '</td></tr>'
-    + '<tr><td style="padding:6px 0;color:#666;">' + (m.type === 'entree' ? 'Déposant' : 'Bénéficiaire') + '</td><td style="padding:6px 0;">' + escHtml(m.beneficiaire||'—') + '</td></tr>'
-    + '<tr><td style="padding:6px 0;color:#666;">Montant</td><td style="padding:10px 0;font-size:20px;font-weight:800;">' + fmtF(m.montant) + ' FCFA</td></tr>'
+  /* [Circuit de visas] Chaque impression est tracée ; toute réimpression
+     porte la mention DUPLICATA (le bon original circule pour signatures). */
+  var dejaImprime = !!(m.impressions && m.impressions.length);
+  m.impressions = (m.impressions || []).concat([{ par: (APP.currentUser && APP.currentUser.nom) || '—', le: new Date().toISOString() }]);
+  if (typeof _cvSauverMvt === 'function') _cvSauverMvt(m);
+  var validation = (m.requiert_validation === true && m.valide === true)
+    ? 'VALIDÉ DANS LE SYSTÈME par ' + escHtml(m.valide_par || '—') + ' le ' + (m.valide_le ? escHtml(m.valide_le.replace('T',' ').slice(0,16)) : '—')
+    : (m.versement_id ? 'ENREGISTRÉ AUTOMATIQUEMENT — versement souscripteur ' + escHtml(m.piece_ref || '') : 'ENREGISTRÉ DANS LE SYSTÈME');
+  var qr = (typeof _cvQrDataUrl === 'function') ? _cvQrDataUrl('BON|' + (m.numero || '') + '|' + m.id) : '';
+  var case_ = function(titreCase, nom, extra){ return '<td style="border:1px solid #333;vertical-align:top;padding:6px;height:92px;width:25%;font-size:10.5px;"><b>' + titreCase + '</b>' + (nom ? '<br>' + escHtml(nom) : '') + (extra || '') + '<div style="margin-top:34px;border-top:1px dotted #999;font-size:9px;color:#666;">Signature et date</div></td>'; };
+  var html = '<div style="font-family:Georgia,serif;max-width:680px;margin:0 auto;position:relative;">'
+    + (dejaImprime ? '<div style="position:absolute;top:140px;left:0;right:0;text-align:center;font-size:64px;color:rgba(200,0,0,.12);font-weight:900;transform:rotate(-18deg);">DUPLICATA</div>' : '')
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">'
+    + '<div><div style="font-size:16px;font-weight:800;">' + escHtml(p.societe || 'ImmoSuite ERP') + '</div><div style="font-size:11px;color:#666;">' + escHtml(p.adresse||'') + '</div></div>'
+    + (qr ? '<img src="' + qr + '" style="width:78px;height:78px;">' : '') + '</div>'
+    + '<div style="text-align:center;font-size:18px;font-weight:800;border:2px solid #333;padding:8px;margin-bottom:12px;">' + titre + (dejaImprime ? ' — DUPLICATA' : '') + '</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12.5px;">'
+    + '<tr><td style="padding:5px 0;width:38%;color:#666;">N° du bon</td><td style="font-weight:700;">' + escHtml(m.numero) + '</td></tr>'
+    + '<tr><td style="padding:5px 0;color:#666;">N° pièce justificative</td><td>' + escHtml(m.piece_ref || '—') + '</td></tr>'
+    + '<tr><td style="padding:5px 0;color:#666;">Caisse</td><td>' + escHtml(c ? c.nom : '') + ' (compte ' + escHtml(c ? c.compte : '') + ')</td></tr>'
+    + '<tr><td style="padding:5px 0;color:#666;">Date</td><td>' + escHtml((m.date||'').replace('T',' ').slice(0,16)) + '</td></tr>'
+    + '<tr><td style="padding:5px 0;color:#666;">Motif</td><td>' + escHtml(m.motif) + '</td></tr>'
+    + '<tr><td style="padding:5px 0;color:#666;">' + (m.type === 'entree' ? 'Déposant' : 'Bénéficiaire') + '</td><td>' + escHtml(m.beneficiaire||'—') + '</td></tr>'
+    + '<tr><td style="padding:5px 0;color:#666;">Montant</td><td style="font-size:19px;font-weight:800;">' + fmtF(m.montant) + ' FCFA</td></tr>'
+    + '<tr><td style="padding:5px 0;color:#666;">Montant en lettres</td><td style="font-style:italic;">' + escHtml((typeof _montantEnLettres === 'function' ? _montantEnLettres(m.montant) : '')) + ' francs CFA</td></tr>'
     + '</table>'
-    + visaHtml
-    + '<div style="display:flex;justify-content:space-between;margin-top:60px;font-size:12px;">'
-    + '<div>Caissière<br><br><br>___________________<br>' + escHtml(m.created_by||'') + '</div>'
-    + '<div>' + (m.type === 'entree' ? 'Déposant / Versé par' : 'Bénéficiaire / Reçu par') + '<br><br><br>___________________</div>'
-    + '</div>'
+    + '<div style="margin-top:10px;padding:7px 10px;background:#F0FDF4;border:1px solid #16A34A;border-radius:6px;font-size:11.5px;font-weight:700;">✅ ' + validation + '</div>'
+    + '<table style="width:100%;border-collapse:collapse;margin-top:14px;"><tr>'
+    + case_(m.type === 'entree' ? '1. Déposant (a versé)' : '1. Bénéficiaire (a reçu)', m.beneficiaire || '')
+    + case_('2. Visa caisse', m.created_by || '')
+    + case_('3. Visa comptable', '', '<br>Compte : ' + escHtml(m.compte_ventile || '________'))
+    + case_('4. Visa Gérant Holding', '', '<br>« Approuvé »')
+    + '</tr></table>'
+    + '<div style="font-size:9.5px;color:#666;margin-top:8px;">Impression n° ' + m.impressions.length + ' par ' + escHtml(m.impressions[m.impressions.length-1].par) + ' le ' + escHtml(m.impressions[m.impressions.length-1].le.replace('T',' ').slice(0,16)) + ' — Pièce à transmettre au Gérant Holding par bordereau après visa comptable.</div>'
     + '</div>';
   openPrintPreview(html, titre + ' — ' + m.numero);
 }
@@ -127515,6 +127903,14 @@ function caisseControleIntegrite() {
     + fmtF(vrsSansBon.reduce(function(s, v){ return s + (parseFloat(v.montant) || 0); }, 0)) + ' F) — bouton « 💵 Versements espèces » pour les rattacher.');
   else ok.push('✅ Versements en espèces de l\'année tous rattachés à un bon de caisse.');
 
+  /* 13 ter. Circuit de visas : pièces comptabilisées depuis plus de 7 jours
+     sans visa du Gérant Holding. */
+  if (typeof _cvConcerne === 'function') {
+    var _cvRetard = mvts.filter(function(m){ return _cvConcerne(m) && !m.visa_dg && m.statut === 'ventile' && (Date.now() - new Date(m.ventile_le || m.date).getTime()) > 7*24*3600*1000; });
+    if (_cvRetard.length) pb.push('⚠️ ' + _cvRetard.length + ' pièce(s) de caisse comptabilisée(s) depuis plus de 7 jours sans visa du Gérant Holding — Caisse → Visas Gérant.');
+    else ok.push('✅ Aucune pièce de caisse en retard de visa du Gérant.');
+  }
+
   /* 14. [INC-0005] Réapprovisionnements servis sans provenance tracée : une
      entrée en caisse sans aucune caisse débitée ni origine externe déclarée
      (servis avant le correctif — ex. REAP-2026-0009, 750 000 F). */
@@ -128180,7 +128576,9 @@ function _majBadgeValidationsPilotage() {
     + (DATA.caisse_budgets||[]).filter(function(b){ return b.statut === 'soumis'; }).length
     /* [FIX] Les demandes de réapprovisionnement en attente n'étaient pas
        comptées : aucun signal côté validateurs. */
-    + (DATA.demandes_reappro||[]).filter(function(d){ return d.statut === 'soumise'; }).length;
+    + (DATA.demandes_reappro||[]).filter(function(d){ return d.statut === 'soumise'; }).length
+    /* Bordereaux prêts à viser (liasse scannée) — pour le Gérant uniquement. */
+    + ((typeof _cvEstSignataire === 'function' && _cvEstSignataire()) ? (DATA.bordereaux_caisse||[]).filter(function(b){ return b.statut !== 'vise' && b.scan_joint; }).length : 0);
   badge.textContent = n;
   badge.style.display = n ? 'inline-block' : 'none';
 }
@@ -132111,6 +132509,15 @@ goTo = function(page) {
       <button class="btn btn-secondary" onclick="closeModal('modal-caisse-transfert')">Annuler</button>
       <button class="btn btn-primary" onclick="caisseTransfererFonds()">🔄 Effectuer le transfert</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal : visa du Gérant Holding sur un bordereau -->
+<div class="modal-overlay" id="modal-cv-visa">
+  <div class="modal" style="max-width:900px;">
+    <div class="modal-header"><h3 id="cv-visa-titre">🖋️ Viser le bordereau</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-cv-visa')">✕</button></div>
+    <div class="modal-body"><input type="hidden" id="cv-visa-id"><div id="cv-visa-liste" style="max-height:60vh;overflow:auto;"></div></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-cv-visa')">Annuler</button><button class="btn btn-primary" onclick="cvConfirmerVisa()">🖋️ Viser</button></div>
   </div>
 </div>
 
