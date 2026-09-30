@@ -18009,13 +18009,13 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
       </div>
       <div class="form-group">
         <label>Motif de la résiliation</label>
-        <select class="form-control" id="rs-motif" onchange="resilierRecalculer()"></select>
+        <select class="form-control" id="rs-motif" onchange="resilierMotifChange()"></select>
         <div id="rs-suggestion-auto" style="font-size:11px;color:var(--or,#B87333);margin-top:4px;"></div>
       </div>
       <div class="form-group"><label id="rs-justification-label">Justification / motif détaillé (obligatoire)</label><textarea class="form-control" id="rs-justification" rows="3" placeholder="Ex. Retard de livraison de 14 mois sur programme dont l'échéance contractuelle était le..."></textarea></div>
       <div class="form-grid">
         <div class="form-group"><label>Montant total versé (hors frais de dossier)</label><input type="text" class="form-control" id="rs-montant-verse" disabled></div>
-        <div class="form-group"><label>Taux de remboursement</label><input type="text" class="form-control" id="rs-taux" disabled></div>
+        <div class="form-group"><label>Taux de remboursement (%) — à fixer pour ce dossier</label><input type="number" class="form-control" id="rs-taux" min="0" max="100" step="0.5" oninput="resilierRecalculer()"><div id="rs-taux-info" style="font-size:11px;color:var(--or,#B87333);margin-top:4px;"></div></div>
         <div class="form-group"><label>Montant à rembourser</label><input type="text" class="form-control" id="rs-montant-rembourse" disabled style="font-weight:700;color:var(--vert);"></div>
         <div class="form-group"><label>Montant retenu (conservé)</label><input type="text" class="form-control" id="rs-montant-retenu" disabled style="font-weight:700;color:var(--or,#B87333);"></div>
       </div>
@@ -33149,10 +33149,10 @@ function _resilMotifsDefaut(p){
   return [
     { id:'desistement_client', libelle:'Désistement du souscripteur', imputable:'souscripteur',
       taux:_resilNum(p.resil_taux_desistement, 60, 0, 100), retenue_min:0, commissions:'annuler_recuperer',
-      liberer_lots:true, suggestion:'aucune', tolerance_jours:0, justification_obligatoire:true, actif:true },
+      liberer_lots:true, taux_libre:true, suggestion:'aucune', tolerance_jours:0, justification_obligatoire:true, actif:true },
     { id:'faute_promoteur', libelle:'Défaut/retard imputable au promoteur', imputable:'promoteur',
       taux:_resilNum(p.resil_taux_faute, 100, 0, 100), retenue_min:0, commissions:'conserver',
-      liberer_lots:true, suggestion:'livraison_depassee', tolerance_jours:0, justification_obligatoire:true, actif:true }
+      liberer_lots:true, taux_libre:true, suggestion:'livraison_depassee', tolerance_jours:0, justification_obligatoire:true, actif:true }
   ];
 }
 function _resilNormMotif(m){
@@ -33162,6 +33162,7 @@ function _resilNormMotif(m){
     libelle: String(m.libelle || '').trim() || 'Motif sans nom',
     imputable: RESIL_IMPUTABLES[m.imputable] ? m.imputable : 'autre',
     taux: _resilNum(m.taux, 0, 0, 100),
+    taux_libre: m.taux_libre !== false,
     retenue_min: _resilNum(m.retenue_min, 0, 0, null),
     commissions: RESIL_COMMISSION_REGLES[m.commissions] ? m.commissions : 'annuler_recuperer',
     liberer_lots: m.liberer_lots !== false,
@@ -33208,6 +33209,19 @@ function _resilCalc(verse, m){
   if (retenu < min) { retenu = Math.min(verse, min); rembourse = verse - retenu; }
   return { rembourse:rembourse, retenu:retenu };
 }
+/* Taux réellement appliqué à CE dossier : saisi dans la fenêtre de résiliation
+   (cas par cas) quand le motif l'autorise, sinon taux du motif. */
+function _resilTauxDossier(m){
+  var el = document.getElementById('rs-taux');
+  if (!m.taux_libre || !el || String(el.value).trim() === '') return m.taux;
+  var n = parseFloat(String(el.value).replace(',', '.'));
+  return isFinite(n) ? n : NaN;
+}
+function resilierMotifChange(){
+  var m = _resilMotif(document.getElementById('rs-motif').value); if (!m) return;
+  var el = document.getElementById('rs-taux'); if (el) el.value = m.taux;
+  resilierRecalculer();
+}
 function _resilCommissionsTexte(m, nb, total){
   if (m.commissions==='conserver')
     return '✅ '+nb+' commission(s) pour '+fcfa(total)+' — <b>conservées</b> (règle du motif « '+escHtml(m.libelle)+' »).';
@@ -33219,7 +33233,7 @@ function _resilClauseTexte(){
   var p = DATA.params || {};
   if (p.resil_clause && String(p.resil_clause).trim()) return escHtml(String(p.resil_clause).trim()).replace(/\n/g,'<br>');
   return 'Conditions de résiliation applicables : ' + _resilMotifs().map(function(m){
-    return escHtml(m.libelle)+' → remboursement de <b>'+m.taux+'%</b>'+(m.retenue_min>0?' (retenue minimale '+fcfa(m.retenue_min)+')':'');
+    return escHtml(m.libelle)+' → remboursement de <b>'+m.taux+'%</b>'+(m.taux_libre?' (indicatif, fixé au cas par cas)':'')+(m.retenue_min>0?' (retenue minimale '+fcfa(m.retenue_min)+')':'');
   }).join(' ; ') + '.';
 }
 function resilierOuvrir(clientId){
@@ -33240,7 +33254,7 @@ function resilierOuvrir(clientId){
   var motifs = _resilMotifs();
   var sel = document.getElementById('rs-motif');
   sel.innerHTML = motifs.map(function(m){
-    return '<option value="'+escHtml(m.id)+'">'+escHtml(m.libelle)+' ('+m.taux+'%)</option>';
+    return '<option value="'+escHtml(m.id)+'">'+escHtml(m.libelle)+(m.taux_libre?' (indicatif '+m.taux+'%)':' ('+m.taux+'%)')+'</option>';
   }).join('');
 
   /* Suggestion automatique : premier motif dont la condition « livraison
@@ -33261,6 +33275,7 @@ function resilierOuvrir(clientId){
   if (!choisi) choisi = motifs.filter(function(m){ return m.suggestion==='aucune'; })[0] || motifs[0];
   sel.value = choisi.id;
   sugg.textContent = raison;
+  var _tEl = document.getElementById('rs-taux'); if (_tEl) _tEl.value = choisi.taux;
 
   document.getElementById('rs-recap').innerHTML =
     '<b>'+escHtml(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</b> — '+(prog?escHtml(prog.nom):'—')
@@ -33282,9 +33297,18 @@ function resilierRecalculer(){
   if (!c) return;
   var m = _resilMotif(document.getElementById('rs-motif').value) || _resilMotifs()[0];
   var verse = totalPayePrix(clientId);
-  var calc = _resilCalc(verse, m);
+  var tauxEl = document.getElementById('rs-taux');
+  tauxEl.disabled = !m.taux_libre;
+  if (!m.taux_libre) tauxEl.value = m.taux;
+  var tauxDossier = _resilTauxDossier(m);
+  var tauxOk = isFinite(tauxDossier) && tauxDossier >= 0 && tauxDossier <= 100;
+  var calc = _resilCalc(verse, Object.assign({}, m, { taux: tauxOk ? tauxDossier : m.taux }));
   document.getElementById('rs-montant-verse').value = fcfa(verse);
-  document.getElementById('rs-taux').value = m.taux+'%'+(m.retenue_min>0?' (retenue min. '+fcfa(m.retenue_min)+')':'');
+  var infoTaux = document.getElementById('rs-taux-info');
+  if (infoTaux) infoTaux.textContent = !tauxOk ? '⚠️ Taux invalide : saisissez une valeur entre 0 et 100.'
+    : (m.taux_libre ? 'Taux indicatif du motif : '+m.taux+'% — à fixer pour ce dossier.' : 'Taux imposé par le motif.')
+      + (tauxOk && tauxDossier !== m.taux && m.taux_libre ? ' Taux modifié : précisez la raison dans la justification.' : '')
+      + (m.retenue_min>0 ? ' Retenue minimale : '+fcfa(m.retenue_min)+'.' : '');
   document.getElementById('rs-montant-rembourse').value = fcfa(calc.rembourse);
   document.getElementById('rs-montant-retenu').value = fcfa(calc.retenu);
   var lj = document.getElementById('rs-justification-label');
@@ -33313,12 +33337,17 @@ async function resilierConfirmer(){
   if (!m) { toast('Motif de résiliation introuvable — vérifiez Paramètres → Conditions de résiliation.','error'); return; }
   var motif = m.id;
   var justification = document.getElementById('rs-justification').value.trim();
-  if (m.justification_obligatoire && !justification) { toast('La justification est obligatoire — pièce du dossier juridique.','error'); return; }
+  var tauxDossier = _resilTauxDossier(m);
+  if (!isFinite(tauxDossier) || tauxDossier < 0 || tauxDossier > 100) { toast('Taux de remboursement invalide — saisissez une valeur entre 0 et 100.','error'); return; }
+  var tauxAjuste = (tauxDossier !== m.taux);
+  if ((m.justification_obligatoire || tauxAjuste) && !justification) {
+    toast(tauxAjuste && !m.justification_obligatoire ? 'Taux modifié : précisez la raison dans la justification.' : 'La justification est obligatoire — pièce du dossier juridique.','error'); return;
+  }
   if (!document.getElementById('rs-confirme').checked) { toast('Cochez la case de confirmation avant de valider.','error'); return; }
 
   var verse = totalPayePrix(clientId);
-  var calc = _resilCalc(verse, m);
-  var taux = m.taux/100;
+  var calc = _resilCalc(verse, Object.assign({}, m, { taux: tauxDossier }));
+  var taux = tauxDossier/100;
   var rembourse = calc.rembourse;
   var retenu = calc.retenu;
 
@@ -33389,13 +33418,13 @@ async function resilierConfirmer(){
      Si le motif ne libère pas les lots, le souscripteur les garde. */
   if (m.liberer_lots) { c.lot_id = null; c.lot_ids = []; }
   c.resiliation = { date:dat, motif:motif, motif_libelle:m.libelle, imputable:m.imputable, justification:justification, montant_verse:verse,
-    taux_remboursement:m.taux, retenue_min:m.retenue_min, regle_commissions:m.commissions, lots_liberes_auto:m.liberer_lots,
+    taux_remboursement:tauxDossier, taux_indicatif:m.taux, taux_ajuste:tauxAjuste, retenue_min:m.retenue_min, regle_commissions:m.commissions, lots_liberes_auto:m.liberer_lots,
     montant_rembourse:rembourse, montant_retenu:retenu,
     commissions_annulees:nbAnnulees, commissions_a_recuperer:nbARecuperer,
     lots_liberes:lotsLiberes, valide_par:(APP.currentUser&&APP.currentUser.nom)||'—', cree_le:new Date().toISOString() };
   c._modifie = new Date().toISOString();
   await logAudit('clients', clientId, 'resiliation', null, c.resiliation);
-  await clientLierDossierJuridique(c, 'Résiliation de souscription — motif : '+m.libelle+' ('+m.taux+'%). '+justification, rembourse, true);
+  await clientLierDossierJuridique(c, 'Résiliation de souscription — motif : '+m.libelle+' (taux de remboursement appliqué : '+tauxDossier+'%'+(tauxAjuste?', taux indicatif du motif : '+m.taux+'%':'')+'). '+justification, rembourse, true);
   await dbPut('clients', c); if (typeof syncToSupabase==='function') syncToSupabase('pi_clients', c);
 
   closeModal('modal-resiliation');
@@ -33423,7 +33452,8 @@ function _resilEdRendre(){
       +'<div class="form-grid">'
       +'<div class="form-group span-2"><label>Libellé du motif</label><input type="text" class="form-control" value="'+escHtml(m.libelle)+'" '+f('libelle')+'></div>'
       +'<div class="form-group"><label>Imputable à</label><select class="form-control" '+f('imputable')+'>'+opt(RESIL_IMPUTABLES, m.imputable)+'</select></div>'
-      +'<div class="form-group"><label>Remboursement (% des versements)</label><input type="number" class="form-control" min="0" max="100" step="1" value="'+m.taux+'" '+f('taux')+'></div>'
+      +'<div class="form-group"><label>Taux de remboursement indicatif (% des versements)</label><input type="number" class="form-control" min="0" max="100" step="1" value="'+m.taux+'" '+f('taux')+'></div>'
+      +'<div class="form-group"><label><input type="checkbox" '+(m.taux_libre?'checked ':'')+f('taux_libre')+'> Taux ajustable au cas par cas lors de la résiliation</label></div>'
       +'<div class="form-group"><label>Retenue minimale (FCFA, 0 = aucune)</label><input type="number" class="form-control" min="0" step="1000" value="'+m.retenue_min+'" '+f('retenue_min')+'></div>'
       +'<div class="form-group span-2"><label>Sort des commissions déjà générées</label><select class="form-control" '+f('commissions')+'>'+opt(RESIL_COMMISSION_REGLES, m.commissions)+'</select></div>'
       +'<div class="form-group"><label>Suggestion automatique</label><select class="form-control" '+f('suggestion')+'>'
@@ -33439,7 +33469,7 @@ function _resilEdRendre(){
 }
 function _resilEdMaj(i, k, el){
   if (!_RESIL_ED || !_RESIL_ED[i]) return;
-  var checkboxes = { liberer_lots:1, justification_obligatoire:1, actif:1 };
+  var checkboxes = { liberer_lots:1, justification_obligatoire:1, actif:1, taux_libre:1 };
   _RESIL_ED[i][k] = checkboxes[k] ? !!el.checked : el.value;
   /* Re-dessiner seulement quand la mise en page change (actif, suggestion) */
   if (k==='actif' || k==='suggestion') _resilEdRendre();
@@ -33577,11 +33607,11 @@ function resilierImprimerDecompte(clientId){
     +'<h2>Motif de la résiliation</h2><p>'+escHtml(motifLabel)+'</p><p style="font-style:italic;color:#444;">'+escHtml(r.justification||'')+'</p>'
     +'<h2>Décompte financier</h2><table><tbody>'
     +'<tr><td class="k">Montant total versé (hors frais de dossier)</td><td>'+fcfa(r.montant_verse)+'</td></tr>'
-    +'<tr><td class="k">Taux de remboursement applicable</td><td>'+r.taux_remboursement+'%'+(r.retenue_min>0?' (retenue minimale '+fcfa(r.retenue_min)+')':'')+'</td></tr>'
+    +'<tr><td class="k">Taux de remboursement applicable</td><td>'+r.taux_remboursement+'%'+(r.taux_ajuste?' (taux indicatif du motif : '+r.taux_indicatif+'%, fixé pour ce dossier)':'')+(r.retenue_min>0?' (retenue minimale '+fcfa(r.retenue_min)+')':'')+'</td></tr>'
     +'<tr><td class="k"><b>Montant à rembourser</b></td><td><b>'+fcfa(r.montant_rembourse)+'</b></td></tr>'
     +'<tr><td class="k">Montant retenu (frais de dossier non remboursables exclus)</td><td>'+fcfa(r.montant_retenu)+'</td></tr>'
     +'</tbody></table>'
-    +'<div class="pied">'+(((DATA.params||{}).resil_fondement||'').trim() ? escHtml((DATA.params.resil_fondement||'').trim()).replace(/\n/g,'<br>') : 'Fondement contractuel : cahier des charges — conditions de résiliation, motif « '+escHtml(motifLabel)+' » ('+r.taux_remboursement+'% des versements remboursés).')
+    +'<div class="pied">'+(((DATA.params||{}).resil_fondement||'').trim() ? escHtml((DATA.params.resil_fondement||'').trim()).replace(/\n/g,'<br>') : 'Fondement contractuel : cahier des charges — conditions de résiliation, motif « '+escHtml(motifLabel)+' » (taux de remboursement appliqué : '+r.taux_remboursement+'% des versements).')
     +'<br><br>Fait à '+escHtml((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+new Date().toLocaleDateString('fr-FR')
     +'<br><br>Pour '+escHtml(soc)+' : ___________________________<br><br>Le souscripteur (bon pour accord) : ___________________________</div>'
     +'</body></html>');
@@ -88627,7 +88657,7 @@ function _docsEngagementHTML(d) {
   var c = d.c, s = _identiteSociete();
   var cond = '';
   if (typeof _resilMotifs === 'function') {
-    cond = ' : ' + _resilMotifs().map(function(m){ return m.libelle + ' → remboursement de ' + m.taux + '% des versements'; }).join(' ; ');
+    cond = ' : ' + _resilMotifs().map(function(m){ return m.libelle + (m.taux_libre ? ' → taux de remboursement fixé au cas par cas (indicatif : ' + m.taux + '%)' : ' → remboursement de ' + m.taux + '% des versements'); }).join(' ; ');
   }
   var vars = { nom:d.nom, piece:d.piece, adresse:c.adresse || '—', societe:s.nom || 'le promoteur',
     logement:d.logement + (d.prog ? ' (programme ' + d.prog.nom + ')' : ''), prix:fcfa(d.prix), apport:fcfa(d.apport),
