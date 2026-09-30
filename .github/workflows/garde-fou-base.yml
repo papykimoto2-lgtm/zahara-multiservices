@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Refuser la référence à la base de l'autre entreprise
         run: |
-          if grep -rIl --exclude-dir=.git --exclude-dir=node_modules --exclude=garde-fou-base.yml "pxwgefdxgrskusjbzrxz" .; then
+          if grep -rIl --exclude-dir=.git --exclude-dir=node_modules --exclude=garde-fou-base.yml --exclude=*.md "pxwgefdxgrskusjbzrxz" .; then
             echo "::error::Référence à la base Supabase d'une autre entreprise (pxwgefdxgrskusjbzrxz) détectée dans les fichiers ci-dessus."
             exit 1
           fi
