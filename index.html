@@ -6330,6 +6330,13 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                   <div class="form-group"><label>Fondement contractuel imprimé sur le décompte (vide = généré automatiquement)</label>
                     <textarea id="param-resil-fondement" class="form-control" rows="2"></textarea></div>
                 </div>
+                <div class="form-group span-2" style="border:1px solid var(--bordure,#D1D5DB);border-radius:8px;padding:12px;">
+                  <label style="font-weight:700;">📄 Documents de souscription (fiche + engagement d'acquisition)</label>
+                  <div class="form-group"><label>Rappel des conditions générales du promoteur (encadré de la fiche de souscription)</label>
+                    <textarea id="param-doc-rappel-cgv" class="form-control" rows="5"></textarea></div>
+                  <div class="form-group"><label>Texte de l'engagement ferme et irrévocable — variables : {nom} {piece} {adresse} {societe} {logement} {prix} {apport} {duree} {mensualite} {date_debut} {conditions_resiliation}</label>
+                    <textarea id="param-doc-engagement" class="form-control" rows="9"></textarea></div>
+                </div>
                 <div class="form-group">
                   <label>Banque principale (cpt 512)</label>
                   <input type="text" id="param-banque" class="form-control" placeholder="SGCI, NSIA, BNI...">
@@ -17579,6 +17586,14 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
 ════════════════════════════════════════════════════ -->
 
 <!-- Modal Client -->
+<div class="modal-overlay" id="modal-docs-souscription">
+  <div class="modal">
+    <div class="modal-header"><h3>📄 Documents de souscription</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-docs-souscription')">✕</button></div>
+    <div class="modal-body" id="docs-souscription-corps"></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-docs-souscription')">Fermer</button></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-client">
   <div class="modal modal-lg">
     <div class="modal-header">
@@ -17612,12 +17627,23 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </div>
           <div class="form-group">
             <label>Situation matrimoniale</label>
-            <select class="form-control" id="c-matrimonial">
+            <select class="form-control" id="c-matrimonial" onchange="clientToggleConjoint()">
               <option value="celibataire">Célibataire</option>
               <option value="marie">Marié(e)</option>
               <option value="divorce">Divorcé(e)</option>
               <option value="veuf">Veuf/Veuve</option>
             </select>
+          </div>
+          <div class="form-group span-2" id="c-conjoint-bloc" style="display:none;border:1px solid var(--bord,#D1D5DB);border-radius:8px;padding:10px 12px;">
+            <label style="font-weight:700;">Conjoint(e)</label>
+            <div class="form-grid">
+              <div class="form-group"><label>Nom</label><input type="text" class="form-control" id="c-conj-nom"></div>
+              <div class="form-group"><label>Prénoms</label><input type="text" class="form-control" id="c-conj-prenoms"></div>
+              <div class="form-group"><label>Date de naissance</label><input type="date" class="form-control" id="c-conj-ddn"></div>
+              <div class="form-group"><label>Profession</label><input type="text" class="form-control" id="c-conj-profession"></div>
+              <div class="form-group"><label>Téléphone</label><input type="tel" class="form-control" id="c-conj-tel"></div>
+              <div class="form-group"><label>N° pièce d'identité</label><input type="text" class="form-control" id="c-conj-piece-num"></div>
+            </div>
           </div>
           <div class="form-group">
             <label>Profession</label>
@@ -31899,7 +31925,9 @@ function openClientModal(id) {
     var _lotDoc = DATA.lots.find(function(l) { return l.id === c.lot_id; });
     var _libelleDoc = (_lotDoc && _lotDoc.statut === 'vendu') ? '📄 Contrat de vente' : '📄 Contrat réservation';
     docBtns.innerHTML = '<button class="btn btn-secondary btn-sm" onclick="printContrat(\'' + id + '\')">' + _libelleDoc + '</button>'
-      + '<button class="btn btn-secondary btn-sm" onclick="etatEcheancier(\'' + id + '\')">📅 Échéancier</button>';
+      + '<button class="btn btn-secondary btn-sm" onclick="etatEcheancier(\'' + id + '\')">📅 Échéancier</button>'
+      + '<button class="btn btn-secondary btn-sm" onclick="genererDocsSouscription(\'' + id + '\',\'fiche\')">📄 Fiche de souscription</button>'
+      + '<button class="btn btn-secondary btn-sm" onclick="genererDocsSouscription(\'' + id + '\',\'engagement\')">✍️ Engagement d\'acquisition</button>';
     // Documents téléversés
     setTimeout(function(){ refreshDocumentsForEntity('client', id); }, 80);
     renderClientHistorique(id);
@@ -31941,11 +31969,13 @@ function clearClientForm() {
    'c-piece-num','c-montant-total','c-apport','c-duree','c-date-debut','c-date-souscription','c-mensualite','c-type-logement','c-surface',
    'c-commercial','c-apporteur',
    'c-num-dm','c-numero-tf','c-ilot','c-superficie-reelle','c-superficie-supplementaire','c-superficie-totale',
-   'c-terrain-supplementaire','c-cout-villa','c-modification'].forEach(function(id) {
+   'c-terrain-supplementaire','c-cout-villa','c-modification',
+   'c-conj-nom','c-conj-prenoms','c-conj-ddn','c-conj-profession','c-conj-tel','c-conj-piece-num'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = el.id === 'c-nationalite' ? 'Ivoirienne' : el.id === 'c-duree' ? '60' : el.id === 'c-apport' ? '0' : '';
   });
   var modeAcqEl = document.getElementById('c-mode-acquisition'); if (modeAcqEl) modeAcqEl.value = '';
+  if (typeof clientToggleConjoint === 'function') clientToggleConjoint();
   var svEcart = document.getElementById('c-surface-ecart'); if (svEcart) svEcart.style.display = 'none';
   var cGeoStatutClear = document.getElementById('c-geoloc-statut'); if (cGeoStatutClear) cGeoStatutClear.textContent = '';
   document.getElementById('doc-btns').style.display = 'none';
@@ -31977,6 +32007,7 @@ function fillClientForm(c) {
   var cGeoStatut = document.getElementById('c-geoloc-statut');
   if (cGeoStatut) cGeoStatut.textContent = c.geoloc_at ? ('✅ Position GPS capturée le '+dateShort(c.geoloc_at)) : '';
   setSelectValue('c-matrimonial', c.matrimonial);
+  _clientRemplirConjoint(c);
   setSelectValue('c-standing', c.standing);
   setSelectValue('c-programme', c.programme_id);
   setSelectValue('c-commercial', c.commercial_id || '');
@@ -32241,6 +32272,7 @@ async function saveClient() {
     ddn: document.getElementById('c-ddn').value,
     nationalite: document.getElementById('c-nationalite').value,
     matrimonial: document.getElementById('c-matrimonial').value,
+    conjoint: (document.getElementById('c-matrimonial').value === 'marie') ? _clientLireConjoint() : null,
     profession: document.getElementById('c-profession').value,
     employeur: document.getElementById('c-employeur').value,
     tel: tel,
@@ -32358,6 +32390,7 @@ async function saveClient() {
     toast('Souscripteur enregistré.', 'success');
     renderClients();
     refreshDashboard();
+    if (!_clientAvant) ouvrirDocsSouscription(client.id);
   } finally {
     APP._savingClient = false;
   }
@@ -47113,6 +47146,7 @@ async function saveParams() {
     resil_motifs: _resilEdLire(),
     resil_clause: document.getElementById('param-resil-clause') ? gv('param-resil-clause') : (DATA.params||{}).resil_clause,
     resil_fondement: document.getElementById('param-resil-fondement') ? gv('param-resil-fondement') : (DATA.params||{}).resil_fondement,
+    cdc: _cdcParamsLire(),
     banque:      gv('param-banque'),
     exercice:    gv('param-exercice'),
   });
@@ -47432,6 +47466,7 @@ function loadParamFields() {
   if (autoComptaEl) autoComptaEl.checked = p.auto_compta_commissions !== false; sv('param-penalites',p.penalites_pct||0.5);
   _resilEdCharger(p);
   sv('param-banque',p.banque); sv('param-exercice',p.exercice||'2025');
+  _cdcParamsCharger(p);
   sv('param-obj-ca',p.objectif_ca_mensuel||20000000);
   sv('param-obj-ventes',p.objectif_ventes_mensuel||5);
   sv('param-obj-leads',p.objectif_leads_mensuel||20);
@@ -88458,6 +88493,187 @@ function etatEcheancier(clientId) {
     couleur: '#1D4ED8',
     contenu: contenu
   });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DOCUMENTS DE SOUSCRIPTION — générés après l'enregistrement d'un nouveau
+   souscripteur : 1) Fiche de souscription (souscripteur, conjoint(e),
+   logement choisi + encadré « Rappel des conditions générales du
+   promoteur ») ; 2) Engagement ferme et irrévocable d'acquisition.
+   Les textes juridiques (rappel des conditions, engagement) sont
+   modifiables dans Paramètres → Comptabilité (DATA.params.cdc) ; les
+   valeurs ci-dessous ne sont que des modèles de départ. ═══════════ */
+CDC_DEFAULTS.engagement_acquisition =
+  "Je soussigné(e) {nom}, titulaire de la pièce d'identité {piece}, demeurant à {adresse}, déclare m'engager de manière FERME ET IRRÉVOCABLE à acquérir auprès de {societe} le logement désigné ci-après : {logement}, au prix global de {prix}.\n"
+  + "1. Je m'engage à payer ce prix selon les modalités suivantes : apport initial de {apport}, puis {duree} mensualités de {mensualite} à compter du {date_debut}, conformément au tableau d'amortissement qui me sera remis.\n"
+  + "2. Je reconnais avoir pris connaissance des conditions générales du promoteur rappelées dans ma fiche de souscription, ainsi que du cahier des charges du logement, et je les accepte sans réserve.\n"
+  + "3. Je reconnais que tout désistement de ma part est régi par les conditions de résiliation du promoteur{conditions_resiliation}.\n"
+  + "4. Le présent engagement est ferme et irrévocable : je ne peux le rétracter ni le modifier unilatéralement. Il est établi en deux exemplaires originaux, dont un m'est remis.";
+CDC_DEFAULTS.rappel_cgv = '';
+
+/* Rappel des conditions générales : surcharge éventuelle, sinon les
+   conditions de souscription + autres conditions du cahier des charges. */
+function _rappelCgvTexte() {
+  var ov = (DATA.params && DATA.params.cdc) ? DATA.params.cdc.rappel_cgv : null;
+  if (ov && String(ov).trim()) return String(ov).trim();
+  return [_cdcTxt('conditions_souscription'), _cdcTxt('autres_conditions')].filter(Boolean).join('\n');
+}
+
+/* ── Conjoint(e) : lecture / remplissage / affichage du formulaire ── */
+var CLIENT_CONJOINT_CHAMPS = { nom:'c-conj-nom', prenoms:'c-conj-prenoms', ddn:'c-conj-ddn', profession:'c-conj-profession',
+  tel:'c-conj-tel', piece_num:'c-conj-piece-num' };
+function _clientLireConjoint() {
+  var out = {}, any = false;
+  Object.keys(CLIENT_CONJOINT_CHAMPS).forEach(function(k){
+    var el = document.getElementById(CLIENT_CONJOINT_CHAMPS[k]);
+    out[k] = el ? String(el.value || '').trim() : ''; if (out[k]) any = true;
+  });
+  return any ? out : null;
+}
+function _clientRemplirConjoint(c) {
+  var cj = (c && c.conjoint) || {};
+  Object.keys(CLIENT_CONJOINT_CHAMPS).forEach(function(k){
+    var el = document.getElementById(CLIENT_CONJOINT_CHAMPS[k]); if (el) el.value = cj[k] || '';
+  });
+  clientToggleConjoint();
+}
+function clientToggleConjoint() {
+  var sel = document.getElementById('c-matrimonial'), bloc = document.getElementById('c-conjoint-bloc');
+  if (bloc) bloc.style.display = (sel && sel.value === 'marie') ? '' : 'none';
+}
+
+/* ── Données communes aux deux documents ── */
+function _docsSouscriptionDonnees(clientId) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === clientId; });
+  if (!c) return null;
+  var lotIds = (typeof _lotIdsDeClient === 'function') ? _lotIdsDeClient(c) : (c.lot_id ? [c.lot_id] : []);
+  var lots = lotIds.map(function(id){ return (DATA.lots || []).find(function(l){ return l.id === id; }); }).filter(Boolean);
+  var prog = (DATA.programmes || []).find(function(p){ return p.id === c.programme_id || (lots[0] && lots[0].programme_id === p.id); }) || null;
+  var prix = c.montant_total || lots.reduce(function(s,l){ return s + (parseFloat(l.prix) || 0); }, 0);
+  var apport = c.apport || 0, duree = c.duree || 0;
+  var mensualite = duree > 0 ? Math.round(Math.max(0, prix - apport) / duree) : 0;
+  var standingLbl = { economique:'Économique', moyen:'Moyen standing', haut:'Haut standing' };
+  var logement = lots.length
+    ? lots.map(function(l){ return 'Lot ' + (l.numero || l.id) + (l.type ? ' — ' + l.type : '') + (l.surface ? ' (' + l.surface + ' m²)' : ''); }).join(' ; ')
+    : (c.type_logement || '—');
+  return { c:c, lots:lots, prog:prog, prix:prix, apport:apport, duree:duree, mensualite:mensualite,
+    standing: standingLbl[c.standing] || c.standing || '—', logement:logement,
+    nom: ((c.prenoms ? c.prenoms + ' ' : '') + (c.nom || '')).trim(),
+    piece: ((c.piece_type || '') + ' ' + (c.piece_num || '')).trim() || '—' };
+}
+
+function _docsFicheSouscriptionHTML(d) {
+  var c = d.c, cj = c.conjoint || null, marie = (c.matrimonial === 'marie');
+  var e = escHtml;
+  var matLbl = { celibataire:'Célibataire', marie:'Marié(e)', divorce:'Divorcé(e)', veuf:'Veuf/Veuve' }[c.matrimonial] || (c.matrimonial || '—');
+  var row = function(k, v){ return '<tr><th style="width:32%;">' + e(k) + '</th><td>' + e(v == null || v === '' ? '—' : String(v)) + '</td></tr>'; };
+  var h = '';
+  h += '<h3>1. Informations sur le souscripteur</h3><table>'
+    + row('Nom et prénoms', d.nom) + row('N° de dossier', c.dossier || c.id)
+    + row('Date de naissance', c.ddn ? dateShort(c.ddn) : '') + row('Nationalité', c.nationalite)
+    + row('Situation matrimoniale', matLbl) + row('Profession', c.profession) + row('Employeur', c.employeur)
+    + row('Pièce d\'identité', d.piece) + row('Téléphone', c.tel) + row('Email', c.email) + row('Adresse', c.adresse)
+    + '</table>';
+  h += '<h3>2. Informations sur le/la conjoint(e)</h3>';
+  if (marie && cj) {
+    h += '<table>' + row('Nom et prénoms', ((cj.prenoms ? cj.prenoms + ' ' : '') + (cj.nom || '')).trim())
+      + row('Date de naissance', cj.ddn ? dateShort(cj.ddn) : '') + row('Profession', cj.profession)
+      + row('Téléphone', cj.tel) + row('N° pièce d\'identité', cj.piece_num) + '</table>';
+  } else if (marie) {
+    h += '<p style="color:#b45309;">Souscripteur marié(e) : informations du/de la conjoint(e) non renseignées.</p>';
+  } else {
+    h += '<p style="color:#555;">Sans objet — situation matrimoniale : ' + e(matLbl) + '.</p>';
+  }
+  h += '<h3>3. Logement choisi</h3><table>'
+    + row('Programme', d.prog ? d.prog.nom : '') + row('Logement / lot(s)', d.logement)
+    + row('Type de logement', c.type_logement) + row('Standing', d.standing)
+    + row('Surface', c.surface ? c.surface + ' m²' : '')
+    + row('Prix total', fcfa(d.prix)) + row('Apport initial', fcfa(d.apport))
+    + row('Durée', d.duree ? d.duree + ' mois' : '') + row('Mensualité', d.mensualite ? fcfa(d.mensualite) : '')
+    + row('Date de souscription', (c.date_souscription || c.date_debut) ? dateShort(c.date_souscription || c.date_debut) : '')
+    + row('Début des paiements', c.date_debut ? dateShort(c.date_debut) : '')
+    + row('Livraison prévue', d.prog && d.prog.date_livraison ? dateShort(d.prog.date_livraison) : '')
+    + row('Conseiller commercial', c.commercial || c.apporteur || '')
+    + '</table>';
+  h += '<div style="border:2px solid #1D4ED8;border-radius:6px;padding:10px 14px;margin:16px 0;background:#F5F8FF;page-break-inside:avoid;">'
+    + '<div style="font-weight:700;color:#1D4ED8;margin-bottom:4px;">📌 Rappel des conditions générales du promoteur</div>'
+    + _cdcPara(_rappelCgvTexte()) + '</div>';
+  h += '<div class="etat-signatures"><div><div class="etat-sign-line">Le souscripteur (lu et approuvé)</div></div>'
+    + '<div><div class="etat-sign-line">Pour ' + e(_identiteSociete().nom || 'le promoteur') + '</div></div></div>';
+  return h;
+}
+
+function _docsEngagementHTML(d) {
+  var c = d.c, s = _identiteSociete();
+  var cond = '';
+  if (typeof _resilMotifs === 'function') {
+    cond = ' : ' + _resilMotifs().map(function(m){ return m.libelle + ' → remboursement de ' + m.taux + '% des versements'; }).join(' ; ');
+  }
+  var vars = { nom:d.nom, piece:d.piece, adresse:c.adresse || '—', societe:s.nom || 'le promoteur',
+    logement:d.logement + (d.prog ? ' (programme ' + d.prog.nom + ')' : ''), prix:fcfa(d.prix), apport:fcfa(d.apport),
+    duree:String(d.duree || '—'), mensualite:fcfa(d.mensualite), date_debut:c.date_debut ? dateShort(c.date_debut) : '—',
+    conditions_resiliation:cond };
+  var texte = _cdcTxt('engagement_acquisition').replace(/\{([a-z_]+)\}/g, function(m, k){ return vars.hasOwnProperty(k) ? vars[k] : m; });
+  var ville = (DATA.params && DATA.params.ville) || 'Abidjan';
+  return '<div style="text-align:center;margin:0 0 14px;"><div style="font-size:16px;font-weight:700;text-transform:uppercase;">Engagement ferme et irrévocable d\'acquisition de logement</div>'
+    + '<div style="font-size:11px;color:#555;">Dossier ' + escHtml(c.dossier || c.id) + '</div></div>'
+    + '<div style="font-size:12px;line-height:1.8;text-align:justify;">' + _cdcPara(texte).replace('font-size:11px;line-height:1.6;', 'font-size:12px;line-height:1.8;') + '</div>'
+    + '<p style="margin-top:18px;">Fait à ' + escHtml(ville) + ', le ' + new Date().toLocaleDateString('fr-FR') + '</p>'
+    + '<div class="etat-signatures"><div><div class="etat-sign-line">Le souscripteur<br>(mention « Lu et approuvé — bon pour engagement ferme et irrévocable »)</div></div>'
+    + '<div><div class="etat-sign-line">Pour ' + escHtml(s.nom || 'le promoteur') + '</div></div></div>';
+}
+
+/* which : 'fiche' | 'engagement' | 'tous' */
+function genererDocsSouscription(clientId, which) {
+  var d = _docsSouscriptionDonnees(clientId);
+  if (!d) { toast('Souscripteur introuvable.', 'error'); return; }
+  which = which || 'tous';
+  var contenu = '', titre;
+  if (which === 'fiche' || which === 'tous') contenu += _docsFicheSouscriptionHTML(d);
+  if (which === 'tous') contenu += '<div style="page-break-before:always;"></div>';
+  if (which === 'engagement' || which === 'tous') contenu += _docsEngagementHTML(d);
+  titre = which === 'fiche' ? 'Fiche de souscription' : which === 'engagement' ? 'Engagement d\'acquisition' : 'Dossier de souscription';
+  genererEtatPDF({ titre: titre, sousTitre: d.nom, reference: d.c.dossier || d.c.id, contenu: contenu });
+}
+
+/* Fenêtre proposée automatiquement après l'enregistrement d'un NOUVEAU
+   souscripteur (un clic utilisateur est requis pour ouvrir le PDF sans
+   être bloqué par le navigateur). */
+function ouvrirDocsSouscription(clientId) {
+  var d = _docsSouscriptionDonnees(clientId);
+  if (!d) return;
+  var box = document.getElementById('docs-souscription-corps');
+  if (!box) return;
+  box.innerHTML = '<div style="margin-bottom:10px;">Souscripteur <b>' + escHtml(d.nom) + '</b> enregistré. Les documents suivants sont prêts :</div>'
+    + '<div style="display:flex;flex-direction:column;gap:8px;">'
+    + '<button class="btn btn-primary" onclick="genererDocsSouscription(\'' + clientId + '\',\'tous\')">🖨️ Imprimer les deux documents</button>'
+    + '<button class="btn btn-secondary" onclick="genererDocsSouscription(\'' + clientId + '\',\'fiche\')">📄 Fiche de souscription</button>'
+    + '<button class="btn btn-secondary" onclick="genererDocsSouscription(\'' + clientId + '\',\'engagement\')">✍️ Engagement ferme et irrévocable d\'acquisition</button>'
+    + '</div>';
+  openModal('modal-docs-souscription');
+}
+
+/* ── Paramètres : textes des documents (Paramètres → Comptabilité) ── */
+function _cdcParamsCharger(p) {
+  var a = document.getElementById('param-doc-rappel-cgv'), b = document.getElementById('param-doc-engagement');
+  if (a) a.value = _rappelCgvTexte();
+  if (b) b.value = _cdcTxt('engagement_acquisition');
+}
+/* Ne mémorise une surcharge que si le texte diffère du modèle de départ. */
+function _cdcParamsLire() {
+  var cdc = Object.assign({}, (DATA.params && DATA.params.cdc) || {});
+  var a = document.getElementById('param-doc-rappel-cgv'), b = document.getElementById('param-doc-engagement');
+  var sans = function(v){ return String(v || '').replace(/\r/g, '').trim(); };
+  if (a) {
+    var defA = [_cdcTxt('conditions_souscription'), _cdcTxt('autres_conditions')].filter(Boolean).join('\n');
+    var vA = sans(a.value);
+    if (!vA || vA === sans(defA)) delete cdc.rappel_cgv; else cdc.rappel_cgv = vA;
+  }
+  if (b) {
+    var vB = sans(b.value);
+    if (!vB || vB === sans(CDC_DEFAULTS.engagement_acquisition)) delete cdc.engagement_acquisition; else cdc.engagement_acquisition = vB;
+  }
+  return cdc;
 }
 
 /* Lettre de relance graduée selon le retard */
