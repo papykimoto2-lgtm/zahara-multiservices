@@ -26136,6 +26136,12 @@ async function syncToSupabase(table, obj, opts) {
         });
         obj.params_maj = _rM;
       }
+      /* Ne jamais supprimer du cloud un réglage que ce poste n'a simplement pas
+         (l'upsert remplace toute la colonne JSON : un poste au jeu réduit
+         effaçait les réglages de tous les autres). */
+      Object.keys(_remoteParams).forEach(function(k){
+        if (obj[k] === undefined && _paramPartage(k)) obj[k] = _remoteParams[k];
+      });
       if (!obj.params_maj) obj.params_maj = new Date().toISOString();
       /* Préserver l'ordre de remise à zéro distant : sans cela, le premier
          poste qui enregistre un réglage quelconque le supprimait du cloud
@@ -27680,6 +27686,17 @@ var PARAMS_PARTAGES = [
   'adresse','ville','tel','email','logo',
   'synthese_auto','synthese_heure'
 ];
+/* [FIX réglages non conservés] Seule la liste blanche ci-dessus était reprise
+   du cloud : commissions, taux, banque, pénalités, seuils, conditions de
+   résiliation… restaient prisonniers du poste qui les avait saisis, et tout
+   autre poste (ou navigateur vierge) qui renvoyait SON jeu réduit de réglages
+   écrasait la ligne du cloud (l'upsert remplace la colonne JSON entière).
+   Règle désormais : tout réglage est partagé, sauf les marqueurs techniques,
+   le plan comptable (fusion dédiée) et les clés secrètes (clé API, jeton,
+   mot de passe), qui restent propres au poste. */
+var PARAMS_LOCAUX_RE = /^(id|params_maj|reset_broadcast|plan_comptable_.*|_.*|.*(api_key|secret|token|password|pwd).*)$/i;
+function _paramPartage(k) { return !PARAMS_LOCAUX_RE.test(String(k)); }
+
 function _paramsToucher() {
   DATA.params = DATA.params || {};
   DATA.params.id = 'main';
@@ -27734,16 +27751,19 @@ async function _pullPlanComptableCloud() {
        récente. Sans arbitrage par horodatage, deux postes se seraient écrasés
        mutuellement à chaque cycle. */
     var _rMaj = remote.params_maj || '', _lMaj = loc.params_maj || '';
-    if (_rMaj && _rMaj > _lMaj) {
-      var _adoptes = 0;
-      PARAMS_PARTAGES.forEach(function(k){
-        if (remote[k] === undefined) return;
-        if (JSON.stringify(remote[k]) === JSON.stringify(loc[k])) return;
-        loc[k] = remote[k]; _adoptes++;
-      });
-      loc.params_maj = _rMaj;
-      if (_adoptes) { changed = true; console.log('[Params] ' + _adoptes + ' réglage(s) partagé(s) mis à jour depuis le cloud.'); }
-    }
+    var _distantPlusRecent = !!(_rMaj && _rMaj > _lMaj);
+    var _clesAdopt = Object.keys(remote).filter(_paramPartage);
+    PARAMS_PARTAGES.forEach(function(k){ if (_clesAdopt.indexOf(k) === -1) _clesAdopt.push(k); });
+    var _adoptes = 0;
+    _clesAdopt.forEach(function(k){
+      if (remote[k] === undefined) return;
+      if (JSON.stringify(remote[k]) === JSON.stringify(loc[k])) return;
+      /* Version distante plus récente : elle fait foi. Sinon on ne comble que
+         ce que ce poste n'a pas du tout (navigateur vierge, poste resté en arrière). */
+      if (_distantPlusRecent || loc[k] === undefined) { loc[k] = remote[k]; _adoptes++; }
+    });
+    if (_distantPlusRecent) loc.params_maj = _rMaj;
+    if (_adoptes) { changed = true; console.log('[Params] ' + _adoptes + ' réglage(s) partagé(s) mis à jour depuis le cloud.'); }
 
     if (remote.reset_broadcast && remote.reset_broadcast.id) {
       var _rbLoc = loc.reset_broadcast, _rbRem = remote.reset_broadcast;
