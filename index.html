@@ -17655,7 +17655,13 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </div>
           <div class="form-group">
             <label>Téléphone *</label>
-            <input type="tel" class="form-control" id="c-tel">
+            <input type="tel" class="form-control" id="c-tel" placeholder="07 12 34 56 78 ou +33 6 12 34 56 78" oninput="clientTelIndice('c-tel','c-tel-hint')">
+            <div id="c-tel-hint" style="font-size:11px;margin-top:3px;"></div>
+          </div>
+          <div class="form-group">
+            <label>Téléphone 2 (facultatif)</label>
+            <input type="tel" class="form-control" id="c-tel2" placeholder="05 12 34 56 78 ou +225 05 12 34 56 78" oninput="clientTelIndice('c-tel2','c-tel2-hint')">
+            <div id="c-tel2-hint" style="font-size:11px;margin-top:3px;"></div>
           </div>
           <div class="form-group">
             <label>Email</label>
@@ -31985,7 +31991,7 @@ function openClientModal(id) {
 }
 
 function clearClientForm() {
-  ['c-nom','c-prenoms','c-ddn','c-nationalite','c-profession','c-employeur','c-tel','c-email','c-adresse','c-commune','c-lat','c-lng',
+  ['c-nom','c-prenoms','c-ddn','c-nationalite','c-profession','c-employeur','c-tel','c-tel2','c-email','c-adresse','c-commune','c-lat','c-lng',
    'c-piece-num','c-montant-total','c-apport','c-duree','c-date-debut','c-date-souscription','c-mensualite','c-type-logement','c-surface',
    'c-commercial','c-apporteur',
    'c-num-dm','c-numero-tf','c-ilot','c-superficie-reelle','c-superficie-supplementaire','c-superficie-totale',
@@ -31998,6 +32004,7 @@ function clearClientForm() {
   if (typeof clientToggleConjoint === 'function') clientToggleConjoint();
   var svEcart = document.getElementById('c-surface-ecart'); if (svEcart) svEcart.style.display = 'none';
   var cGeoStatutClear = document.getElementById('c-geoloc-statut'); if (cGeoStatutClear) cGeoStatutClear.textContent = '';
+  ['c-tel-hint','c-tel2-hint'].forEach(function(i){ var h=document.getElementById(i); if(h) h.textContent=''; });
   document.getElementById('doc-btns').style.display = 'none';
   document.getElementById('doc-btns').innerHTML = '';
   var modeEl = document.getElementById('c-mode-livraison'); if (modeEl) modeEl.value = 'gros_oeuvre';
@@ -32010,7 +32017,7 @@ function clearClientForm() {
 
 function fillClientForm(c) {
   var map = { 'c-nom': 'nom', 'c-prenoms': 'prenoms', 'c-ddn': 'ddn', 'c-nationalite': 'nationalite',
-    'c-profession': 'profession', 'c-employeur': 'employeur', 'c-tel': 'tel', 'c-email': 'email', 'c-adresse': 'adresse',
+    'c-profession': 'profession', 'c-employeur': 'employeur', 'c-tel': 'tel', 'c-tel2': 'tel2', 'c-email': 'email', 'c-adresse': 'adresse',
     'c-piece-num': 'piece_num', 'c-montant-total': 'montant_total', 'c-apport': 'apport',
     'c-duree': 'duree', 'c-date-debut': 'date_debut', 'c-date-souscription': 'date_souscription', 'c-type-logement': 'type_logement', 'c-surface': 'surface',
     'c-lat': 'lat', 'c-lng': 'lng', 'c-commune': 'commune',
@@ -32024,6 +32031,7 @@ function fillClientForm(c) {
     if (id === 'c-date-souscription') { el.value = c.date_souscription || c.date_debut || c.created_at || ''; return; }
     el.value = c[map[id]] || '';
   });
+  clientTelIndice('c-tel','c-tel-hint'); clientTelIndice('c-tel2','c-tel2-hint');
   var cGeoStatut = document.getElementById('c-geoloc-statut');
   if (cGeoStatut) cGeoStatut.textContent = c.geoloc_at ? ('✅ Position GPS capturée le '+dateShort(c.geoloc_at)) : '';
   setSelectValue('c-matrimonial', c.matrimonial);
@@ -32249,6 +32257,16 @@ async function saveClient() {
   var nom = document.getElementById('c-nom').value.trim();
   var tel = document.getElementById('c-tel').value.trim();
   if (!nom || !tel) { toast('Nom et téléphone obligatoires.', 'error'); return; }
+  /* Numéros : ivoirien (10 chiffres) ou international (+indicatif). Un numéro
+     déjà enregistré et non modifié n'est jamais bloqué (anciennes fiches). */
+  var tel2 = ((document.getElementById('c-tel2') || {}).value || '').trim();
+  var _exTel = APP.editingId ? (DATA.clients.find(function(x){ return x.id === APP.editingId; }) || {}) : {};
+  var _aTel = telAnalyser(tel), _aTel2 = telAnalyser(tel2);
+  if (!_aTel.valide && tel !== (_exTel.tel || '')) { toast('Téléphone 1 : ' + _aTel.message, 'error'); return; }
+  if (tel2 && !_aTel2.valide && tel2 !== (_exTel.tel2 || '')) { toast('Téléphone 2 : ' + _aTel2.message, 'error'); return; }
+  if (_aTel.valide && _aTel2.valide && _aTel.e164 === _aTel2.e164) { toast('Téléphone 1 et Téléphone 2 sont identiques : laissez le second vide ou saisissez un autre numéro.', 'error'); return; }
+  if (_aTel.valide && tel !== (_exTel.tel || '')) tel = _aTel.stockage;
+  if (tel2 && _aTel2.valide && tel2 !== (_exTel.tel2 || '')) tel2 = _aTel2.stockage;
 
   // ── Validation : commercial OU apporteur obligatoire ──────────────────────
   var commId = document.getElementById('c-commercial') ? document.getElementById('c-commercial').value : '';
@@ -32296,6 +32314,7 @@ async function saveClient() {
     profession: document.getElementById('c-profession').value,
     employeur: document.getElementById('c-employeur').value,
     tel: tel,
+    tel2: tel2,
     email: document.getElementById('c-email').value,
     adresse: document.getElementById('c-adresse').value,
     piece_type: document.getElementById('c-piece-type').value,
@@ -32564,7 +32583,7 @@ function renderClients() {
   var idxAp = {}; DATA.apporteurs.forEach(function(a){ idxAp[a.id] = a; });
 
   var list = scopeFiltrer(DATA.clients, 'programme_id').filter(function(c) {
-    var match = !search || (c.nom + ' ' + c.prenoms + ' ' + c.tel + ' ' + (c.email || '')).toLowerCase().indexOf(search) !== -1;
+    var match = !search || (c.nom + ' ' + c.prenoms + ' ' + c.tel + ' ' + (c.tel2 || '') + ' ' + (c.email || '')).toLowerCase().indexOf(search) !== -1;
     var prog = !filterProg || c.programme_id === filterProg;
     var stand = !filterStand || c.standing === filterStand;
     var ca = true;
@@ -32731,6 +32750,72 @@ function setVueClients(v) {
    ressembler à un doublon sans en être un. Réutilise la normalisation/
    similarité de noms du module de criblage LBC/FT (sfcNormalise/sfcSimilarite)
    pour éviter de dupliquer cette logique. ═══════════════════════════════ */
+/* ═══ NUMÉROS DE TÉLÉPHONE — format ivoirien ET international ═══════════
+   Ivoirien (plan de numérotation à 10 chiffres depuis 2021) : 10 chiffres,
+   avec ou sans +225 / 00225 devant (07 12 34 56 78, +225 07 12 34 56 78).
+   International : indicatif pays obligatoire, précédé de + ou 00
+   (+33 6 12 34 56 78, 0033 6 12 34 56 78) — 8 à 15 chiffres au total (E.164).
+   Stockage : ivoirien = 10 chiffres sans espace (comme avant, compatible avec
+   l'existant) ; international = +indicatif+numéro sans espace. */
+function telAnalyser(v) {
+  var brut = String(v == null ? '' : v).trim();
+  if (!brut) return { vide:true, valide:false, message:'' };
+  var compact = brut.replace(/[\s.\-()\/]/g, '');
+  if (/[^0-9+]/.test(compact) || (compact.indexOf('+') > 0) || (compact.match(/\+/g) || []).length > 1)
+    return { valide:false, message:'Caractères non autorisés : utilisez uniquement des chiffres, des espaces et un + initial.' };
+  var intl = compact.charAt(0) === '+' || compact.indexOf('00') === 0;
+  var d = compact.replace(/\D/g, '');
+  if (compact.indexOf('00') === 0) d = d.slice(2);
+  var repete = function(x){ return /^(\d)\1+$/.test(x); };
+  if (!intl && d.length === 13 && d.indexOf('225') === 0) { intl = true; }   /* 225… saisi sans + */
+  if (!intl) {
+    if (d.length === 10) {
+      if (repete(d)) return { valide:false, message:'Numéro impossible (chiffre répété).' };
+      return { valide:true, pays:'CI', national:d, stockage:d, e164:'+225' + d, wa:'225' + d,
+               affichage:d.replace(/(\d{2})(?=\d)/g, '$1 ').trim() };
+    }
+    if (d.length === 8) return { valide:false, message:'Ancien format ivoirien à 8 chiffres : le numéro doit comporter 10 chiffres (préfixe 01, 05, 07, 21, 25, 27…).' };
+    return { valide:false, message:'Numéro ivoirien : 10 chiffres attendus (ex. 07 12 34 56 78). Pour un numéro étranger, commencez par + et l\'indicatif pays (ex. +33…).' };
+  }
+  if (d.indexOf('225') === 0) {
+    var nat = d.slice(3);
+    if (nat.length !== 10) return { valide:false, message:'Numéro +225 : 10 chiffres attendus après l\'indicatif (ex. +225 07 12 34 56 78).' };
+    if (repete(nat)) return { valide:false, message:'Numéro impossible (chiffre répété).' };
+    return { valide:true, pays:'CI', national:nat, stockage:nat, e164:'+225' + nat, wa:'225' + nat,
+             affichage:nat.replace(/(\d{2})(?=\d)/g, '$1 ').trim() };
+  }
+  if (d.length < 8 || d.length > 15 || d.charAt(0) === '0')
+    return { valide:false, message:'Numéro international : indicatif pays puis numéro, 8 à 15 chiffres au total (ex. +33 6 12 34 56 78).' };
+  if (repete(d)) return { valide:false, message:'Numéro impossible (chiffre répété).' };
+  return { valide:true, pays:'INT', stockage:'+' + d, e164:'+' + d, wa:d, affichage:_telAffichageIntl(d) };
+}
+/* Découpe indicatif pays / numéro pour l'affichage (+33 6 12 34 56 78). */
+function _telAffichageIntl(d) {
+  var deux = ',20,27,30,31,32,33,34,36,39,40,41,43,44,45,46,47,48,49,51,52,53,54,55,56,57,58,60,61,62,63,64,65,66,81,82,84,86,90,91,92,93,94,95,98,';
+  var n = (d.charAt(0) === '1' || d.charAt(0) === '7') ? 1 : (deux.indexOf(',' + d.slice(0, 2) + ',') !== -1 ? 2 : 3);
+  var reste = d.slice(n), tete = reste.length % 2, g = [];
+  if (tete) g.push(reste.slice(0, tete));
+  for (var i = tete; i < reste.length; i += 2) g.push(reste.slice(i, i + 2));
+  return '+' + d.slice(0, n) + ' ' + g.join(' ');
+}
+/* Numéro affichable (document, liste) : formaté si reconnu, tel quel sinon. */
+function telAffichage(v) { var a = telAnalyser(v); return a.valide ? a.affichage : String(v == null ? '' : v); }
+/* Numéro pour wa.me : chiffres avec indicatif pays (225 par défaut pour un numéro national). */
+function telWhatsApp(v) {
+  var a = telAnalyser(v);
+  if (a.valide) return a.wa;
+  var d = String(v == null ? '' : v).replace(/\D/g, '');
+  return (d.indexOf('225') !== 0 && d.length <= 10) ? '225' + d : d;
+}
+/* Indication en direct sous le champ du formulaire. */
+function clientTelIndice(inputId, hintId) {
+  var el = document.getElementById(inputId), h = document.getElementById(hintId); if (!el || !h) return;
+  var a = telAnalyser(el.value);
+  if (a.vide) { h.textContent = ''; return; }
+  if (!a.valide) { h.style.color = '#DC2626'; h.textContent = '⚠️ ' + a.message; return; }
+  h.style.color = '#0E9F6E';
+  h.textContent = (a.pays === 'CI' ? '✅ Numéro ivoirien : ' : '🌍 Numéro international : ') + a.affichage;
+}
 function _cdNormPhone(t) { return (t || '').toString().replace(/[^0-9]/g, '').replace(/^00225/, '').replace(/^225/, '').replace(/^0+/, ''); }
 /* [Détection] Numéro structurellement impossible — distinct d'un doublon
    (deux fiches qui PARTAGENT un numéro). Ici une seule fiche suffit : le
@@ -32744,10 +32829,7 @@ function _cdNormPhone(t) { return (t || '').toString().replace(/[^0-9]/g, '').re
    total avant ce correctif. */
 function _telChiffres(t) { return (t || '').toString().replace(/[^0-9]/g, ''); }
 function _telInvalide(t) {
-  var n = _telChiffres(t);
-  if (n.length !== 10) return true;
-  if (/^(\d)\1{9}$/.test(n)) return true;
-  return false;
+  return !telAnalyser(t).valide;
 }
 function _clientsTelInvalidesListe() {
   return (DATA.clients || []).filter(function(c){ return c.statut !== 'resilie' && _telInvalide(c.tel); });
@@ -46012,7 +46094,7 @@ function openRelanceModal(clientId) {
     + '<textarea class="form-control" id="relance-msg" style="min-height:100px;">' + msgSMS + '</textarea></div>'
     + '<div style="display:flex;gap:10px;margin-top:12px;">'
     + '<a class="btn btn-secondary btn-sm" href="sms:' + client.tel + '" target="_blank">📱 Ouvrir SMS</a>'
-    + '<a class="btn btn-secondary btn-sm" href="https://wa.me/225' + client.tel.replace(/[\s+\-()]/g,'') + '?text=' + encodeURIComponent(msgSMS) + '" target="_blank">💬 WhatsApp</a>'
+    + '<a class="btn btn-secondary btn-sm" href="https://wa.me/' + telWhatsApp(client.tel) + '?text=' + encodeURIComponent(msgSMS) + '" target="_blank">💬 WhatsApp</a>'
     + '</div>';
 
   document.getElementById('relance-body').innerHTML = body;
@@ -79113,8 +79195,7 @@ function envoyerSMSClient() {
 function envoyerWhatsAppClient() {
   var c = DATA.clients.find(function(x){ return x.id === APP.editingId; });
   if (!c||!c.tel) { toast('Numéro de téléphone manquant.','error'); return; }
-  var tel   = c.tel.replace(/[\s\-\/\+]/g,'');
-  if (!tel.startsWith('225') && tel.length <= 10) tel = '225' + tel;
+  var tel   = telWhatsApp(c.tel);
   var prog  = DATA.programmes.find(function(p){ return p.id===c.programme_id; })||{nom:'votre programme'};
   var texte = 'Bonjour ' + c.prenoms + ' ' + c.nom + ',\n\nNous vous contactons au sujet de votre dossier *' + (c.dossier||'N/A') + '* — Programme *' + prog.nom + '*.\n\nCordialement,\n*' + (DATA.params.societe||'ImmoSuite ERP') + '*';
   window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(texte), '_blank');
@@ -88622,7 +88703,7 @@ function _docsFicheSouscriptionHTML(d) {
     + row('Nom et prénoms', d.nom) + row('N° de dossier', c.dossier || c.id)
     + row('Date de naissance', c.ddn ? dateShort(c.ddn) : '') + row('Nationalité', c.nationalite)
     + row('Situation matrimoniale', matLbl) + row('Profession', c.profession) + row('Employeur', c.employeur)
-    + row('Pièce d\'identité', d.piece) + row('Téléphone', c.tel) + row('Email', c.email) + row('Adresse', c.adresse)
+    + row('Pièce d\'identité', d.piece) + row('Téléphone 1', telAffichage(c.tel)) + row('Téléphone 2', c.tel2 ? telAffichage(c.tel2) : '') + row('Email', c.email) + row('Adresse', c.adresse)
     + '</table>';
   h += '<h3>2. Informations sur le/la conjoint(e)</h3>';
   if (marie && cj) {
@@ -109043,7 +109124,7 @@ function crecOpenRelance(id) {
     + '<div class="form-group"><label>Message SMS / WhatsApp</label><textarea class="form-control" id="crec-relance-msg" style="min-height:110px;">' + msg + '</textarea></div>'
     + '<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
     + (tel ? '<a class="btn btn-secondary btn-sm" href="sms:' + tel + '">📱 SMS</a>'
-          + '<a class="btn btn-secondary btn-sm" target="_blank" href="https://wa.me/225' + tel.replace(/[\s+\-()]/g, '') + '?text=' + encodeURIComponent(msg) + '">💬 WhatsApp</a>' : '<span style="color:var(--rouge);font-size:12px;">Aucun téléphone enregistré.</span>')
+          + '<a class="btn btn-secondary btn-sm" target="_blank" href="https://wa.me/' + telWhatsApp(tel) + '?text=' + encodeURIComponent(msg) + '">💬 WhatsApp</a>' : '<span style="color:var(--rouge);font-size:12px;">Aucun téléphone enregistré.</span>')
     + '</div>';
   document.getElementById('crec-relance-body').innerHTML = body;
   document.getElementById('crec-relance-niv').value = String(niv);
