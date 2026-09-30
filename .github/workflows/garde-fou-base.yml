@@ -1,0 +1,20 @@
+name: Garde-fou base de données (Zahara)
+
+# Bloque toute fusion ou tout commit qui ferait pointer ce dépôt vers la base
+# Supabase d'une autre entreprise (pxwgefdxgrskusjbzrxz).
+on:
+  push:
+  pull_request:
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuser la référence à la base de l'autre entreprise
+        run: |
+          if grep -rIl --exclude-dir=.git --exclude-dir=node_modules --exclude=garde-fou-base.yml "pxwgefdxgrskusjbzrxz" .; then
+            echo "::error::Référence à la base Supabase d'une autre entreprise (pxwgefdxgrskusjbzrxz) détectée dans les fichiers ci-dessus."
+            exit 1
+          fi
+          echo "OK : aucune référence à la base d'une autre entreprise."
