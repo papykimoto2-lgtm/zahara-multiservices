@@ -18389,6 +18389,11 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <label>Description</label>
           <textarea class="form-control" id="p-description"></textarea>
         </div>
+        <div class="form-group span-2">
+          <label>Rappel du cahier des charges du programme (encadré de la fiche de souscription)</label>
+          <textarea class="form-control" id="p-rappel-cgv" rows="6" placeholder="Laissé vide : seules les conditions générales du promoteur sont rappelées."></textarea>
+          <button type="button" class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="programmeInsererModeleCgv()">📋 Insérer le modèle « cahier des charges Cité Maphouet »</button>
+        </div>
         <div class="form-group span-2" style="border-top:1px solid var(--bord);padding-top:14px;margin-top:4px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <label style="margin-bottom:0;">📎 Documents du programme (cahier des charges, plan de situation…)</label>
@@ -35893,6 +35898,7 @@ function openProgrammeModal(id) {
     document.getElementById('p-nb-lots').value = p.nbLots || p.nb_lots || 0;
     var _pp = document.getElementById('p-publier-portail'); if (_pp) _pp.value = p.publier_portail ? 'oui' : 'non';
     document.getElementById('p-description').value = p.description || '';
+    var _rc = document.getElementById('p-rappel-cgv'); if (_rc) _rc.value = p.rappel_cgv || '';
     document.getElementById('p-date-lancement').value = p.dateLancement || p.date_lancement || '';
     document.getElementById('p-date-livraison').value = p.dateLivraison || p.date_livraison || '';
     setSelectValue('p-statut', p.statut);
@@ -35945,7 +35951,7 @@ function _progPopulateParcelles() {
 }
 
 function clearProgrammeForm() {
-  ['p-nom','p-localisation','p-nb-lots','p-date-lancement','p-date-livraison','p-description'].forEach(function(id) {
+  ['p-nom','p-localisation','p-nb-lots','p-date-lancement','p-date-livraison','p-description','p-rappel-cgv'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -35970,6 +35976,7 @@ async function saveProgramme() {
     nature: (document.getElementById('p-nature')||{}).value || 'construction',
     date_lancement: document.getElementById('p-date-lancement').value,
     date_livraison: document.getElementById('p-date-livraison').value,
+    rappel_cgv: ((document.getElementById('p-rappel-cgv') || {}).value || '').trim(),
     parcelle_id: document.getElementById('p-parcelle-id').value,
     division_id: (document.getElementById('p-division')||{}).value || '',
     pct_honoraires_tech: parseFloat(document.getElementById('p-pct-honoraires-tech').value) || 0,
@@ -88641,6 +88648,31 @@ CDC_DEFAULTS.engagement_acquisition =
   + "3. Je reconnais que tout désistement de ma part est régi par les conditions de résiliation du promoteur{conditions_resiliation}.\n"
   + "4. Le présent engagement est ferme et irrévocable : je ne peux le rétracter ni le modifier unilatéralement. Il est établi en deux exemplaires originaux, dont un m'est remis.";
 CDC_DEFAULTS.rappel_cgv = '';
+/* Modèle de résumé du cahier des charges de l'ensemble immobilier « Cité Maphouet »
+   (acte notarié). Proposé à l'insertion depuis la fiche Programme : le texte reste
+   modifiable par programme, et un lotissement sans texte n'affiche rien de tel.
+   C'est un RÉSUMÉ : le cahier des charges intégral fait foi. */
+var CDC_MODELE_CGV_MAPHOUET =
+  "Résumé du cahier des charges de l'ensemble immobilier (le texte intégral remis à l'acquéreur fait foi) :\n"
+  + "• Destination : maisons individuelles à usage de résidence principale ou secondaire ; toute activité commerciale ou artisanale est interdite, sauf dans les locaux prévus à cet effet.\n"
+  + "• Constructions : l'esthétique d'ensemble doit être maintenue. Toute construction ou extension respecte les modules d'extension du promoteur et est visée par l'Association des copropriétaires avant le dépôt de la demande d'autorisation. Surélévation limitée à un étage sur rez-de-chaussée ; aucune construction en zone non aedificandi.\n"
+  + "• Clôture : chaque propriétaire clôture sa parcelle dans les 6 mois suivant la vente ou la remise des clés ; le mur d'enceinte de la cité est commun et entretenu par tous.\n"
+  + "• Entretien : le logement est maintenu en bon état extérieur ; l'Association peut y pourvoir aux frais du propriétaire défaillant.\n"
+  + "• Jardins et espaces verts : jardins d'agrément uniquement (pas de cultures potagères) ; espaces verts à respecter, sans dépôt d'ordures ni sortie de garage.\n"
+  + "• Parcelles : toute subdivision est interdite ; la réunion de deux parcelles est libre mais ne permet pas de modifier l'aspect extérieur des maisons.\n"
+  + "• Vie commune : linge étendu uniquement à l'arrière et de façon discrète ; usage discret des appareils sonores.\n"
+  + "• Charges : entretien des équipements communs, voiries et réseaux réparti entre les propriétaires selon les millièmes de leur lot ; appels de fonds par le syndic, provision en début d'exercice ; gardiennage de la cité à la charge des propriétaires (et locataires).\n"
+  + "• Charges impayées : 30 jours après mise en demeure par lettre recommandée, le propriétaire perd la jouissance des services de l'Association ; intérêts de 10 % par mois ; hypothèque forcée sur le lot.\n"
+  + "• Assurances : assurance incendie et dégâts des eaux obligatoire, avec clause de recours des voisins ; responsabilité civile couverte collectivement par l'Association.\n"
+  + "• Location : le propriétaire impose le cahier des charges à son locataire, qui contribue aussi aux charges.\n"
+  + "• Impôts : à la charge de l'acquéreur dès l'entrée en jouissance ; déclaration foncière annuelle.\n"
+  + "• Revente : le vendeur impose à son acquéreur de prendre sa place dans l'Association et en informe le syndic 15 jours avant la signature.\n"
+  + "• Association des copropriétaires : tout propriétaire en est membre de plein droit.";
+function programmeInsererModeleCgv() {
+  var el = document.getElementById('p-rappel-cgv'); if (!el) return;
+  if (el.value.trim() && !confirm('Remplacer le texte actuel par le modèle « cahier des charges Cité Maphouet » ?')) return;
+  el.value = CDC_MODELE_CGV_MAPHOUET;
+}
 
 /* Rappel des conditions générales : surcharge éventuelle, sinon les
    conditions de souscription + autres conditions du cahier des charges. */
@@ -88728,7 +88760,11 @@ function _docsFicheSouscriptionHTML(d) {
     + '</table>';
   h += '<div style="border:2px solid #1D4ED8;border-radius:6px;padding:10px 14px;margin:16px 0;background:#F5F8FF;page-break-inside:avoid;">'
     + '<div style="font-weight:700;color:#1D4ED8;margin-bottom:4px;">📌 Rappel des conditions générales du promoteur</div>'
-    + _cdcPara(_rappelCgvTexte()) + '</div>';
+    + _cdcPara(_rappelCgvTexte())
+    + ((d.prog && d.prog.rappel_cgv && String(d.prog.rappel_cgv).trim())
+        ? '<div style="font-weight:700;margin-top:8px;">Cahier des charges du programme « ' + escHtml(d.prog.nom || '') + ' »</div>' + _cdcPara(String(d.prog.rappel_cgv).trim())
+        : '')
+    + '</div>';
   h += '<div class="etat-signatures"><div><div class="etat-sign-line">Le souscripteur (lu et approuvé)</div></div>'
     + '<div><div class="etat-sign-line">Pour ' + e(_identiteSociete().nom || 'le promoteur') + '</div></div></div>';
   return h;
