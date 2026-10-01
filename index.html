@@ -25420,12 +25420,50 @@ function saveIAConfig() {
    volontaire est respecté (voir getSBConfig). */
 var SB_URL_DEFAUT = '';
 var SB_KEY_DEFAUT = '';
+function _sbNormUrl(u) { return String(u || '').trim().replace(/\/+$/, '').toLowerCase(); }
+/* Cohérence poste / base. Les données locales (IndexedDB) et les réglages
+   mémorisés d'un poste doivent venir de la base de CETTE installation. On
+   retient la base d'origine (sb_origine) ; si le poste a été relié à une autre
+   base (réglage mémorisé ou origine différente), on propose de le
+   réinitialiser : effacement des données locales puis rechargement depuis la
+   bonne base. Tant que ce n'est pas fait, la synchronisation est coupée pour
+   ne rien mélanger. */
+function _sbVerifierCoherence() {
+  if (!SB_URL_DEFAUT) return;
+  var dep = _sbNormUrl(SB_URL_DEFAUT);
+  var stocke = _sbNormUrl(localStorage.getItem('sb_url'));
+  var origine = _sbNormUrl(localStorage.getItem('sb_origine'));
+  var etranger = (stocke && stocke !== dep) || (origine && origine !== dep);
+  if (!etranger) { if (!origine) localStorage.setItem('sb_origine', dep); return; }
+  if (confirm("Ce poste était relié à une AUTRE base de données que celle de cette installation.\n\n"
+    + "Pour protéger vos données, il doit être réinitialisé : les données enregistrées localement sur ce poste seront effacées, "
+    + "puis rechargées depuis la bonne base. Rien n'est supprimé sur le serveur.\n\nRéinitialiser maintenant ?")) {
+    _sbReinitialiserPoste();
+  } else {
+    window._sbBloque = true;
+    alert("Synchronisation désactivée sur ce poste tant qu'il n'est pas réinitialisé. Rechargez la page pour y revenir.");
+  }
+}
+function _sbReinitialiserPoste() {
+  try {
+    Object.keys(localStorage).forEach(function(k){
+      if (/^(sb_|sync_)/.test(k) || k === 'company_logo') { try { localStorage.removeItem(k); } catch(e){} }
+    });
+  } catch(e){}
+  var fini = false, terminer = function(){ if (fini) return; fini = true; location.reload(); };
+  try {
+    var req = indexedDB.deleteDatabase(typeof DB_NAME !== 'undefined' ? DB_NAME : 'ImmoSuiteDB');
+    req.onsuccess = terminer; req.onerror = terminer; req.onblocked = terminer;
+  } catch(e) { terminer(); }
+  setTimeout(terminer, 2500);
+}
 (function _sbDefautsDepuisEcranConfig(){
   function lire(){
     var u=document.getElementById('cfg-url'), k=document.getElementById('cfg-key');
     var vu=u?String(u.value||'').trim():'', vk=k?String(k.value||'').trim():'';
     if(/^https?:\/\/[^ ]+\.supabase\.co\/?$/i.test(vu)) SB_URL_DEFAUT=vu;
     if(vk.length>20) SB_KEY_DEFAUT=vk;
+    try { _sbVerifierCoherence(); } catch(e) { console.warn('[Cohérence base]', e); }
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',lire);
   else lire();
@@ -25531,6 +25569,12 @@ function getSBConfig() {
      (ex. la clé collée par erreur dans le champ URL), on ignore les valeurs
      sauvegardées. */
   if (!/^https?:\/\/[^ ]+\.supabase\.co\/?$/i.test(u)) { u = ''; k = ''; }
+  /* [PROTECTION ENTREPRISES] Un poste ne doit JAMAIS rester relié à la base d'une
+     autre entreprise. Si l'adresse mémorisée localement diffère de celle de
+     CETTE installation, elle est ignorée : le projet du déploiement l'emporte.
+     (Cas réel : un poste ouvert pendant l'incident du 28/09 avait mémorisé la
+     base d'une autre société et y restait relié après la correction.) */
+  if (u && SB_URL_DEFAUT && _sbNormUrl(u) !== _sbNormUrl(SB_URL_DEFAUT)) { u = ''; k = ''; }
   /* Repli sur le projet du déploiement quand aucun réglage n'a été saisi : la
      synchro est active sans configuration poste par poste. Le mode local reste
      possible, mais seulement s'il a été CHOISI (« Continuer sans Supabase » ou
@@ -25541,6 +25585,8 @@ function getSBConfig() {
   }
   SB.url = u.replace(/\/+$/, '');
   SB.key = k;
+  /* Poste en attente de réinitialisation (données d'une autre base) : aucune synchro. */
+  if (window._sbBloque) { SB.url = ''; SB.key = ''; }
 }
 
 /* Récupère un utilisateur partagé depuis Supabase par identifiant (auth multi-appareils) */
