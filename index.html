@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.113 · 2026-10-01 — Résiliation à taux libre et conditions paramétrables, fiche de souscription + engagement d\'acquisition, 2 téléphones (CI/international), réglages partagés entre postes, protection contre le mélange des bases. Précédemment : v14.112 · 2026-08-31 — Session majeure : (1) Souscripteurs multi-lots sur un même programme avec échéancier/montant combiné unique (client.lot_ids, client.lot_id conservé comme lot principal pour compatibilité) ; (2) Surface relevée manuellement sur la fiche Lot et surface souscrite sur la fiche Souscripteur, comparées en direct à la surface au plan/aux lots rattachés ; (3) Nouveau module Budget : Compte d\'exploitation prévisionnel (Budget vs Réel comptable, mensualisé, par division), masque de saisie simplifié façon business-plan (24 rubriques dont 11 propres à l\'immobilier, lignes personnalisables), diagnostic de viabilité (résultat + trésorerie cumulée) ; (4) Cockpit étendu au Budget et au Parc Auto (file d\'actions + Pouls de santé) ; (5) Audit de synchronisation : 4 stores écrits/synchronisés mais jamais rechargés corrigés (declarations_versement_financier invisible sur tout autre poste, audit_log, cout_gestion_exercices, conflits_sync) ; (6) 4 sélecteurs de lots (souscription, lots supplémentaires, simulateur fiscal, livraison) désormais rafraîchis après création d\'un lot, localement et après synchro cloud ; (7) Correctif charge Supabase : pull de secours espacé de 60 s à ~6 min (Realtime reste le canal principal) suite à saturation du compute observée le 31/08 (527k requêtes/24h sur instance Nano) ; (8) Parc Auto : bouton "Actualiser les données" + badge "Hors ligne" cliquable avec diagnostic de la cause probable (projet en pause/clé invalide, jamais un vrai bug CORS).';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.115 · 2026-10-03 — Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -25447,7 +25447,7 @@ function _sbVerifierCoherence() {
 function _sbReinitialiserPoste() {
   try {
     Object.keys(localStorage).forEach(function(k){
-      if (/^(sb_|sync_)/.test(k) || k === 'company_logo') { try { localStorage.removeItem(k); } catch(e){} }
+      if (/^(sb_|sync_)/.test(k) || k === 'company_logo' || k === 'immosuite_tombstones') { try { localStorage.removeItem(k); } catch(e){} }
     });
   } catch(e){}
   var fini = false, terminer = function(){ if (fini) return; fini = true; location.reload(); };
@@ -26208,6 +26208,10 @@ async function syncToSupabase(table, obj, opts) {
         var _oD = (_oRb && _oRb.date) || '', _rD = _rRb.date || '';
         if (!_oRb || (!_oD || _rD > _oD)) obj.reset_broadcast = _rRb;
       }
+      /* Signal de remise à niveau des tombstones : publié uniquement côté
+         serveur, jamais tenu par un poste — on recopie toujours la valeur
+         distante pour que l'upsert (colonne JSON entière) ne l'efface pas. */
+      if (_remoteParams && _remoteParams.purge_tombstones) obj.purge_tombstones = _remoteParams.purge_tombstones;
     } catch(e) { /* offline/erreur réseau → on pousse tel quel, le pull dédié rattrapera au prochain cycle */ }
   }
 
@@ -27751,7 +27755,7 @@ var PARAMS_PARTAGES = [
    Règle désormais : tout réglage est partagé, sauf les marqueurs techniques,
    le plan comptable (fusion dédiée) et les clés secrètes (clé API, jeton,
    mot de passe), qui restent propres au poste. */
-var PARAMS_LOCAUX_RE = /^(id|params_maj|reset_broadcast|plan_comptable_.*|_.*|.*(api_key|secret|token|password|pwd).*)$/i;
+var PARAMS_LOCAUX_RE = /^(id|params_maj|reset_broadcast|purge_tombstones|plan_comptable_.*|_.*|.*(api_key|secret|token|password|pwd).*)$/i;
 function _paramPartage(k) { return !PARAMS_LOCAUX_RE.test(String(k)); }
 
 function _paramsToucher() {
@@ -27958,10 +27962,21 @@ async function _appliquerLignesPullTable(table, store, rows) {
   if (!DATA[store]) DATA[store] = [];
   var byId = {};
   DATA[store].forEach(function(x){ if (x && x.id !== undefined) byId[String(x.id)] = x; });
+  /* [INCIDENT 03/10] Un tombstone LOCAL (localStorage, posé par une remise à
+     zéro locale ou par l'application d'un ordre diffusé) ne doit jamais
+     effacer le cloud : seul le registre PARTAGÉ (pi_suppressions, une
+     suppression réellement voulue et propagée) y est autorisé. Avant, une
+     « remise à zéro locale — Supabase conservé » vidait Supabase dès le pull
+     suivant, puis chaque poste recevant l'ordre en faisait autant. */
+  var _tsPartages = {};
+  (DATA.suppressions_sync || []).forEach(function(t){ if (t && t.store === store && t.record_id !== undefined) _tsPartages[String(t.record_id)] = true; });
   for (var j = 0; j < rows.length; j++) {
     var r = _supaUnwrap(table, rows[j]);
     if (!r || r.id === undefined) continue;
-    if (typeof tombHas === 'function' && tombHas(store, r.id)) { try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, r.id); } catch(e){} continue; }
+    if (typeof tombHas === 'function' && tombHas(store, r.id)) {
+      if (_tsPartages[String(r.id)]) { try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, r.id); } catch(e){} }
+      continue;
+    }
     var ex = byId[String(r.id)];
     if (_remoteWins(r, ex)) {
       byId[String(r.id)] = r;
@@ -28083,6 +28098,38 @@ async function _syncUsersSeul(){
   return n;
 }
 
+/* ═══ REMISE À NIVEAU DES TOMBSTONES (incident du 03/10) ═══
+   Les marques de suppression d'un poste (cache localStorage + registre
+   suppressions_sync en IndexedDB) ne se purgent jamais : retirer une marque
+   du cloud ne suffit donc pas à faire réapparaître un enregistrement
+   restauré — chaque poste continuait de le cacher, voire de le re-supprimer.
+   Un signal daté publié dans pi_params (purge_tombstones = {id, date}) fait
+   vider ces marques locales UNE fois par poste ; la phase 0 du pull les
+   recharge aussitôt depuis pi_suppressions, qui redevient la seule référence. */
+var PURGE_TOMB_KEY = 'immosuite_purge_tomb_appliquee';
+async function _appliquerPurgeTombstones() {
+  var rows = await sbFetch('pi_params?id=eq.main&select=*', 'GET');
+  var p = (rows && rows.length) ? _supaUnwrap('pi_params', rows[0]) : null;
+  var ordre = p && p.purge_tombstones;
+  if (!ordre || !ordre.id) return false;
+  var lu = ''; try { lu = localStorage.getItem(PURGE_TOMB_KEY) || ''; } catch(e){}
+  if (lu === String(ordre.id)) return false;                     /* déjà appliqué ici */
+
+  try { if (typeof tombClear === 'function') tombClear(); } catch(e){}
+  var locaux = []; try { locaux = await dbGetAll('suppressions_sync'); } catch(e){}
+  for (var i = 0; i < locaux.length; i++) {
+    if (locaux[i] && locaux[i].id !== undefined) { try { await dbDelete('suppressions_sync', locaux[i].id); } catch(e){} }
+  }
+  DATA.suppressions_sync = [];
+  /* Ne pas renvoyer au cloud d'anciennes marques encore en attente d'envoi */
+  Object.keys(_dirtySync).forEach(function(k){ if (k.indexOf('suppressions_sync|') === 0) delete _dirtySync[k]; });
+  try { _outboxWrite(_outboxRead().filter(function(e){ return !e || e.table !== 'pi_suppressions'; })); } catch(e){}
+
+  try { localStorage.setItem(PURGE_TOMB_KEY, String(ordre.id)); } catch(e){}
+  console.log('[Sync] Remise à niveau des suppressions appliquée (' + locaux.length + ' marque(s) locale(s) retirée(s)).');
+  return true;
+}
+
 async function pullFromCloudSilent() {
   if (!navigator.onLine) return;
   getSBConfig();
@@ -28098,6 +28145,7 @@ async function pullFromCloudSilent() {
        re-supprimée par _appliquerSuppressionsSync() en fin de cycle :
        fenêtre de réapparition à l'écran, et risque de re-push si le poste
        la marquait « dirty » entre-temps. */
+    try { await _appliquerPurgeTombstones(); } catch(e) { console.warn('[Sync] Remise à niveau des suppressions', e); }
     try {
       var supRows = await sbFetch('pi_suppressions?select=*', 'GET');
       if (supRows && supRows.length) {
@@ -48221,6 +48269,11 @@ async function _appliquerResetBroadcast() {
   var b = DATA.params && DATA.params.reset_broadcast;
   if (!b || !b.id || !Array.isArray(b.stores) || !b.stores.length) return 0;
   if (_resetBroadcastLu() === String(b.id)) return 0;          /* déjà appliqué ici */
+  /* [INCIDENT 03/10] Ordre émis SANS nettoyage Supabase : les données restent
+     au cloud, la purge locale n'aurait aucun effet durable — et les
+     tombstones qu'elle posait faisaient effacer le cloud au pull suivant.
+     On l'ignore (marqué comme lu pour ne pas le réévaluer). */
+  if (!b.cloud) { _resetBroadcastMarquer(b.id); return 0; }
 
   var limite = b.date || '';
   var total = 0, detail = [];
@@ -48321,6 +48374,11 @@ async function executerReset() {
       var all = await dbGetAll(store).catch(function(){ return []; });
       nb = all.length;
       for (var j=0; j<all.length; j++) {
+        /* [INCIDENT 03/10] Remise à zéro LOCALE (Supabase conservé) : aucun
+           tombstone. Ils étaient poussés dans pi_suppressions puis appliqués
+           par tous les postes, qui effaçaient alors le cloud — contrairement
+           à ce qu'annonce l'écran. Les données reviennent au prochain pull. */
+        if (!withCloud) { await dbDelete(store, all[j].id).catch(function(){}); continue; }
         try { if (typeof tombAdd==='function') tombAdd(store, all[j].id); } catch(e){}
         /* CORRECTIF : alimenter aussi le registre partagé/daté (suppressions_sync), pas seulement
            le cache local tombAdd() (non daté, jamais purgé). Sans ceci, un reset suivi d'une
