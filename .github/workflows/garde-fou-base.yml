@@ -1,7 +1,12 @@
 name: Garde-fou base de données (Zahara)
 
-# Bloque toute fusion ou tout commit qui ferait pointer ce dépôt vers la base
-# Supabase d'une autre entreprise (pxwgefdxgrskusjbzrxz).
+# Bloque toute fusion ou tout commit qui ferait pointer ce dépôt vers une autre
+# base Supabase que celle de Zahara (ilvusckdanwrckxqvhmr).
+#
+# Incident du 28/09 : la page d'une autre entreprise (adresse + clé MENCO) a été
+# collée dans index.html ; les postes Zahara ont alors mélangé les deux bases.
+# L'ancien contrôle ne connaissait que la base MENCO : on passe à une liste
+# blanche — seule la base de Zahara est acceptée, quelle que soit l'autre.
 on:
   push:
   pull_request:
@@ -11,10 +16,64 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Refuser la référence à la base de l'autre entreprise
+      - name: N'accepter que la base Supabase de Zahara
+        shell: python3 {0}
         run: |
-          if grep -rIl --exclude-dir=.git --exclude-dir=node_modules --exclude=garde-fou-base.yml --exclude=*.md "pxwgefdxgrskusjbzrxz" .; then
-            echo "::error::Référence à la base Supabase d'une autre entreprise (pxwgefdxgrskusjbzrxz) détectée dans les fichiers ci-dessus."
-            exit 1
-          fi
-          echo "OK : aucune référence à la base d'une autre entreprise."
+          import base64, json, os, re, sys
+
+          ZAHARA = "ilvusckdanwrckxqvhmr"
+          # Bases des autres entreprises de l'organisation : refusées même citées
+          # seules (sans « .supabase.co »), par exemple dans un réglage.
+          AUTRES = {
+              "pxwgefdxgrskusjbzrxz": "MENCO HOLDING",
+              "snphfuygvllbioaoyfkm": "beda-alu-erp",
+              "mglosevjadbvwurdrlsz": "sanix-factory-erp",
+              "xmmogualzmcisyddukms": "aluExpert",
+              "lzplxzmlasnezajcgqfa": "Espace Cyr",
+              "ixeuosnuiewjqoxoqtnj": "100% INOX",
+          }
+          CE_FICHIER = os.path.join(".github", "workflows", "garde-fou-base.yml")
+
+          re_url = re.compile(r"([a-z0-9]{20})\.supabase\.co")
+          re_jwt = re.compile(r"eyJ[A-Za-z0-9_-]+\.(eyJ[A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+")
+
+          def ref_du_jeton(charge):
+              try:
+                  charge += "=" * (-len(charge) % 4)
+                  return json.loads(base64.urlsafe_b64decode(charge)).get("ref")
+              except Exception:
+                  return None
+
+          erreurs = []
+          for racine, dossiers, fichiers in os.walk("."):
+              dossiers[:] = [d for d in dossiers if d not in (".git", "node_modules")]
+              for nom in fichiers:
+                  chemin = os.path.relpath(os.path.join(racine, nom))
+                  if nom.endswith(".md") or chemin == CE_FICHIER:
+                      continue
+                  try:
+                      with open(chemin, encoding="utf-8") as f:
+                          texte = f.read()
+                  except (UnicodeDecodeError, OSError):
+                      continue  # fichier binaire
+                  for ref in sorted(set(re_url.findall(texte)) - {ZAHARA}):
+                      erreurs.append(f"{chemin} : adresse d'une autre base ({ref}.supabase.co — {AUTRES.get(ref, 'base inconnue')})")
+                  for charge in set(re_jwt.findall(texte)):
+                      ref = ref_du_jeton(charge)
+                      if ref and ref != ZAHARA:
+                          erreurs.append(f"{chemin} : clé Supabase d'une autre base ({ref} — {AUTRES.get(ref, 'base inconnue')})")
+                  for ref, entreprise in AUTRES.items():
+                      if ref in texte:
+                          erreurs.append(f"{chemin} : référence à la base de {entreprise} ({ref})")
+
+          # Une adresse supprimée passerait inaperçue : la page principale doit
+          # toujours viser la base de Zahara.
+          with open("index.html", encoding="utf-8") as f:
+              if f"{ZAHARA}.supabase.co" not in f.read():
+                  erreurs.append(f"index.html : l'adresse de la base de Zahara ({ZAHARA}.supabase.co) est introuvable")
+
+          for e in sorted(set(erreurs)):
+              print(f"::error::{e}")
+          if erreurs:
+              sys.exit(1)
+          print("OK : seule la base Supabase de Zahara est référencée.")
