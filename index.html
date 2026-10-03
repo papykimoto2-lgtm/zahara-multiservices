@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.113 · 2026-10-01 — Résiliation à taux libre et conditions paramétrables, fiche de souscription + engagement d\'acquisition, 2 téléphones (CI/international), réglages partagés entre postes, protection contre le mélange des bases. Précédemment : v14.112 · 2026-08-31 — Session majeure : (1) Souscripteurs multi-lots sur un même programme avec échéancier/montant combiné unique (client.lot_ids, client.lot_id conservé comme lot principal pour compatibilité) ; (2) Surface relevée manuellement sur la fiche Lot et surface souscrite sur la fiche Souscripteur, comparées en direct à la surface au plan/aux lots rattachés ; (3) Nouveau module Budget : Compte d\'exploitation prévisionnel (Budget vs Réel comptable, mensualisé, par division), masque de saisie simplifié façon business-plan (24 rubriques dont 11 propres à l\'immobilier, lignes personnalisables), diagnostic de viabilité (résultat + trésorerie cumulée) ; (4) Cockpit étendu au Budget et au Parc Auto (file d\'actions + Pouls de santé) ; (5) Audit de synchronisation : 4 stores écrits/synchronisés mais jamais rechargés corrigés (declarations_versement_financier invisible sur tout autre poste, audit_log, cout_gestion_exercices, conflits_sync) ; (6) 4 sélecteurs de lots (souscription, lots supplémentaires, simulateur fiscal, livraison) désormais rafraîchis après création d\'un lot, localement et après synchro cloud ; (7) Correctif charge Supabase : pull de secours espacé de 60 s à ~6 min (Realtime reste le canal principal) suite à saturation du compute observée le 31/08 (527k requêtes/24h sur instance Nano) ; (8) Parc Auto : bouton "Actualiser les données" + badge "Hors ligne" cliquable avec diagnostic de la cause probable (projet en pause/clé invalide, jamais un vrai bug CORS).';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.114 · 2026-10-03 — Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -27958,10 +27958,21 @@ async function _appliquerLignesPullTable(table, store, rows) {
   if (!DATA[store]) DATA[store] = [];
   var byId = {};
   DATA[store].forEach(function(x){ if (x && x.id !== undefined) byId[String(x.id)] = x; });
+  /* [INCIDENT 03/10] Un tombstone LOCAL (localStorage, posé par une remise à
+     zéro locale ou par l'application d'un ordre diffusé) ne doit jamais
+     effacer le cloud : seul le registre PARTAGÉ (pi_suppressions, une
+     suppression réellement voulue et propagée) y est autorisé. Avant, une
+     « remise à zéro locale — Supabase conservé » vidait Supabase dès le pull
+     suivant, puis chaque poste recevant l'ordre en faisait autant. */
+  var _tsPartages = {};
+  (DATA.suppressions_sync || []).forEach(function(t){ if (t && t.store === store && t.record_id !== undefined) _tsPartages[String(t.record_id)] = true; });
   for (var j = 0; j < rows.length; j++) {
     var r = _supaUnwrap(table, rows[j]);
     if (!r || r.id === undefined) continue;
-    if (typeof tombHas === 'function' && tombHas(store, r.id)) { try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, r.id); } catch(e){} continue; }
+    if (typeof tombHas === 'function' && tombHas(store, r.id)) {
+      if (_tsPartages[String(r.id)]) { try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, r.id); } catch(e){} }
+      continue;
+    }
     var ex = byId[String(r.id)];
     if (_remoteWins(r, ex)) {
       byId[String(r.id)] = r;
@@ -48221,6 +48232,11 @@ async function _appliquerResetBroadcast() {
   var b = DATA.params && DATA.params.reset_broadcast;
   if (!b || !b.id || !Array.isArray(b.stores) || !b.stores.length) return 0;
   if (_resetBroadcastLu() === String(b.id)) return 0;          /* déjà appliqué ici */
+  /* [INCIDENT 03/10] Ordre émis SANS nettoyage Supabase : les données restent
+     au cloud, la purge locale n'aurait aucun effet durable — et les
+     tombstones qu'elle posait faisaient effacer le cloud au pull suivant.
+     On l'ignore (marqué comme lu pour ne pas le réévaluer). */
+  if (!b.cloud) { _resetBroadcastMarquer(b.id); return 0; }
 
   var limite = b.date || '';
   var total = 0, detail = [];
@@ -48321,6 +48337,11 @@ async function executerReset() {
       var all = await dbGetAll(store).catch(function(){ return []; });
       nb = all.length;
       for (var j=0; j<all.length; j++) {
+        /* [INCIDENT 03/10] Remise à zéro LOCALE (Supabase conservé) : aucun
+           tombstone. Ils étaient poussés dans pi_suppressions puis appliqués
+           par tous les postes, qui effaçaient alors le cloud — contrairement
+           à ce qu'annonce l'écran. Les données reviennent au prochain pull. */
+        if (!withCloud) { await dbDelete(store, all[j].id).catch(function(){}); continue; }
         try { if (typeof tombAdd==='function') tombAdd(store, all[j].id); } catch(e){}
         /* CORRECTIF : alimenter aussi le registre partagé/daté (suppressions_sync), pas seulement
            le cache local tombAdd() (non daté, jamais purgé). Sans ceci, un reset suivi d'une
