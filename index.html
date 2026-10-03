@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.114 · 2026-10-03 — Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.115 · 2026-10-03 — Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -25447,7 +25447,7 @@ function _sbVerifierCoherence() {
 function _sbReinitialiserPoste() {
   try {
     Object.keys(localStorage).forEach(function(k){
-      if (/^(sb_|sync_)/.test(k) || k === 'company_logo') { try { localStorage.removeItem(k); } catch(e){} }
+      if (/^(sb_|sync_)/.test(k) || k === 'company_logo' || k === 'immosuite_tombstones') { try { localStorage.removeItem(k); } catch(e){} }
     });
   } catch(e){}
   var fini = false, terminer = function(){ if (fini) return; fini = true; location.reload(); };
@@ -26208,6 +26208,10 @@ async function syncToSupabase(table, obj, opts) {
         var _oD = (_oRb && _oRb.date) || '', _rD = _rRb.date || '';
         if (!_oRb || (!_oD || _rD > _oD)) obj.reset_broadcast = _rRb;
       }
+      /* Signal de remise à niveau des tombstones : publié uniquement côté
+         serveur, jamais tenu par un poste — on recopie toujours la valeur
+         distante pour que l'upsert (colonne JSON entière) ne l'efface pas. */
+      if (_remoteParams && _remoteParams.purge_tombstones) obj.purge_tombstones = _remoteParams.purge_tombstones;
     } catch(e) { /* offline/erreur réseau → on pousse tel quel, le pull dédié rattrapera au prochain cycle */ }
   }
 
@@ -27751,7 +27755,7 @@ var PARAMS_PARTAGES = [
    Règle désormais : tout réglage est partagé, sauf les marqueurs techniques,
    le plan comptable (fusion dédiée) et les clés secrètes (clé API, jeton,
    mot de passe), qui restent propres au poste. */
-var PARAMS_LOCAUX_RE = /^(id|params_maj|reset_broadcast|plan_comptable_.*|_.*|.*(api_key|secret|token|password|pwd).*)$/i;
+var PARAMS_LOCAUX_RE = /^(id|params_maj|reset_broadcast|purge_tombstones|plan_comptable_.*|_.*|.*(api_key|secret|token|password|pwd).*)$/i;
 function _paramPartage(k) { return !PARAMS_LOCAUX_RE.test(String(k)); }
 
 function _paramsToucher() {
@@ -28094,6 +28098,38 @@ async function _syncUsersSeul(){
   return n;
 }
 
+/* ═══ REMISE À NIVEAU DES TOMBSTONES (incident du 03/10) ═══
+   Les marques de suppression d'un poste (cache localStorage + registre
+   suppressions_sync en IndexedDB) ne se purgent jamais : retirer une marque
+   du cloud ne suffit donc pas à faire réapparaître un enregistrement
+   restauré — chaque poste continuait de le cacher, voire de le re-supprimer.
+   Un signal daté publié dans pi_params (purge_tombstones = {id, date}) fait
+   vider ces marques locales UNE fois par poste ; la phase 0 du pull les
+   recharge aussitôt depuis pi_suppressions, qui redevient la seule référence. */
+var PURGE_TOMB_KEY = 'immosuite_purge_tomb_appliquee';
+async function _appliquerPurgeTombstones() {
+  var rows = await sbFetch('pi_params?id=eq.main&select=*', 'GET');
+  var p = (rows && rows.length) ? _supaUnwrap('pi_params', rows[0]) : null;
+  var ordre = p && p.purge_tombstones;
+  if (!ordre || !ordre.id) return false;
+  var lu = ''; try { lu = localStorage.getItem(PURGE_TOMB_KEY) || ''; } catch(e){}
+  if (lu === String(ordre.id)) return false;                     /* déjà appliqué ici */
+
+  try { if (typeof tombClear === 'function') tombClear(); } catch(e){}
+  var locaux = []; try { locaux = await dbGetAll('suppressions_sync'); } catch(e){}
+  for (var i = 0; i < locaux.length; i++) {
+    if (locaux[i] && locaux[i].id !== undefined) { try { await dbDelete('suppressions_sync', locaux[i].id); } catch(e){} }
+  }
+  DATA.suppressions_sync = [];
+  /* Ne pas renvoyer au cloud d'anciennes marques encore en attente d'envoi */
+  Object.keys(_dirtySync).forEach(function(k){ if (k.indexOf('suppressions_sync|') === 0) delete _dirtySync[k]; });
+  try { _outboxWrite(_outboxRead().filter(function(e){ return !e || e.table !== 'pi_suppressions'; })); } catch(e){}
+
+  try { localStorage.setItem(PURGE_TOMB_KEY, String(ordre.id)); } catch(e){}
+  console.log('[Sync] Remise à niveau des suppressions appliquée (' + locaux.length + ' marque(s) locale(s) retirée(s)).');
+  return true;
+}
+
 async function pullFromCloudSilent() {
   if (!navigator.onLine) return;
   getSBConfig();
@@ -28109,6 +28145,7 @@ async function pullFromCloudSilent() {
        re-supprimée par _appliquerSuppressionsSync() en fin de cycle :
        fenêtre de réapparition à l'écran, et risque de re-push si le poste
        la marquait « dirty » entre-temps. */
+    try { await _appliquerPurgeTombstones(); } catch(e) { console.warn('[Sync] Remise à niveau des suppressions', e); }
     try {
       var supRows = await sbFetch('pi_suppressions?select=*', 'GET');
       if (supRows && supRows.length) {
