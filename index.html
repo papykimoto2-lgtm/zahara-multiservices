@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.115 · 2026-10-03 — Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.116 · 2026-10-03 — Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -28154,7 +28154,15 @@ async function pullFromCloudSilent() {
         for (var s0 = 0; s0 < supRows.length; s0++) {
           var ts0 = _supaUnwrap('pi_suppressions', supRows[s0]);
           if (!ts0 || !ts0.id || !ts0.store || !ts0.record_id) continue;
-          if (!supIds[ts0.id]) { DATA.suppressions_sync.push(ts0); try { await dbPut('suppressions_sync', ts0); } catch(e){} }
+          /* _pulling est un drapeau global : une autre tâche (pull des
+             utilisateurs, temps réel…) peut le remettre à false pendant les
+             milliers d'await de cette boucle. Chaque marque recopiée du cloud
+             était alors notée « à envoyer » et tout le registre était
+             republié — y compris une marque retirée du cloud entre-temps
+             (restauration), qui refaisait disparaître l'enregistrement. On le
+             réarme juste avant chaque écriture (dbPut le lit de façon
+             synchrone). */
+          if (!supIds[ts0.id]) { DATA.suppressions_sync.push(ts0); try { _pulling = true; await dbPut('suppressions_sync', ts0); } catch(e){} }
           try { if (typeof tombAdd === 'function') tombAdd(ts0.store, ts0.record_id); } catch(e){}
         }
       }
