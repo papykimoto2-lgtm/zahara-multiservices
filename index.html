@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.117 · 2026-10-05 — Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.118 · 2026-10-05 — Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -26226,6 +26226,7 @@ async function syncToSupabase(table, obj, opts) {
          serveur, jamais tenu par un poste — on recopie toujours la valeur
          distante pour que l'upsert (colonne JSON entière) ne l'efface pas. */
       if (_remoteParams && _remoteParams.purge_tombstones) obj.purge_tombstones = _remoteParams.purge_tombstones;
+      if (_remoteParams && _remoteParams.reinit_postes) obj.reinit_postes = _remoteParams.reinit_postes;
     } catch(e) { /* offline/erreur réseau → on pousse tel quel, le pull dédié rattrapera au prochain cycle */ }
   }
 
@@ -27769,7 +27770,7 @@ var PARAMS_PARTAGES = [
    Règle désormais : tout réglage est partagé, sauf les marqueurs techniques,
    le plan comptable (fusion dédiée) et les clés secrètes (clé API, jeton,
    mot de passe), qui restent propres au poste. */
-var PARAMS_LOCAUX_RE = /^(id|params_maj|reset_broadcast|purge_tombstones|plan_comptable_.*|_.*|.*(api_key|secret|token|password|pwd).*)$/i;
+var PARAMS_LOCAUX_RE = /^(id|params_maj|reset_broadcast|purge_tombstones|reinit_postes|plan_comptable_.*|_.*|.*(api_key|secret|token|password|pwd).*)$/i;
 function _paramPartage(k) { return !PARAMS_LOCAUX_RE.test(String(k)); }
 
 function _paramsToucher() {
@@ -28112,6 +28113,32 @@ async function _syncUsersSeul(){
   return n;
 }
 
+/* ═══ RÉINITIALISATION DES POSTES À DISTANCE (incident du 05/10) ═══
+   Des postes ayant gardé dans leur navigateur des données d'une autre
+   entreprise (mélange de fin septembre) les réinjectaient dans la base.
+   Un ordre daté publié dans pi_params (reinit_postes = {id, date, motif})
+   fait vider UNE fois chaque poste (IndexedDB, file d'envoi, marques de
+   suppression) puis le recharge depuis la base — sans que personne ait à se
+   déplacer. Un navigateur vierge (jamais synchronisé) n'a rien à vider : il
+   note simplement l'ordre comme appliqué. Vérifié au début de chaque pull,
+   avant tout envoi. */
+var REINIT_POSTES_KEY = 'immosuite_reinit_applique';
+async function _appliquerReinitPostes() {
+  var rows = await sbFetch('pi_params?id=eq.main&select=*', 'GET');
+  var p = (rows && rows.length) ? _supaUnwrap('pi_params', rows[0]) : null;
+  var ordre = p && p.reinit_postes;
+  if (!ordre || !ordre.id) return false;
+  var lu = ''; try { lu = localStorage.getItem(REINIT_POSTES_KEY) || ''; } catch(e){}
+  if (lu === String(ordre.id)) return false;                     /* déjà appliqué ici */
+  try { localStorage.setItem(REINIT_POSTES_KEY, String(ordre.id)); } catch(e){}
+  if (!_syncStampGet('pull')) return false;                      /* poste vierge : rien à vider */
+  try { localStorage.removeItem(_SYNC_OUTBOX_KEY); } catch(e){}
+  try { toast('🧹 Réinitialisation de ce poste demandée par l\'administrateur — rechargement depuis la base…', 'info', 6000); } catch(e){}
+  console.warn('[Sync] Réinitialisation du poste à distance : ' + (ordre.motif || ordre.id));
+  _sbReinitialiserPoste();                                       /* vide IndexedDB + caches locaux, puis recharge */
+  return true;
+}
+
 /* ═══ REMISE À NIVEAU DES TOMBSTONES (incident du 03/10) ═══
    Les marques de suppression d'un poste (cache localStorage + registre
    suppressions_sync en IndexedDB) ne se purgent jamais : retirer une marque
@@ -28159,6 +28186,7 @@ async function pullFromCloudSilent() {
        re-supprimée par _appliquerSuppressionsSync() en fin de cycle :
        fenêtre de réapparition à l'écran, et risque de re-push si le poste
        la marquait « dirty » entre-temps. */
+    try { if (await _appliquerReinitPostes()) { _pulling = false; return; } } catch(e) { console.warn('[Sync] Réinitialisation à distance', e); }
     try { await _appliquerPurgeTombstones(); } catch(e) { console.warn('[Sync] Remise à niveau des suppressions', e); }
     try {
       var supRows = await sbFetch('pi_suppressions?select=*', 'GET');
