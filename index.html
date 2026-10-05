@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.116 · 2026-10-03 — Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.117 · 2026-10-05 — Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -26090,7 +26090,21 @@ function _signalerTombstoneKO() {
   if (entry) deleteFromSupabase(entry[0], id);
 }
 
+/* [INCIDENT 05/10] Un enregistrement marqué supprimé (tombstone) ne doit
+   jamais repartir au cloud, quel que soit le chemin d'envoi : la
+   réconciliation automatique (toutes les ~30 min) et « Tout envoyer »
+   renvoyaient tout enregistrement local absent du cloud, sans regarder les
+   suppressions. Un poste ayant gardé des données MENKO du mélange de fin
+   septembre les réinjectait ainsi dans la base Zahara. Une recréation
+   volontaire lève le tombstone en amont (dbPut → _untomb), elle passe donc. */
+function _envoiBloqueParTombstone(table, obj) {
+  if (!obj || obj.id === undefined || table === 'pi_suppressions' || typeof tombHas !== 'function') return false;
+  var e = SUPA_STORE_MAP.find(function(x){ return x[0] === table; });
+  return !!(e && tombHas(e[1], obj.id));
+}
+
 async function syncToSupabase(table, obj, opts) {
+  if (_envoiBloqueParTombstone(table, obj)) return true;   /* rien à envoyer : traité comme fait */
   if (table === 'pi_ecritures' && obj && obj.date && !_pulling && !obj._forceCloture
       && typeof exerciceEstClos === 'function' && exerciceEstClos(obj.date)) {
     console.warn('[VERROU CLOTURE] Sync cloud bloquée — exercice clos:', obj);
@@ -26273,7 +26287,7 @@ async function syncToSupabase(table, obj, opts) {
    contrôle de conflit de syncToSupabase() ne s'applique de toute façon pas. */
 async function syncToSupabaseBatch(table, objs, chunkSize) {
   chunkSize = chunkSize || 300;
-  objs = (objs||[]).filter(function(o){ return o; });
+  objs = (objs||[]).filter(function(o){ return o && !_envoiBloqueParTombstone(table, o); });
   if (!objs.length) return true;
   if (table === 'pi_ecritures') {
     objs = objs.filter(function(obj){
