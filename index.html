@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.125 · 2026-10-08 — Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.126 · 2026-10-08 — PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -11250,7 +11250,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <table>
               <thead><tr>
                 <th>N° OM</th><th>Type</th><th>Chef de mission</th><th>Équipe</th><th>Divisions</th><th>Objet</th><th>Destination</th>
-                <th>Période</th><th>Frais alloués</th><th>Statut</th><th>Actions</th>
+                <th>Période</th><th>Frais alloués</th><th>Statut</th><th>PV de mission</th><th>Actions</th>
               </tr></thead>
               <tbody id="tbody-om"></tbody>
             </table>
@@ -11339,6 +11339,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <div class="form-group span-2"><textarea class="form-control" id="om-compte-rendu" rows="4" placeholder="Résultats obtenus, contacts pris, parcelles identifiées, suites à donner..."></textarea></div>
             </div>
             <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--bord);text-align:right;">
+              <button class="btn btn-secondary" type="button" onclick="if(!APP.editingOMId){toast('Enregistrez d\'abord l\'ordre de mission.','error');return;}closeModal('modal-om');pvOmOpen(APP.editingOMId)">📋 PV de mission</button>
               <button class="btn btn-secondary" type="button" onclick="imprimerOrdreMission(APP.editingOMId)">🖨️ Aperçu avant impression</button>
             </div>
           </div>
@@ -88147,6 +88148,12 @@ async function saveOrdreMission() {
     compte_rendu: document.getElementById('om-compte-rendu').value.trim(),
     created_at: APP.editingOMId ? undefined : new Date().toISOString()
   };
+  /* Le formulaire reconstruit l'ordre de mission : sans ce report, le PV structuré (om.pv) et la date de création seraient perdus à chaque modification. */
+  if (APP.editingOMId) {
+    var _exOM = DATA.ordres_mission.find(function(x){ return x.id === APP.editingOMId; });
+    if (_exOM) { if (_exOM.pv) om.pv = _exOM.pv; om.created_at = _exOM.created_at || om.created_at; }
+  }
+  om._modifie = new Date().toISOString();
   if (APP.editingOMId) {
     var idx = DATA.ordres_mission.findIndex(function(x){ return x.id === APP.editingOMId; });
     if (idx >= 0) DATA.ordres_mission[idx] = om; else DATA.ordres_mission.push(om);
@@ -88204,7 +88211,7 @@ function renderOrdresMission() {
   var statutLabel = { planifiee: 'Planifiée', en_cours: 'En cours', terminee: 'Terminée', annulee: 'Annulée' };
 
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun ordre de mission</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun ordre de mission</td></tr>';
   } else {
     tbody.innerHTML = list.map(function(o){
       var nbEquipe = (o.equipe_ids || []).length;
@@ -88219,7 +88226,10 @@ function renderOrdresMission() {
         + '<td>' + dateShort(o.date_debut) + ' → ' + dateShort(o.date_fin) + '</td>'
         + '<td style="color:var(--or);font-weight:600;">' + fmtF(o.frais || 0) + ' FCFA</td>'
         + '<td><span class="badge ' + (statutBadge[o.statut] || 'badge-bleu') + '">' + (statutLabel[o.statut] || o.statut) + '</span></td>'
-        + '<td>'
+        + '<td>' + pvOmBadge(o) + '</td>'
+        + '<td style="white-space:nowrap;">'
+        + '<button class="btn btn-secondary btn-sm btn-icon" onclick="pvOmOpen(\'' + o.id + '\')" title="' + (o.pv ? 'Ouvrir le PV de mission' : 'Rédiger le PV de mission') + '">📋</button> '
+        + (o.pv ? '<button class="btn btn-secondary btn-sm btn-icon" onclick="pvOmPrint(\'' + o.id + '\')" title="Imprimer le PV">🖨️PV</button> ' : '')
         + '<button class="btn btn-secondary btn-sm btn-icon" onclick="openOrdreMission(\'' + o.id + '\')">✏️</button> '
         + '<button class="btn btn-secondary btn-sm btn-icon" onclick="imprimerOrdreMission(\'' + o.id + '\')" title="Imprimer">🖨️</button> '
         + '<button class="btn btn-danger btn-sm btn-icon" onclick="deleteOrdreMission(\'' + o.id + '\')">🗑</button>'
@@ -88248,6 +88258,148 @@ function exportOrdresMissionCSV() {
 }
 
 /* ── Impression Ordre de Mission (aperçu avant impression) ─── */
+/* ══════════════════════════════════════════════════════════════════════════
+   PV DE MISSION — procès-verbal structuré, rattaché à l'ordre de mission
+   Porté par l'ordre de mission lui-même (champ o.pv) : même synchronisation,
+   même suppression, aucune table supplémentaire. Le champ libre historique
+   « compte-rendu » est conservé et repris comme synthèse.
+   ══════════════════════════════════════════════════════════════════════════ */
+var PV_OM = { id:null, rencontres:[], decisions:[], presents:[] };
+function pvOmBadge(o){
+  var p = o && o.pv;
+  if(!p) return (o && o.compte_rendu) ? '<span class="badge badge-or" style="font-size:10px;" title="Compte-rendu libre existant : à structurer en PV">📝 CR libre</span>' : '<span style="color:var(--blanc-dim);font-size:11px;">—</span>';
+  return p.statut==='signe' ? '<span class="badge badge-vert" style="font-size:10px;">✅ PV signé</span>' : '<span class="badge badge-bleu" style="font-size:10px;">📝 PV brouillon</span>';
+}
+function pvOmEnsureModal(){
+  if(document.getElementById('modal-pv-om')) return;
+  var d = document.createElement('div');
+  d.className = 'modal-overlay'; d.id = 'modal-pv-om';
+  d.innerHTML = '<div class="modal modal-lg"><div class="modal-header"><h3 id="pv-om-titre">PV de mission</h3>'
+    + '<button class="btn btn-secondary btn-icon" onclick="closeModal(\'modal-pv-om\')">✕</button></div>'
+    + '<div class="modal-body"><div class="form-grid">'
+    + '<div class="form-group span-2" id="pv-om-resume" style="font-size:12px;background:var(--gris-med);padding:8px 10px;border-radius:8px;"></div>'
+    + '<div class="form-group"><label>Date du PV</label><input type="date" class="form-control" id="pv-om-date"></div>'
+    + '<div class="form-group"><label>Objectif de la mission</label><select class="form-control" id="pv-om-objectif"><option value="atteint">✅ Atteint</option><option value="partiel">🟠 Partiellement atteint</option><option value="non_atteint">❌ Non atteint</option></select></div>'
+    + '<div class="form-group"><label>Heure de départ</label><input type="time" class="form-control" id="pv-om-hdep"></div>'
+    + '<div class="form-group"><label>Heure de retour</label><input type="time" class="form-control" id="pv-om-hret"></div>'
+    + '<div class="form-group span-2"><label>Agents effectivement présents</label><div id="pv-om-presents" style="display:flex;flex-wrap:wrap;gap:6px 16px;border:1px solid var(--bord);border-radius:var(--r);padding:8px;"></div></div>'
+    + '<div class="form-group span-2"><label>Lieux visités</label><input type="text" class="form-control" id="pv-om-lieux" placeholder="Localités, sites, parcelles visités…"></div>'
+    + '<div class="form-group span-2"><label>Personnes rencontrées</label><div id="pv-om-rencontres"></div><button type="button" class="btn btn-secondary btn-sm" onclick="pvOmAddRencontre()">+ Personne rencontrée</button></div>'
+    + '<div class="form-group span-2"><label>Constats et résultats obtenus *</label><textarea class="form-control" id="pv-om-resultats" rows="4" placeholder="Ce qui a été constaté, obtenu, convenu…"></textarea></div>'
+    + '<div class="form-group span-2"><label>Décisions et actions à suivre</label><div id="pv-om-decisions"></div><button type="button" class="btn btn-secondary btn-sm" onclick="pvOmAddDecision()">+ Action à suivre</button></div>'
+    + '<div class="form-group span-2"><label>Difficultés rencontrées</label><textarea class="form-control" id="pv-om-difficultes" rows="2"></textarea></div>'
+    + '<div class="form-group"><label>Frais réellement engagés (FCFA)</label><input type="number" class="form-control" id="pv-om-frais" min="0" step="500"></div>'
+    + '<div class="form-group"><label>Statut du PV</label><select class="form-control" id="pv-om-statut"><option value="brouillon">📝 Brouillon</option><option value="signe">✅ Signé / clôturé</option></select></div>'
+    + '</div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal(\'modal-pv-om\')">Fermer</button>'
+    + '<button class="btn btn-secondary" onclick="pvOmSave(true)">🖨️ Enregistrer et imprimer</button>'
+    + '<button class="btn btn-primary" onclick="pvOmSave(false)">Enregistrer</button></div></div>';
+  document.body.appendChild(d);
+}
+function pvOmLignes(){
+  var r = document.getElementById('pv-om-rencontres'), d = document.getElementById('pv-om-decisions');
+  if(r) r.innerHTML = PV_OM.rencontres.map(function(x,i){
+    return '<div style="display:grid;grid-template-columns:2fr 1.5fr 1.5fr 2fr auto;gap:6px;margin-bottom:6px;">'
+      + '<input class="form-control" placeholder="Nom" value="'+escHtml(x.nom||'')+'" oninput="PV_OM.rencontres['+i+'].nom=this.value">'
+      + '<input class="form-control" placeholder="Qualité / fonction" value="'+escHtml(x.qualite||'')+'" oninput="PV_OM.rencontres['+i+'].qualite=this.value">'
+      + '<input class="form-control" placeholder="Contact" value="'+escHtml(x.contact||'')+'" oninput="PV_OM.rencontres['+i+'].contact=this.value">'
+      + '<input class="form-control" placeholder="Objet de l\'échange" value="'+escHtml(x.objet||'')+'" oninput="PV_OM.rencontres['+i+'].objet=this.value">'
+      + '<button type="button" class="btn btn-danger btn-sm btn-icon" onclick="PV_OM.rencontres.splice('+i+',1);pvOmLignes()">🗑</button></div>';
+  }).join('') || '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">Aucune personne saisie.</div>';
+  if(d) d.innerHTML = PV_OM.decisions.map(function(x,i){
+    return '<div style="display:grid;grid-template-columns:3fr 1.5fr 1fr auto;gap:6px;margin-bottom:6px;">'
+      + '<input class="form-control" placeholder="Action à mener" value="'+escHtml(x.action||'')+'" oninput="PV_OM.decisions['+i+'].action=this.value">'
+      + '<input class="form-control" placeholder="Responsable" value="'+escHtml(x.responsable||'')+'" oninput="PV_OM.decisions['+i+'].responsable=this.value">'
+      + '<input type="date" class="form-control" value="'+escHtml(x.echeance||'')+'" oninput="PV_OM.decisions['+i+'].echeance=this.value">'
+      + '<button type="button" class="btn btn-danger btn-sm btn-icon" onclick="PV_OM.decisions.splice('+i+',1);pvOmLignes()">🗑</button></div>';
+  }).join('') || '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">Aucune action saisie.</div>';
+}
+function pvOmAddRencontre(){ PV_OM.rencontres.push({nom:'',qualite:'',contact:'',objet:''}); pvOmLignes(); }
+function pvOmAddDecision(){ PV_OM.decisions.push({action:'',responsable:'',echeance:''}); pvOmLignes(); }
+function pvOmOpen(omId){
+  var o = (DATA.ordres_mission||[]).find(function(x){ return x.id===omId; });
+  if(!o){ toast('Ordre de mission introuvable.','error'); return; }
+  pvOmEnsureModal();
+  var p = o.pv || {};
+  PV_OM = { id:omId,
+    rencontres: JSON.parse(JSON.stringify(p.rencontres||[])),
+    decisions:  JSON.parse(JSON.stringify(p.decisions||[])),
+    presents: (p.presents_ids || o.equipe_ids || []).slice() };
+  document.getElementById('pv-om-titre').textContent = 'PV de mission — ' + o.numero;
+  document.getElementById('pv-om-resume').innerHTML = '<strong>' + escHtml(o.numero) + '</strong> · ' + escHtml(o.objet||'') + ' · ' + escHtml(o.destination||'')
+    + '<br>Du ' + escHtml(dateShort(o.date_debut)) + ' au ' + escHtml(dateShort(o.date_fin)) + ' · Chef de mission : <strong>' + escHtml(_omNomAgent(o.chef_id)) + '</strong>';
+  var ids = (o.equipe_ids||[]).slice(); if(o.chef_id && ids.indexOf(o.chef_id)===-1) ids.unshift(o.chef_id);
+  document.getElementById('pv-om-presents').innerHTML = ids.map(function(id){
+    return '<label style="font-size:12px;font-weight:normal;display:flex;gap:5px;align-items:center;"><input type="checkbox" class="pv-om-pres" value="'+id+'"'+(PV_OM.presents.indexOf(id)!==-1?' checked':'')+'> '+escHtml(_omNomAgent(id))+'</label>';
+  }).join('') || '<span style="font-size:12px;color:var(--blanc-dim);">Aucun agent dans l\'équipe.</span>';
+  document.getElementById('pv-om-date').value = p.date_pv || o.date_fin || today();
+  document.getElementById('pv-om-objectif').value = p.objectif || 'atteint';
+  document.getElementById('pv-om-hdep').value = p.heure_depart || '';
+  document.getElementById('pv-om-hret').value = p.heure_retour || '';
+  document.getElementById('pv-om-lieux').value = p.lieux || o.destination || '';
+  document.getElementById('pv-om-resultats').value = p.resultats || o.compte_rendu || '';
+  document.getElementById('pv-om-difficultes').value = p.difficultes || '';
+  document.getElementById('pv-om-frais').value = (p.frais_reels != null) ? p.frais_reels : '';
+  document.getElementById('pv-om-statut').value = p.statut || 'brouillon';
+  pvOmLignes();
+  document.getElementById('modal-pv-om').classList.add('open');
+}
+async function pvOmSave(imprimer){
+  var o = (DATA.ordres_mission||[]).find(function(x){ return x.id===PV_OM.id; }); if(!o) return;
+  var resultats = document.getElementById('pv-om-resultats').value.trim();
+  var statut = document.getElementById('pv-om-statut').value;
+  if(!resultats){ toast('Renseignez les constats et résultats obtenus.','error'); return; }
+  if(statut==='signe' && !PV_OM.rencontres.length && !confirm('Aucune personne rencontrée n\'est saisie. Clôturer quand même le PV ?')) return;
+  var pres = []; document.querySelectorAll('#pv-om-presents .pv-om-pres').forEach(function(c){ if(c.checked) pres.push(c.value); });
+  o.pv = { statut:statut, date_pv:document.getElementById('pv-om-date').value || today(),
+    objectif:document.getElementById('pv-om-objectif').value,
+    heure_depart:document.getElementById('pv-om-hdep').value, heure_retour:document.getElementById('pv-om-hret').value,
+    presents_ids:pres, lieux:document.getElementById('pv-om-lieux').value.trim(),
+    rencontres:PV_OM.rencontres.filter(function(x){ return (x.nom||'').trim(); }),
+    resultats:resultats,
+    decisions:PV_OM.decisions.filter(function(x){ return (x.action||'').trim(); }),
+    difficultes:document.getElementById('pv-om-difficultes').value.trim(),
+    frais_reels:(document.getElementById('pv-om-frais').value===''?null:parseFloat(document.getElementById('pv-om-frais').value)||0),
+    redige_par:(o.pv && o.pv.redige_par) || (APP.currentUser && APP.currentUser.nom) || '—',
+    modifie_le:new Date().toISOString() };
+  o.compte_rendu = resultats;
+  if(statut==='signe' && o.statut!=='annulee' && o.statut!=='terminee'){ o.statut = 'terminee'; toast('Mission passée au statut « Terminée ».','info'); }
+  o._modifie = new Date().toISOString();
+  await dbPut('ordres_mission', o);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_ordres_mission', o);
+  renderOrdresMission();
+  closeModal('modal-pv-om');
+  toast('PV de mission enregistré.','success');
+  if(imprimer) pvOmPrint(o.id);
+}
+function pvOmPrint(omId){
+  var o = (DATA.ordres_mission||[]).find(function(x){ return x.id===omId; }); if(!o || !o.pv){ toast('Aucun PV pour cet ordre de mission.','error'); return; }
+  var p = o.pv, E = function(x){ return escHtml(x==null?'':String(x)); }, soc = (DATA.params&&DATA.params.societe)||'';
+  var obj = { atteint:'Atteint', partiel:'Partiellement atteint', non_atteint:'Non atteint' }[p.objectif] || '—';
+  var pres = (p.presents_ids||[]).map(function(id){ return '<li>'+E(_omNomAgent(id))+(id===o.chef_id?' (chef de mission)':'')+'</li>'; }).join('') || '<li>—</li>';
+  var renc = (p.rencontres||[]).map(function(r,i){ return '<tr><td>'+(i+1)+'</td><td>'+E(r.nom)+'</td><td>'+E(r.qualite)+'</td><td>'+E(r.contact)+'</td><td>'+E(r.objet)+'</td></tr>'; }).join('') || '<tr><td colspan="5" style="text-align:center;">Aucune</td></tr>';
+  var dec = (p.decisions||[]).map(function(r,i){ return '<tr><td>'+(i+1)+'</td><td>'+E(r.action)+'</td><td>'+E(r.responsable)+'</td><td>'+E(r.echeance?dateShort(r.echeance):'')+'</td></tr>'; }).join('') || '<tr><td colspan="4" style="text-align:center;">Aucune</td></tr>';
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>PV de mission '+E(o.numero)+'</title><style>'
+    + 'body{font-family:Georgia,serif;color:#1a1a1a;padding:34px 44px;max-width:780px;margin:0 auto;font-size:13px;line-height:1.5;}'
+    + 'h1{text-align:center;font-size:20px;color:#1D3F7A;margin:10px 0 2px;}h3{font-size:13px;color:#1D3F7A;margin:14px 0 4px;text-transform:uppercase;}'
+    + 'table{width:100%;border-collapse:collapse;margin:6px 0;}td,th{border:1px solid #ccc;padding:4px 8px;font-size:12px;text-align:left;}th{background:#eef2f9;}'
+    + '.sig{display:flex;justify-content:space-between;margin-top:40px;}.sig div{width:46%;text-align:center;font-size:12px;}</style></head><body>'
+    + '<div style="display:flex;justify-content:space-between;border-bottom:2px solid #1D3F7A;padding-bottom:6px;"><strong>'+E(soc)+'</strong><span>Réf. OM : <strong>'+E(o.numero)+'</strong></span></div>'
+    + '<h1>PROCÈS-VERBAL DE MISSION</h1><div style="text-align:center;font-size:12px;color:#555;">'+(p.statut==='signe'?'Document clôturé':'PROJET — brouillon')+' · établi le '+E(dateShort(p.date_pv))+'</div>'
+    + '<h3>Mission</h3><table><tr><th style="width:26%">Objet</th><td>'+E(o.objet)+'</td></tr><tr><th>Destination</th><td>'+E(o.destination)+'</td></tr>'
+    + '<tr><th>Période</th><td>Du '+E(dateShort(o.date_debut))+' au '+E(dateShort(o.date_fin))+(p.heure_depart||p.heure_retour?(' — départ '+E(p.heure_depart||'—')+', retour '+E(p.heure_retour||'—')):'')+'</td></tr>'
+    + '<tr><th>Chef de mission</th><td>'+E(_omNomAgent(o.chef_id))+'</td></tr><tr><th>Lieux visités</th><td>'+E(p.lieux)+'</td></tr><tr><th>Objectif</th><td>'+E(obj)+'</td></tr></table>'
+    + '<h3>Agents présents</h3><ul style="margin:4px 0 0 18px;">'+pres+'</ul>'
+    + '<h3>Personnes rencontrées</h3><table><tr><th>#</th><th>Nom</th><th>Qualité</th><th>Contact</th><th>Objet</th></tr>'+renc+'</table>'
+    + '<h3>Constats et résultats</h3><div style="white-space:pre-wrap;">'+E(p.resultats)+'</div>'
+    + (p.difficultes?'<h3>Difficultés rencontrées</h3><div style="white-space:pre-wrap;">'+E(p.difficultes)+'</div>':'')
+    + '<h3>Décisions et actions à suivre</h3><table><tr><th>#</th><th>Action</th><th>Responsable</th><th>Échéance</th></tr>'+dec+'</table>'
+    + (p.frais_reels!=null?'<div style="margin-top:8px;">Frais réellement engagés : <strong>'+E(fmtF(p.frais_reels))+' FCFA</strong></div>':'')
+    + '<div class="sig"><div>Le chef de mission<br><strong>'+E(_omNomAgent(o.chef_id))+'</strong><br><br><br>Signature</div><div>Visa de la Direction<br><br><br><br>Signature et cachet</div></div>'
+    + '</body></html>';
+  var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
+  w.document.write(html); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400);
+}
+
 function imprimerOrdreMission(id) {
   var o = id ? DATA.ordres_mission.find(function(x){ return x.id === id; }) : null;
   if (!o) { toast('Enregistrez d\'abord l\'ordre de mission.', 'error'); return; }
