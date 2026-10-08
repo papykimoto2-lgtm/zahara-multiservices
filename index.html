@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.135 · 2026-10-08 — Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.136 · 2026-10-08 — PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -17505,6 +17505,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             </div>
             <div class="tab-pane active" id="tab-rdpv-redaction">
               <div class="card">
+                <div id="rd-pv-auto-note"></div>
+                <div id="rd-pv-controle"></div>
                 <div class="form-section-title">En-tête du PV</div>
                 <div class="form-grid">
                   <div class="form-group"><label>N° PV</label><input class="form-control" id="rd-pv-numero" placeholder="PV-2025-001"></div>
@@ -91823,12 +91825,7 @@ function rdInitAideRedaction() {
   rdMajSuggestionsPlan(); rdMajSuggestionsSeance(); rdMajSuggestionsPV();
 }
 /* Résumé du PV rédigé à partir de la séance : ordre du jour, présents, décisions, actions, notes. */
-function rdGenererResumePV() {
-  var id = (document.getElementById('rd-pv-select') || {}).value;
-  var r = (DATA.reunions_direction || []).find(function(x){ return x.id === id; });
-  if (!r) { toast('Choisissez d\'abord une réunion.','error'); return; }
-  var champ = document.getElementById('rd-pv-resume');
-  if (champ.value.trim() && !confirm('Le résumé actuel sera remplacé par un résumé généré. Continuer ?')) return;
+function rdResumePVTexte(r) {
   var pres = (r.participants || []).filter(function(p){ return p.present; }), tot = (r.participants || []).length;
   var L = [];
   L.push('Réunion « ' + (r.titre || '') + ' » du ' + dateShort(String(r.date || '').slice(0, 10)) + (r.lieu ? ', tenue à ' + r.lieu : '') + (r.animateur ? ', sous la présidence de ' + r.animateur : '') + '.');
@@ -91841,8 +91838,48 @@ function rdGenererResumePV() {
   if (r.notes_seance && r.notes_seance.trim()) L.push('\nDiscussions :\n' + r.notes_seance.trim());
   if ((r.decisions || []).length) { L.push('\nDécisions :'); r.decisions.forEach(function(d, i){ L.push((i + 1) + '. ' + (d.texte || d)); }); }
   if ((r.actions || []).length) { L.push('\nActions à mener :'); r.actions.forEach(function(a){ L.push('- ' + a.titre + ' — ' + (a.responsable || '?') + (a.delai ? ', avant le ' + dateShort(a.delai) : '')); }); }
-  champ.value = L.join('\n');
+  return L.join('\n');
+}
+function rdGenererResumePV() {
+  var id = (document.getElementById('rd-pv-select') || {}).value;
+  var r = (DATA.reunions_direction || []).find(function(x){ return x.id === id; });
+  if (!r) { toast('Choisissez d\'abord une réunion.','error'); return; }
+  var champ = document.getElementById('rd-pv-resume');
+  if (champ.value.trim() && !confirm('Le résumé actuel sera remplacé par un résumé généré. Continuer ?')) return;
+  champ.value = rdResumePVTexte(r);
   toast('Résumé généré : relisez et complétez avant de sauvegarder.','success');
+}
+/* ── PV AUTOMATIQUE ─────────────────────────────────────────────────────────
+   À la clôture de la séance, le PV est créé tout seul : numéro unique, date, résumé tiré de l'ordre du jour,
+   des notes, des décisions et des actions. Il reste en brouillon « à relire » jusqu'à sa sauvegarde par un
+   utilisateur. L'onglet PV propose aussi la prochaine date selon la périodicité et contrôle la complétude. */
+function rdPvNumeroSuivant() {
+  var an = new Date().getFullYear(), max = 0;
+  (DATA.reunions_direction || []).forEach(function(x){
+    var m = /^PV-(\d{4})-(\d+)$/.exec(x.pv_numero || ''); if (m && +m[1] === an) max = Math.max(max, +m[2]);
+  });
+  return 'PV-' + an + '-' + ('000' + (max + 1)).slice(-3);
+}
+function rdPvAContenu(r) { return !!((r.odj || []).length || (r.decisions || []).length || (r.actions || []).length || (r.notes_seance || '').trim()); }
+function rdPvAutoGenerer(r) {
+  if (!r.pv_numero) r.pv_numero = rdPvNumeroSuivant();
+  if (!r.pv_date) r.pv_date = today();
+  if (!(r.pv_resume || '').trim()) { r.pv_resume = rdResumePVTexte(r); r.pv_auto = true; r.pv_auto_le = rdNow(); }
+  if (!r.pv_statut) r.pv_statut = 'brouillon';
+}
+/* Points à vérifier avant diffusion. */
+function rdPvControle(r) {
+  var pb = [], P = r.participants || [];
+  if (!P.some(function(p){ return p.present; })) pb.push('Aucun présent pointé (onglet Réunion → Feuille de présence).');
+  var nt = (r.odj || []).filter(function(x){ return !x.traite; }).length;
+  if (nt) pb.push(nt + ' point(s) de l\'ordre du jour non traité(s).');
+  if (!(r.decisions || []).length) pb.push('Aucune décision enregistrée.');
+  var sr = (r.actions || []).filter(function(a){ return !a.responsable_id && !a.responsable; }).length;
+  if (sr) pb.push(sr + ' action(s) sans responsable.');
+  var sd = (r.actions || []).filter(function(a){ return !a.delai; }).length;
+  if (sd) pb.push(sd + ' action(s) sans échéance.');
+  if (!((document.getElementById('rd-pv-resume') || {}).value || r.pv_resume || '').trim()) pb.push('Résumé des discussions vide.');
+  return pb;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -92525,6 +92562,7 @@ async function rdCloturerSeance() {
   r.notes_seance = document.getElementById('rd-notes-seance').value;
   r.decisions = JSON.parse(JSON.stringify(RD_STATE.currentDecisions));
   r.actions   = JSON.parse(JSON.stringify(RD_STATE.currentActionsLive));
+  rdPvAutoGenerer(r);   /* PV créé automatiquement : numéro, date, résumé — brouillon à relire */
   await dbPut('reunions_direction', r); if (typeof syncToSupabase==='function') syncToSupabase('pi_reunions_direction', r);
   /* Persister actions dans store global */
   for (var i=0;i<RD_STATE.currentActionsLive.length;i++) {
@@ -92534,7 +92572,7 @@ async function rdCloturerSeance() {
     await dbPut('actions_reunion', a); if (typeof syncToSupabase==='function') syncToSupabase('pi_actions_reunion', a);
   }
   rdUpdateBadge();
-  toast('🔒 Séance clôturée ! PV généré.','success');
+  toast('🔒 Séance clôturée ! PV ' + r.pv_numero + ' généré automatiquement : relisez-le avant diffusion.','success');
   rdPeuplerSelectPV();
   switchTab('rd','pv');
   document.getElementById('rd-pv-select').value = id;
@@ -92549,14 +92587,17 @@ function rdChargerPV() {
   var r = (DATA.reunions_direction||[]).find(function(x){ return x.id===id; });
   document.getElementById('rd-pv-content').style.display = r ? '' : 'none';
   if (!r) return;
-  /* Numéro auto */
-  if (!document.getElementById('rd-pv-numero').value) {
-    var n = String((DATA.reunions_direction||[]).filter(function(x){ return x.statut==='tenue'; }).length).padStart(3,'0');
-    document.getElementById('rd-pv-numero').value = 'PV-'+new Date().getFullYear()+'-'+n;
-  }
-  document.getElementById('rd-pv-date').value = today();
+  /* PV automatique : numéro unique, date, objet et résumé repris de la réunion (ou générés s'ils n'existent pas encore) */
+  document.getElementById('rd-pv-numero').value = r.pv_numero || rdPvNumeroSuivant();
+  document.getElementById('rd-pv-date').value = r.pv_date || today();
   document.getElementById('rd-pv-objet').value = r.titre;
-  if (r.notes_seance) document.getElementById('rd-pv-resume').value = r.notes_seance;
+  var resumeInit = r.pv_resume || (rdPvAContenu(r) ? rdResumePVTexte(r) : '');
+  document.getElementById('rd-pv-resume').value = resumeInit;
+  var nA = document.getElementById('rd-pv-auto-note');
+  if (nA) nA.innerHTML = (r.pv_auto || (!r.pv_resume && resumeInit))
+    ? '<div class="alert alert-info" style="margin-bottom:10px;font-size:12px;">🤖 PV <strong>généré automatiquement</strong> à partir de la séance' + (r.pv_auto_le ? ' (' + rdEscape(rdDateHeure(r.pv_auto_le)) + ')' : '') + ' : relisez, complétez puis cliquez sur « Sauvegarder PV ».</div>' : '';
+  var pc = document.getElementById('rd-proch-date');
+  if (pc && !pc.value) { var pd = r.prochaine_date || rdProchaineDate(r); if (pd) pc.value = pd; }
   /* Présence */
   var pres = (r.participants||[]).filter(function(p){ return p.present; });
   var abs  = (r.participants||[]).filter(function(p){ return !p.present; });
@@ -92678,8 +92719,10 @@ async function rdSauvegarderPV() {
   r.pv_numero = document.getElementById('rd-pv-numero').value;
   r.pv_date   = document.getElementById('rd-pv-date').value;
   r.pv_resume = document.getElementById('rd-pv-resume').value;
+  r.pv_auto = false; r.pv_statut = r.pv_statut || 'brouillon'; r.pv_relu_par = (APP.currentUser && APP.currentUser.nom) || ''; r.pv_relu_le = rdNow();
   await dbPut('reunions_direction', r); if (typeof syncToSupabase==='function') syncToSupabase('pi_reunions_direction', r);
   rdGenererApercu(r);
+  var nA2 = document.getElementById('rd-pv-auto-note'); if (nA2) nA2.innerHTML = '';
   toast('✅ PV sauvegardé.','success');
 }
 
@@ -92687,8 +92730,11 @@ function rdGenererApercu(r) {
   var societe = (DATA.params&&DATA.params.societe)||'ImmoSuite ERP';
   document.getElementById('rd-pv-societe-header').textContent = societe;
   var pres = (r.participants||[]).filter(function(p){ return p.present; });
-  var abs  = (r.participants||[]).filter(function(p){ return !p.present; });
+  var exc  = (r.participants||[]).filter(function(p){ return !p.present && rdConvStatut(p) === 'excuse'; });
+  var abs  = (r.participants||[]).filter(function(p){ return !p.present && rdConvStatut(p) !== 'excuse'; });
   var html = '';
+  var ctl = rdPvControle(r), zc = document.getElementById('rd-pv-controle');
+  if (zc) zc.innerHTML = ctl.length ? '<div class="alert alert-warn" style="margin-bottom:10px;font-size:12px;"><strong>⚠️ À vérifier avant diffusion :</strong><ul style="margin:4px 0 0 18px;">' + ctl.map(function(x){ return '<li>' + rdEscape(x) + '</li>'; }).join('') + '</ul></div>' : '<div class="alert alert-info" style="margin-bottom:10px;font-size:12px;">✅ PV complet : présents, ordre du jour, décisions et actions renseignés.</div>';
   html += '<div class="rd-pv-section-title">Informations Générales</div>';
   html += '<div class="rd-pv-row"><div class="rd-pv-label">N° PV :</div><div class="rd-pv-val">'+(r.pv_numero||document.getElementById('rd-pv-numero').value||'—')+'</div></div>';
   html += '<div class="rd-pv-row"><div class="rd-pv-label">Date réunion :</div><div class="rd-pv-val">'+rdDateHeure(r.date)+'</div></div>';
@@ -92699,7 +92745,13 @@ function rdGenererApercu(r) {
   html += '<table class="rd-pv-table"><thead><tr><th>Nom</th><th>Fonction</th></tr></thead><tbody>';
   pres.forEach(function(p){ html+='<tr><td>'+rdEscape(p.nom)+'</td><td>'+rdEscape(p.role)+'</td></tr>'; });
   html += '</tbody></table>';
+  if (exc.length) html += '<div style="margin-top:6px;font-size:12px;color:var(--dim);">Excusés : '+exc.map(function(p){ return rdEscape(p.nom); }).join(', ')+'</div>';
   if (abs.length) html += '<div style="margin-top:6px;font-size:12px;color:var(--rouge);">Absents : '+abs.map(function(p){ return rdEscape(p.nom); }).join(', ')+'</div>';
+  if ((r.odj||[]).length) {
+    html += '<div class="rd-pv-section-title">Ordre du Jour</div><table class="rd-pv-table"><thead><tr><th>#</th><th>Point</th><th>Responsable</th><th>Durée</th><th>Traité</th></tr></thead><tbody>';
+    r.odj.forEach(function(x,i){ html += '<tr><td>'+(i+1)+'</td><td>'+rdEscape(x.titre)+'</td><td>'+rdEscape(x.responsable||'—')+'</td><td>'+(x.duree||'—')+' min</td><td>'+(x.traite?'✅':'—')+'</td></tr>'; });
+    html += '</tbody></table>';
+  }
   var resume = r.pv_resume || document.getElementById('rd-pv-resume').value || '';
   if (resume) { html+='<div class="rd-pv-section-title">Résumé des Discussions</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap;">'+rdEscape(resume)+'</div>'; }
   if ((r.decisions||[]).length) {
