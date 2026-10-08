@@ -6,22 +6,34 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<link rel="manifest" href="manifest-erp.json">
+<meta name="theme-color" content="#1B4332">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ERP">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <title>ERP — Logiciel de Gestion Immobilière</title>
 <script>
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
-   version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
-   version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.137 · 2026-10-08 — Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+   version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
+   sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
+   rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
+window.IMMOSUITE_VERSION = 'v14.138 · 2026-10-08 — Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function (regs) {
-        regs.forEach(function (r) { r.unregister(); });
+        regs.forEach(function (r) {
+          var u = (r.active || r.waiting || r.installing || {}).scriptURL || '';
+          if (!/\/sw\.js$/.test(u)) r.unregister();
+        });
       }).catch(function () {});
+      window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
     }
     if (window.caches && caches.keys) {
       caches.keys().then(function (keys) {
-        keys.forEach(function (k) { caches.delete(k); });
+        keys.forEach(function (k) { if (k !== 'zahara-portail-v2') caches.delete(k); });
       }).catch(function () {});
     }
     /* Suivi de version : détecte un nouveau déploiement et le journalise */
@@ -2417,6 +2429,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
     <div class="topbar-spacer"></div>
     <div id="rt-badge" title="Realtime multi-utilisateurs" style="font-size:10px;padding:3px 8px;border-radius:12px;background:rgba(255,255,255,0.07);color:#94a3b8;margin-right:6px;cursor:default;letter-spacing:.5px;transition:all .4s;">⬤ RT</div>
     <div id="staff-session-badge" title="Session personnel dégradée — cliquer pour réessayer" style="display:none;font-size:10px;padding:3px 8px;border-radius:12px;background:rgba(234,88,12,0.18);color:#EA580C;margin-right:6px;cursor:pointer;letter-spacing:.5px;flex-shrink:0;white-space:nowrap;" onclick="staffLoginRetryManuel()">⚠ Session</div>
+    <button class="btn btn-secondary btn-sm" id="btn-install-erp" style="display:none;" onclick="installerAppERP()" title="Installer l'application sur cet appareil">📲 Installer l'application</button>
     <div class="sync-badge" id="sync-badge">● Sync</div>
     <div class="topbar-user" onclick="logout()">
       <div class="user-avatar" id="user-avatar">A</div>
@@ -81839,6 +81852,37 @@ document.addEventListener('keydown', function(e){
   };
 })();
 /* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Installation de l'application (PWA) ─────────────────────────────────────
+   Chrome/Edge/Android : le navigateur propose l'installation (événement beforeinstallprompt) → le bouton
+   « Installer l'application » apparaît en haut. iPhone/iPad (Safari) : pas d'événement, on affiche la marche
+   à suivre. Une fois installée (ou déjà ouverte en mode application), le bouton disparaît. */
+var _installERP = null;
+function _erpEnModeApp() { return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault(); _installERP = e;
+  var b = document.getElementById('btn-install-erp'); if (b && !_erpEnModeApp()) b.style.display = '';
+});
+window.addEventListener('appinstalled', function(){
+  _installERP = null; var b = document.getElementById('btn-install-erp'); if (b) b.style.display = 'none';
+  try { toast('✅ Application installée sur cet appareil.', 'success'); } catch (e) {}
+});
+window.addEventListener('load', function(){
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  var b = document.getElementById('btn-install-erp');
+  if (b && ios && !_erpEnModeApp()) b.style.display = '';
+});
+async function installerAppERP() {
+  if (_installERP) {
+    _installERP.prompt();
+    try { await _installERP.userChoice; } catch (e) {}
+    _installERP = null;
+    var b = document.getElementById('btn-install-erp'); if (b) b.style.display = 'none';
+    return;
+  }
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) { toast('Sur iPhone/iPad : touchez le bouton Partager de Safari, puis « Sur l\'écran d\'accueil ».', 'info', 9000); return; }
+  toast('Installation non proposée par ce navigateur : utilisez le menu du navigateur (⋮) → « Installer l\'application » ou « Ajouter à l\'écran d\'accueil ».', 'info', 9000);
+}
 
 async function startApp() {
   await initDB();

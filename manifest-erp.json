@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Zahara ERP — Gestion immobilière",
+  "short_name": "Zahara ERP",
+  "description": "ERP de gestion immobilière Zahara MultiServices : souscripteurs, versements, comptabilité, juridique, chantiers.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#EDEDF2",
+  "theme_color": "#1B4332",
+  "lang": "fr",
+  "icons": [
+    { "src": "/icons/favicon-32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

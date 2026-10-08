@@ -63,7 +63,8 @@ self.addEventListener('fetch', function (event) {
   try { url = new URL(req.url); } catch (e) { return; }
   if (url.origin !== self.location.origin) return;
 
-  var estCoquille = APP_SHELL.indexOf(url.pathname) !== -1 || url.pathname === '/';
+  /* La racine « / » est l'ERP (page de plusieurs Mo, toujours rechargée du réseau) : jamais mise en cache. */
+  var estCoquille = APP_SHELL.indexOf(url.pathname) !== -1;
 
   /* Navigation : réseau d'abord, repli sur la coquille si le réseau manque. */
   if (req.mode === 'navigate') {
@@ -76,7 +77,8 @@ self.addEventListener('fetch', function (event) {
         return res;
       }).catch(function () {
         return caches.match(req, { ignoreSearch: true }).then(function (cached) {
-          return cached || caches.match('/portail-unique.html');
+          /* Hors ligne : le portail client retombe sur sa coquille ; l'ERP, lui, n'est pas disponible sans réseau. */
+          return cached || (url.pathname.indexOf('/portail-unique') === 0 ? caches.match('/portail-unique.html') : Response.error());
         });
       })
     );
