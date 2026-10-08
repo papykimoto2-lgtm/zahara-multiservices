@@ -19,7 +19,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.142 · 2026-10-08 — Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.143 · 2026-10-08 — Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -18523,6 +18523,33 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
 <!-- ═══════════════════════════════════════════════════
      MODAL — Agrément Promoteur
 ═══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-agr-suivi">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-header">
+      <h3 id="agsv-titre">📒 Journal de suivi d'agrément</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-agr-suivi')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="agsv-coll"><input type="hidden" id="agsv-id">
+      <div id="agsv-resume" style="margin-bottom:12px;"></div>
+      <div class="card" style="padding:12px;margin-bottom:14px;">
+        <div class="form-section-title">➕ Nouvelle étape de la procédure</div>
+        <div class="form-grid" style="margin-top:8px;">
+          <div class="form-group"><label>Date</label><input type="date" class="form-control" id="agsv-date"></div>
+          <div class="form-group"><label>Étape</label><select class="form-control" id="agsv-type"></select></div>
+          <div class="form-group span-2"><label>Détail / référence (n° de récépissé, courrier, interlocuteur…)</label><input type="text" class="form-control" id="agsv-note" placeholder="Ex : Récépissé n° 245 — dossier reçu par la CAPPI"></div>
+          <div class="form-group"><label>Prochaine relance / échéance (optionnel)</label><input type="date" class="form-control" id="agsv-relance"></div>
+          <div class="form-group"><label>Objet de la relance</label><input type="text" class="form-control" id="agsv-relance-obj" placeholder="Ex : Relancer la commission"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="agrSuiviAjouter()">💾 Ajouter au journal</button>
+      </div>
+      <div id="agsv-journal"></div>
+      <div id="agsv-histo" style="margin-top:14px;"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-agr-suivi')">Fermer</button></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-agrement-promoteur">
   <div class="modal" style="max-width:780px;">
     <div class="modal-header">
@@ -31469,7 +31496,7 @@ function buildDashTabJuridique() {
     {l:'Priorité urgente',      v:urgents.length,        i:'🔴', c:urgents.length?'kpi-red':'kpi-green', d:'à traiter en priorité'},
     {l:'Échéances 30 jours',    v:echeance30.length,     i:'📅', c:echeance30.length?'kpi-copper':'',    d:'dossier(s) avec échéance proche'},
     {l:'Contentieux actifs',    v:contentieux.length,    i:'⚖️', c:contentieux.length?'kpi-red':'kpi-green', d:'litige(s) en cours'},
-    {l:'Agréments enregistrés', v:agrements,             i:'🏛️', c:'',          d:'promoteur + programmes'},
+    {l:'Agréments enregistrés', v:agrements,             i:'🏛️', c:(typeof agrEntites==='function' && agrEntites().some(function(e){ return e.rec && agrDiagnostic(e).niv==='rouge'; })) ? 'kpi-red' : '', d:'promoteur + programmes (échéances : onglet Agrément)'},
   ].map(function(k){
     return '<div class="kpi-card '+k.c+'" data-icon="'+k.i+'"><div class="kpi-label">'+k.l+'</div>'
       +'<div class="kpi-value or" style="font-size:17px;">'+k.v+'</div>'
@@ -31878,6 +31905,19 @@ function buildAlertes() {
     detail:permisAlerte.map(function(p){return p.numero;}).join(', '),
     action:"goTo('conception')"
   });
+
+  // 3bis. Agréments (promoteur / programmes) : renouvellement à lancer, expirés, instruction trop longue
+  try {
+    var _agrNiv = { rouge: [], or: [] };
+    agrEntites().forEach(function(e) {
+      if (!e.rec) return;
+      var dg = agrDiagnostic(e);
+      if (dg.niv === 'rouge') _agrNiv.rouge.push(e.nom + ' — ' + dg.txt);
+      else if (dg.niv === 'orange') _agrNiv.or.push(e.nom + ' — ' + dg.txt);
+    });
+    if (_agrNiv.rouge.length) alertes.push({ type:'rouge', icon:'🏛️', msg:_agrNiv.rouge.length + ' agrément(s) expiré(s) ou à renouveler en urgence', detail:_agrNiv.rouge.slice(0,3).join(' · '), action:"goTo('juridique');switchTab('juridique','agrement');renderParamsAgrement()" });
+    if (_agrNiv.or.length) alertes.push({ type:'or', icon:'🏛️', msg:_agrNiv.or.length + ' agrément(s) à suivre / renouveler', detail:_agrNiv.or.slice(0,3).join(' · '), action:"goTo('juridique');switchTab('juridique','agrement');renderParamsAgrement()" });
+  } catch (_e) {}
 
   // 4. Conventions sans rapport depuis 14j
   var convSansRapport = DATA.conventions.filter(function(c){
@@ -37680,6 +37720,7 @@ async function saveAgrementPromoteur() {
     documents: APP._agpDocs || {},
     created_at: today()
   };
+  agrSauvegardeSuivi(agr, 'agrement_promoteur');
   if (!DATA.agrement_promoteur) DATA.agrement_promoteur = [];
   var idx = DATA.agrement_promoteur.findIndex(function(a) { return a.id === id; });
   if (idx >= 0) DATA.agrement_promoteur[idx] = agr;
@@ -37688,6 +37729,7 @@ async function saveAgrementPromoteur() {
   await dbPut('agrement_promoteur', agr);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_agrement_promoteur', agr);
   renderAgrStatutPanel('agp');
+  renderParamsAgrement();
   toast('✅ Agrément promoteur enregistré.', 'success');
 }
 
@@ -37709,6 +37751,7 @@ async function saveAgrementProgramme() {
     documents: APP._agprDocs || {},
     created_at: today()
   };
+  agrSauvegardeSuivi(agr, 'agrement_programme');
   if (!DATA.agrement_programme) DATA.agrement_programme = [];
   var idx = DATA.agrement_programme.findIndex(function(a) { return a.id === id; });
   if (idx >= 0) DATA.agrement_programme[idx] = agr;
@@ -37717,11 +37760,12 @@ async function saveAgrementProgramme() {
   await dbPut('agrement_programme', agr);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_agrement_programme', agr);
   renderProgrammes();
+  renderParamsAgrement();
   renderAgrStatutPanel('agpr');
   toast('✅ Agrément programme enregistré.', 'success');
 }
 
-function renderParamsAgrement() {
+function renderParamsAgrementBase() {
   var container = document.getElementById('params-agrement-content');
   if (!container) return;
   var agp = (DATA.agrement_promoteur || [])[0];
@@ -37768,6 +37812,259 @@ function renderParamsAgrement() {
     }).join('');
   }
   container.innerHTML = html;
+}
+
+
+/* ════════════════════════════════════════════════════
+   SUIVI DES AGRÉMENTS (promoteur + programmes) & RENOUVELLEMENT
+   Journal des étapes de la procédure, historique des cycles,
+   échéancier de renouvellement et alertes (fenêtre configurable).
+════════════════════════════════════════════════════ */
+var AGR_ETAPES = {
+  depot:              '📥 Dépôt du dossier',
+  accuse:             '🧾 Accusé / récépissé de dépôt',
+  complement_demande: '❗ Complément demandé par l\'administration',
+  complement_fourni:  '📤 Complément fourni',
+  commission:         '🏛️ Passage en commission',
+  avis_favorable:     '👍 Avis favorable',
+  avis_defavorable:   '👎 Avis défavorable / ajournement',
+  paiement_droits:    '💳 Paiement des droits / frais',
+  obtention:          '✅ Agrément délivré',
+  retrait:            '📄 Retrait de l\'original',
+  relance:            '📞 Relance',
+  renouvellement:     '🔄 Renouvellement lancé',
+  statut:             '🔁 Changement de statut',
+  autre:              '📝 Autre'
+};
+function agrSeuilRenouv() { return parseInt((DATA.params || {}).agrement_alerte_j) || 180; }
+function agrExpIso(a) {
+  if (!a) return '';
+  var e = a.date_expiration_iso || a.date_expiration || '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(e)) return e;
+  var m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(e);
+  if (m) return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+  if (a.date_obtention && a.duree) {
+    var d = new Date(a.date_obtention); if (isNaN(d)) return '';
+    d.setFullYear(d.getFullYear() + (parseInt(a.duree) || 0));
+    return d.toISOString().slice(0, 10);
+  }
+  return '';
+}
+function agrJoursRestants(a) {
+  var iso = agrExpIso(a); if (!iso) return null;
+  return Math.round((new Date(iso + 'T00:00:00') - new Date(today() + 'T00:00:00')) / 86400000);
+}
+function agrPrev(coll, id) { return (DATA[coll] || []).find(function(x) { return x.id === id; }) || null; }
+/* appelé par les deux enregistrements : conserve journal + historique, trace les changements de statut */
+function agrSauvegardeSuivi(agr, coll) {
+  var prev = agrPrev(coll, agr.id);
+  agr.etapes = prev && prev.etapes ? prev.etapes.slice() : [];
+  agr.historique = prev && prev.historique ? prev.historique.slice() : [];
+  if (prev) { agr.created_at = prev.created_at || agr.created_at; agr._baseModifie = prev._modifie; if (prev.numero_precedent) agr.numero_precedent = prev.numero_precedent; if (prev.echeance_en_cours && !agr.date_obtention) agr.echeance_en_cours = prev.echeance_en_cours; }
+  agr.date_expiration_iso = agrExpIso(agr);
+  if (!prev && agr.date_depot) agr.etapes.push({ id: uid(), date: agr.date_depot, type: 'depot', note: 'Dossier déposé', auteur: agrAuteur() });
+  if (prev && prev.statut !== agr.statut) agr.etapes.push({ id: uid(), date: today(), type: 'statut', note: (prev.statut || '—') + ' → ' + agr.statut, auteur: agrAuteur() });
+  if (prev && !prev.date_depot && agr.date_depot && !agr.etapes.some(function(e) { return e.type === 'depot' && e.date === agr.date_depot; }))
+    agr.etapes.push({ id: uid(), date: agr.date_depot, type: 'depot', note: 'Dossier déposé', auteur: agrAuteur() });
+}
+function agrAuteur() { try { return (APP.currentUser && (APP.currentUser.nom || APP.currentUser.email)) || ''; } catch (e) { return ''; } }
+function agrEntites() {
+  var L = [];
+  var agp = (DATA.agrement_promoteur || [])[0];
+  L.push({ coll: 'agrement_promoteur', kind: 'promoteur', rec: agp || null, nom: 'Agrément promoteur immobilier', progId: '' });
+  (DATA.programmes || []).forEach(function(p) {
+    var r = (DATA.agrement_programme || []).find(function(a) { return a.programme_id === p.id; }) || null;
+    L.push({ coll: 'agrement_programme', kind: 'programme', rec: r, nom: 'Programme « ' + (p.nom || p.id) + ' »', progId: p.id });
+  });
+  return L;
+}
+function agrDocsPct(e) {
+  var defs = e.kind === 'promoteur' ? AGP_DOCS : AGPR_DOCS;
+  var docs = (e.rec && e.rec.documents) || {};
+  var n = defs.filter(function(d) { return docs[d.key] && docs[d.key].fourni; }).length;
+  return { n: n, tot: defs.length, pct: defs.length ? Math.round(n / defs.length * 100) : 0 };
+}
+/* niveau d'urgence + prochaine action recommandée */
+function agrDiagnostic(e) {
+  var a = e.rec, seuil = agrSeuilRenouv();
+  if (!a) return { niv: e.kind === 'promoteur' ? 'rouge' : 'gris', txt: e.kind === 'promoteur' ? 'Aucun agrément enregistré' : 'Agrément non déposé', act: e.kind === 'promoteur' ? 'Constituer le dossier d\'agrément promoteur' : 'Constituer le dossier d\'agrément du programme' };
+  var j = agrJoursRestants(a), d = agrDocsPct(e);
+  var relance = (a.etapes || []).filter(function(x) { return x.relance && !x.relance_faite; }).sort(function(x, y) { return x.relance.localeCompare(y.relance); })[0];
+  if (a.statut === 'refuse' || a.statut === 'retire') return { niv: 'rouge', txt: a.statut === 'retire' ? 'Agrément retiré' : 'Agrément refusé', act: 'Analyser le motif et redéposer un dossier' };
+  if (a.statut === 'en_instruction' || a.statut === 'en_cours' || a.statut === 'renouvellement') {
+    var dep = a.date_depot ? Math.round((new Date(today()) - new Date(a.date_depot)) / 86400000) : null;
+    var niv = 'bleu', txt = (a.statut === 'renouvellement' ? 'Renouvellement en cours' : 'En instruction') + (dep !== null ? ' depuis ' + dep + ' j' : ' — non déposé');
+    var act = dep === null ? (d.pct < 100 ? 'Compléter le dossier (' + d.n + '/' + d.tot + ' pièces) puis déposer' : 'Déposer le dossier') : 'Suivre l\'instruction';
+    if (dep !== null && dep > 90) { niv = 'orange'; act = 'Relancer l\'administration (> 90 j sans décision)'; }
+    if (j !== null && j < 0) { niv = 'rouge'; txt += ' — agrément précédent EXPIRÉ'; }
+    else if (j !== null && j <= 60) niv = 'rouge';
+    if (relance) { act = 'Relance prévue le ' + relance.relance + (relance.relance_obj ? ' : ' + relance.relance_obj : ''); if (relance.relance <= today()) niv = niv === 'bleu' ? 'orange' : niv; }
+    return { niv: niv, txt: txt, act: act };
+  }
+  if (j === null) return { niv: 'gris', txt: 'Échéance non renseignée', act: 'Renseigner la date d\'obtention et la durée' };
+  if (j < 0) return { niv: 'rouge', txt: 'EXPIRÉ depuis ' + Math.abs(j) + ' j', act: 'Lancer le renouvellement sans délai' };
+  if (j <= 60) return { niv: 'rouge', txt: 'Expire dans ' + j + ' j', act: 'Renouvellement urgent' };
+  if (j <= seuil) return { niv: 'orange', txt: 'Expire dans ' + j + ' j', act: 'Lancer le renouvellement (fenêtre de ' + seuil + ' j)' };
+  return { niv: 'vert', txt: 'Valide — ' + j + ' j restants', act: 'Aucune action' };
+}
+function renderSuiviAgrements() {
+  var coul = { rouge: 'var(--rouge)', orange: 'var(--or)', bleu: 'var(--bleu)', vert: 'var(--vert)', gris: 'var(--dim)' };
+  var ents = agrEntites(), nbAlerte = 0;
+  var rows = ents.map(function(e) {
+    var dg = agrDiagnostic(e), d = agrDocsPct(e), a = e.rec;
+    if (dg.niv === 'rouge' || dg.niv === 'orange') nbAlerte++;
+    var cle = e.kind === 'promoteur' ? '' : e.progId;
+    var btns = '<button class="btn btn-secondary btn-sm" onclick="agrOuvrirSuivi(\'' + e.coll + '\',\'' + cle + '\')">📒 Journal</button> '
+      + '<button class="btn btn-secondary btn-sm" onclick="' + (e.kind === 'promoteur' ? 'openAgrementPromoteur()' : 'openAgrementProgramme(\'' + e.progId + '\')') + '">✏️ Fiche</button>'
+      + (a && (a.statut === 'obtenu' || a.statut === 'delivre' || a.statut === 'expire') ? ' <button class="btn btn-primary btn-sm" onclick="agrLancerRenouvellement(\'' + e.coll + '\',\'' + cle + '\')">🔄 Renouveler</button>' : '');
+    return '<tr style="border-left:4px solid ' + coul[dg.niv] + ';">'
+      + '<td><strong>' + escHtml(e.nom) + '</strong><div style="font-size:11px;color:var(--dim);">' + escHtml(a && a.numero ? 'N° ' + a.numero : 'N° —') + '</div></td>'
+      + '<td>' + escHtml(a ? (a.statut || '—').replace('_', ' ') : 'non déposé') + '</td>'
+      + '<td>' + escHtml(agrExpIso(a) ? new Date(agrExpIso(a) + 'T00:00:00').toLocaleDateString('fr-FR') : '—') + '</td>'
+      + '<td style="color:' + coul[dg.niv] + ';font-weight:700;">' + escHtml(dg.txt) + '</td>'
+      + '<td>' + (a ? d.n + '/' + d.tot + ' <span style="color:var(--dim);font-size:11px;">(' + d.pct + '%)</span>' : '—') + '</td>'
+      + '<td style="font-size:12px;">' + escHtml(dg.act) + '</td>'
+      + '<td style="white-space:nowrap;">' + btns + '</td></tr>';
+  }).join('');
+  /* relances à venir toutes entités confondues */
+  var rel = [];
+  ents.forEach(function(e) { ((e.rec && e.rec.etapes) || []).forEach(function(x) { if (x.relance && !x.relance_faite) rel.push({ nom: e.nom, x: x }); }); });
+  rel.sort(function(a, b) { return a.x.relance.localeCompare(b.x.relance); });
+  return '<div class="card" style="margin-bottom:16px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
+    + '<div style="font-family:var(--font-head);font-size:16px;color:var(--or);">📊 Suivi des agréments &amp; renouvellements</div>'
+    + '<span style="font-size:12px;color:' + (nbAlerte ? 'var(--rouge)' : 'var(--vert)') + ';font-weight:700;">' + (nbAlerte ? '🔔 ' + nbAlerte + ' agrément(s) à traiter' : '✅ Tout est à jour') + '</span></div>'
+    + '<div class="table-wrap"><table><thead><tr><th>Agrément</th><th>Statut</th><th>Échéance</th><th>Situation</th><th>Pièces</th><th>Prochaine action</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    + (rel.length ? '<div style="margin-top:10px;font-size:12px;"><strong>📅 Relances / échéances de procédure :</strong>' + rel.slice(0, 5).map(function(r) {
+        return '<div style="padding:3px 0;color:' + (r.x.relance < today() ? 'var(--rouge)' : 'var(--dim)') + ';">' + escHtml(r.x.relance) + ' — ' + escHtml(r.nom) + ' : ' + escHtml(r.x.relance_obj || (AGR_ETAPES[r.x.type] || '')) + '</div>';
+      }).join('') + '</div>' : '')
+    + '<div style="margin-top:10px;font-size:12px;color:var(--dim);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">⏰ Alerte de renouvellement :'
+    + ' <input type="number" id="agr-seuil-j" class="form-control" style="width:90px;" min="30" max="730" step="15" value="' + agrSeuilRenouv() + '"> jours avant l\'expiration'
+    + ' <button class="btn btn-secondary btn-sm" onclick="agrSauverSeuil()">💾 Enregistrer</button>'
+    + '<span style="font-size:11px;">Rouge à moins de 60 j. Chaque renouvellement archive le cycle précédent.</span></div>'
+    + '</div>';
+}
+async function agrSauverSeuil() {
+  var v = parseInt(document.getElementById('agr-seuil-j').value);
+  if (!v || v < 30 || v > 730) { toast('Délai invalide : entre 30 et 730 jours.', 'warning'); return; }
+  DATA.params = DATA.params || {};
+  DATA.params.agrement_alerte_j = v;
+  DATA.params._modifie = new Date().toISOString();
+  await dbPut('params', DATA.params);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
+  renderParamsAgrement();
+  if (typeof buildAlertes === 'function') { try { buildAlertes(); } catch (e) {} }
+  toast('Délai d\'alerte enregistré : ' + v + ' jours.', 'success');
+}
+function renderParamsAgrement() {
+  renderParamsAgrementBase();
+  var c = document.getElementById('params-agrement-content');
+  if (c) c.insertAdjacentHTML('afterbegin', renderSuiviAgrements());
+}
+function agrResolve(coll, cle) {
+  var e = agrEntites().find(function(x) { return x.coll === coll && (coll === 'agrement_promoteur' || x.progId === cle); });
+  return e;
+}
+function agrOuvrirSuivi(coll, cle) {
+  var e = agrResolve(coll, cle);
+  if (!e) return;
+  if (!e.rec) { toast('Créez d\'abord la fiche de l\'agrément (bouton « Fiche »).', 'warning'); return; }
+  document.getElementById('agsv-coll').value = coll;
+  document.getElementById('agsv-id').value = e.rec.id;
+  document.getElementById('agsv-titre').textContent = '📒 Suivi — ' + e.nom;
+  document.getElementById('agsv-date').value = today();
+  document.getElementById('agsv-note').value = '';
+  document.getElementById('agsv-relance').value = '';
+  document.getElementById('agsv-relance-obj').value = '';
+  document.getElementById('agsv-type').innerHTML = Object.keys(AGR_ETAPES).filter(function(k) { return k !== 'statut' && k !== 'renouvellement'; }).map(function(k) { return '<option value="' + k + '">' + AGR_ETAPES[k] + '</option>'; }).join('');
+  agrRenderSuivi();
+  openModal('modal-agr-suivi');
+}
+function agrRecCourant() { return agrPrev(document.getElementById('agsv-coll').value, document.getElementById('agsv-id').value); }
+function agrRenderSuivi() {
+  var a = agrRecCourant(); if (!a) return;
+  var j = agrJoursRestants(a);
+  document.getElementById('agsv-resume').innerHTML = '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;">'
+    + '<span><strong>N° :</strong> ' + escHtml(a.numero || '—') + '</span><span><strong>Statut :</strong> ' + escHtml(a.statut || '—') + '</span>'
+    + '<span><strong>Échéance :</strong> ' + escHtml(agrExpIso(a) || '—') + (j !== null ? ' (' + (j < 0 ? 'expiré depuis ' + (-j) : j) + ' j)' : '') + '</span></div>';
+  var et = (a.etapes || []).slice().sort(function(x, y) { return (y.date || '').localeCompare(x.date || ''); });
+  document.getElementById('agsv-journal').innerHTML = '<div style="font-weight:700;color:var(--or);margin-bottom:6px;">Journal de la procédure en cours</div>'
+    + (et.length ? et.map(function(x) {
+      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--bord2);font-size:12.5px;">'
+        + '<div style="min-width:84px;color:var(--dim);">' + escHtml(x.date || '') + '</div>'
+        + '<div style="flex:1;"><strong>' + (AGR_ETAPES[x.type] || x.type) + '</strong>' + (x.note ? '<div>' + escHtml(x.note) + '</div>' : '')
+        + (x.relance ? '<div style="color:' + (x.relance_faite ? 'var(--vert)' : 'var(--or)') + ';">⏰ ' + (x.relance_faite ? 'Fait — ' : 'À faire le ') + escHtml(x.relance) + (x.relance_obj ? ' : ' + escHtml(x.relance_obj) : '') + '</div>' : '')
+        + (x.auteur ? '<div style="font-size:11px;color:var(--dim);">par ' + escHtml(x.auteur) + '</div>' : '') + '</div>'
+        + '<div style="display:flex;flex-direction:column;gap:4px;">'
+        + (x.relance && !x.relance_faite ? '<button class="btn btn-secondary btn-sm" onclick="agrRelanceFaite(\'' + x.id + '\')">✔ Fait</button>' : '')
+        + '<button class="btn btn-secondary btn-sm" onclick="agrSuiviSupprimer(\'' + x.id + '\')">🗑</button></div></div>';
+    }).join('') : '<div style="color:var(--dim);font-size:12px;">Aucune étape enregistrée.</div>');
+  var h = a.historique || [];
+  document.getElementById('agsv-histo').innerHTML = h.length ? '<div style="font-weight:700;color:var(--or);margin-bottom:6px;">🗄️ Historique des cycles précédents</div>'
+    + '<div class="table-wrap"><table><thead><tr><th>N°</th><th>Obtenu le</th><th>Expiré / échéance</th><th>Archivé le</th><th>Étapes</th></tr></thead><tbody>'
+    + h.map(function(c) { return '<tr><td>' + escHtml(c.numero || '—') + '</td><td>' + escHtml(c.date_obtention || '—') + '</td><td>' + escHtml(c.date_expiration || '—') + '</td><td>' + escHtml(c.archive_le || '') + '</td><td>' + ((c.etapes || []).length) + '</td></tr>'; }).join('')
+    + '</tbody></table></div>' : '';
+}
+async function agrSuiviPersister(a, coll) {
+  a._baseModifie = a._modifie;
+  var i = DATA[coll].findIndex(function(x) { return x.id === a.id; });
+  if (i >= 0) DATA[coll][i] = a;
+  await dbPut(coll, a);
+  if (typeof syncToSupabase === 'function') syncToSupabase(coll === 'agrement_promoteur' ? 'pi_agrement_promoteur' : 'pi_agrement_programme', a);
+  agrRenderSuivi();
+  renderParamsAgrement();
+  if (typeof buildAlertes === 'function') { try { buildAlertes(); } catch (e) {} }
+}
+async function agrSuiviAjouter() {
+  var coll = document.getElementById('agsv-coll').value, a = agrRecCourant(); if (!a) return;
+  var date = document.getElementById('agsv-date').value, type = document.getElementById('agsv-type').value;
+  if (!date) { toast('Indiquez la date de l\'étape.', 'warning'); return; }
+  var x = { id: uid(), date: date, type: type, note: document.getElementById('agsv-note').value.trim(), auteur: agrAuteur() };
+  var rl = document.getElementById('agsv-relance').value;
+  if (rl) { x.relance = rl; x.relance_obj = document.getElementById('agsv-relance-obj').value.trim(); }
+  var n = Object.assign({}, a); n.etapes = (a.etapes || []).concat([x]);
+  /* l'étape pilote la fiche : dépôt → date de dépôt + instruction ; délivrance → statut */
+  if (type === 'depot') { n.date_depot = date; if (n.statut === 'non_depose' || n.statut === 'renouvellement' && false) n.statut = 'en_instruction'; }
+  if (type === 'obtention') {
+    n.date_obtention = date; n.statut = coll === 'agrement_promoteur' ? 'obtenu' : 'delivre';
+    n.date_expiration_iso = agrExpIso(n);
+    n.date_expiration = n.date_expiration_iso ? new Date(n.date_expiration_iso + 'T00:00:00').toLocaleDateString('fr-FR') : '';
+    toast('Statut passé à « délivré » : vérifiez le n° et la durée dans la fiche.', 'info');
+  }
+  if (type === 'avis_defavorable' && n.statut !== 'obtenu' && n.statut !== 'delivre') n.statut = 'refuse';
+  await agrSuiviPersister(n, coll);
+  document.getElementById('agsv-note').value = ''; document.getElementById('agsv-relance').value = ''; document.getElementById('agsv-relance-obj').value = '';
+  toast('Étape ajoutée au journal.', 'success');
+}
+async function agrRelanceFaite(id) {
+  var coll = document.getElementById('agsv-coll').value, a = agrRecCourant(); if (!a) return;
+  var n = Object.assign({}, a); n.etapes = (a.etapes || []).map(function(x) { return x.id === id ? Object.assign({}, x, { relance_faite: today() }) : x; });
+  await agrSuiviPersister(n, coll);
+}
+async function agrSuiviSupprimer(id) {
+  if (!confirm('Supprimer cette étape du journal ?')) return;
+  var coll = document.getElementById('agsv-coll').value, a = agrRecCourant(); if (!a) return;
+  var n = Object.assign({}, a); n.etapes = (a.etapes || []).filter(function(x) { return x.id !== id; });
+  await agrSuiviPersister(n, coll);
+}
+/* Renouvellement : archive le cycle en cours, rouvre une procédure, remet les pièces à revalider */
+async function agrLancerRenouvellement(coll, cle) {
+  var e = agrResolve(coll, cle); if (!e || !e.rec) return;
+  var a = e.rec;
+  if (!confirm('Lancer le renouvellement de « ' + e.nom + ' » ?\n\nLe cycle actuel (n° ' + (a.numero || '—') + ') sera archivé dans l\'historique, les pièces seront à revalider et une nouvelle procédure sera ouverte.')) return;
+  var n = Object.assign({}, a);
+  n.historique = (a.historique || []).concat([{ numero: a.numero || '', date_obtention: a.date_obtention || '', date_expiration: agrExpIso(a), duree: a.duree, statut: a.statut, etapes: a.etapes || [], archive_le: today() }]);
+  n.numero_precedent = a.numero || '';
+  n.statut = 'renouvellement';
+  n.date_depot = ''; n.date_obtention = ''; n.date_expiration = ''; n.date_expiration_iso = agrExpIso(a);
+  n.etapes = [{ id: uid(), date: today(), type: 'renouvellement', note: 'Renouvellement du n° ' + (a.numero || '—') + ' (échéance ' + (agrExpIso(a) || '—') + ')', auteur: agrAuteur() }];
+  var docs = {}; Object.keys(a.documents || {}).forEach(function(k) { docs[k] = Object.assign({}, a.documents[k], { fourni: false, a_revalider: true }); });
+  n.documents = docs;
+  /* l'échéance de l'agrément en cours reste suivie jusqu'à la nouvelle délivrance */
+  n.echeance_en_cours = agrExpIso(a);
+  await agrSuiviPersister(n, coll);
+  toast('Renouvellement ouvert — revalidez les pièces puis ajoutez les étapes au journal.', 'success');
+  if (coll === 'agrement_promoteur') openAgrementPromoteur(); else openAgrementProgramme(cle);
 }
 
 /* ──────────────────────────────────────────────────────
