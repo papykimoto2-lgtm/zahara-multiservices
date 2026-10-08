@@ -1096,6 +1096,25 @@
     if (v == null || v === '') return (dflt == null ? '' : dflt);
     return v;
   }
+  /* Logo de la société sur les documents imprimés depuis le portail (échéancier, attestations…), sauf s'ils en portent déjà un. */
+  function docAjouterLogo(html){
+    try{
+      if(typeof html!=='string' || !/<body[\s>]/i.test(html)) return html;
+      var logo=BR('logo_url',''); if(!logo) return html;
+      var m=/<body[^>]*>/i.exec(html), pos=m.index+m[0].length, tete=html.slice(pos,pos+6000);
+      if(tete.indexOf('doc-logo-auto')!==-1 || tete.indexOf(logo.slice(0,80))!==-1 || /<img[^>]+src=["']?(data:image|[^"'>\s]*logo)/i.test(tete)) return html;
+      return html.slice(0,pos)+'<div class="doc-logo-auto" style="text-align:left;margin:0 0 12px;"><img src="'+String(logo).replace(/"/g,'&quot;')+'" alt="" style="height:56px;max-width:220px;object-fit:contain;"></div>'+html.slice(pos);
+    }catch(e){ return html; }
+  }
+  (function(){
+    if(window.__logoOpenPatch) return; window.__logoOpenPatch=true;
+    var ouvrir=window.open;
+    window.open=function(url){
+      var w=ouvrir.apply(window,arguments);
+      try{ if(w && (!url || url==='about:blank') && w.document && !w.__logoDocPatch){ var d=w.document, ecrire=d.write; d.write=function(){ return ecrire.apply(d,Array.prototype.slice.call(arguments).map(docAjouterLogo)); }; w.__logoDocPatch=true; } }catch(e){}
+      return w;
+    };
+  })();
   function _brandNom(){ return BR('nom', 'notre société'); }
   function contactFallback(){
     var t = BR('tel',''), e = BR('email','');
