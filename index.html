@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.131 · 2026-10-08 — Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.132 · 2026-10-08 — Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -17243,6 +17243,12 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </div>
           <div class="card">
             <div class="form-section-title">Informations Générales</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px;padding:8px 10px;background:var(--gris-med);border-radius:8px;">
+              <span style="font-size:12px;font-weight:600;">🔁 Reprendre une réunion précédente</span>
+              <select class="form-control" id="rd-reprise-select" onchange="this.dataset.manuel='1'" style="flex:1;min-width:260px;"><option value="">— Choisir la réunion à reprendre —</option></select>
+              <button class="btn btn-secondary btn-sm" type="button" onclick="rdReprendreReunion()">↺ Reprendre</button>
+            </div>
+            <div id="rd-reprise-hint" style="font-size:11px;color:var(--dim);margin-bottom:10px;"></div>
             <div class="form-grid">
               <div class="form-group span-2"><label>Intitulé *</label><input class="form-control" id="rd-pl-titre" list="rd-dl-titres" placeholder="ex: Réunion Direction Mensuelle — Juin 2025"><div class="rd-sugg" id="rd-sugg-titre"></div>
                 <datalist id="rd-dl-titres"></datalist><datalist id="rd-dl-lieux"></datalist><datalist id="rd-dl-animateurs"></datalist></div>
@@ -91708,6 +91714,7 @@ function rdSuggIndicateurs(themes) {
 function rdSuggUniques(liste) { var vu = {}; return liste.filter(function(x){ var k = (typeof x === 'string' ? x : x.t).toLowerCase(); if (vu[k]) return false; vu[k] = 1; return true; }); }
 
 function rdMajSuggestionsPlan() {
+  rdPeuplerReprise();
   var type = (document.getElementById('rd-pl-type') || {}).value || 'mensuelle';
   var themes = (RD_STATE && RD_STATE.selectedThemes) || [];
   var obj = (RD_SUGG_CATALOGUE.objectifs.types[type] || []).slice();
@@ -91798,6 +91805,69 @@ function rdGenererResumePV() {
   if ((r.actions || []).length) { L.push('\nActions à mener :'); r.actions.forEach(function(a){ L.push('- ' + a.titre + ' — ' + (a.responsable || '?') + (a.delai ? ', avant le ' + dateShort(a.delai) : '')); }); }
   champ.value = L.join('\n');
   toast('Résumé généré : relisez et complétez avant de sauvegarder.','success');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   REPRISE D'UNE RÉUNION PRÉCÉDENTE — recopie le cadre d'une réunion récurrente
+   (type, périodicité, durée, lieu, animateur, division, thèmes, objectifs, documents,
+   participants) et propose la prochaine date. Les décisions, actions, présences et
+   confirmations ne sont jamais reprises : la nouvelle réunion repart vierge.
+   ══════════════════════════════════════════════════════════════════════════ */
+function rdPeuplerReprise() {
+  var sel = document.getElementById('rd-reprise-select'); if (!sel) return;
+  var liste = (DATA.reunions_direction || []).filter(function(r){ return r.statut !== 'annulee'; })
+    .sort(function(a, b){ return (b.date || '').localeCompare(a.date || ''); });
+  var type = (document.getElementById('rd-pl-type') || {}).value;
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">— Choisir la réunion à reprendre —</option>' + liste.map(function(r){
+    return '<option value="' + r.id + '">' + rdDateHeure(r.date) + ' · ' + rdEscape(r.titre) + (r.type ? ' [' + rdEscape(r.type) + ']' : '') + '</option>';
+  }).join('');
+  if (cur && liste.some(function(r){ return r.id === cur; })) sel.value = cur;
+  else if (!sel.dataset.manuel) { var memeType = liste.filter(function(r){ return r.type === type; })[0]; sel.value = memeType ? memeType.id : ''; }
+  var h = document.getElementById('rd-reprise-hint');
+  if (h) h.textContent = liste.length ? 'Recopie le cadre de la réunion choisie (participants, thèmes, objectifs, documents) — sans ses décisions ni ses actions.' : 'Aucune réunion précédente à reprendre.';
+}
+function rdProchaineDate(r) {
+  var base = String(r.date || ''); if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(base)) return '';
+  var pas = { hebdo:{ j:7 }, mensuelle:{ m:1 }, trimestrielle:{ m:3 } }[r.periodicite];
+  if (!pas) return '';
+  var d = new Date(base), now = new Date();
+  for (var i = 0; i < 120 && d <= now; i++) { if (pas.j) d.setDate(d.getDate() + pas.j); else d.setMonth(d.getMonth() + pas.m); }
+  var p2 = function(n){ return ('0' + n).slice(-2); };
+  return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + 'T' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+}
+function rdTitreSuivant(titre, dateIso) {
+  var mois = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  var re = new RegExp('(' + mois.join('|') + ')\\s+\\d{4}', 'i');
+  var m = re.exec(titre || ''); if (!m || !dateIso) return titre || '';
+  var d = new Date(dateIso), nom = mois[d.getMonth()];
+  if (m[1].charAt(0) === m[1].charAt(0).toUpperCase()) nom = nom.charAt(0).toUpperCase() + nom.slice(1);
+  return titre.replace(re, nom + ' ' + d.getFullYear());
+}
+function rdReprendreReunion() {
+  var id = (document.getElementById('rd-reprise-select') || {}).value;
+  var r = (DATA.reunions_direction || []).find(function(x){ return x.id === id; });
+  if (!r) { toast('Choisissez la réunion à reprendre.', 'error'); return; }
+  var dejaSaisi = ['rd-pl-titre', 'rd-pl-objectifs', 'rd-pl-docs'].some(function(i){ return (document.getElementById(i).value || '').trim(); }) || RD_STATE.currentParticipants.length;
+  if (dejaSaisi && !confirm('Le formulaire contient déjà des informations : elles seront remplacées par celles de la réunion choisie. Continuer ?')) return;
+  var set = function(i, v){ var e = document.getElementById(i); if (e) e.value = (v == null ? '' : v); };
+  set('rd-pl-type', r.type || 'mensuelle'); set('rd-pl-periodicite', r.periodicite || 'ponctuelle');
+  set('rd-pl-duree', r.duree || 90); set('rd-pl-lieu', r.lieu); set('rd-pl-animateur', r.animateur);
+  set('rd-pl-division', r.division_id); set('rd-pl-objectifs', r.objectifs); set('rd-pl-docs', r.docs_prepa);
+  var date = rdProchaineDate(r); set('rd-pl-date', date);
+  set('rd-pl-titre', rdTitreSuivant(r.titre, date));
+  RD_STATE.selectedThemes = (r.themes || []).slice();
+  document.querySelectorAll('#rd-theme-chips .rd-chip').forEach(function(c){ c.classList.toggle('selected', RD_STATE.selectedThemes.indexOf(c.dataset.theme) !== -1); });
+  var ecartes = 0;
+  RD_STATE.currentParticipants = (r.participants || []).filter(function(p){
+    if (!p.employe_id) return true;   /* invité hors liste : conservé */
+    var e = (DATA.employes || []).find(function(x){ return x.id === p.employe_id; });
+    if (e && !empEstActif(e)) { ecartes++; return false; }
+    return true;
+  }).map(function(p){ var n = { id:uid(), nom:p.nom, role:p.role, contact:p.contact, confirme:false, present:false }; if (p.employe_id) n.employe_id = p.employe_id; return n; });
+  rdRenderParticipantChips(); rdMajSuggestionsPlan();
+  toast('Réunion reprise : ' + RD_STATE.currentParticipants.length + ' participant(s), ' + RD_STATE.selectedThemes.length + ' thème(s)'
+    + (ecartes ? ' — ' + ecartes + ' personne(s) sortie(s) du personnel écartée(s)' : '') + (date ? '. Prochaine date proposée : ' + rdDateHeure(date) : '. Renseignez la date.') + ' Vérifiez puis enregistrez.', 'success', 8000);
 }
 
 function rdOpenPlanModal() { switchTab('rd','planifier'); }
