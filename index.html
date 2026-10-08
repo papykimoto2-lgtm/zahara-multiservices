@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.126 · 2026-10-08 — PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.127 · 2026-10-08 — Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -17283,6 +17283,13 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             </div>
 
             <div class="form-section-title">Participants</div>
+            <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;align-items:center;">
+              <select class="form-control" id="rd-pl-p-emp" onfocus="rdPeuplerPersonnel()" onchange="rdChoisirPersonnel(this.value)" style="flex:1;min-width:260px;">
+                <option value="">👥 Choisir dans le personnel (nom — fonction)…</option>
+              </select>
+              <button class="btn btn-secondary btn-sm" type="button" onclick="rdAjouterTousPersonnel()" title="Ajoute d'un coup tout le personnel actif pas encore dans la liste">+ Tout le personnel</button>
+            </div>
+            <div style="font-size:11px;color:var(--blanc-dim);margin-bottom:8px;">Choisir une personne remplit les champs ci-dessous (modifiables), puis « + Ajouter ». Pour un participant <strong>hors liste</strong> (invité, partenaire…), saisir directement son nom, sa fonction et son contact.</div>
             <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
               <input class="form-control" id="rd-pl-p-nom" placeholder="Nom du participant" style="flex:1;min-width:140px;">
               <input class="form-control" id="rd-pl-p-role" placeholder="Fonction / Rôle" style="flex:1;min-width:140px;">
@@ -91500,6 +91507,7 @@ async function rdInitPage() {
   await rdLoadData();
   populateDivisionSelects();
   rdRenderDashboard();
+  rdPeuplerPersonnel();
   var pl = document.getElementById('rd-pl-animateur');
   if (pl && !pl.value && DATA.params && DATA.params.societe) {
     /* pré-remplir société */
@@ -91582,23 +91590,64 @@ function rdToggleTheme(el) {
   else           { RD_STATE.selectedThemes.push(t);       el.classList.add('selected'); }
 }
 
+/* Personnel actif proposé comme participant (hors personnes déjà ajoutées). */
+function rdPersonnelDisponible() {
+  var deja = {}; RD_STATE.currentParticipants.forEach(function(p){ if (p.employe_id) deja[p.employe_id] = true; });
+  return (DATA.employes || []).filter(function(e){ return empEstActif(e) && !deja[e.id]; })
+    .sort(function(a,b){ return ((a.nom||'')+' '+(a.prenoms||'')).localeCompare((b.nom||'')+' '+(b.prenoms||''), 'fr'); });
+}
+function rdPeuplerPersonnel() {
+  var sel = document.getElementById('rd-pl-p-emp'); if (!sel) return;
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">👥 Choisir dans le personnel (nom — fonction)…</option>'
+    + rdPersonnelDisponible().map(function(e){
+        return '<option value="' + e.id + '">' + rdEscape(((e.nom||'') + ' ' + (e.prenoms||'')).trim()) + (e.poste ? ' — ' + rdEscape(e.poste) : '') + '</option>';
+      }).join('');
+  sel.value = cur;
+}
+function rdChoisirPersonnel(id) {
+  if (!id) return;
+  var e = (DATA.employes || []).find(function(x){ return x.id === id; }); if (!e) return;
+  document.getElementById('rd-pl-p-nom').value = ((e.nom||'') + ' ' + (e.prenoms||'')).trim();
+  document.getElementById('rd-pl-p-role').value = e.poste || '';
+  document.getElementById('rd-pl-p-contact').value = e.tel || '';
+  document.getElementById('rd-pl-p-nom').dataset.employeId = id;
+}
+function rdAjouterTousPersonnel() {
+  var liste = rdPersonnelDisponible();
+  if (!liste.length) { toast('Tout le personnel actif figure déjà dans la liste.','info'); return; }
+  liste.forEach(function(e){
+    RD_STATE.currentParticipants.push({ id:uid(), employe_id:e.id, nom:((e.nom||'') + ' ' + (e.prenoms||'')).trim(), role:e.poste || 'Participant', contact:e.tel || '', confirme:false, present:false });
+  });
+  rdRenderParticipantChips();
+  toast(liste.length + ' personne(s) ajoutée(s). Retirez celles qui ne sont pas concernées (×).','success');
+}
+
 function rdAjouterParticipant() {
   var nom = document.getElementById('rd-pl-p-nom').value.trim();
   var role = document.getElementById('rd-pl-p-role').value.trim();
   var contact = document.getElementById('rd-pl-p-contact').value.trim();
   if (!nom) { toast('Saisir le nom du participant.','error'); return; }
-  RD_STATE.currentParticipants.push({ id:uid(), nom:nom, role:role||'Participant', contact:contact, confirme:false, present:false });
+  var empId = document.getElementById('rd-pl-p-nom').dataset.employeId || '';
+  var deja = RD_STATE.currentParticipants.some(function(p){ return (empId && p.employe_id === empId) || (p.nom || '').toLowerCase() === nom.toLowerCase(); });
+  if (deja) { toast('Ce participant figure déjà dans la liste.','info'); return; }
+  var part = { id:uid(), nom:nom, role:role||'Participant', contact:contact, confirme:false, present:false };
+  if (empId) part.employe_id = empId;   /* lien vers la fiche du personnel ; absent pour un invité hors liste */
+  RD_STATE.currentParticipants.push(part);
   rdRenderParticipantChips();
   ['rd-pl-p-nom','rd-pl-p-role','rd-pl-p-contact'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('rd-pl-p-nom').dataset.employeId = '';
+  var selE = document.getElementById('rd-pl-p-emp'); if (selE) selE.value = '';
 }
 
 function rdRenderParticipantChips() {
+  rdPeuplerPersonnel();
   var el = document.getElementById('rd-participant-chips');
   if (!el) return;
   el.innerHTML = RD_STATE.currentParticipants.map(function(p,i){
     return '<span class="rd-participant-chip">'
       +'<span class="rd-avatar" style="background:'+RD_AVATARS[i%RD_AVATARS.length]+';">'+p.nom.charAt(0).toUpperCase()+'</span>'
-      +rdEscape(p.nom)+' <small style="color:var(--dim);">· '+rdEscape(p.role)+'</small>'
+      +rdEscape(p.nom)+' <small style="color:var(--dim);">· '+rdEscape(p.role)+(p.employe_id?'':' · hors liste')+'</small>'
       +'<span class="rd-remove" onclick="rdRetirerParticipant(\''+p.id+'\')">×</span>'
       +'</span>';
   }).join('');
@@ -91652,6 +91701,7 @@ function rdResetPlanForm() {
   RD_STATE.currentParticipants = [];
   RD_STATE.selectedThemes = [];
   document.getElementById('rd-participant-chips').innerHTML = '';
+  rdPeuplerPersonnel();
   document.querySelectorAll('#rd-theme-chips .rd-chip').forEach(function(c){ c.classList.remove('selected'); });
   ['rd-pl-titre','rd-pl-date','rd-pl-animateur','rd-pl-objectifs','rd-pl-docs','rd-pl-lieu'].forEach(function(id){
     var el = document.getElementById(id); if(el) el.value = '';
