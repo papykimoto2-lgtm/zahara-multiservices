@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.118 · 2026-10-05 — Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.119 · 2026-10-08 — Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -34711,9 +34711,18 @@ function exportCommissionsCSV() {
 }
 
 /* ── ÉCRITURE COMPTABLE AUTOMATIQUE D'UN VERSEMENT (Débit Trésorerie / Crédit Client) ── */
+/* Les encaissements en espèces des souscripteurs (versements, cessions, recouvrements)
+   passent par la CAISSE CENTRALE SOUSCRIPTEURS : on prend le compte configuré sur cette
+   caisse (sous-compte 57…). À défaut de caisse « souscripteurs » active, on retombe sur
+   le compte par défaut « Trésorerie — Caisse ». Les décaissements (commissions, parc auto)
+   ne passent pas ici. */
+function _compteCaisseSouscripteurs() {
+  var c = (DATA.caisses || []).find(function(x){ return x && x.actif !== false && x.compte && /souscript/i.test(x.nom || ''); });
+  return c ? c.compte : requireCompteDefaut('treso_caisse');
+}
 function _compteTresoVersement(mode) {
   var cd = (DATA.params && DATA.params.comptes_defaut) || {};
-  return mode === 'especes' ? (requireCompteDefaut('treso_caisse')) : (mode === 'mobile_money' ? (requireCompteDefaut('treso_mobile')) : (requireCompteDefaut('treso_banque')));
+  return mode === 'especes' ? (_compteCaisseSouscripteurs()) : (mode === 'mobile_money' ? (requireCompteDefaut('treso_mobile')) : (requireCompteDefaut('treso_banque')));
 }
 async function genererEcritureVersement(versement) {
   var client = DATA.clients.find(function(c){ return c.id === versement.client_id; }) || {};
@@ -69315,7 +69324,7 @@ function showReleveTiersCession(cessionId) {
     + paiements.map(function(p) {
         soldeRunning += p.montant||0;
         var soldeCourant = montantTotal - soldeRunning;
-        var compteTreso = (p.mode === 'especes') ? '571' : (p.mode === 'mobile_money' ? '531' : '521');
+        var compteTreso = (p.mode === 'especes') ? _compteCaisseSouscripteurs() : (p.mode === 'mobile_money' ? '531' : '521');
         return '<tr>'
           +'<td>'+dateShort(p.date)+'</td>'
           +'<td>Versement'+(p.notes?' — '+p.notes:'')+'</td>'
@@ -108244,7 +108253,7 @@ async function cesGenererEcriture(c) {
   }
   /* 2. Encaissement : 521/571 (débit) / 4111 (crédit) */
   if ((c.montant_encaisse||0)>0) {
-    var compteTreso=(c.mode==='especes')?'571':'521';
+    var compteTreso=(c.mode==='especes')?_compteCaisseSouscripteurs():'521';
     var eenc={ id:uid(), ref:'ENC-CESS-'+an+'-'+prochainNumeroRef('ecritures','ENC-CESS',an,4), date:c.date||today(), piece:'CESSION',
       type:'tresorerie', libelle:'Encaissement cession — '+(c.acquereur||''),
       compte:compteTreso, compte_debit:compteTreso, compte_credit:cptTiers, montant:c.montant_encaisse||0,
@@ -108356,7 +108365,7 @@ function cesSync() {
     +(reste>0?(' · Reste : <strong style="color:var(--rouge);">'+fmtF(reste)+'</strong>'):'')
     +(sup>0?(' · '+fmtF(Math.round(pum))+' F/m²'):'')+(nb>0?(' · '+fmtF(Math.round(pul))+' F/lot'):'')
     +(_cesGet('ces-notarie')?'<br><span style="font-size:12px;color:#1A6B3A;">⚖️ Vente notariée</span>':'')
-    +'<br><span style="font-size:12px;color:var(--blanc-dim);">Écriture : vente 4111/707 + encaissement '+((_cesGet('ces-mode')==='especes')?'571':'521')+'/4111.</span>';
+    +'<br><span style="font-size:12px;color:var(--blanc-dim);">Écriture : vente 4111/707 + encaissement '+((_cesGet('ces-mode')==='especes')?_compteCaisseSouscripteurs():'521')+'/4111.</span>';
 }
 
 /* [v31] Duplicata supprimé : ancienne version de cesSave() — la définition active est plus bas dans ce fichier. */
@@ -109101,7 +109110,7 @@ async function crecSavePaiement() {
     if (p.ecriture_id && DATA.ecritures) {
       var e = DATA.ecritures.find(function (x) { return x.id === p.ecriture_id; });
       if (e) {
-        var compteTreso = (p.mode === 'especes') ? '571' : (p.mode === 'mobile_money' ? '531' : '521');
+        var compteTreso = (p.mode === 'especes') ? _compteCaisseSouscripteurs() : (p.mode === 'mobile_money' ? '531' : '521');
         e.date = p.date; e.montant = montant; e.mode = p.mode;
         e.compte = compteTreso; e.compte_debit = compteTreso;
         e.libelle = 'Recouvrement acquéreur foncier — ' + (c.acquereur || '') + ' (modifié)';
@@ -109157,7 +109166,7 @@ async function crecSavePaiement() {
 async function crecGenEcriture(c, p) {
   if (!DATA.ecritures) DATA.ecritures = [];
   var an = (p.date || today()).slice(0, 4);
-  var compteTreso = (p.mode === 'especes') ? '571' : (p.mode === 'mobile_money' ? '531' : '521');
+  var compteTreso = (p.mode === 'especes') ? _compteCaisseSouscripteurs() : (p.mode === 'mobile_money' ? '531' : '521');
   var compteCre = crecCompte();
   var e = {
     id: uid(), ref: 'ENC-ACQ-' + an + '-' + prochainNumeroRef('ecritures','ENC-ACQ',an,4), date: p.date || today(), piece: 'RECOUVREMENT',
@@ -124868,6 +124877,12 @@ function caisseConfigModal(caisseId) {
   }).join('');
   selDiv.value = c ? (c.division_id || '') : '';
   selDiv.onchange = function(){ _caisseConfigRenderCaissieres(c); };
+  /* Comptes de caisse proposés : tout le groupe 57 du plan (571, 572, et leurs sous-comptes). */
+  var dlCc = document.getElementById('dl-cc-compte');
+  if (dlCc) {
+    dlCc.innerHTML = (APP.planComptable || []).filter(function(p){ return p && p.code && String(p.code).indexOf('57') === 0; })
+      .map(function(p){ return '<option value="' + escHtml(p.code) + '">' + escHtml(p.label || '') + '</option>'; }).join('');
+  }
   document.getElementById('cc-compte').value = c ? (c.compte||'571') : '571';
   document.getElementById('cc-actif').value = (c && c.actif === false) ? '0' : '1';
   document.getElementById('cc-envoi-auto-jour').checked = !c || c.envoi_auto_journalier !== false;
@@ -124909,7 +124924,13 @@ async function caisseSaveConfig() {
     if (!nom) { toast('Le nom de la caisse est obligatoire.', 'error'); return; }
     var divisionId = document.getElementById('cc-division').value;
     if ((DATA.divisions||[]).length && !divisionId) { toast('Veuillez rattacher la caisse à une division.', 'error'); return; }
-    var compte = document.getElementById('cc-compte').value;
+    var compte = (document.getElementById('cc-compte').value || '').trim();
+    /* Le compte doit exister dans le plan et appartenir au groupe 57 (trésorerie caisse) :
+       un code libre ferait ventiler les bons sur un compte inconnu du grand livre. */
+    if (!compte || compte.indexOf('57') !== 0 || !(APP.planComptable || []).some(function(p){ return p && p.code === compte; })) {
+      toast('Compte de caisse invalide : choisissez un compte du plan commençant par 57 (ex. 57110001).', 'error');
+      return;
+    }
     var actif = document.getElementById('cc-actif').value === '1';
     var caissiereIds = Array.from(document.getElementById('cc-caissieres').selectedOptions).map(function(o){ return o.value; });
     var destInternes = Array.from(document.getElementById('cc-dest-internes').selectedOptions).map(function(o){ return o.value; });
@@ -133009,10 +133030,9 @@ goTo = function(page) {
           <div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">Chaque caisse est rattachée à une division du promoteur (voir Divisions). Le tableau de bord ventile automatiquement par division.</div>
         </div>
         <div class="form-group"><label>Compte SYSCOHADA</label>
-          <select class="form-control" id="cc-compte">
-            <option value="571">571 — Caisse principale</option>
-            <option value="572">572 — Caisse annexe / petite caisse</option>
-          </select>
+          <input type="text" class="form-control" id="cc-compte" list="dl-cc-compte" placeholder="ex. 57110001" autocomplete="off">
+          <datalist id="dl-cc-compte"></datalist>
+          <div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">Un sous-compte de trésorerie (57…) propre à cette caisse, pour que le grand livre suive chaque caisse séparément.</div>
         </div>
         <div class="form-group"><label>Statut</label>
           <select class="form-control" id="cc-actif"><option value="1">Active</option><option value="0">Inactive</option></select>
