@@ -19,7 +19,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.139 · 2026-10-08 — Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.140 · 2026-10-08 — Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -11300,9 +11300,15 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </div>
           <div class="modal-body">
             <div class="form-grid">
+              <div class="form-group span-2" style="background:var(--gris-med);padding:8px 10px;border-radius:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span style="font-size:12px;font-weight:600;">🔁 Reprendre</span>
+                <select class="form-control" id="om-reprise-select" style="flex:1;min-width:240px;"><option value="">— Reprendre un ordre de mission précédent —</option></select>
+                <button class="btn btn-secondary btn-sm" type="button" onclick="omReprendre()">↺ Reprendre</button>
+                <datalist id="om-dl-lieux"></datalist><datalist id="om-dl-objets"></datalist>
+              </div>
               <div class="form-group"><label>N° Ordre de mission</label><input type="text" class="form-control" id="om-numero" readonly></div>
               <div class="form-group"><label>Type de mission *</label>
-                <select class="form-control" id="om-type" onchange="onChangeTypeOM()">
+                <select class="form-control" id="om-type" onchange="onChangeTypeOM();omMajSuggestions()">
                   <option value="prospection">🔍 Prospection commerciale</option>
                   <option value="foncier">🗺️ Portefeuille Foncier</option>
                 </select>
@@ -11327,9 +11333,9 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 </select>
               </div>
               <div class="form-group span-2"><label>Objet de la mission *</label>
-                <input type="text" class="form-control" id="om-objet" placeholder="Ex: Prospection nouveaux clients zone Bingerville / Négociation acquisition parcelle...">
+                <input type="text" class="form-control" id="om-objet" list="om-dl-objets" placeholder="Ex: Prospection nouveaux clients zone Bingerville / Négociation acquisition parcelle..."><div class="rd-sugg" id="om-sugg-objet"></div>
               </div>
-              <div class="form-group"><label>Destination / Zone *</label><input type="text" class="form-control" id="om-destination" placeholder="Commune, sous-préfecture, localité..."></div>
+              <div class="form-group"><label>Destination / Zone *</label><input type="text" class="form-control" id="om-destination" list="om-dl-lieux" placeholder="Commune, sous-préfecture, localité..."><div class="rd-sugg" id="om-sugg-destination"></div></div>
               <div class="form-group" id="om-transport-wrap">
                 <label>Moyen de transport</label>
                 <select class="form-control" id="om-transport" onchange="onChangeOMTransport()">
@@ -11346,7 +11352,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div id="om-vehicule-alerte" style="font-size:11px;margin-top:4px;"></div>
               </div>
               <div class="form-group" id="om-immat-libre-wrap"><label>Immatriculation / référence du véhicule</label><input type="text" class="form-control" id="om-immatriculation" placeholder="Ex: CI-1234-AB (véhicule personnel, moto...)"></div>
-              <div class="form-group"><label>Date de début *</label><input type="date" class="form-control" id="om-date-debut"></div>
+              <div class="form-group"><label>Date de début *</label><input type="date" class="form-control" id="om-date-debut" onchange="var f=document.getElementById('om-date-fin'); if(!f.value||f.value<this.value) f.value=this.value;"></div>
               <div class="form-group"><label>Date de fin *</label><input type="date" class="form-control" id="om-date-fin"></div>
               <div class="form-group span-2" style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-top:4px;">
                 <label style="color:var(--or);font-weight:600;">💰 Détail des frais de mission (usage interne — n'apparaît pas sur le document imprimé)</label>
@@ -11364,7 +11370,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 </select>
               </div>
               <div class="form-group span-2"><label>Instructions particulières</label>
-                <textarea class="form-control" id="om-instructions" rows="2" placeholder="Consignes, personnes à rencontrer, documents à emporter..."></textarea>
+                <textarea class="form-control" id="om-instructions" rows="2" placeholder="Consignes, personnes à rencontrer, documents à emporter..."></textarea><div class="rd-sugg" id="om-sugg-instructions"></div>
               </div>
               <div class="form-group span-2" style="border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;margin-top:4px;">
                 <label style="color:var(--or);font-weight:600;">📝 Compte-rendu de mission (à remplir au retour)</label>
@@ -88295,6 +88301,105 @@ function _omCalcFraisTotal() {
   return total;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   AIDE À LA SAISIE — ORDRES DE MISSION ET PV DE MISSION
+   Même principe que les réunions : on choisit ou on saisit. Suggestions selon le type de mission, lieux
+   déjà utilisés ou connus (programmes, parcelles, missions passées), reprise d'un ordre de mission
+   précédent, trame de PV préremplie, personnes rencontrées choisies parmi les prospects et souscripteurs.
+   ══════════════════════════════════════════════════════════════════════════ */
+var OM_SUGG = {
+  objet: {
+    prospection:['Prospection commerciale de nouveaux souscripteurs','Présentation des programmes et des lots disponibles','Suivi et relance des prospects','Visite de terrain avec des clients','Remise de dossiers et collecte de pièces'],
+    foncier:['Reconnaissance de la parcelle et vérification des limites','Négociation d\'acquisition avec les propriétaires coutumiers','Rencontre du chef de village / chef de terre','Bornage contradictoire','Suivi du dossier administratif (ACD / titre foncier)']
+  },
+  instructions: {
+    prospection:['Se présenter avec la carte professionnelle','Emporter brochures, fiches de souscription et reçus','Rendre compte au chef de mission chaque soir','Respecter le budget de mission alloué'],
+    foncier:['Emporter les plans et les documents fonciers du dossier','Ne signer aucun engagement sans accord de la Direction','Prendre des photos géolocalisées des limites','Établir le PV de mission au retour']
+  },
+  pvResultats: {
+    prospection:['Prospects rencontrés : ','Intérêt exprimé pour le programme : ','Dossiers de souscription remis / collectés : ','Rendez-vous fixés : '],
+    foncier:['Limites de la parcelle vérifiées sur le terrain','Accord de principe obtenu du propriétaire / chef de terre','Pièces foncières consultées : ','Litige ou contestation constaté : ']
+  },
+  pvDifficultes:['Accès difficile / état des pistes','Interlocuteur absent ou indisponible','Contestation des limites','Conditions météorologiques','Moyen de transport indisponible'],
+  pvActions:['Relancer les personnes rencontrées sous 48 h','Transmettre le dossier au service juridique','Programmer une seconde visite','Établir la proposition commerciale','Régulariser les pièces manquantes']
+};
+function omLieuxConnus() {
+  var l = [];
+  (DATA.ordres_mission || []).forEach(function(o){ if (o.destination) l.push(o.destination); });
+  (DATA.programmes || []).forEach(function(p){ if (p.localisation) l.push(p.localisation); if (p.commune) l.push(p.commune); });
+  (DATA.parcelles || []).forEach(function(p){ if (p.localisation) l.push(p.localisation); if (p.commune) l.push(p.commune); });
+  var vu = {}; return l.map(function(x){ return String(x).trim(); }).filter(function(x){ if (!x || vu[x.toLowerCase()]) return false; vu[x.toLowerCase()] = 1; return true; });
+}
+function omMajSuggestions() {
+  var type = (document.getElementById('om-type') || {}).value || 'prospection';
+  rdSuggRender('om-sugg-objet', (OM_SUGG.objet[type] || []).slice());
+  rdSuggRender('om-sugg-destination', omLieuxConnus().slice(0, 12));
+  rdSuggRender('om-sugg-instructions', (OM_SUGG.instructions[type] || []).slice());
+  var dl = document.getElementById('om-dl-lieux');
+  if (dl) dl.innerHTML = omLieuxConnus().map(function(v){ return '<option value="' + rdEscape(v) + '">'; }).join('');
+  var dlo = document.getElementById('om-dl-objets');
+  if (dlo) { var vu = {}; dlo.innerHTML = (DATA.ordres_mission || []).map(function(o){ return o.objet; }).filter(function(v){ v = (v || '').trim(); if (!v || vu[v.toLowerCase()]) return false; vu[v.toLowerCase()] = 1; return true; }).map(function(v){ return '<option value="' + rdEscape(v) + '">'; }).join(''); }
+}
+/* Reprise d'un ordre de mission précédent : recopie équipe, chef, divisions, objet, destination, transport, frais et consignes ; dates à saisir. */
+function omPeuplerReprise() {
+  var sel = document.getElementById('om-reprise-select'); if (!sel) return;
+  var liste = (DATA.ordres_mission || []).filter(function(o){ return o.id !== APP.editingOMId && o.statut !== 'annulee'; })
+    .sort(function(a, b){ return (b.date_debut || '').localeCompare(a.date_debut || ''); });
+  sel.innerHTML = '<option value="">— Reprendre un ordre de mission précédent —</option>' + liste.map(function(o){
+    return '<option value="' + o.id + '">' + rdEscape(o.numero) + ' · ' + rdEscape(o.objet || '') + ' · ' + rdEscape(o.destination || '') + '</option>';
+  }).join('');
+  sel.parentNode.style.display = (APP.editingOMId || !liste.length) ? 'none' : '';
+}
+function omReprendre() {
+  var id = (document.getElementById('om-reprise-select') || {}).value;
+  var o = (DATA.ordres_mission || []).find(function(x){ return x.id === id; });
+  if (!o) { toast('Choisissez l\'ordre de mission à reprendre.', 'error'); return; }
+  if (((document.getElementById('om-objet').value || '').trim() || (document.getElementById('om-destination').value || '').trim()) && !confirm('Le formulaire contient déjà des informations : elles seront remplacées. Continuer ?')) return;
+  document.getElementById('om-type').value = o.type || 'prospection';
+  _omPopulateChef(o.chef_id); _omPopulateEquipe(o.equipe_ids || []); _omPopulateDivisions(o.division_ids || []); _omSyncDivisionsFromEquipe();
+  _omPopulateParcelles(o.parcelle_id); onChangeTypeOM();
+  document.getElementById('om-objet').value = o.objet || ''; document.getElementById('om-destination').value = o.destination || '';
+  document.getElementById('om-transport').value = o.transport || 'vehicule_societe'; document.getElementById('om-immatriculation').value = o.immatriculation || '';
+  onChangeOMTransport();
+  if (o.vehicule_id) { document.getElementById('om-vehicule-id').value = o.vehicule_id; onChangeOMVehicule(); }
+  _omRenderFraisDetail(o.frais_detail || null);
+  document.getElementById('om-instructions').value = o.instructions || '';
+  omMajSuggestions();
+  toast('Ordre de mission repris : saisissez la période, vérifiez puis enregistrez.', 'success', 6000);
+}
+/* ── PV de mission ── */
+function pvOmTrame(o) {
+  var equipe = (o.equipe_ids || []).filter(function(id){ return id !== o.chef_id; }).map(_omNomAgent).join(', ');
+  return 'Mission « ' + (o.objet || '') + ' » à ' + (o.destination || '—') + ', du ' + dateShort(o.date_debut) + ' au ' + dateShort(o.date_fin)
+    + ', conduite par ' + _omNomAgent(o.chef_id) + (equipe ? ' avec ' + equipe : '') + '.\n\nDéroulement :\n• ';
+}
+function pvMajSuggestions() {
+  var o = (DATA.ordres_mission || []).find(function(x){ return x.id === PV_OM.id; }); if (!o) return;
+  var type = o.type || 'prospection';
+  var lieux = [o.destination].concat((DATA.programmes || []).map(function(p){ return p.nom; })).concat(omLieuxConnus()).filter(Boolean);
+  var vu = {}; lieux = lieux.filter(function(x){ x = String(x).trim(); if (!x || vu[x.toLowerCase()]) return false; vu[x.toLowerCase()] = 1; return true; }).slice(0, 10);
+  rdSuggRender('pv-sugg-lieux', lieux);
+  rdSuggRender('pv-sugg-resultats', (OM_SUGG.pvResultats[type] || []).slice());
+  rdSuggRender('pv-sugg-difficultes', OM_SUGG.pvDifficultes.slice());
+  rdSuggRender('pv-sugg-actions', OM_SUGG.pvActions.slice());
+  rdSuggRender('pv-sugg-frais', o.frais ? [{ t:'Frais alloués : ' + fmtF(o.frais) + ' F', v:o.frais }] : []);
+  var sel = document.getElementById('pv-om-contact');
+  if (sel) {
+    var leads = (DATA.leads || []).filter(function(l){ return l.nom; }), cl = (DATA.clients || []).filter(function(c){ return c.nom; });
+    sel.innerHTML = '<option value="">👥 Ajouter un prospect ou un souscripteur…</option>'
+      + (leads.length ? '<optgroup label="Prospects">' + leads.map(function(l){ return '<option value="L:' + l.id + '">' + rdEscape(l.nom) + (l.tel ? ' — ' + rdEscape(l.tel) : '') + '</option>'; }).join('') + '</optgroup>' : '')
+      + (cl.length ? '<optgroup label="Souscripteurs">' + cl.map(function(c){ return '<option value="C:' + c.id + '">' + rdEscape(((c.nom || '') + ' ' + (c.prenoms || '')).trim()) + (c.dossier ? ' · ' + rdEscape(c.dossier) : '') + '</option>'; }).join('') + '</optgroup>' : '');
+  }
+}
+function pvAjouterContact(val) {
+  if (!val) return;
+  var type = val.charAt(0), id = val.slice(2), r;
+  if (type === 'L') { var l = (DATA.leads || []).find(function(x){ return x.id === id; }); if (l) r = { nom:l.nom, qualite:'Prospect', contact:l.tel || '', objet:'' }; }
+  else { var c = (DATA.clients || []).find(function(x){ return x.id === id; }); if (c) r = { nom:((c.nom || '') + ' ' + (c.prenoms || '')).trim(), qualite:'Souscripteur', contact:c.tel || '', objet:'' }; }
+  if (r && !PV_OM.rencontres.some(function(x){ return x.nom === r.nom; })) { PV_OM.rencontres.push(r); pvOmLignes(); }
+  var sel = document.getElementById('pv-om-contact'); if (sel) sel.value = '';
+}
+
 function openOrdreMission(id) {
   APP.editingOMId = id || null;
   document.getElementById('modal-om-title').textContent = id ? 'Modifier l\'Ordre de Mission' : 'Nouvel Ordre de Mission';
@@ -88319,6 +88424,7 @@ function openOrdreMission(id) {
   document.getElementById('om-statut').value = o ? (o.statut || 'planifiee') : 'planifiee';
   document.getElementById('om-instructions').value = o ? (o.instructions || '') : '';
   document.getElementById('om-compte-rendu').value = o ? (o.compte_rendu || '') : '';
+  omMajSuggestions(); omPeuplerReprise();
   document.getElementById('modal-om').classList.add('open');
 }
 
@@ -88502,12 +88608,12 @@ function pvOmEnsureModal(){
     + '<div class="form-group"><label>Heure de départ</label><input type="time" class="form-control" id="pv-om-hdep"></div>'
     + '<div class="form-group"><label>Heure de retour</label><input type="time" class="form-control" id="pv-om-hret"></div>'
     + '<div class="form-group span-2"><label>Agents effectivement présents</label><div id="pv-om-presents" style="display:flex;flex-wrap:wrap;gap:6px 16px;border:1px solid var(--bord);border-radius:var(--r);padding:8px;"></div></div>'
-    + '<div class="form-group span-2"><label>Lieux visités</label><input type="text" class="form-control" id="pv-om-lieux" placeholder="Localités, sites, parcelles visités…"></div>'
-    + '<div class="form-group span-2"><label>Personnes rencontrées</label><div id="pv-om-rencontres"></div><button type="button" class="btn btn-secondary btn-sm" onclick="pvOmAddRencontre()">+ Personne rencontrée</button></div>'
-    + '<div class="form-group span-2"><label>Constats et résultats obtenus *</label><textarea class="form-control" id="pv-om-resultats" rows="4" placeholder="Ce qui a été constaté, obtenu, convenu…"></textarea></div>'
-    + '<div class="form-group span-2"><label>Décisions et actions à suivre</label><div id="pv-om-decisions"></div><button type="button" class="btn btn-secondary btn-sm" onclick="pvOmAddDecision()">+ Action à suivre</button></div>'
-    + '<div class="form-group span-2"><label>Difficultés rencontrées</label><textarea class="form-control" id="pv-om-difficultes" rows="2"></textarea></div>'
-    + '<div class="form-group"><label>Frais réellement engagés (FCFA)</label><input type="number" class="form-control" id="pv-om-frais" min="0" step="500"></div>'
+    + '<div class="form-group span-2"><label>Lieux visités</label><input type="text" class="form-control" id="pv-om-lieux" placeholder="Localités, sites, parcelles visités…"><div class="rd-sugg" id="pv-sugg-lieux"></div></div>'
+    + '<div class="form-group span-2"><label>Personnes rencontrées</label><div id="pv-om-rencontres"></div><div style="display:flex;gap:6px;flex-wrap:wrap;"><select class="form-control" id="pv-om-contact" onchange="pvAjouterContact(this.value)" style="max-width:340px;"></select><button type="button" class="btn btn-secondary btn-sm" onclick="pvOmAddRencontre()">+ Saisir une personne</button></div></div>'
+    + '<div class="form-group span-2"><label>Constats et résultats obtenus *</label><textarea class="form-control" id="pv-om-resultats" rows="4" placeholder="Ce qui a été constaté, obtenu, convenu…"></textarea><div class="rd-sugg" id="pv-sugg-resultats"></div></div>'
+    + '<div class="form-group span-2"><label>Décisions et actions à suivre</label><div id="pv-om-decisions"></div><button type="button" class="btn btn-secondary btn-sm" onclick="pvOmAddDecision()">+ Action à suivre</button><div class="rd-sugg" id="pv-sugg-actions"></div></div>'
+    + '<div class="form-group span-2"><label>Difficultés rencontrées</label><textarea class="form-control" id="pv-om-difficultes" rows="2"></textarea><div class="rd-sugg" id="pv-sugg-difficultes"></div></div>'
+    + '<div class="form-group"><label>Frais réellement engagés (FCFA)</label><input type="number" class="form-control" id="pv-om-frais" min="0" step="500"><div class="rd-sugg" id="pv-sugg-frais"></div></div>'
     + '<div class="form-group"><label>Statut du PV</label><select class="form-control" id="pv-om-statut"><option value="brouillon">📝 Brouillon</option><option value="signe">✅ Signé / clôturé</option></select></div>'
     + '</div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal(\'modal-pv-om\')">Fermer</button>'
     + '<button class="btn btn-secondary" onclick="pvOmSave(true)">🖨️ Enregistrer et imprimer</button>'
@@ -88555,11 +88661,12 @@ function pvOmOpen(omId){
   document.getElementById('pv-om-hdep').value = p.heure_depart || '';
   document.getElementById('pv-om-hret').value = p.heure_retour || '';
   document.getElementById('pv-om-lieux').value = p.lieux || o.destination || '';
-  document.getElementById('pv-om-resultats').value = p.resultats || o.compte_rendu || '';
+  document.getElementById('pv-om-resultats').value = p.resultats || o.compte_rendu || pvOmTrame(o);
   document.getElementById('pv-om-difficultes').value = p.difficultes || '';
   document.getElementById('pv-om-frais').value = (p.frais_reels != null) ? p.frais_reels : '';
   document.getElementById('pv-om-statut').value = p.statut || 'brouillon';
   pvOmLignes();
+  pvMajSuggestions();
   document.getElementById('modal-pv-om').classList.add('open');
 }
 async function pvOmSave(imprimer){
@@ -91852,7 +91959,15 @@ var RD_SUGG_CFG = {
   'rd-sugg-decisions': { cible:'rd-decision-input', mode:'debut' },
   'rd-sugg-actions':   { cible:'rd-act-titre', mode:'debut' },
   'rd-sugg-pvdec':     { cible:'rd-pv-decision-input', mode:'debut' },
-  'rd-sugg-pvact':     { cible:'rd-pva-titre', mode:'debut' }
+  'rd-sugg-pvact':     { cible:'rd-pva-titre', mode:'debut' },
+  'om-sugg-objet':        { cible:'om-objet', mode:'remplace' },
+  'om-sugg-destination':  { cible:'om-destination', mode:'remplace' },
+  'om-sugg-instructions': { cible:'om-instructions', mode:'ligne' },
+  'pv-sugg-lieux':        { cible:'pv-om-lieux', mode:'virgule' },
+  'pv-sugg-resultats':    { cible:'pv-om-resultats', mode:'ligne' },
+  'pv-sugg-difficultes':  { cible:'pv-om-difficultes', mode:'ligne' },
+  'pv-sugg-actions':      { mode:'pvaction' },
+  'pv-sugg-frais':        { cible:'pv-om-frais', mode:'valeur' }
 };
 var RD_SUGG_CACHE = {};
 
@@ -91861,7 +91976,7 @@ function rdSuggRender(zoneId, items) {
   var cfg = RD_SUGG_CFG[zoneId] || {};
   RD_SUGG_CACHE[zoneId] = items;
   var cible = cfg.cible ? document.getElementById(cfg.cible) : null;
-  var courant = (cible && cfg.mode === 'ligne') ? (cible.value || '').toLowerCase() : '';
+  var courant = (cible && (cfg.mode === 'ligne' || cfg.mode === 'virgule')) ? (cible.value || '').toLowerCase() : '';
   if (!items.length) { z.innerHTML = ''; return; }
   z.innerHTML = '<span class="rd-sugg-lib">💡 Suggestions :</span>' + items.map(function(it, i){
     var texte = typeof it === 'string' ? it : it.t;
@@ -91881,15 +91996,26 @@ function rdSuggClic(zoneId, i) {
     rdRenderODJ(); rdMajSuggestionsPrepa();
     return;
   }
+  if (cfg.mode === 'pvaction') {
+    if (PV_OM.decisions.some(function(x){ return (x.action || '').toLowerCase() === texte.toLowerCase(); })) return;
+    PV_OM.decisions.push({ action:texte, responsable:'', echeance:'' }); pvOmLignes(); return;
+  }
   var c = document.getElementById(cfg.cible); if (!c) return;
-  if (cfg.mode === 'ligne') {
+  if (cfg.mode === 'valeur') { c.value = (it && it.v != null) ? it.v : texte; }
+  else if (cfg.mode === 'remplace') { c.value = texte; }
+  else if (cfg.mode === 'virgule') {
+    if ((c.value || '').toLowerCase().indexOf(texte.toLowerCase()) !== -1) return;
+    c.value = c.value.trim() ? c.value.replace(/[\s,]+$/, '') + ', ' + texte : texte;
+  } else if (cfg.mode === 'ligne') {
     if ((c.value || '').toLowerCase().indexOf(texte.toLowerCase()) !== -1) return;
     c.value = (c.value.trim() ? c.value.replace(/\s+$/, '') + '\n' : '') + '• ' + texte;
   } else {
     c.value = c.value.trim() ? c.value.replace(/\s+$/, '') + ' ' + texte : texte;
     c.focus(); try { c.setSelectionRange(c.value.length, c.value.length); } catch (e) {}
   }
-  rdMajSuggestionsPlan(); rdMajSuggestionsPrepa();
+  if (zoneId.indexOf('om-') === 0) omMajSuggestions();
+  else if (zoneId.indexOf('pv-') === 0) pvMajSuggestions();
+  else { rdMajSuggestionsPlan(); rdMajSuggestionsPrepa(); }
 }
 /* Suggestions chiffrées : un indicateur en alerte devient un point à traiter. */
 function rdSuggIndicateurs(themes) {
