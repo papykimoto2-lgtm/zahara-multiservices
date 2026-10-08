@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.127 · 2026-10-08 — Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.128 · 2026-10-08 — Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -1330,6 +1330,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   transition:all var(--tr);
 }
 .rd-chip.selected, .rd-chip:hover { background:var(--or-glow);border-color:var(--or);color:var(--or); }
+.rd-sugg { display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:5px; }
+.rd-sugg-lib { font-size:11px;color:var(--dim);margin-right:2px; }
+.rd-sugg-chip { display:inline-flex;align-items:center;padding:3px 10px;border-radius:14px;font-size:11px;cursor:pointer;background:#F4F6F9;border:1px dashed var(--bord);color:var(--dim);transition:all var(--tr); }
+.rd-sugg-chip:hover { background:var(--or-glow);border-color:var(--or);color:var(--or); }
+.rd-sugg-chip.deja { opacity:.5;border-style:solid; }
+.rd-delais { display:flex;flex-wrap:wrap;gap:4px;margin-top:4px; }
 .rd-chip.selected { box-shadow:0 0 0 2px var(--or); }
 
 /* Participant chip */
@@ -17238,9 +17244,10 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="card">
             <div class="form-section-title">Informations Générales</div>
             <div class="form-grid">
-              <div class="form-group span-2"><label>Intitulé *</label><input class="form-control" id="rd-pl-titre" placeholder="ex: Réunion Direction Mensuelle — Juin 2025"></div>
+              <div class="form-group span-2"><label>Intitulé *</label><input class="form-control" id="rd-pl-titre" list="rd-dl-titres" placeholder="ex: Réunion Direction Mensuelle — Juin 2025"><div class="rd-sugg" id="rd-sugg-titre"></div>
+                <datalist id="rd-dl-titres"></datalist><datalist id="rd-dl-lieux"></datalist><datalist id="rd-dl-animateurs"></datalist></div>
               <div class="form-group"><label>Type *</label>
-                <select class="form-control" id="rd-pl-type">
+                <select class="form-control" id="rd-pl-type" onchange="rdMajSuggestionsPlan()">
                   <option value="mensuelle">Mensuelle</option>
                   <option value="hebdomadaire">Hebdomadaire</option>
                   <option value="trimestrielle">Trimestrielle</option>
@@ -17259,12 +17266,12 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               </div>
               <div class="form-group"><label>Date & Heure *</label><input class="form-control" id="rd-pl-date" type="datetime-local"></div>
               <div class="form-group"><label>Durée estimée (min)</label><input class="form-control" id="rd-pl-duree" type="number" value="90" min="15" step="15"></div>
-              <div class="form-group"><label>Lieu / Salle</label><input class="form-control" id="rd-pl-lieu" placeholder="Salle de réunion Direction"></div>
-              <div class="form-group"><label>Animateur / Président *</label><input class="form-control" id="rd-pl-animateur" placeholder="Nom de l'animateur"></div>
+              <div class="form-group"><label>Lieu / Salle</label><input class="form-control" id="rd-pl-lieu" list="rd-dl-lieux" placeholder="Salle de réunion Direction"></div>
+              <div class="form-group"><label>Animateur / Président *</label><input class="form-control" id="rd-pl-animateur" list="rd-dl-animateurs" placeholder="Nom de l'animateur"></div>
               <div class="form-group"><label>🏢 Division</label>
                 <select class="form-control" id="rd-pl-division"><option value="">— Toutes divisions (Groupe) —</option></select>
               </div>
-              <div class="form-group span-2"><label>Objectifs</label><textarea class="form-control" id="rd-pl-objectifs" placeholder="Objectifs principaux de cette réunion..."></textarea></div>
+              <div class="form-group span-2"><label>Objectifs</label><textarea class="form-control" id="rd-pl-objectifs" placeholder="Objectifs principaux de cette réunion..."></textarea><div class="rd-sugg" id="rd-sugg-objectifs"></div></div>
             </div>
 
             <div class="form-section-title">🔍 Thèmes — Analyse 360° ImmoSuite</div>
@@ -17300,6 +17307,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
 
             <div class="form-section-title">Documents Préparatoires</div>
             <textarea class="form-control" id="rd-pl-docs" placeholder="Liste des documents à préparer (rapports, tableaux de bord, états financiers...)"></textarea>
+            <div class="rd-sugg" id="rd-sugg-docs"></div>
 
             <div class="modal-footer" style="border:none;padding:16px 0 0;justify-content:flex-end;">
               <button class="btn btn-secondary" onclick="rdResetPlanForm()">Effacer</button>
@@ -17368,6 +17376,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <select class="form-control" id="rd-odj-resp" style="max-width:200px;"><option value="">Responsable</option></select>
                 <button class="btn btn-secondary btn-sm" onclick="rdAjouterODJ()">+ Ajouter</button>
               </div>
+              <div class="rd-sugg" id="rd-sugg-odj"></div>
             </div>
             <div class="card">
               <div class="card-title">📊 Indicateurs 360° à Présenter</div>
@@ -17375,7 +17384,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             </div>
             <div class="card">
               <div class="card-title">📁 Documents & Notes de Préparation</div>
-              <textarea class="form-control" id="rd-prep-docs" placeholder="Documents à préparer, rapports, états financiers..." style="margin-bottom:10px;"></textarea>
+              <textarea class="form-control" id="rd-prep-docs" placeholder="Documents à préparer, rapports, états financiers..." style="margin-bottom:4px;"></textarea>
+              <div class="rd-sugg" id="rd-sugg-prepdocs" style="margin-bottom:10px;"></div>
               <label style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;">Notes de préparation</label>
               <textarea class="form-control" id="rd-prep-notes" placeholder="Points sensibles, contexte à partager..."></textarea>
               <div style="margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="rdSauvegarderPreparation()">💾 Sauvegarder préparation</button></div>
@@ -17427,6 +17437,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div class="form-section-title">Décisions Prises</div>
                 <div id="rd-decisions-live" style="margin-bottom:8px;"></div>
                 <div style="display:flex;gap:8px;"><input class="form-control" id="rd-decision-input" placeholder="Saisir une décision..." style="flex:1;"><button class="btn btn-secondary btn-sm" onclick="rdAjouterDecision()">+ Décision</button></div>
+                <div class="rd-sugg" id="rd-sugg-decisions"></div>
               </div>
             </div>
             <div class="tab-pane" id="tab-rdreal-actions-live">
@@ -17434,9 +17445,9 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div class="card-title">⚡ Actions Identifiées en Séance</div>
                 <div id="rd-actions-live" style="margin-bottom:10px;"></div>
                 <div class="form-grid">
-                  <div class="form-group span-2"><input class="form-control" id="rd-act-titre" placeholder="Description de l'action *"></div>
+                  <div class="form-group span-2"><input class="form-control" id="rd-act-titre" placeholder="Description de l'action *"><div class="rd-sugg" id="rd-sugg-actions"></div></div>
                   <div class="form-group"><select class="form-control" id="rd-act-resp"><option value="">Responsable *</option></select></div>
-                  <div class="form-group"><input class="form-control" id="rd-act-delai" type="date"></div>
+                  <div class="form-group"><input class="form-control" id="rd-act-delai" type="date"><div class="rd-delais" data-pour="rd-act-delai"></div></div>
                   <div class="form-group span-2"><input class="form-control" id="rd-act-obs" placeholder="Observations / Contexte"></div>
                 </div>
                 <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="rdAjouterActionLive()">+ Ajouter Action</button>
@@ -17482,10 +17493,12 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div class="form-section-title">Présents / Absents</div>
                 <div id="rd-pv-presence"></div>
                 <div class="form-section-title">Résumé des Discussions</div>
+                <div style="margin-bottom:6px;"><button class="btn btn-secondary btn-sm" type="button" onclick="rdGenererResumePV()">✨ Générer le résumé depuis la séance</button> <span style="font-size:11px;color:var(--dim);">ordre du jour, présents, décisions et actions repris automatiquement</span></div>
                 <textarea class="form-control" id="rd-pv-resume" style="min-height:160px;" placeholder="Résumé structuré par point ODJ..."></textarea>
                 <div class="form-section-title">Décisions Officielles</div>
                 <div id="rd-pv-decisions" style="margin-bottom:8px;"></div>
                 <div style="display:flex;gap:8px;"><input class="form-control" id="rd-pv-decision-input" placeholder="Ajouter décision officielle..." style="flex:1;"><button class="btn btn-secondary btn-sm" onclick="rdAjouterDecisionPV()">+ Ajouter</button></div>
+                <div class="rd-sugg" id="rd-sugg-pvdec"></div>
                 <div style="margin-top:14px;"><button class="btn btn-primary btn-sm" onclick="rdSauvegarderPV()">💾 Sauvegarder PV</button></div>
               </div>
             </div>
@@ -17495,9 +17508,9 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div id="rd-plan-action"></div>
                 <div class="form-section-title">Ajouter une Action</div>
                 <div class="form-grid">
-                  <div class="form-group span-2"><input class="form-control" id="rd-pva-titre" placeholder="Description précise *"></div>
+                  <div class="form-group span-2"><input class="form-control" id="rd-pva-titre" placeholder="Description précise *"><div class="rd-sugg" id="rd-sugg-pvact"></div></div>
                   <div class="form-group"><select class="form-control" id="rd-pva-resp"><option value="">Responsable *</option></select></div>
-                  <div class="form-group"><input class="form-control" id="rd-pva-delai" type="date"></div>
+                  <div class="form-group"><input class="form-control" id="rd-pva-delai" type="date"><div class="rd-delais" data-pour="rd-pva-delai"></div></div>
                   <div class="form-group"><select class="form-control" id="rd-pva-theme">
                     <option value="foncier">🗺️ Foncier</option><option value="juridique">⚖️ Juridique</option>
                     <option value="programmes">🏗️ Programmes</option><option value="travaux">👷 Travaux</option>
@@ -91508,6 +91521,7 @@ async function rdInitPage() {
   populateDivisionSelects();
   rdRenderDashboard();
   rdPeuplerPersonnel();
+  rdInitAideRedaction();
   var pl = document.getElementById('rd-pl-animateur');
   if (pl && !pl.value && DATA.params && DATA.params.societe) {
     /* pré-remplir société */
@@ -91581,6 +91595,209 @@ function rdRenderDashboard() {
 /* ─────────────────────────────────────────────────
    PLANIFICATION
 ──────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   AIDE À LA RÉDACTION — suggestions cliquables (objectifs, documents, ordre du
+   jour, décisions, actions, résumé du PV) et échéances rapides.
+   Principe : on choisit ou on saisit. Les suggestions viennent du type de
+   réunion, des thèmes cochés, des chiffres réels du logiciel et de l'historique
+   des réunions ; la saisie libre reste toujours possible.
+   ══════════════════════════════════════════════════════════════════════════ */
+var RD_SUGG_CATALOGUE = {
+  objectifs: {
+    types: {
+      mensuelle:['Passer en revue les résultats du mois écoulé','Valider les priorités du mois à venir','Suivre l\'avancement des décisions et actions de la réunion précédente'],
+      hebdomadaire:['Faire le point sur les actions de la semaine','Lever les blocages et arbitrer les urgences','Fixer les priorités de la semaine à venir'],
+      trimestrielle:['Analyser les résultats du trimestre par rapport aux objectifs','Ajuster le budget et les prévisions du trimestre suivant','Valider le plan d\'action du trimestre à venir'],
+      urgence:['Qualifier la situation et mesurer son impact','Décider des mesures immédiates et désigner un responsable','Définir la communication interne et externe'],
+      bilan:['Présenter et valider le bilan de l\'exercice','Évaluer les résultats par division','Arrêter les orientations stratégiques de l\'exercice suivant'],
+      autre:['Informer la direction et recueillir ses décisions']
+    },
+    themes: {
+      foncier:['Faire le point sur les parcelles et l\'état des titres fonciers','Décider des acquisitions foncières à engager'],
+      juridique:['Suivre les dossiers juridiques et les échéances de procédure','Sécuriser les actes en cours (ACD, titres, contrats)'],
+      programmes:['Suivre l\'avancement des programmes et des lots disponibles','Décider du lancement ou du report de nouvelles tranches'],
+      travaux:['Faire le point sur l\'avancement des chantiers et les retards','Valider les situations de travaux et les réceptions'],
+      commercial:['Analyser les ventes, les leads et le plan d\'action commercial','Fixer les objectifs de vente du mois'],
+      recouvrement:['Examiner les impayés et décider des actions de relance','Suivre les souscripteurs soldés à livrer'],
+      finance:['Examiner la trésorerie, les encaissements et les décaissements','Valider les engagements de dépenses du mois'],
+      rh:['Faire le point sur les effectifs, absences et recrutements','Valider les ordres de mission et le planning du personnel'],
+      informatique:['Faire le point sur le système d\'information et les incidents','Arbitrer les demandes d\'évolution du logiciel'],
+      autre:[]
+    }
+  },
+  docs: {
+    foncier:['État du portefeuille foncier','Tableau de suivi des titres fonciers'],
+    juridique:['Registre des dossiers juridiques en cours','Échéancier des procédures'],
+    programmes:['État des programmes et des lots (disponibles / vendus)','Planning prévisionnel des tranches'],
+    travaux:['Rapports de chantier et avancement physique','Situations de travaux à valider'],
+    commercial:['Rapport commercial du mois','Point sur les leads et les réservations'],
+    recouvrement:['État des impayés et relances ouvertes','Liste des souscripteurs soldés à livrer'],
+    finance:['Balance et situation de trésorerie','Journal des encaissements du mois'],
+    rh:['État des présences et absences','Ordres de mission et PV de mission du mois'],
+    informatique:['Journal des incidents','Demandes d\'évolution en attente'],
+    autre:[]
+  },
+  odj: {
+    foncier:[['Point sur le portefeuille foncier',15]], juridique:[['Dossiers juridiques et échéances',15]], programmes:[['Avancement des programmes et des lots',20]],
+    travaux:[['Avancement des chantiers',20]], commercial:[['Résultats commerciaux et leads',15]], recouvrement:[['Impayés et plan de relance',15]],
+    finance:[['Situation de trésorerie',20]], rh:[['Ressources humaines et missions',10]], informatique:[['Système d\'information et incidents',10]], autre:[]
+  },
+  decisions:['Il est décidé de ','Il est demandé à  de  avant le ','La direction valide ','La direction refuse ','Il est décidé de reporter  à la prochaine réunion','Il est décidé de ne pas donner suite à '],
+  actions:['Relancer les souscripteurs en retard de paiement','Transmettre le rapport demandé à la direction','Planifier une visite de terrain','Préparer les documents pour la prochaine réunion','Régulariser le dossier juridique concerné','Mettre à jour le suivi dans le logiciel']
+};
+var RD_SUGG_CFG = {
+  'rd-sugg-objectifs': { cible:'rd-pl-objectifs', mode:'ligne' },
+  'rd-sugg-docs':      { cible:'rd-pl-docs', mode:'ligne' },
+  'rd-sugg-prepdocs':  { cible:'rd-prep-docs', mode:'ligne' },
+  'rd-sugg-odj':       { mode:'odj' },
+  'rd-sugg-decisions': { cible:'rd-decision-input', mode:'debut' },
+  'rd-sugg-actions':   { cible:'rd-act-titre', mode:'debut' },
+  'rd-sugg-pvdec':     { cible:'rd-pv-decision-input', mode:'debut' },
+  'rd-sugg-pvact':     { cible:'rd-pva-titre', mode:'debut' }
+};
+var RD_SUGG_CACHE = {};
+
+function rdSuggRender(zoneId, items) {
+  var z = document.getElementById(zoneId); if (!z) return;
+  var cfg = RD_SUGG_CFG[zoneId] || {};
+  RD_SUGG_CACHE[zoneId] = items;
+  var cible = cfg.cible ? document.getElementById(cfg.cible) : null;
+  var courant = (cible && cfg.mode === 'ligne') ? (cible.value || '').toLowerCase() : '';
+  if (!items.length) { z.innerHTML = ''; return; }
+  z.innerHTML = '<span class="rd-sugg-lib">💡 Suggestions :</span>' + items.map(function(it, i){
+    var texte = typeof it === 'string' ? it : it.t;
+    var deja = courant && courant.indexOf(texte.toLowerCase()) !== -1;
+    return '<span class="rd-sugg-chip' + (deja ? ' deja' : '') + '" onclick="rdSuggClic(\'' + zoneId + '\',' + i + ')" title="' + rdEscape(texte) + '">' + (deja ? '✓ ' : '+ ') + rdEscape(texte.length > 70 ? texte.slice(0, 68) + '…' : texte) + '</span>';
+  }).join('');
+}
+function rdSuggClic(zoneId, i) {
+  var it = (RD_SUGG_CACHE[zoneId] || [])[i]; if (it == null) return;
+  var cfg = RD_SUGG_CFG[zoneId] || {}, texte = typeof it === 'string' ? it : it.t;
+  if (cfg.mode === 'odj') {
+    RD_STATE.currentODJ = RD_STATE.currentODJ || [];
+    if (RD_STATE.currentODJ.some(function(p){ return (p.titre || '').toLowerCase() === texte.toLowerCase(); })) { toast('Ce point figure déjà à l\'ordre du jour.','info'); return; }
+    var sel = document.getElementById('rd-odj-resp');
+    var respId = sel ? sel.value : '', respNom = (sel && sel.selectedIndex > 0) ? sel.options[sel.selectedIndex].text : '';
+    RD_STATE.currentODJ.push({ id:uid(), titre:texte, duree:(it && it.d) || 15, responsable_id:respId, responsable:respNom, traite:false });
+    rdRenderODJ(); rdMajSuggestionsPrepa();
+    return;
+  }
+  var c = document.getElementById(cfg.cible); if (!c) return;
+  if (cfg.mode === 'ligne') {
+    if ((c.value || '').toLowerCase().indexOf(texte.toLowerCase()) !== -1) return;
+    c.value = (c.value.trim() ? c.value.replace(/\s+$/, '') + '\n' : '') + '• ' + texte;
+  } else {
+    c.value = c.value.trim() ? c.value.replace(/\s+$/, '') + ' ' + texte : texte;
+    c.focus(); try { c.setSelectionRange(c.value.length, c.value.length); } catch (e) {}
+  }
+  rdMajSuggestionsPlan(); rdMajSuggestionsPrepa();
+}
+/* Suggestions chiffrées : un indicateur en alerte devient un point à traiter. */
+function rdSuggIndicateurs(themes) {
+  var res = [];
+  try {
+    var ind = rdGetIndicateurs360();
+    (themes || []).forEach(function(t){ (ind[t] || []).forEach(function(x){
+      if (x.alert === 'rouge' || x.alert === 'or') res.push('Examiner : ' + x.label + ' (' + x.val + ')');
+    }); });
+  } catch (e) {}
+  return res;
+}
+function rdSuggUniques(liste) { var vu = {}; return liste.filter(function(x){ var k = (typeof x === 'string' ? x : x.t).toLowerCase(); if (vu[k]) return false; vu[k] = 1; return true; }); }
+
+function rdMajSuggestionsPlan() {
+  var type = (document.getElementById('rd-pl-type') || {}).value || 'mensuelle';
+  var themes = (RD_STATE && RD_STATE.selectedThemes) || [];
+  var obj = (RD_SUGG_CATALOGUE.objectifs.types[type] || []).slice();
+  themes.forEach(function(t){ obj = obj.concat(RD_SUGG_CATALOGUE.objectifs.themes[t] || []); });
+  obj = obj.concat(rdSuggIndicateurs(themes));
+  rdSuggRender('rd-sugg-objectifs', rdSuggUniques(obj));
+  var docs = []; themes.forEach(function(t){ docs = docs.concat(RD_SUGG_CATALOGUE.docs[t] || []); });
+  rdSuggRender('rd-sugg-docs', rdSuggUniques(docs));
+  rdSuggTitre();
+}
+/* Intitulé : modèle daté + intitulés, lieux et animateurs déjà utilisés (listes de saisie assistée). */
+function rdSuggTitre() {
+  var type = (document.getElementById('rd-pl-type') || {}).value || 'mensuelle';
+  var lib = { mensuelle:'Mensuelle', hebdomadaire:'Hebdomadaire', trimestrielle:'Trimestrielle', urgence:'Urgence / Crise', bilan:'Bilan annuel', autre:'' }[type];
+  var mois = new Date().toLocaleDateString('fr-FR', { month:'long', year:'numeric' });
+  var modele = 'Réunion Direction' + (lib ? ' ' + lib : '') + ' — ' + mois;
+  rdSuggRenderModeleTitre(modele);
+  var reun = DATA.reunions_direction || [];
+  var rempl = function(id, vals) {
+    var dl = document.getElementById(id); if (!dl) return;
+    var vu = {}; dl.innerHTML = vals.filter(function(v){ v = (v || '').trim(); if (!v || vu[v.toLowerCase()]) return false; vu[v.toLowerCase()] = 1; return true; })
+      .map(function(v){ return '<option value="' + rdEscape(v) + '">'; }).join('');
+  };
+  rempl('rd-dl-titres', reun.map(function(r){ return r.titre; }));
+  rempl('rd-dl-lieux', ['Salle de réunion Direction'].concat(reun.map(function(r){ return r.lieu; })));
+  rempl('rd-dl-animateurs', (DATA.employes || []).filter(empEstActif).map(function(e){ return ((e.nom || '') + ' ' + (e.prenoms || '')).trim(); }).concat(reun.map(function(r){ return r.animateur; })));
+}
+function rdSuggRenderModeleTitre(modele) {
+  var z = document.getElementById('rd-sugg-titre'); if (!z) return;
+  z.innerHTML = '<span class="rd-sugg-lib">💡</span><span class="rd-sugg-chip" onclick="document.getElementById(\'rd-pl-titre\').value=this.dataset.t" data-t="' + rdEscape(modele) + '">+ ' + rdEscape(modele) + '</span>';
+}
+function rdMajSuggestionsPrepa() {
+  var id = (document.getElementById('rd-prep-select') || {}).value;
+  var r = (DATA.reunions_direction || []).find(function(x){ return x.id === id; }); if (!r) return;
+  var odj = [];
+  var ouvertes = (DATA.actions_reunion || []).filter(function(a){ return a.reunion_id !== r.id && a.statut !== 'done'; }).length;
+  if (ouvertes) odj.push({ t:'Suivi des actions de réunions précédentes (' + ouvertes + ' en cours)', d:15 });
+  (r.themes || []).forEach(function(t){ (RD_SUGG_CATALOGUE.odj[t] || []).forEach(function(p){ odj.push({ t:p[0], d:p[1] }); }); });
+  odj = odj.concat(rdSuggIndicateurs(r.themes).map(function(x){ return { t:x, d:10 }; }));
+  odj.push({ t:'Questions diverses', d:10 });
+  var deja = (RD_STATE.currentODJ || []).map(function(p){ return (p.titre || '').toLowerCase(); });
+  rdSuggRender('rd-sugg-odj', rdSuggUniques(odj).filter(function(x){ return deja.indexOf(x.t.toLowerCase()) === -1; }));
+  var docs = []; (r.themes || []).forEach(function(t){ docs = docs.concat(RD_SUGG_CATALOGUE.docs[t] || []); });
+  rdSuggRender('rd-sugg-prepdocs', rdSuggUniques(docs));
+}
+function rdMajSuggestionsSeance() {
+  rdSuggRender('rd-sugg-decisions', RD_SUGG_CATALOGUE.decisions);
+  rdSuggRender('rd-sugg-actions', RD_SUGG_CATALOGUE.actions);
+}
+function rdMajSuggestionsPV() {
+  rdSuggRender('rd-sugg-pvdec', RD_SUGG_CATALOGUE.decisions);
+  rdSuggRender('rd-sugg-pvact', RD_SUGG_CATALOGUE.actions);
+}
+/* Échéances rapides à côté de chaque champ « date limite ». */
+function rdDelaiRapide(inputId, jours) {
+  var el = document.getElementById(inputId); if (!el) return;
+  var d = new Date();
+  if (jours === 'fin_mois') d = new Date(d.getFullYear(), d.getMonth() + 1, 0); else d.setDate(d.getDate() + jours);
+  el.value = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+function rdInitAideRedaction() {
+  document.querySelectorAll('.rd-delais').forEach(function(z){
+    var f = z.dataset.pour;
+    z.innerHTML = [['+3 j',3],['+1 sem.',7],['+2 sem.',14],['Fin de mois','fin_mois']].map(function(b){
+      return '<span class="rd-sugg-chip" onclick="rdDelaiRapide(\'' + f + '\',' + (typeof b[1] === 'number' ? b[1] : '\'' + b[1] + '\'') + ')">' + b[0] + '</span>';
+    }).join('');
+  });
+  rdMajSuggestionsPlan(); rdMajSuggestionsSeance(); rdMajSuggestionsPV();
+}
+/* Résumé du PV rédigé à partir de la séance : ordre du jour, présents, décisions, actions, notes. */
+function rdGenererResumePV() {
+  var id = (document.getElementById('rd-pv-select') || {}).value;
+  var r = (DATA.reunions_direction || []).find(function(x){ return x.id === id; });
+  if (!r) { toast('Choisissez d\'abord une réunion.','error'); return; }
+  var champ = document.getElementById('rd-pv-resume');
+  if (champ.value.trim() && !confirm('Le résumé actuel sera remplacé par un résumé généré. Continuer ?')) return;
+  var pres = (r.participants || []).filter(function(p){ return p.present; }), tot = (r.participants || []).length;
+  var L = [];
+  L.push('Réunion « ' + (r.titre || '') + ' » du ' + dateShort(String(r.date || '').slice(0, 10)) + (r.lieu ? ', tenue à ' + r.lieu : '') + (r.animateur ? ', sous la présidence de ' + r.animateur : '') + '.');
+  L.push('Présents : ' + pres.length + ' sur ' + tot + ' convoqués' + (pres.length ? ' (' + pres.map(function(p){ return p.nom; }).join(', ') + ')' : '') + '.');
+  if (r.objectifs) L.push('\nObjectifs :\n' + r.objectifs);
+  if ((r.odj || []).length) {
+    L.push('\nDéroulement :');
+    r.odj.forEach(function(p, i){ L.push((i + 1) + '. ' + p.titre + (p.responsable ? ' — ' + p.responsable : '') + ' (' + (p.duree || 0) + ' min) : ' + (p.traite ? 'point traité' : 'point non traité')); });
+  }
+  if (r.notes_seance && r.notes_seance.trim()) L.push('\nDiscussions :\n' + r.notes_seance.trim());
+  if ((r.decisions || []).length) { L.push('\nDécisions :'); r.decisions.forEach(function(d, i){ L.push((i + 1) + '. ' + (d.texte || d)); }); }
+  if ((r.actions || []).length) { L.push('\nActions à mener :'); r.actions.forEach(function(a){ L.push('- ' + a.titre + ' — ' + (a.responsable || '?') + (a.delai ? ', avant le ' + dateShort(a.delai) : '')); }); }
+  champ.value = L.join('\n');
+  toast('Résumé généré : relisez et complétez avant de sauvegarder.','success');
+}
+
 function rdOpenPlanModal() { switchTab('rd','planifier'); }
 
 function rdToggleTheme(el) {
@@ -91588,6 +91805,7 @@ function rdToggleTheme(el) {
   var idx = RD_STATE.selectedThemes.indexOf(t);
   if (idx >= 0) { RD_STATE.selectedThemes.splice(idx,1); el.classList.remove('selected'); }
   else           { RD_STATE.selectedThemes.push(t);       el.classList.add('selected'); }
+  rdMajSuggestionsPlan();
 }
 
 /* Personnel actif proposé comme participant (hors personnes déjà ajoutées). */
@@ -91702,6 +91920,7 @@ function rdResetPlanForm() {
   RD_STATE.selectedThemes = [];
   document.getElementById('rd-participant-chips').innerHTML = '';
   rdPeuplerPersonnel();
+  rdMajSuggestionsPlan();
   document.querySelectorAll('#rd-theme-chips .rd-chip').forEach(function(c){ c.classList.remove('selected'); });
   ['rd-pl-titre','rd-pl-date','rd-pl-animateur','rd-pl-objectifs','rd-pl-docs','rd-pl-lieu'].forEach(function(id){
     var el = document.getElementById(id); if(el) el.value = '';
@@ -91843,6 +92062,7 @@ function rdChargerPreparation() {
   }).join('') || '<div style="color:var(--dim);font-size:12px;">Aucun thème sélectionné.</div>';
   if (r.docs_prepa) document.getElementById('rd-prep-docs').value = r.docs_prepa;
   if (r.notes_prepa) document.getElementById('rd-prep-notes').value = r.notes_prepa;
+  rdMajSuggestionsPrepa();
 }
 
 function rdAjouterODJ() {
@@ -91855,6 +92075,7 @@ function rdAjouterODJ() {
   document.getElementById('rd-odj-input').value='';
   document.getElementById('rd-odj-duree').value='';
   rdRenderODJ();
+  rdMajSuggestionsPrepa();
 }
 
 function rdRenderODJ() {
