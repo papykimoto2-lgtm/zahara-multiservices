@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.121 · 2026-10-08 — Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.122 · 2026-10-08 — Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -5632,6 +5632,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="etape">
             <div class="etape-hd"><span class="etape-num">2</span>Livraison</div>
             <div class="etape-btns">
+              <button class="tab-btn" onclick="switchTab('recliv','alivrer');renderLivAFaire()"><i>📋</i>À livrer (soldés) <span id="liv-afaire-badge" class="badge badge-or" style="font-size:10px;margin-left:4px;"></span></button>
               <button class="tab-btn" onclick="switchTab('recliv','liv')"><i>🔑</i>Livraisons souscripteurs</button>
               <button class="tab-btn" onclick="switchTab('recliv','dos')"><i>📋</i>Dossiers de réception</button>
             </div>
@@ -5648,6 +5649,22 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="card"><div class="table-wrap"><table>
             <thead><tr><th>N°</th><th>Type</th><th>Convention</th><th>Constructeur</th><th>Date</th><th>Réserves</th><th style="text-align:right;">Retenue gar.</th><th>Statut</th><th></th></tr></thead>
             <tbody id="tbody-rect"></tbody>
+          </table></div></div>
+        </div>
+        <div class="tab-pane" id="tab-recliv-alivrer">
+          <div class="card" style="margin-bottom:12px;">
+            <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Souscripteurs <b>soldés</b> (versé sur le prix, frais de souscription exclus, supérieur ou égal au prix de vente) pour lesquels <b>aucune livraison</b> n'est encore enregistrée. Les souscripteurs résiliés sont exclus.</div>
+            <div class="filters-bar">
+              <select class="filter-select" id="liv-af-prog" onchange="renderLivAFaire()"><option value="">Tous les programmes</option></select>
+              <select class="filter-select" id="liv-af-nature" onchange="renderLivAFaire()"><option value="">Terrains et logements</option><option value="terrain">🗺️ Terrains</option><option value="logement">🏠 Logements</option><option value="indetermine">Nature non renseignée</option></select>
+              <input type="text" class="search-input" id="liv-af-recherche" placeholder="🔍 Nom, dossier, lot…" oninput="_debInput('renderLivAFaire')">
+              <label style="font-size:12px;display:flex;align-items:center;gap:6px;"><input type="checkbox" id="liv-af-alertes" onchange="renderLivAFaire()"> Seulement avec points à vérifier</label>
+            </div>
+            <div id="liv-af-resume" style="font-size:12px;margin-top:8px;font-weight:600;"></div>
+          </div>
+          <div class="card"><div class="table-wrap"><table>
+            <thead><tr><th>Dossier</th><th>Souscripteur</th><th>Programme</th><th>Nature</th><th>Bien</th><th>Contact</th><th>Réception travaux</th><th style="text-align:right;">Prix de vente</th><th style="text-align:right;">Versé sur prix</th><th>Dernier versement</th><th>À vérifier</th><th></th></tr></thead>
+            <tbody id="tbody-liv-af"></tbody>
           </table></div></div>
         </div>
         <div class="tab-pane" id="tab-recliv-liv">
@@ -107005,8 +107022,104 @@ function rlTypeBadge(t){ return t==='definitive'?'<span class="badge badge-vert"
 function rlRectStatutBadge(st){ var m={enregistre:'badge-bleu',brouillon:'badge-or',en_attente_validation:'badge-bleu',valide:'badge-vert'}; var l={enregistre:'Enregistrée',brouillon:'Brouillon',en_attente_validation:'⏳ À valider',valide:'✅ Validée'}; return '<span class="badge '+(m[st]||'badge-or')+'">'+(l[st]||st)+'</span>'; }
 function rlReservesTxt(arr){ arr=arr||[]; if(!arr.length)return '—'; var lev=arr.filter(function(r){return r.leve;}).length; return lev+' / '+arr.length+' levées'; }
 
+/* ── Souscripteurs soldés restant à livrer ──────────────────────────────────────
+   Soldé = versé sur le prix (frais de souscription exclus, comme totalPayePrix) ≥ prix de vente.
+   À livrer = soldé, non résilié, sans aucune livraison enregistrée. Calcul en une passe sur les versements. */
+function livSouscripteursAFaire(){
+  var verse = {}, dernier = {};
+  (DATA.versements||[]).forEach(function(v){
+    if(!v || !v.client_id || (typeof _versementSurPrix==='function' && !_versementSurPrix(v))) return;
+    verse[v.client_id] = (verse[v.client_id]||0) + (parseFloat(v.montant)||0);
+    var d = String(v.date||'').slice(0,10);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d) && (!dernier[v.client_id] || d > dernier[v.client_id])) dernier[v.client_id] = d;
+  });
+  var livres = {}; (DATA.livraisons||[]).forEach(function(l){ if(l && l.client_id) livres[l.client_id] = true; });
+  var progNom = function(id){ var p=(DATA.programmes||[]).find(function(x){return x.id===id;}); return p ? (p.nom||p.libelle||p.numero||'') : ''; };
+  var auj = today();
+  return (DATA.clients||[]).filter(function(c){
+    if(!c || c.statut==='resilie' || livres[c.id]) return false;
+    var prix = parseFloat(c.montant_total)||0;
+    return prix > 0 && (verse[c.id]||0) >= prix - 0.5;
+  }).map(function(c){
+    var prix = parseFloat(c.montant_total)||0, vs = verse[c.id]||0;
+    var lotIds = (typeof _lotIdsDeClient==='function') ? _lotIdsDeClient(c) : (c.lot_id ? [c.lot_id] : []);
+    var lots = lotIds.map(function(id){ return rlLotLabel(id); }).filter(Boolean);
+    var lot0 = lotIds.length ? (DATA.lots||[]).find(function(l){return l.id===lotIds[0];}) : null;
+    var progId = c.programme_id || (lot0 && lot0.programme_id) || '';
+    var prog = progNom(progId);
+    var nature = (typeof clientNatureBien==='function') ? clientNatureBien(c) : 'indetermine';
+    var recs = (DATA.receptions_travaux||[]).filter(function(r){ return progId && r.programme_id===progId; });
+    var recTxt = nature==='terrain' ? 'Sans objet (terrain)'
+      : recs.some(function(r){return r.type==='definitive';}) ? 'Définitive' : recs.length ? 'Provisoire' : 'Aucune réception';
+    var alertes = [];
+    if(nature!=='terrain' && recTxt==='Aucune réception') alertes.push('Réception des travaux à faire');
+    if(nature==='indetermine') alertes.push('Nature du bien à préciser');
+    if(vs > prix + 0.5) alertes.push('Trop-perçu de ' + fmtF(Math.round(vs - prix)) + ' F');
+    if(!lots.length) alertes.push('Lot non attribué');
+    if(!prog) alertes.push('Programme non renseigné');
+    if(dernier[c.id] && dernier[c.id] > auj) alertes.push('Date du dernier versement postérieure à aujourd\'hui');
+    return { id:c.id, dossier:c.dossier||'', nom:((c.nom||'')+' '+(c.prenoms||c.prenom||'')).trim(), progId:progId, prog:prog,
+      nature:nature, rec:recTxt, tel:c.tel||'', lots:lots, prix:prix, verse:vs, dernier:dernier[c.id]||'', alertes:alertes };
+  }).sort(function(a,b){
+    return (a.prog||'￿').localeCompare(b.prog||'￿') || String(a.dossier).localeCompare(String(b.dossier), 'fr', {numeric:true}) || a.nom.localeCompare(b.nom);
+  });
+}
+function renderLivAFaire(){
+  var tb = document.getElementById('tbody-liv-af'); if(!tb) return;
+  var tous = livSouscripteursAFaire();
+  var badge = document.getElementById('liv-afaire-badge'); if(badge) badge.textContent = tous.length ? String(tous.length) : '';
+  var selProg = document.getElementById('liv-af-prog');
+  if(selProg){
+    var cur = selProg.value, vus = {}, opts = '<option value="">Tous les programmes</option>';
+    tous.forEach(function(x){ var k = x.progId || '__aucun'; if(vus[k]) return; vus[k] = 1; opts += '<option value="'+escHtml(k)+'">'+escHtml(x.prog || '(programme non renseigné)')+'</option>'; });
+    selProg.innerHTML = opts; selProg.value = cur;
+  }
+  var fProg = selProg ? selProg.value : '';
+  var fNat = (document.getElementById('liv-af-nature')||{}).value||'';
+  var q = ((document.getElementById('liv-af-recherche')||{}).value||'').toLowerCase().trim();
+  var seulAl = !!(document.getElementById('liv-af-alertes')||{}).checked;
+  var liste = tous.filter(function(x){
+    if(fProg && (x.progId || '__aucun') !== fProg) return false;
+    if(fNat && x.nature !== fNat) return false;
+    if(seulAl && !x.alertes.length) return false;
+    if(q && (x.nom+' '+x.dossier+' '+x.prog+' '+x.lots.join(' ')).toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  });
+  var res = document.getElementById('liv-af-resume');
+  if(res){
+    var prixTot = liste.reduce(function(s,x){return s+x.prix;},0), nbAl = liste.filter(function(x){return x.alertes.length;}).length;
+    var nT = liste.filter(function(x){return x.nature==='terrain';}).length, nL = liste.filter(function(x){return x.nature==='logement';}).length;
+    res.innerHTML = liste.length + ' souscripteur(s) soldé(s) à livrer (' + nT + ' terrain(s), ' + nL + ' logement(s))' + (liste.length !== tous.length ? ' (sur ' + tous.length + ')' : '')
+      + ' — prix de vente cumulé ' + fmtF(Math.round(prixTot)) + ' F — ' + nbAl + ' avec point(s) à vérifier';
+  }
+  if(!liste.length){ tb.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--blanc-dim);padding:20px;">' + (tous.length ? 'Aucun résultat pour ces filtres.' : 'Aucun souscripteur soldé en attente de livraison.') + '</td></tr>'; return; }
+  tb.innerHTML = liste.map(function(x){
+    var al = x.alertes.length ? x.alertes.map(function(a){ return '<span class="badge badge-or" style="font-size:10px;display:inline-block;margin:1px 2px 1px 0;">'+escHtml(a)+'</span>'; }).join('') : '<span style="color:var(--blanc-dim);">—</span>';
+    return '<tr><td style="font-family:monospace;color:var(--or);">'+escHtml(x.dossier||'—')+'</td>'
+      + '<td style="font-size:12px;">'+escHtml(x.nom||'—')+'</td>'
+      + '<td style="font-size:11px;">'+escHtml(x.prog||'—')+'</td>'
+      + '<td style="font-size:11px;">'+(x.nature==='terrain' ? '🗺️ Terrain' : x.nature==='logement' ? '🏠 Logement' : '—')+'</td>'
+      + '<td style="font-size:11px;">'+(x.lots.length ? escHtml(x.lots.join(', ')) : '—')+'</td>'
+      + '<td style="font-size:11px;white-space:nowrap;">'+escHtml(x.tel||'—')+'</td>'
+      + '<td style="font-size:11px;">'+escHtml(x.rec)+'</td>'
+      + '<td style="text-align:right;">'+fmtF(Math.round(x.prix))+'</td>'
+      + '<td style="text-align:right;">'+fmtF(Math.round(x.verse))+'</td>'
+      + '<td style="font-size:11px;white-space:nowrap;">'+(x.dernier ? dateShort(x.dernier) : '—')+'</td>'
+      + '<td style="font-size:11px;">'+al+'</td>'
+      + '<td><button class="btn btn-primary btn-sm" onclick="livDepuisListe(\''+x.id+'\')" title="Ouvrir une livraison pour ce souscripteur">🔑 Livrer</button></td></tr>';
+  }).join('');
+}
+/* Ouvre une nouvelle livraison avec le souscripteur déjà choisi (bien et programme repris de sa fiche). */
+function livDepuisListe(clientId){
+  openLiv();
+  var sel = document.getElementById('liv-client'); if(!sel) return;
+  sel.value = clientId;
+  if(typeof livClientInfo==='function') livClientInfo();
+}
+
 function renderRecliv(){
   if(typeof renderDossiers==='function')renderDossiers();
+  if(typeof renderLivAFaire==='function')renderLivAFaire();
   var rts=(DATA.receptions_travaux||[]); var livs=(DATA.livraisons||[]);
   var mois=new Date().toISOString().slice(0,7);
   var rgEnCours=rts.filter(function(r){return (parseFloat(r.retenue_garantie)||0)>0 && !r.rg_libere;}).reduce(function(s,r){return s+(parseFloat(r.retenue_garantie)||0);},0);
@@ -107015,6 +107128,7 @@ function renderRecliv(){
     {l:'Réceptions travaux',v:rts.length,i:'🏗️',c:'kpi-blue'},
     {l:'Définitives',v:rts.filter(function(r){return r.type==='definitive';}).length,i:'✅',c:'kpi-green'},
     {l:'Livraisons du mois',v:livs.filter(function(l){return (l.date||'').slice(0,7)===mois;}).length,i:'🔑',c:''},
+    {l:'Soldés à livrer',v:livSouscripteursAFaire().length,i:'📋',c:'kpi-green'},
     {l:'Retenues garanties en cours',v:fmtF(Math.round(rgEnCours))+' F',i:'🛡️',c:'kpi-red'},
   ].map(function(k){return '<div class="kpi-card '+(k.c||'')+'"><div class="kpi-icon">'+k.i+'</div><div class="kpi-value">'+k.v+'</div><div class="kpi-label">'+k.l+'</div></div>';}).join(''); }
 
