@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.120 · 2026-10-08 — Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.121 · 2026-10-08 — Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -7574,6 +7574,10 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bord);">
                 <div style="font-size:13px;color:var(--blanc-dim);margin-bottom:8px;">Force la déconnexion de tous les postes/onglets connectés (utile après un incident de cache local périmé — sync qui réinjecte d'anciennes données). Votre session actuelle n'est pas affectée.</div>
                 <button class="btn btn-danger btn-sm" onclick="deconnecterAutresPostes()">🔒 Déconnecter tous les autres postes</button>
+              </div>
+              <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bord);">
+                <div style="font-size:13px;color:var(--blanc-dim);margin-bottom:8px;">Ordonne à <b>chaque poste</b> de vider ses données locales (base du navigateur, file d'envoi, marques de suppression) puis de se recharger depuis la base, à sa prochaine synchronisation. À utiliser quand des postes gardent d'anciennes données qui réécrivent le serveur. <b>Les saisies d'un poste qui n'ont pas encore été envoyées au serveur seront perdues</b> : demandez d'abord à chacun de terminer et de synchroniser. À combiner avec « Déconnecter tous les autres postes ».</div>
+                <button class="btn btn-danger btn-sm" onclick="reinitialiserTousLesPostes()">🧹 Réinitialiser tous les postes</button>
               </div>
             </div>
             <div class="card">
@@ -28958,6 +28962,35 @@ async function deconnecterAutresPostes() {
   toast('🔒 Tous les autres postes seront déconnectés dans les 60 secondes (prochaine synchronisation).', 'success');
 }
 
+/** Réinitialisation de TOUS les postes à distance (Paramétrage → Sécurité). Publie dans pi_params
+   (ligne « main ») l'ordre reinit_postes = {id, date, motif} que chaque poste applique UNE fois au
+   début de son prochain pull (voir _appliquerReinitPostes). L'ordre est écrit directement dans la
+   base : syncToSupabase recopie toujours la valeur DISTANTE de reinit_postes (un poste ne la tient
+   jamais), il ne pourrait donc pas la publier. Ce poste note l'ordre comme déjà appliqué : il ne se
+   réinitialise pas lui-même. */
+async function reinitialiserTousLesPostes() {
+  if (!hasRole('admin')) { toast('Réservé à l\'administrateur.', 'error'); return; }
+  if (!navigator.onLine || !SB.url || !SB.key) { toast('Connexion à la base requise pour émettre l\'ordre.', 'error'); return; }
+  var motif = prompt('Motif de la réinitialisation (conservé dans l\'ordre, visible dans la console des postes) :', 'Réinitialisation demandée par l\'administrateur');
+  if (motif === null) return;
+  if (!confirm('⚠️ Réinitialiser TOUS les autres postes ?\n\nÀ leur prochaine synchronisation, chaque poste videra ses données locales puis se rechargera depuis la base.\n\n• Les saisies non encore envoyées au serveur seront PERDUES.\n• Rien n\'est supprimé sur le serveur.\n• Votre poste n\'est pas réinitialisé.\n\nContinuer ?')) return;
+  var rows = await sbFetch('pi_params?id=eq.main&select=*', 'GET');
+  if (!rows || !rows.length) { toast('Paramètres introuvables sur le serveur — ordre non émis.', 'error'); return; }
+  var distant = _supaUnwrap('pi_params', rows[0]);
+  if (!distant) { toast('Paramètres illisibles — ordre non émis.', 'error'); return; }
+  var ordre = {
+    id: 'reinit_' + Date.now().toString(36),
+    date: new Date().toISOString(),
+    motif: (String(motif || '').trim().slice(0, 200)) || 'Réinitialisation demandée par l\'administrateur',
+    emis_par: (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || ''
+  };
+  distant.reinit_postes = ordre;
+  var res = await sbFetch('pi_params?id=eq.main', 'PATCH', { data: distant }, 'return=representation');
+  if (!Array.isArray(res) || !res.length) { toast('Ordre non enregistré par le serveur — réessayez.', 'error'); return; }
+  try { localStorage.setItem(REINIT_POSTES_KEY, ordre.id); } catch (e) {}
+  toast('🧹 Ordre émis : chaque poste se réinitialisera à sa prochaine synchronisation (environ une minute). Pensez à « Déconnecter tous les autres postes » pour recharger les onglets ouverts.', 'success', 9000);
+}
+
 /** Contrôle périodique (appelé depuis le tick de sync auto, ~30s) : si la
    session courante a été invalidée par une purge posée depuis un autre
    poste, déconnecte proprement et recharge vers l'écran de connexion. */
@@ -47642,17 +47675,69 @@ function buildPortailBrand(){
   };
 }
 
-function publierParamsPortail(){
-  if (typeof syncToSupabase !== 'function') return;
-  syncToSupabase('pi_params', Object.assign({ id: 'portail' }, buildPortailBrand()));
+/* ── Publication du portail : ne jamais remplacer un contenu publié par du vide ──
+   La ligne « portail » est reconstruite en entier à partir des réglages du POSTE. Un poste dont les
+   réglages de portail sont vides (navigateur neuf, poste réinitialisé, cache vidé) écrasait donc
+   le Mot du DG, les divisions publiées, le slogan, les images… par des champs vides à chaque
+   « Enregistrer les paramètres ». La publication automatique conserve désormais la valeur déjà
+   publiée pour tout champ vide en local ; seule la publication manuelle peut effacer, après avoir
+   prévenu de ce qui sera effacé. */
+function _portailVide(v){
+  if (v === null || v === undefined) return true;
+  if (typeof v === 'string') return v.trim() === '';
+  if (Array.isArray(v)) return v.length === 0;
+  if (typeof v === 'object') return Object.keys(v).length === 0;
+  return false;                                   /* nombres et booléens : une valeur saisie, même 0, est volontaire */
+}
+function _portailChampsEfaces(brand, distant){
+  var liste = [];
+  if (!distant) return liste;
+  Object.keys(brand).forEach(function(k){
+    if (k === 'id' || k.charAt(0) === '_') return;
+    if (_portailVide(brand[k]) && !_portailVide(distant[k])) liste.push(k);
+  });
+  return liste;
+}
+async function _portailLireDistant(){
+  var rows = await sbFetch('pi_params?id=eq.portail&select=*', 'GET');
+  return (rows && rows.length) ? _supaUnwrap('pi_params', rows[0]) : null;
+}
+/* opts.ecraser : publication volontaire (bouton manuel) — les champs vides remplacent le publié. */
+async function publierParamsPortail(opts){
+  if (typeof syncToSupabase !== 'function') return [];
+  var ecraser = !!(opts && opts.ecraser);
+  if (!ecraser && window._portailPubliManuelEnCours) return [];   /* le bouton manuel publie lui-même */
+  var brand = buildPortailBrand();
+  var conserves = [];
+  if (!ecraser) {
+    if (!navigator.onLine) return [];             /* hors ligne : rien à publier, on ne met pas du vide en file d'attente */
+    var distant;
+    try { distant = await _portailLireDistant(); }
+    catch(e) { console.warn('[Portail] Lecture du portail publié impossible — publication automatique annulée', e); return []; }
+    conserves = _portailChampsEfaces(brand, distant);
+    conserves.forEach(function(k){ brand[k] = distant[k]; });
+    if (conserves.length) console.warn('[Portail] Valeurs publiées conservées (vides en local) : ' + conserves.join(', '));
+  }
+  await syncToSupabase('pi_params', Object.assign({ id: 'portail' }, brand));
+  return conserves;
 }
 
 /* Publication manuelle immédiate (bouton dédié dans Paramètres), avec confirmation visuelle. */
 async function publierParamsPortailManuel(){
   if(typeof calculerDisponibilitesLocation==='function') calculerDisponibilitesLocation(true);
-  await saveParams();
-  publierParamsPortail();
-  toast('✅ Portail personnalisé et publié.', 'success');
+  window._portailPubliManuelEnCours = true;
+  try {
+    await saveParams();
+    var efaces;
+    try { efaces = _portailChampsEfaces(buildPortailBrand(), await _portailLireDistant()); }
+    catch(e) { toast('Impossible de vérifier le portail déjà publié — réessayez avec une connexion.', 'error'); return; }
+    if (efaces.length && !confirm('⚠️ Cette publication va EFFACER du portail des contenus actuellement publiés :\n\n• ' + efaces.join('\n• ') + '\n\nCes champs sont vides dans vos réglages. Continuer ?')) {
+      toast('Publication annulée — rien n\'a été modifié sur le portail.', 'info');
+      return;
+    }
+    await publierParamsPortail({ ecraser: true });
+    toast('✅ Portail personnalisé et publié.', 'success');
+  } finally { window._portailPubliManuelEnCours = false; }
 }
 
 async function saveObjectifs() {
