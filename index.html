@@ -19,7 +19,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -32377,7 +32377,7 @@ function clearClientForm() {
   ['c-tel-hint','c-tel2-hint'].forEach(function(i){ var h=document.getElementById(i); if(h) h.textContent=''; });
   document.getElementById('doc-btns').style.display = 'none';
   document.getElementById('doc-btns').innerHTML = '';
-  var modeEl = document.getElementById('c-mode-livraison'); if (modeEl) modeEl.value = 'gros_oeuvre';
+  var modeEl = document.getElementById('c-mode-livraison'); if (modeEl) modeEl.value = 'cle_en_main';
   var standEl = document.getElementById('c-standing'); if (standEl) standEl.value = 'economique';
   var natManEl = document.getElementById('c-nature-manuel'); if (natManEl) natManEl.value = 'auto';
   updateNatureBienUI(null);
@@ -32432,12 +32432,12 @@ function fillClientForm(c) {
     updateLotsByProgramme();
     setTimeout(function() {
       setSelectValue('c-lot', c.lot_id);
-      setSelectValue('c-mode-livraison', c.mode_livraison || 'gros_oeuvre');
+      setSelectValue('c-mode-livraison', c.mode_livraison || 'cle_en_main');
       var lot = (DATA.lots || []).find(function(l) { return l.id === c.lot_id; });
       updateNatureBienUI(lot || null);
     }, 50);
   } else {
-    setSelectValue('c-mode-livraison', c.mode_livraison || 'gros_oeuvre');
+    setSelectValue('c-mode-livraison', c.mode_livraison || 'cle_en_main');
     updateNatureBienUI(null);
   }
   calcEcheancier();
@@ -32732,7 +32732,7 @@ async function saveClient() {
     mode_acquisition: document.getElementById('c-mode-acquisition').value,
     terrain_supplementaire: parseFloat(document.getElementById('c-terrain-supplementaire').value) || 0,
     modification: document.getElementById('c-modification').value,
-    mode_livraison: (function(){ var el=document.getElementById('c-mode-livraison'); return el ? el.value : 'gros_oeuvre'; })(),
+    mode_livraison: (function(){ var el=document.getElementById('c-mode-livraison'); return el ? el.value : 'cle_en_main'; })(),
     standing: document.getElementById('c-standing').value,
     montant_total: parseFloat(document.getElementById('c-montant-total').value) || 0,
     apport: parseFloat(document.getElementById('c-apport').value) || 0,
@@ -37291,7 +37291,7 @@ async function confirmerGenerationLots() {
       prix: 0,
       cout_revient: 0,
       standing: 'moyen',
-      mode_livraison: 'gros_oeuvre',
+      mode_livraison: 'cle_en_main',
       statut: 'disponible',
       notes: [p.numero_tf, p.numero_acd].filter(Boolean).join(' / '),
       created_at: today()
@@ -37481,7 +37481,7 @@ async function _creerLotsDepuisLignes(rows) {
       id: uid(), programme_id: progId, numero: numero, ilot: ilot,
       type: typ || 'Lot', nature: nature, surface: surface, pieces: _piecesFromType(typ),
       prix: pu, cout_revient: amen + fonc,
-      standing: 'moyen', mode_livraison: 'gros_oeuvre',
+      standing: 'moyen', mode_livraison: 'cle_en_main',
       statut: _statutFromEtat(g(col.etat)),
       notes: [g(col.zone) ? 'Zone ' + g(col.zone) : '', g(col.code) ? 'Client ' + g(col.code) : ''].filter(Boolean).join(' · '),
       created_at: today()
@@ -38169,7 +38169,7 @@ function openLotModal(id) {
     setSelectValue('l-standing', l.standing);
     setSelectValue('l-statut', l.statut);
     setSelectValue('l-nature', l.nature || 'villa');
-    setSelectValue('l-mode-livraison', l.mode_livraison || 'gros_oeuvre');
+    setSelectValue('l-mode-livraison', l.mode_livraison || 'cle_en_main');
     document.getElementById('l-numero-tf').value = l.numero_tf || '';
     document.getElementById('l-frais-notaire').value = l.frais_notaire || '';
     var _v = function(x){ return (x === null || x === undefined) ? '' : x; };
@@ -38197,7 +38197,7 @@ function clearLotForm() {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
-  document.getElementById('l-mode-livraison').value = 'gros_oeuvre';
+  document.getElementById('l-mode-livraison').value = 'cle_en_main';
   var pm=document.getElementById('l-prix-mode'); if(pm) pm.value='forfait';
   var cmo=document.getElementById('l-cout-mode'); if(cmo) cmo.value='forfait';
   var tv=document.getElementById('l-terrain-tva'); if(tv) tv.checked=false;
@@ -51996,7 +51996,7 @@ function onClientLotChange() {
      ensuite (même convention que le type de logement ci-dessus). */
   var elIlot = document.getElementById('c-ilot'); if (elIlot) elIlot.value = lot.ilot || '';
   var elTf = document.getElementById('c-numero-tf'); if (elTf) elTf.value = lot.numero_tf || lot.num_titre || '';
-  var modeLiv = lot.mode_livraison || 'gros_oeuvre';
+  var modeLiv = lot.mode_livraison || 'cle_en_main';
   var modeLivEl = document.getElementById('c-mode-livraison');
   if (modeLivEl) modeLivEl.value = modeLiv;
   if (lot.standing) { var st = document.getElementById('c-standing'); if (st) st.value = lot.standing; }
