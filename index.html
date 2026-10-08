@@ -19,7 +19,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.140 · 2026-10-08 — Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.141 · 2026-10-08 — Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -23002,11 +23002,11 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               <option value="">— Sélectionner —</option>
             </select>
           </div>
-          <div class="form-group"><label>Semaine du *</label><input type="date" class="form-control" id="rch-date-debut"></div>
+          <div class="form-group"><label>Semaine du *</label><input type="date" class="form-control" id="rch-date-debut" onchange="var f=document.getElementById('rch-date-fin'); if(this.value){ var d=new Date(this.value); d.setDate(d.getDate()+6); f.value=d.toISOString().slice(0,10); }"></div>
           <div class="form-group"><label>Au</label><input type="date" class="form-control" id="rch-date-fin"></div>
           <div class="form-group"><label>N° Rapport</label><input type="text" class="form-control" id="rch-numero" placeholder="R-2025-001"></div>
           <div class="form-group"><label>Catégorie travaux</label>
-            <select class="form-control" id="rch-categorie">
+            <select class="form-control" id="rch-categorie" onchange="rchMajSuggestions()">
               <option value="amenagement">🗺️ Aménagement</option>
               <option value="vrd">🚧 VRD — Voirie & Réseaux Divers</option>
               <option value="construction">🏗️ Construction / Gros œuvre</option>
@@ -23018,7 +23018,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div class="form-group"><label>Avancement prévu (%)</label><input type="number" class="form-control" id="rch-avancement-prevu" min="0" max="100"></div>
           <div class="form-group"><label>Nb ouvriers présents</label><input type="number" class="form-control" id="rch-ouvriers" value="0"></div>
           <div class="form-group"><label>Météo</label>
-            <select class="form-control" id="rch-meteo">
+            <select class="form-control" id="rch-meteo" onchange="rchMajSuggestions()">
               <option value="favorable">Favorable ☀️</option>
               <option value="nuageux">Nuageux ⛅</option>
               <option value="pluie">Pluie 🌧️ (arrêt travaux)</option>
@@ -23027,15 +23027,15 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </div>
           <div class="form-group span-2">
             <label>Travaux réalisés cette semaine *</label>
-            <textarea class="form-control" id="rch-travaux-realises" rows="3" placeholder="• Coulage dalle niveau R+1 — Surface 150 m²&#10;• Montage murs porteurs bloc A&#10;• Ferraillage colonnes axe C-D"></textarea>
+            <textarea class="form-control" id="rch-travaux-realises" rows="3" placeholder="• Coulage dalle niveau R+1 — Surface 150 m²&#10;• Montage murs porteurs bloc A&#10;• Ferraillage colonnes axe C-D"></textarea><div class="rd-sugg" id="rch-sugg-realises"></div>
           </div>
           <div class="form-group span-2">
             <label>Travaux prévus semaine prochaine</label>
-            <textarea class="form-control" id="rch-travaux-prevus" rows="2" placeholder="• Coulage dalles R+2 bloc B..."></textarea>
+            <textarea class="form-control" id="rch-travaux-prevus" rows="2" placeholder="• Coulage dalles R+2 bloc B..."></textarea><div class="rd-sugg" id="rch-sugg-prevus"></div>
           </div>
           <div class="form-group span-2">
             <label>Difficultés / Points bloquants</label>
-            <textarea class="form-control" id="rch-difficultes" rows="2" placeholder="Retard livraison acier, problème sol..."></textarea>
+            <textarea class="form-control" id="rch-difficultes" rows="2" placeholder="Retard livraison acier, problème sol..."></textarea><div class="rd-sugg" id="rch-sugg-difficultes"></div>
           </div>
           <div class="form-group">
             <label>Dépenses semaine (FCFA)</label>
@@ -23047,11 +23047,11 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           </div>
           <div class="form-group span-2">
             <label>Observations / Décisions de chantier</label>
-            <textarea class="form-control" id="rch-observations" rows="2"></textarea>
+            <textarea class="form-control" id="rch-observations" rows="2"></textarea><div class="rd-sugg" id="rch-sugg-observations"></div>
           </div>
           <div class="form-group">
             <label>Validé par</label>
-            <input type="text" class="form-control" id="rch-valideur" placeholder="Nom du chef de chantier / DT">
+            <input type="text" class="form-control" id="rch-valideur" placeholder="Nom du chef de chantier / DT"><div class="rd-sugg" id="rch-sugg-valideur"></div>
           </div>
           <div class="form-group">
             <label>Statut</label>
@@ -75924,6 +75924,7 @@ function openRapportChantier(convId){
   document.getElementById('rch-ouvriers').value='0';document.getElementById('rch-meteo').value='favorable';document.getElementById('rch-statut').value='brouillon';document.getElementById('rch-depenses').value='0';document.getElementById('rch-budget-cumul').value='0';
   if(convId){setTimeout(function(){var s=document.getElementById('rch-convention');if(s){s.value=convId;onSelectConventionRapport();}},80);}
   document.getElementById('rch-modal-title').textContent='Rapport hebdomadaire de chantier';
+  rchMajSuggestions();
   document.getElementById('modal-rapport-chantier').classList.add('open');
 }
 /* [Purge code mort 2026-08-14] 5 fonctions dupliquées (onSelectConventionRapport,
@@ -84747,6 +84748,66 @@ refreshDashboard = function() {
 };
 
 // Fonctions stub pour modules sans logique complète
+/* ══════════════════════════════════════════════════════════════════════════
+   AIDE À LA SAISIE — RAPPORT HEBDOMADAIRE DE CHANTIER
+   Même principe que les réunions et les missions : on choisit ou on saisit.
+   · Les travaux PRÉVUS au rapport précédent de la même convention sont proposés comme travaux réalisés
+     (et un clic les reprend tous) ; effectif repris du rapport précédent ;
+   · suggestions par catégorie de travaux, selon la météo, pour les difficultés et les décisions ;
+   · validateur choisi parmi le personnel technique ; date de fin calculée (début + 6 jours).
+   ══════════════════════════════════════════════════════════════════════════ */
+var RCH_SUGG = {
+  realises: {
+    amenagement:['Débroussaillage et nettoyage de l\'emprise','Piquetage et implantation des voies','Terrassement et décapage de la plate-forme','Mise en forme et compactage des plates-formes'],
+    vrd:['Pose des bordures et caniveaux','Mise en place de la couche de fondation (graveleux latéritique)','Pose des conduites d\'eau potable','Fouilles et pose du réseau d\'assainissement','Pose des fourreaux et poteaux d\'éclairage'],
+    construction:['Fouilles en rigole et coulage des semelles','Ferraillage et coulage des poteaux et poutres','Coulage de la dalle','Montage des murs en agglos','Pose de la charpente et de la couverture'],
+    finition:['Enduits intérieurs et extérieurs','Pose du carrelage','Pose des menuiseries (portes et fenêtres)','Plomberie sanitaire et électricité','Peinture'],
+    reception:['Inspection des ouvrages et relevé des réserves','Levée des réserves du procès-verbal de réception','Nettoyage final du chantier','Préparation des dossiers de réception']
+  },
+  prevus: {
+    amenagement:['Poursuite du terrassement','Implantation des voies restantes'],
+    vrd:['Poursuite de la pose des réseaux','Mise en œuvre de la couche de roulement'],
+    construction:['Poursuite des élévations','Coulage de la dalle suivante','Pose de la couverture'],
+    finition:['Poursuite des enduits et du carrelage','Peinture des locaux terminés'],
+    reception:['Levée des réserves restantes','Organisation de la réception']
+  },
+  difficultes:['Retard de livraison des matériaux (acier, ciment)','Rupture d\'approvisionnement en eau ou en électricité','Manque de main-d\'œuvre sur le chantier','Panne ou indisponibilité d\'engin','Problème de sol ou de terrain','Contestation ou litige avec un riverain'],
+  meteo:{ 'pluie':'Arrêt des travaux pour cause de pluie', 'forte-pluie':'Arrêt des travaux : forte pluie, chantier inaccessible' },
+  observations:['Réunion de chantier tenue avec le conducteur de travaux','Décision : commande des matériaux à anticiper','Réserves à lever avant la prochaine situation','Demande de situation de travaux à valider','Respect des règles de sécurité rappelé aux équipes']
+};
+function rchLignes(txt) { return String(txt || '').split(/\n+/).map(function(x){ return x.replace(/^\s*[•\-*]\s*/, '').trim(); }).filter(Boolean); }
+function rchRapportPrecedent(convId, exceptId) {
+  return (DATA.rapports_chantier || []).filter(function(r){ return r.convention_id === convId && r.id !== exceptId; })
+    .sort(function(a, b){ return (b.date_debut || '').localeCompare(a.date_debut || ''); })[0] || null;
+}
+function rchMajSuggestions() {
+  var conv = (document.getElementById('rch-convention') || {}).value, cat = (document.getElementById('rch-categorie') || {}).value || 'construction';
+  var meteo = (document.getElementById('rch-meteo') || {}).value;
+  var prec = conv ? rchRapportPrecedent(conv, APP.editingId) : null;
+  var prevuPrec = prec ? rchLignes(prec.travaux_prevus) : [];
+  var real = [];
+  if (prevuPrec.length) real.push({ t:'↺ Tout le prévu du rapport précédent (' + prevuPrec.length + ')', lignes:prevuPrec });
+  prevuPrec.forEach(function(l){ real.push(l); });
+  rdSuggRender('rch-sugg-realises', rdSuggUniques(real.concat(RCH_SUGG.realises[cat] || [])));
+  rdSuggRender('rch-sugg-prevus', rdSuggUniques((RCH_SUGG.prevus[cat] || []).concat(RCH_SUGG.realises[cat] || []).slice(0, 8)));
+  var dif = (RCH_SUGG.meteo[meteo] ? [RCH_SUGG.meteo[meteo]] : []).concat(RCH_SUGG.difficultes);
+  rdSuggRender('rch-sugg-difficultes', dif);
+  rdSuggRender('rch-sugg-observations', RCH_SUGG.observations.slice());
+  var tech = (DATA.employes || []).filter(function(e){ return empEstActif(e) && (e.dept === 'technique' || /chantier|conducteur|technique|ing[ée]nieur|\bDT\b/i.test(e.poste || '')); })
+    .map(function(e){ return ((e.nom || '') + ' ' + (e.prenoms || '')).trim() + (e.poste ? ' — ' + e.poste : ''); });
+  rdSuggRender('rch-sugg-valideur', tech.slice(0, 8));
+}
+/* Nouvelle saisie sur une convention déjà suivie : effectif repris du dernier rapport. */
+function rchReprendreContexte() {
+  if (APP.editingId) return;
+  var conv = (document.getElementById('rch-convention') || {}).value; if (!conv) return;
+  var num = document.getElementById('rch-numero');   /* numéro proposé aussi quand la convention est présélectionnée à l'ouverture */
+  if (num && !num.value) num.value = 'R-' + today().slice(0, 4) + '-' + String((DATA.rapports_chantier || []).filter(function(r){ return r.convention_id === conv; }).length + 1).padStart(3, '0');
+  var prec = rchRapportPrecedent(conv, null); if (!prec) return;
+  var ouv = document.getElementById('rch-ouvriers'); if (ouv && (!ouv.value || ouv.value === '0') && prec.nb_ouvriers) ouv.value = prec.nb_ouvriers;
+  var ct = document.getElementById('rch-categorie'); if (ct && prec.categorie) ct.value = prec.categorie;
+}
+
 function onSelectConventionRapport(){
   var id=document.getElementById('rch-convention').value;if(!id)return;
   var conv=DATA.conventions.find(function(c){return c.id===id;});if(!conv)return;
@@ -84762,6 +84823,8 @@ function onSelectConventionRapport(){
   document.getElementById('rch-numero').value='R-'+today().slice(0,4)+'-'+String(nb).padStart(3,'0');
   var paye=DATA.situations.filter(function(s){return s.convention_id===id&&s.statut==='payee';}).reduce(function(s,x){return s+(x.net||0);},0);
   document.getElementById('rch-budget-cumul').value=paye;
+  rchReprendreContexte();
+  rchMajSuggestions();
   updateRapportGauge();
 }
 
@@ -91967,7 +92030,12 @@ var RD_SUGG_CFG = {
   'pv-sugg-resultats':    { cible:'pv-om-resultats', mode:'ligne' },
   'pv-sugg-difficultes':  { cible:'pv-om-difficultes', mode:'ligne' },
   'pv-sugg-actions':      { mode:'pvaction' },
-  'pv-sugg-frais':        { cible:'pv-om-frais', mode:'valeur' }
+  'pv-sugg-frais':        { cible:'pv-om-frais', mode:'valeur' },
+  'rch-sugg-realises':    { cible:'rch-travaux-realises', mode:'ligne' },
+  'rch-sugg-prevus':      { cible:'rch-travaux-prevus', mode:'ligne' },
+  'rch-sugg-difficultes': { cible:'rch-difficultes', mode:'ligne' },
+  'rch-sugg-observations':{ cible:'rch-observations', mode:'ligne' },
+  'rch-sugg-valideur':    { cible:'rch-valideur', mode:'remplace' }
 };
 var RD_SUGG_CACHE = {};
 
@@ -92007,14 +92075,18 @@ function rdSuggClic(zoneId, i) {
     if ((c.value || '').toLowerCase().indexOf(texte.toLowerCase()) !== -1) return;
     c.value = c.value.trim() ? c.value.replace(/[\s,]+$/, '') + ', ' + texte : texte;
   } else if (cfg.mode === 'ligne') {
-    if ((c.value || '').toLowerCase().indexOf(texte.toLowerCase()) !== -1) return;
-    c.value = (c.value.trim() ? c.value.replace(/\s+$/, '') + '\n' : '') + '• ' + texte;
+    var _ajout = (it && it.lignes) ? it.lignes : [texte];   /* une puce peut porter plusieurs lignes (« tout reprendre ») */
+    _ajout.forEach(function(lg){
+      if ((c.value || '').toLowerCase().indexOf(lg.toLowerCase()) !== -1) return;
+      c.value = (c.value.trim() ? c.value.replace(/\s+$/, '') + '\n' : '') + '• ' + lg;
+    });
   } else {
     c.value = c.value.trim() ? c.value.replace(/\s+$/, '') + ' ' + texte : texte;
     c.focus(); try { c.setSelectionRange(c.value.length, c.value.length); } catch (e) {}
   }
   if (zoneId.indexOf('om-') === 0) omMajSuggestions();
   else if (zoneId.indexOf('pv-') === 0) pvMajSuggestions();
+  else if (zoneId.indexOf('rch-') === 0) rchMajSuggestions();
   else { rdMajSuggestionsPlan(); rdMajSuggestionsPrepa(); }
 }
 /* Suggestions chiffrées : un indicateur en alerte devient un point à traiter. */
@@ -95860,6 +95932,8 @@ function rchGenererApercu() {
     el('rch-ouvriers','0'); el('rch-depenses','0'); el('rch-budget-cumul','0');
     el('rch-travaux-realises',''); el('rch-travaux-prevus','');
     el('rch-difficultes',''); el('rch-observations',''); el('rch-valideur','');
+    rchReprendreContexte();   /* effectif repris du dernier rapport de la convention */
+    rchMajSuggestions();
 
     rchUpdateBadgePhotos();
     rchRenderPhotosGrid();
