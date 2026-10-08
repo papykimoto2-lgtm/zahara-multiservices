@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.136 · 2026-10-08 — PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.137 · 2026-10-08 — Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -10233,6 +10233,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <div class="etape-hd"><span class="etape-num">1</span>Références</div>
             <div class="etape-btns">
               <button class="tab-btn" onclick="switchTab('juridique','contrats')"><i>📝</i>Contrats</button>
+              <button class="tab-btn" onclick="switchTab('juridique','attestations');renderAttestationsJuridiques()"><i>📜</i>Attestations</button>
               <button class="tab-btn" onclick="switchTab('juridique','agrement');renderParamsAgrement()"><i>🏛️</i>Agrément &amp; Conformité</button>
             </div>
           </div>
@@ -10276,6 +10277,19 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         </div>
         <div class="tab-pane" id="tab-juridique-contrats">
           <div class="card"><div id="contrats-jur-box" style="color:var(--blanc-dim);font-size:13px;padding:20px;">Aucun contrat enregistré.</div></div>
+        </div>
+        <div class="tab-pane" id="tab-juridique-attestations">
+          <div class="card">
+            <div class="card-title">📜 Registre des attestations</div>
+            <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Attestations de solde, de cession définitive et de réservation provisoire. Chaque attestation de solde est rattachée au dossier juridique du souscripteur (type « Contrat de vente ») et tracée dans son historique.</div>
+            <div id="attest-kpi" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"></div>
+            <div class="filters-bar">
+              <input type="text" class="search-input" id="attest-recherche" placeholder="🔍 Nom, n° d'attestation, dossier…" oninput="_debInput('renderAttestationsJuridiques')">
+              <select class="filter-select" id="attest-filtre-type" onchange="renderAttestationsJuridiques()"><option value="">Tous types</option><option value="solde">Attestation de solde</option><option value="cession">Attestation de cession</option><option value="reservation">Attestation de réservation</option></select>
+              <select class="filter-select" id="attest-filtre-statut" onchange="renderAttestationsJuridiques()"><option value="">Tous statuts (hors « à établir »)</option><option value="valide">Validée</option><option value="en_attente">En attente DG/gérant</option><option value="brouillon">Brouillon</option><option value="rejete">Rejetée</option><option value="delivre">Délivrée</option><option value="a_etablir">À établir (soldés sans attestation)</option></select>
+            </div>
+            <div id="attest-jur-box"></div>
+          </div>
         </div>
         <div class="tab-pane" id="tab-juridique-agrement">
           <div id="params-agrement-content">
@@ -21515,6 +21529,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         </div>
         <div class="form-group"><label>Montant litige (FCFA)</label><input type="number" class="form-control" id="dj-montant" value="0"></div>
         <div class="form-group span-2"><label>Notes / Historique des actions</label><textarea class="form-control" id="dj-notes" style="min-height:100px;"></textarea></div>
+        <div class="form-group span-2" id="dj-pieces"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -82805,6 +82820,7 @@ function renderDossiersJuridiques() {
   }).join('');
   renderContratsJuridiques();
   renderContentieuxJuridiques();
+  renderAttestationsJuridiques();
 }
 
 /* [FIX] Onglets « Contrats » et « Contentieux » jamais alimentés : le
@@ -82859,6 +82875,95 @@ function renderContentieuxJuridiques() {
   }).join('');
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ATTESTATIONS ET MODULE JURIDIQUE
+   Les attestations sont des pièces juridiques : elles sont donc rattachées au dossier juridique du
+   souscripteur (« Contrat de vente », ouvert automatiquement s'il n'existe pas), consignées dans son
+   historique (validation, impression d'une version indicative, publication, envoi), et recensées dans
+   le registre de l'onglet « Attestations » du Département Juridique. Le dossier affiche aussi la liste
+   des pièces attendues (contrat, attestation de solde, PV de livraison, acte notarié, titre foncier…).
+   ══════════════════════════════════════════════════════════════════════════ */
+async function attLierJuridique(c, note) {
+  try {
+    var a = c.attestation_solde;
+    var d = await clientLierDossierJuridique(c, note, a ? a.prix : 0, false);
+    if (a && d) a.dossier_juridique_id = d.id;
+    return d;
+  } catch (e) { console.warn('[Juridique] liaison attestation impossible :', e); return null; }
+}
+var ATT_STATUT_LIB = { a_etablir:['À établir','badge-neutre'], brouillon:['Brouillon','badge-bleu'], en_attente:['En attente DG/gérant','badge-or'], valide:['Validée','badge-vert'], rejete:['Rejetée','badge-rouge'], emise:['Émise','badge-vert'], delivre:['Délivrée','badge-vert'] };
+function attRegistreLignes() {
+  var L = [];
+  (DATA.clients || []).forEach(function(c){
+    var a = c.attestation_solde, nom = ((c.nom || '') + ' ' + (c.prenoms || '')).trim();
+    if (a) L.push({ type:'solde', typeLib:'Attestation de solde', ref:a.numero, nom:nom, dossier:c.dossier || '', statut:a.statut, date:a.valide_le || a.date_demande || a.date_brouillon || '', clientId:c.id, djId:c.dossier_juridique_id || a.dossier_juridique_id || '', variantes:(a.variantes || []).length });
+    else if (c.statut !== 'resilie' && typeof attSoldeSolde === 'function' && attSoldeSolde(c).solde)
+      L.push({ type:'solde', typeLib:'Attestation de solde', ref:'—', nom:nom, dossier:c.dossier || '', statut:'a_etablir', date:'', clientId:c.id, djId:c.dossier_juridique_id || '', variantes:0 });
+  });
+  if (typeof finGetAll === 'function' && typeof finDocEtat === 'function') {
+    finGetAll().forEach(function(f){
+      var ec = finDocEtat(f, 'attestation_cession'), er = finDocEtat(f, 'attestation_reservation');
+      if (ec.etat === 'delivre') L.push({ type:'cession', typeLib:'Attestation de cession définitive', ref:'ATTEST-FIN-' + String(f.id).slice(-6).toUpperCase(), nom:f.nom || '', dossier:'', statut:'delivre', date:ec.date || '', finId:f.id, djId:'', variantes:0 });
+      if (er.etat === 'delivre') L.push({ type:'reservation', typeLib:'Attestation de réservation provisoire', ref:'—', nom:f.nom || '', dossier:'', statut:'delivre', date:er.date || '', finId:f.id, djId:'', variantes:0 });
+    });
+  }
+  return L;
+}
+function renderAttestationsJuridiques() {
+  var box = document.getElementById('attest-jur-box'); if (!box) return;
+  var tout = attRegistreLignes();
+  var fT = (document.getElementById('attest-filtre-type') || {}).value || '', fS = (document.getElementById('attest-filtre-statut') || {}).value || '';
+  var q = ((document.getElementById('attest-recherche') || {}).value || '').toLowerCase().trim();
+  var liste = tout.filter(function(x){
+    if (fT && x.type !== fT) return false;
+    if (fS ? x.statut !== fS : x.statut === 'a_etablir') return false;   /* « à établir » n'apparaît que sur demande */
+    return !q || (x.nom + ' ' + x.ref + ' ' + x.dossier).toLowerCase().indexOf(q) !== -1;
+  }).sort(function(a, b){ return String(b.date || '').localeCompare(String(a.date || '')); });
+  var cnt = function(s){ return tout.filter(function(x){ return x.statut === s; }).length; };
+  var kpi = document.getElementById('attest-kpi');
+  if (kpi) kpi.innerHTML = '<span class="badge badge-vert">✅ ' + (cnt('valide') + cnt('delivre')) + ' validée(s) / délivrée(s)</span> <span class="badge badge-or">⏳ ' + cnt('en_attente') + ' en attente du DG</span> <span class="badge badge-bleu">📝 ' + cnt('brouillon') + ' brouillon(s)</span> <span class="badge badge-neutre">À établir : ' + cnt('a_etablir') + '</span>';
+  if (!liste.length) { box.innerHTML = '<div style="padding:20px;color:var(--blanc-dim);font-size:13px;">Aucune attestation pour ces critères.</div>'; return; }
+  box.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Type</th><th>N°</th><th>Bénéficiaire</th><th>Statut</th><th>Date</th><th>Dossier juridique</th><th></th></tr></thead><tbody>' + liste.map(function(x){
+    var s = ATT_STATUT_LIB[x.statut] || [x.statut, 'badge-bleu'], d = x.djId ? (DATA.dossiersJuridiques || []).find(function(z){ return z.id === x.djId; }) : null;
+    var act = '';
+    if (x.type === 'solde') {
+      var cq = '\'' + x.clientId + '\'';
+      act = x.statut === 'valide' ? '<button class="btn btn-secondary btn-sm" onclick="attSoldeImprimer(' + cq + ')" title="Version officielle, sans modification">🖨 Sans modif.</button> <button class="btn btn-secondary btn-sm" onclick="attSoldeVarianteOuvrir(' + cq + ')" title="Version indicative avec modifications">✏️ Avec modif.</button>'
+        : '<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(' + cq + ')">👁 Voir</button>' + (x.statut === 'a_etablir' ? ' <button class="btn btn-primary btn-sm" onclick="attSoldeDemander(' + cq + ')">📜 Établir</button>' : '');
+    } else if (x.type === 'cession') act = '<button class="btn btn-secondary btn-sm" onclick="finImprimerAttestation(\'' + x.finId + '\')">🖨 Imprimer</button>';
+    else if (x.type === 'reservation' && typeof finImprimerAttestationReservation === 'function') act = '<button class="btn btn-secondary btn-sm" onclick="finImprimerAttestationReservation(\'' + x.finId + '\')">🖨 Imprimer</button>';
+    return '<tr><td style="font-size:11px;">' + escHtml(x.typeLib) + (x.variantes ? '<br><span style="color:var(--or);">✏️ ' + x.variantes + ' version(s) indicative(s)</span>' : '') + '</td>'
+      + '<td style="font-family:monospace;color:var(--or);font-weight:700;">' + escHtml(x.ref || '—') + '</td>'
+      + '<td>' + escHtml(x.nom || '—') + (x.dossier ? '<br><span style="font-size:10px;color:var(--dim);">' + escHtml(x.dossier) + '</span>' : '') + '</td>'
+      + '<td><span class="badge ' + s[1] + '">' + s[0] + '</span></td>'
+      + '<td style="font-size:11px;white-space:nowrap;">' + (x.date ? escHtml(dateShort(String(x.date).slice(0, 10))) : '—') + '</td>'
+      + '<td style="font-size:11px;">' + (d ? '<a style="cursor:pointer;color:var(--or);" onclick="openDossierJuridique(\'' + d.id + '\')">' + escHtml(d.ref) + '</a>' : '—') + '</td>'
+      + '<td style="white-space:nowrap;">' + act + '</td></tr>';
+  }).join('') + '</tbody></table></div>';
+}
+
+/* Pièces attendues du dossier de vente d'un souscripteur : ce qui est présent, ce qui manque. */
+var DJ_PIECES_ATTENDUES = ['Acte de vente notarié', 'Titre foncier', 'Attestation de non-gage / non-hypothèque', 'Plan de situation du lot', 'Procès-verbal de bornage contradictoire', 'Cahier des charges du lotissement'];
+async function djRenderPieces(d) {
+  var z = document.getElementById('dj-pieces'); if (!z) return;
+  var c = d && d.client_id ? (DATA.clients || []).find(function(x){ return x.id === d.client_id; }) : null;
+  if (!c) { z.innerHTML = ''; return; }
+  var docs = []; try { docs = (await dbGetAll('documents')).filter(function(x){ return x.entity_type === 'client' && x.entity_id === c.id; }); } catch (e) {}
+  var a = c.attestation_solde, solde = typeof attSoldeSolde === 'function' && attSoldeSolde(c).solde, liv = (DATA.livraisons || []).find(function(l){ return l.client_id === c.id; });
+  var P = [];
+  P.push({ lib:'Contrat de vente / réservation', ok:true, det:'Généré depuis la fiche souscripteur', act:'<button class="btn btn-secondary btn-sm" onclick="printContrat(\'' + c.id + '\')">🖨</button>' });
+  var stLib = a ? (ATT_STATUT_LIB[a.statut] || [a.statut])[0] : (solde ? 'à établir' : 'non soldé');
+  P.push({ lib:'Attestation de solde', ok:!!(a && a.statut === 'valide'), att:!!a, det:(a ? a.numero + ' — ' : '') + stLib, act:(a || solde) ? attSoldeCellule(c.id) : '' });
+  P.push({ lib:'Procès-verbal de livraison', ok:!!liv, det:liv ? ((liv.numero || '') + ' — ' + dateShort(liv.date)) : (solde ? 'à établir (Réception & Livraison)' : 'après solde'), act:'' });
+  DJ_PIECES_ATTENDUES.forEach(function(t){
+    var f = docs.find(function(x){ return String(x.description || '').toLowerCase().indexOf(t.toLowerCase().slice(0, 18)) !== -1; });
+    P.push({ lib:t, ok:!!f, det:f ? (f.name + ' — ' + dateShort(f.upload_date)) : 'à téléverser (fiche souscripteur → Documents)', act:'' });
+  });
+  var n = P.filter(function(x){ return x.ok; }).length;
+  z.innerHTML = '<div class="form-section-title" style="margin-top:14px;">📎 Pièces du dossier — ' + escHtml(((c.nom || '') + ' ' + (c.prenoms || '')).trim()) + ' <span style="font-weight:normal;font-size:11px;">(' + n + ' / ' + P.length + ' présentes)</span></div>'
+    + P.map(function(x){ return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--bord);font-size:12px;"><span style="width:22px;">' + (x.ok ? '✅' : '⏳') + '</span><span style="flex:1;"><strong>' + escHtml(x.lib) + '</strong><br><span style="color:var(--dim);font-size:11px;">' + escHtml(x.det) + '</span></span><span style="white-space:nowrap;">' + (x.act || '') + '</span></div>'; }).join('');
+}
+
 function openDossierJuridique(id) {
   APP.editingId = id || null;
   if (id) {
@@ -82875,6 +82980,7 @@ function openDossierJuridique(id) {
   }
   document.getElementById('modal-dossier-jur-title').textContent = id ? 'Modifier Dossier' : 'Nouveau Dossier Juridique';
   document.getElementById('modal-dossier-jur').classList.add('open');
+  djRenderPieces(id ? DATA.dossiersJuridiques.find(function(x){return x.id===id;}) : null);
 }
 
 async function saveDossierJuridique() {
@@ -82894,7 +83000,8 @@ async function saveDossierJuridique() {
     notes: document.getElementById('dj-notes').value.trim(),
     created_at: APP.editingId ? undefined : today()
   };
-  if (APP.editingId){var idx=DATA.dossiersJuridiques.findIndex(function(x){return x.id===APP.editingId;});if(idx>=0)DATA.dossiersJuridiques[idx]=d;}
+  /* Le formulaire ne porte pas les champs de liaison (client_id, bail_id…) ni la date de création : on repart de l'existant, sinon le dossier perdait son rattachement au souscripteur à chaque modification. */
+  if (APP.editingId){var idx=DATA.dossiersJuridiques.findIndex(function(x){return x.id===APP.editingId;});if(idx>=0){ var _exDJ=DATA.dossiersJuridiques[idx]; d.created_at=_exDJ.created_at; d=Object.assign({},_exDJ,d); DATA.dossiersJuridiques[idx]=d; }}
   else DATA.dossiersJuridiques.push(d);
   await dbPut('dossiersJuridiques', d);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_dossiers_juridiques', d);
@@ -107742,6 +107849,7 @@ async function valApply(type,refId,decision){
       else if(decision==='valide'){
         at.statut='valide'; at.valide_par=nomV; at.valide_le=today(); at.date_emission=today();
         at.html=attSoldeHtml(ac,{numero:at.numero,date:today(),signataire:nomV});
+        await attLierJuridique(ac,'Attestation de solde N° '+at.numero+' validée par '+nomV+' (version officielle, sans modification).');
       } else {
         var vr=(DATA.validations||[]).filter(function(x){return x.type===type&&x.ref_id===refId&&x.statut==='rejete';}).pop();
         at.statut='rejete'; at.motif=(vr&&vr.motif)||'';
@@ -108067,7 +108175,7 @@ function attSoldeVarianteOuvrir(clientId){
   document.getElementById('att-var-titre').textContent = 'Attestation de solde ' + (c.attestation_solde.numero||'') + ' — version avec modifications (indicatif)';
   document.getElementById('modal-att-var').classList.add('open');
 }
-function attSoldeVarianteImprimer(imprimer){
+async function attSoldeVarianteImprimer(imprimer){
   var c = (DATA.clients||[]).find(function(x){return x.id===ATT_VAR_CLIENT;}); if(!c || !c.attestation_solde) return;
   var a = c.attestation_solde, def = attSoldeChampsDefaut(c), champs = {}, modifs = [];
   Object.keys(ATT_VAR_LIBELLES).forEach(function(k){
@@ -108084,6 +108192,7 @@ function attSoldeVarianteImprimer(imprimer){
     setTimeout(function(){ try{ w.print(); }catch(e){} }, 400);
     a.variante = { champs:champs, motif:motif, date:today(), par:(APP.currentUser&&APP.currentUser.nom)||'—' };
     a.variantes = (a.variantes||[]).concat([{ date:today(), par:a.variante.par, motif:motif, modifs:modifs.map(function(m){ return m.libelle; }) }]).slice(-10);
+    await attLierJuridique(c,'Attestation de solde N° '+a.numero+' : version INDICATIVE imprimée à la demande du souscripteur — '+motif+' (modifié : '+modifs.map(function(m){ return m.libelle; }).join(', ')+').');
     attSoldeSauver(c);
     closeModal('modal-att-var');
     toast('Version indicative imprimée et tracée (motif et modifications enregistrés).','success');
@@ -108125,6 +108234,7 @@ function attSoldeImprimer(clientId){
 function attSoldePublier(clientId, on){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c || !c.attestation_solde || c.attestation_solde.statut!=='valide') return;
   c.attestation_solde.publie_portail = !!on; if(on) c.attestation_solde.publie_le = today();
+  attLierJuridique(c,'Attestation de solde N° '+c.attestation_solde.numero+(on?' publiée au portail du souscripteur.':' retirée du portail.'));
   attSoldeSauver(c); attSoldeRafraichirUI(c.id);
   toast(on?'🌐 Attestation disponible dans l\'espace portail du souscripteur.':'Attestation retirée du portail.','info');
 }
@@ -108138,7 +108248,9 @@ function attSoldeWhatsApp(clientId){
     + (a.publie_portail ? 'Vous pouvez la consulter et l\'imprimer depuis votre espace souscripteur (rubrique Documents) :\n' + lien + '\n\n' : 'Elle peut être retirée à nos bureaux ou vous être transmise sur demande.\n\n')
     + 'Merci de votre confiance.\n' + (p.societe||'');
   window.open('https://wa.me/' + telWhatsApp(c.tel) + '?text=' + encodeURIComponent(msg), '_blank');
-  a.wa_envoye_le = today(); attSoldeSauver(c); attSoldeRafraichirUI(c.id);
+  a.wa_envoye_le = today();
+  attLierJuridique(c,'Attestation de solde N° '+a.numero+' transmise par WhatsApp au souscripteur.');
+  attSoldeSauver(c); attSoldeRafraichirUI(c.id);
   toast('📲 WhatsApp ouvert avec le message prêt : cliquez sur Envoyer.' + (a.publie_portail ? '' : ' (Pensez à publier l\'attestation au portail pour que le lien fonctionne.)'),'info',7000);
 }
 function attSoldeCellule(clientId){
