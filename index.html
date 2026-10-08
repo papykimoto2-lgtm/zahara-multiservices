@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.134 · 2026-10-08 — Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.135 · 2026-10-08 — Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -17956,6 +17956,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           Documents générés automatiquement après enregistrement.
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;" id="doc-btns"></div>
+        <div id="doc-att-zone"></div>
 
         <!-- Documents téléversés -->
         <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--bord);">
@@ -32217,6 +32218,7 @@ function openClientModal(id) {
       + '<button class="btn btn-secondary btn-sm" onclick="etatEcheancier(\'' + id + '\')">📅 Échéancier</button>'
       + '<button class="btn btn-secondary btn-sm" onclick="genererDocsSouscription(\'' + id + '\',\'fiche\')">📄 Fiche de souscription</button>'
       + '<button class="btn btn-secondary btn-sm" onclick="genererDocsSouscription(\'' + id + '\',\'engagement\')">✍️ Engagement d\'acquisition</button>';
+    var _zAtt = document.getElementById('doc-att-zone'); if (_zAtt) _zAtt.innerHTML = attSoldeZoneClient(id);
     // Documents téléversés
     setTimeout(function(){ refreshDocumentsForEntity('client', id); }, 80);
     renderClientHistorique(id);
@@ -32233,6 +32235,7 @@ function openClientModal(id) {
         + (nbSubro ? ' <span class="badge badge-bleu" style="margin-left:4px;">'+nbSubro+' déjà</span>' : '') + '</button>';
     }
   } else {
+    var _zAttN = document.getElementById('doc-att-zone'); if (_zAttN) _zAttN.innerHTML = '';
     document.getElementById('modal-client-title').textContent = 'Nouveau Souscripteur';
     document.getElementById('c-date-debut').value = today();
     document.getElementById('c-date-souscription').value = today();
@@ -35621,6 +35624,7 @@ async function savePaiement() {
       if (_mvtLie && vEdit.mode === 'especes') { var _sL = _vrsSessionDe(_mvtLie); if (_sL && _sL.statut !== 'ouverte') await _vrsRecalculerSessionCloturee(_sL); }
       if (_mvtLie || _creerBon) _vrsRafraichirCaisse();
       if (typeof majStatutLotClient === 'function') await majStatutLotClient(vEdit.client_id);
+      attSoldeAuto(vEdit.client_id);
       APP._editVersementId = null;
       closeModal('modal-paiement');
       toast('Versement modifié — commissions et écriture comptable réimpactées.', 'success');
@@ -35707,6 +35711,7 @@ async function savePaiement() {
   await genererCommissionsVersement(versement);
   // ── Statut du lot : passe « vendu » dès que le seuil d'immobilisation est atteint ──
   if (typeof majStatutLotClient === 'function') await majStatutLotClient(versement.client_id);
+  attSoldeAuto(versement.client_id);
 
   closeModal('modal-paiement');
   if (_bon) toast('💰 Bon d\'entrée ' + _bon.numero + ' créé dans la caisse au ' + dateShort(versement.date) + (_resBon.cloturee ? ' (session déjà clôturée : solde théorique et écart recalculés)' : ' — solde de caisse à jour') + '.', 'success', 7000);
@@ -107690,7 +107695,7 @@ async function valApply(type,refId,decision){
         at.statut='rejete'; at.motif=(vr&&vr.motif)||'';
       }
       attSoldeSauver(ac);
-      if(typeof renderLivAFaire==='function') renderLivAFaire();
+      attSoldeRafraichirUI(ac.id);
     }
   }
   /* extensible : situation, convention, cession … */
@@ -107877,6 +107882,7 @@ function attSoldeNumero(){
 /* Corps du document. opts : {numero, date, signataire, fonction, projet}. Pas d'image embarquée (reste léger dans la fiche). */
 function attSoldeHtml(c, opts){
   opts = opts || {};
+  var ov = opts.overrides || {};
   var p = DATA.params || {}, S = attSoldeSolde(c), E = function(x){ return escHtml(x==null?'':String(x)); };
   var prog = (DATA.programmes||[]).find(function(x){ return x.id===c.programme_id; }) || {};
   var lotIds = (typeof _lotIdsDeClient==='function') ? _lotIdsDeClient(c) : (c.lot_id?[c.lot_id]:[]);
@@ -107886,9 +107892,10 @@ function attSoldeHtml(c, opts){
   var n = function(x){ return new Intl.NumberFormat('fr-FR').format(Math.round(x)); };
   var lettres = (typeof _montantEnLettres==='function') ? _montantEnLettres(S.prix) : '';
   var lignes = S.vs.map(function(v){ return '<tr><td>'+E(dateShort(v.date))+'</td><td>'+E(v.ref||v.id)+'</td><td>'+E(v.mode||'—')+'</td><td style="text-align:right;">'+n(parseFloat(v.montant)||0)+'</td></tr>'; }).join('');
-  var ident = [c.piece_type, c.piece_num && ('N° '+c.piece_num)].filter(Boolean).join(' ');
+  var ident = ov.piece || [c.piece_type, c.piece_num && ('N° '+c.piece_num)].filter(Boolean).join(' ');
+  if(ov.bien) bien = E(ov.bien);
   var promoteur = E(p.societe||'La société') + (p.rccm?(', RCCM '+E(p.rccm)):'') + (p.dgi?(', N° CC '+E(p.dgi)):'') + (p.agrement?(', agréée en qualité de promoteur immobilier sous le N° '+E(p.agrement)):', promoteur immobilier') + (p.adresse?(', siège : '+E(String(p.adresse).replace(/\s*\n\s*/g,', '))):'');
-  var h = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Attestation de solde '+E(opts.numero||'')+'</title>'
+  var h = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Attestation de solde '+E(opts.numero||'')+(opts.indicatif?' (indicatif)':'')+'</title>'
     + '<style>body{font-family:Georgia,serif;color:#1a1a1a;padding:38px 46px;max-width:760px;margin:0 auto;font-size:13px;line-height:1.55;position:relative;}'
     + 'h1{text-align:center;font-size:21px;letter-spacing:1px;margin:16px 0 2px;color:#1D3F7A;}.sub{text-align:center;font-size:12px;color:#555;margin-bottom:14px;}'
     + '.ref{display:flex;justify-content:space-between;font-size:12px;color:#444;border-bottom:2px solid #1D3F7A;padding-bottom:8px;}'
@@ -107899,11 +107906,14 @@ function attSoldeHtml(c, opts){
     + '.projet{position:fixed;top:40%;left:8%;font-size:64px;color:rgba(200,0,0,.13);transform:rotate(-24deg);font-weight:bold;pointer-events:none;}'
     + '@media print{body{padding:18mm 16mm;}}</style></head><body>'
     + (opts.projet ? '<div class="projet">PROJET — NON VALIDÉ</div>' : '')
+    + (opts.indicatif ? '<div class="projet">À TITRE INDICATIF</div>' : '')
     + '<div class="ref"><div><strong style="font-size:15px;">'+E(p.societe||'')+'</strong></div><div style="text-align:right;">N° <strong>'+E(opts.numero||'—')+'</strong><br>Dossier : '+E(c.dossier||c.id)+'</div></div>'
     + '<h1>ATTESTATION DE SOLDE</h1><div class="sub">Quitus de paiement intégral du prix de vente</div>'
+    + (opts.indicatif ? '<div style="border:2px solid #b45309;background:#fffbeb;padding:8px 12px;margin:8px 0;font-size:12px;"><strong>VERSION À TITRE INDICATIF</strong> — établie à la demande du souscripteur ('+E(opts.motif||'')+'). Elle ne remplace pas l\'attestation de solde sans modification n° '+E(opts.numero||'')+', seule à remettre au notaire.'
+        + ((opts.modifs||[]).length ? '<br>Éléments modifiés : '+(opts.modifs||[]).map(function(m){ return E(m.libelle)+' (« '+E(m.avant||'—')+' » → « '+E(m.apres||'—')+' »)'; }).join(' ; ') : '')+'</div>' : '')
     + '<h3>Le promoteur</h3><div class="art">'+promoteur+'.</div>'
-    + '<h3>Le souscripteur (acquéreur)</h3><table><tr><th style="width:28%">Nom et prénoms</th><td>'+E(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</td></tr>'
-    + (c.ddn?'<tr><th>Né(e) le</th><td>'+E(dateShort(c.ddn))+(c.nationalite?(' — '+E(c.nationalite)):'')+'</td></tr>':'')
+    + '<h3>Le souscripteur (acquéreur)</h3><table><tr><th style="width:28%">Nom et prénoms</th><td>'+E(ov.nom || ((c.nom||'')+' '+(c.prenoms||'')).trim())+'</td></tr>'
+    + (ov.naissance ? '<tr><th>Né(e) le</th><td>'+E(ov.naissance)+'</td></tr>' : (!opts.overrides && c.ddn)?'<tr><th>Né(e) le</th><td>'+E(dateShort(c.ddn))+(c.nationalite?(' — '+E(c.nationalite)):'')+'</td></tr>':'')
     + (ident?'<tr><th>Pièce d\'identité</th><td>'+E(ident)+'</td></tr>':'')
     + '<tr><th>Contact</th><td>'+E([c.tel,c.email,c.adresse].filter(Boolean).join(' — ')||'—')+'</td></tr></table>'
     + '<h3>Le bien</h3><table><tr><th style="width:28%">Programme</th><td>'+E(prog.nom||'—')+(prog.localisation?(' — '+E(prog.localisation)):'')+'</td></tr>'
@@ -107911,7 +107921,7 @@ function attSoldeHtml(c, opts){
     + '<tr><th>Nature</th><td>'+(nature==='terrain'?'Terrain / parcelle':nature==='logement'?'Logement':'—')+'</td></tr>'
     + '<tr><th>Souscription</th><td>Contrat du '+E(dateShort(c.date_souscription||c.date_debut))+'</td></tr></table>'
     + '<h3>Situation financière</h3>'
-    + '<div class="art">Nous, '+E(p.societe||'le promoteur')+', attestons que <strong>'+E(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</strong> a <strong>intégralement réglé le prix de vente</strong> du bien désigné ci-dessus, fixé à <strong>'+n(S.prix)+' FCFA</strong>'+(lettres?(' ('+E(lettres)+' francs CFA)'):'')+', '
+    + '<div class="art">Nous, '+E(p.societe||'le promoteur')+', attestons que <strong>'+E(ov.nom || ((c.nom||'')+' '+(c.prenoms||'')).trim())+'</strong> a <strong>intégralement réglé le prix de vente</strong> du bien désigné ci-dessus, fixé à <strong>'+n(S.prix)+' FCFA</strong>'+(lettres?(' ('+E(lettres)+' francs CFA)'):'')+', '
     + (S.dateSolde?('le dernier versement ayant été constaté le <strong>'+E(dateShort(S.dateSolde))+'</strong>'):'')+'.</div>'
     + '<table><thead><tr><th>Date</th><th>Référence</th><th>Mode</th><th style="text-align:right;">Montant (FCFA)</th></tr></thead><tbody>'+lignes
     + '<tr><td colspan="3"><strong>Total versé sur le prix</strong></td><td style="text-align:right;"><strong>'+n(S.verse)+'</strong></td></tr></tbody></table>'
@@ -107922,12 +107932,112 @@ function attSoldeHtml(c, opts){
     + '<div class="art">2. La présente attestation est établie sous réserve de l\'encaissement effectif des sommes versées et sur la foi de la comptabilité du promoteur à la date de son émission.</div>'
     + '<div class="art">3. Elle ne constitue ni un titre de propriété ni un acte de vente authentique. Le transfert de propriété est constaté par acte authentique établi par notaire et inscrit à la Conservation de la propriété foncière, conformément à la législation ivoirienne en vigueur en matière de promotion immobilière et de construction.</div>'
     + '<div class="art">4. La livraison du bien (remise des clés ou du terrain) sera constatée par un procès-verbal de livraison contradictoire, dont la date sera notifiée au souscripteur.</div>'
-    + '<div class="art">5. La présente attestation est délivrée à l\'intéressé(e) pour servir et valoir ce que de droit, notamment auprès du notaire et de la Conservation foncière.</div>'
+    + '<div class="art">5. La présente attestation est délivrée à l\'intéressé(e) pour servir et valoir ce que de droit, notamment auprès '+(ov.destinataire?E(ov.destinataire):'du notaire et de la Conservation foncière')+'.</div>'
+    + (ov.observations ? '<div class="art">6. '+E(ov.observations)+'</div>' : '')
     + '<div class="sig"><div>Le souscripteur<br><br><br>(lu et pris connaissance)</div>'
     + '<div>Fait à '+E(p.ville||'____________')+', le '+E(dateShort(opts.date||today()))+'<br><strong>'+E(opts.fonction||'Le Directeur Général / Le Gérant')+'</strong><br>'+E(opts.signataire||'')+'<br><br><br>Signature et cachet</div></div>'
     + '</body></html>';
   return h;
 }
+/* Constat de solde de tout compte : appelé après chaque versement. Prépare un BROUILLON d'attestation
+   (rien n'est transmis au souscripteur tant que la direction n'a pas validé) ; retire le brouillon si le
+   souscripteur n'est plus soldé (versement modifié ou annulé). */
+function attSoldeAuto(clientId){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
+  var S = attSoldeSolde(c), a = c.attestation_solde;
+  if(c.statut==='resilie') return;
+  if(S.solde && !a){
+    c.attestation_solde = { numero:attSoldeNumero(), statut:'brouillon', date_brouillon:today(), prix:S.prix, verse:S.verse, date_solde:S.dateSolde, publie_portail:false };
+    attSoldeSauver(c);
+    toast('📜 Souscripteur soldé : attestation de solde préparée en brouillon (fiche du souscripteur → Documents).','success',7000);
+  } else if(!S.solde && a && a.statut==='brouillon'){
+    delete c.attestation_solde; attSoldeSauver(c);
+  }
+  attSoldeRafraichirUI(clientId);
+}
+/* Rafraîchit la liste « À livrer » et la zone Documents de la fiche souscripteur si elle est ouverte. */
+function attSoldeRafraichirUI(clientId){
+  if(typeof renderLivAFaire==='function') renderLivAFaire();
+  var z = document.getElementById('doc-att-zone');
+  if(z && typeof APP!=='undefined' && APP.editingId===clientId) z.innerHTML = attSoldeZoneClient(clientId);
+}
+function attSoldeZoneClient(clientId){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return '';
+  if(!c.attestation_solde && !attSoldeSolde(c).solde) return '';
+  var a = c.attestation_solde;
+  return '<div style="margin-top:12px;padding:10px 12px;border:1px solid var(--bord);border-radius:8px;"><div class="form-section-title" style="margin-bottom:6px;">📜 Attestation de solde'
+    + (a ? ' <span style="font-weight:normal;font-size:11px;">N° '+escHtml(a.numero||'')+'</span>' : '') + '</div>'
+    + '<div style="font-size:11.5px;color:var(--blanc-dim);margin-bottom:6px;">'
+    + (!a ? 'Souscripteur soldé — aucune attestation préparée.' : a.statut==='brouillon' ? 'Brouillon généré automatiquement au constat du solde de tout compte. À soumettre au DG / gérant.' : a.statut==='en_attente' ? 'En attente de validation du DG / gérant.' : a.statut==='valide' ? 'Validée par '+escHtml(a.valide_par||'')+' le '+escHtml(dateShort(a.valide_le))+'.' : 'Rejetée'+(a.motif?(' : '+escHtml(a.motif)):'')+'.')
+    + '</div>' + attSoldeCellule(clientId) + '</div>';
+}
+/* ── Impression « avec modifications » (à titre indicatif) ───────────────────
+   Deux versions imprimables d'une attestation validée :
+   · SANS modification : le texte figé à la validation — c'est celle que l'on remet au notaire ;
+   · AVEC modifications demandées par le souscripteur : libellés ajustables (identité, désignation du bien,
+     destinataire, observations), marquée « À TITRE INDICATIF » avec la liste des changements et le motif.
+   Les montants, dates et versements ne sont jamais modifiables ici (ils viennent de la comptabilité) et
+   l'attestation validée, publiée ou envoyée reste toujours la version sans modification. */
+function attSoldeChampsDefaut(c){
+  var ident = [c.piece_type, c.piece_num && ('N° '+c.piece_num)].filter(Boolean).join(' ');
+  var lotIds = (typeof _lotIdsDeClient==='function') ? _lotIdsDeClient(c) : (c.lot_id?[c.lot_id]:[]);
+  var bien = lotIds.map(function(id){ return (DATA.lots||[]).find(function(l){return l.id===id;}); }).filter(Boolean)
+    .map(function(l){ return 'Lot ' + (l.numero||l.nom||'?') + (l.ilot?(', îlot '+l.ilot):'') + (l.surface?(' — '+l.surface+' m²'):'') + (l.type?(' ('+l.type+')'):''); }).join(' ; ') || '—';
+  return { nom:((c.nom||'')+' '+(c.prenoms||'')).trim(), naissance:(c.ddn?dateShort(c.ddn):'')+(c.ddn&&c.nationalite?(' — '+c.nationalite):''), piece:ident, bien:bien, destinataire:'', observations:'' };
+}
+var ATT_VAR_LIBELLES = { nom:'Nom et prénoms', naissance:'Date et nationalité', piece:'Pièce d\'identité', bien:'Désignation du bien', destinataire:'Destinataire (auprès de…)', observations:'Observations' };
+function attSoldeEnsureModalVar(){
+  if(document.getElementById('modal-att-var')) return;
+  var d = document.createElement('div'); d.className = 'modal-overlay'; d.id = 'modal-att-var';
+  d.innerHTML = '<div class="modal modal-lg"><div class="modal-header"><h3 id="att-var-titre">Attestation de solde — version avec modifications</h3>'
+    + '<button class="btn btn-secondary btn-icon" onclick="closeModal(\'modal-att-var\')">✕</button></div><div class="modal-body"><div class="form-grid">'
+    + '<div class="form-group span-2" style="font-size:12px;background:var(--gris-med);padding:8px 10px;border-radius:8px;">⚠️ Version <strong>à titre indicatif</strong>, établie à la demande du souscripteur. Elle porte la mention « À TITRE INDICATIF » et ne remplace pas l\'attestation <strong>sans modification</strong>, seule à remettre au notaire. Les montants, dates et versements ne sont pas modifiables.</div>'
+    + '<div class="form-group span-2"><label>Nom et prénoms</label><input class="form-control" id="att-var-nom"></div>'
+    + '<div class="form-group"><label>Date de naissance et nationalité</label><input class="form-control" id="att-var-naissance" placeholder="ex : 12/03/1985 — Ivoirienne"></div>'
+    + '<div class="form-group"><label>Pièce d\'identité</label><input class="form-control" id="att-var-piece"></div>'
+    + '<div class="form-group span-2"><label>Désignation du bien</label><textarea class="form-control" id="att-var-bien" rows="2"></textarea></div>'
+    + '<div class="form-group span-2"><label>Destinataire (à qui l\'attestation est remise)</label><input class="form-control" id="att-var-destinataire" placeholder="ex : Banque X, Ambassade de France, employeur… (laisser vide : notaire et Conservation foncière)"></div>'
+    + '<div class="form-group span-2"><label>Observations complémentaires</label><textarea class="form-control" id="att-var-observations" rows="2"></textarea></div>'
+    + '<div class="form-group span-2"><label>Motif de la modification * <span style="font-weight:normal;color:var(--dim);">(demande du souscripteur)</span></label><input class="form-control" id="att-var-motif" placeholder="ex : orthographe du nom corrigée à la demande de M. KONE du 08/10/2026"></div>'
+    + '</div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal(\'modal-att-var\')">Annuler</button>'
+    + '<button class="btn btn-secondary" onclick="attSoldeVarianteImprimer(false)">👁 Aperçu</button>'
+    + '<button class="btn btn-primary" onclick="attSoldeVarianteImprimer(true)">🖨 Imprimer (indicatif)</button></div></div>';
+  document.body.appendChild(d);
+}
+var ATT_VAR_CLIENT = null;
+function attSoldeVarianteOuvrir(clientId){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;});
+  if(!c || !c.attestation_solde || c.attestation_solde.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
+  attSoldeEnsureModalVar(); ATT_VAR_CLIENT = clientId;
+  var def = attSoldeChampsDefaut(c), prec = (c.attestation_solde.variante || {}).champs || {};
+  Object.keys(ATT_VAR_LIBELLES).forEach(function(k){ document.getElementById('att-var-'+k).value = (prec[k] != null ? prec[k] : def[k]) || ''; });
+  document.getElementById('att-var-motif').value = '';
+  document.getElementById('att-var-titre').textContent = 'Attestation de solde ' + (c.attestation_solde.numero||'') + ' — version avec modifications (indicatif)';
+  document.getElementById('modal-att-var').classList.add('open');
+}
+function attSoldeVarianteImprimer(imprimer){
+  var c = (DATA.clients||[]).find(function(x){return x.id===ATT_VAR_CLIENT;}); if(!c || !c.attestation_solde) return;
+  var a = c.attestation_solde, def = attSoldeChampsDefaut(c), champs = {}, modifs = [];
+  Object.keys(ATT_VAR_LIBELLES).forEach(function(k){
+    var v = (document.getElementById('att-var-'+k).value || '').trim(); champs[k] = v;
+    if(v !== (def[k]||'')) modifs.push({ champ:k, libelle:ATT_VAR_LIBELLES[k], avant:def[k]||'', apres:v });
+  });
+  var motif = (document.getElementById('att-var-motif').value || '').trim();
+  if(!modifs.length){ toast('Aucune modification saisie : imprimez l\'attestation sans modification.','error'); return; }
+  if(!motif){ toast('Indiquez le motif de la modification (demande du souscripteur).','error'); return; }
+  var html = attSoldeHtml(c, { numero:a.numero, date:a.date_emission||a.valide_le, signataire:a.valide_par, indicatif:true, overrides:champs, motif:motif, modifs:modifs });
+  var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
+  w.document.write(html); w.document.close();
+  if(imprimer){
+    setTimeout(function(){ try{ w.print(); }catch(e){} }, 400);
+    a.variante = { champs:champs, motif:motif, date:today(), par:(APP.currentUser&&APP.currentUser.nom)||'—' };
+    a.variantes = (a.variantes||[]).concat([{ date:today(), par:a.variante.par, motif:motif, modifs:modifs.map(function(m){ return m.libelle; }) }]).slice(-10);
+    attSoldeSauver(c);
+    closeModal('modal-att-var');
+    toast('Version indicative imprimée et tracée (motif et modifications enregistrés).','success');
+  }
+}
+
 function attSoldeSauver(c){
   c._modifie = new Date().toISOString();
   dbPut('clients', c);
@@ -107945,7 +108055,7 @@ async function attSoldeDemander(clientId){
     demandeur:(APP.currentUser&&APP.currentUser.nom)||'—', prix:S.prix, verse:S.verse, date_solde:S.dateSolde, publie_portail:false };
   attSoldeSauver(c);
   var v = await valCreate('attestation_solde', c.id, 'Attestation de solde '+c.attestation_solde.numero+' — '+nom+(c.dossier?(' ('+c.dossier+')'):''), S.prix, {client_id:c.id});
-  if(typeof renderLivAFaire==='function') renderLivAFaire();
+  attSoldeRafraichirUI(c.id);
   toast('📤 Attestation transmise au DG / gérant pour validation (menu Validations).','success');
 }
 function attSoldeApercu(clientId){
@@ -107963,7 +108073,7 @@ function attSoldeImprimer(clientId){
 function attSoldePublier(clientId, on){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c || !c.attestation_solde || c.attestation_solde.statut!=='valide') return;
   c.attestation_solde.publie_portail = !!on; if(on) c.attestation_solde.publie_le = today();
-  attSoldeSauver(c); if(typeof renderLivAFaire==='function') renderLivAFaire();
+  attSoldeSauver(c); attSoldeRafraichirUI(c.id);
   toast(on?'🌐 Attestation disponible dans l\'espace portail du souscripteur.':'Attestation retirée du portail.','info');
 }
 function attSoldeWhatsApp(clientId){
@@ -107976,19 +108086,21 @@ function attSoldeWhatsApp(clientId){
     + (a.publie_portail ? 'Vous pouvez la consulter et l\'imprimer depuis votre espace souscripteur (rubrique Documents) :\n' + lien + '\n\n' : 'Elle peut être retirée à nos bureaux ou vous être transmise sur demande.\n\n')
     + 'Merci de votre confiance.\n' + (p.societe||'');
   window.open('https://wa.me/' + telWhatsApp(c.tel) + '?text=' + encodeURIComponent(msg), '_blank');
-  a.wa_envoye_le = today(); attSoldeSauver(c); if(typeof renderLivAFaire==='function') renderLivAFaire();
+  a.wa_envoye_le = today(); attSoldeSauver(c); attSoldeRafraichirUI(c.id);
   toast('📲 WhatsApp ouvert avec le message prêt : cliquez sur Envoyer.' + (a.publie_portail ? '' : ' (Pensez à publier l\'attestation au portail pour que le lien fonctionne.)'),'info',7000);
 }
 function attSoldeCellule(clientId){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return '';
   var a = c.attestation_solde, b = 'style="font-size:10px;padding:2px 6px;"', q = '\''+clientId+'\'';
-  if(!a || a.statut==='rejete'){
-    return (a ? '<div class="badge badge-rouge" style="font-size:10px;margin-bottom:3px;" title="'+escHtml(a.motif||'')+'">⛔ Rejetée</div><br>' : '')
-      + '<button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeDemander('+q+')">📜 Faire valider</button>';
+  if(!a || a.statut==='rejete' || a.statut==='brouillon'){
+    return (a && a.statut==='rejete' ? '<div class="badge badge-rouge" style="font-size:10px;margin-bottom:3px;" title="'+escHtml(a.motif||'')+'">⛔ Rejetée</div><br>' : '')
+      + (a && a.statut==='brouillon' ? '<span class="badge badge-bleu" style="font-size:10px;">📝 Brouillon</span> <button class="btn btn-secondary btn-sm" '+b+' title="Aperçu" onclick="attSoldeApercu('+q+')">👁</button> ' : '')
+      + '<button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeDemander('+q+')">'+(a && a.statut==='brouillon' ? '📤 Soumettre au DG' : '📜 Faire valider')+'</button>';
   }
   if(a.statut==='en_attente') return '<span class="badge badge-or" style="font-size:10px;">⏳ En attente DG/gérant</span> <button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeApercu('+q+')">👁</button>';
   return '<span class="badge badge-vert" style="font-size:10px;">✅ Validée</span> '
-    + '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer" onclick="attSoldeImprimer('+q+')">🖨</button> '
+    + '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer l\'attestation SANS modification : version officielle, à remettre au notaire" onclick="attSoldeImprimer('+q+')">🖨 Sans modif.</button> '
+    + '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer avec les modifications demandées par le souscripteur : version à titre indicatif" onclick="attSoldeVarianteOuvrir('+q+')">✏️ Avec modif.</button> '
     + '<button class="btn '+(a.publie_portail?'btn-primary':'btn-secondary')+' btn-sm" '+b+' title="'+(a.publie_portail?'Publiée au portail — cliquer pour retirer':'Publier au portail du souscripteur')+'" onclick="attSoldePublier('+q+','+(a.publie_portail?'false':'true')+')">🌐</button> '
     + '<button class="btn btn-secondary btn-sm" '+b+' title="Envoyer par WhatsApp" onclick="attSoldeWhatsApp('+q+')">📲</button>'
     + (a.wa_envoye_le?'<div style="font-size:9px;color:var(--blanc-dim);">WhatsApp : '+escHtml(dateShort(a.wa_envoye_le))+'</div>':'');
