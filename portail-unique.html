@@ -1509,7 +1509,7 @@
     html+='<div class="sub" id="s-ver"><div class="card"><strong>💳 Historique des versements</strong><div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Mode</th></tr></thead><tbody>'+tableVers(vs)+'</tbody></table></div></div></div>';
     html+='<div class="sub" id="s-tra">'+blocTravaux()+'</div>';
     html+='<div class="sub" id="s-rec">'+blocReception()+'</div>';
-    html+='<div class="sub" id="s-doc"><div class="card"><strong>📁 Mes documents</strong><div style="display:flex; flex-direction:column; gap:12px; margin-top:12px; max-width:340px;"><button class="highlight-btn" style="background:#0077b6;" onclick="docEcheancier()">📅 Échéancier personnalisé</button><button class="highlight-btn" style="background:#0077b6;" onclick="docAttestation()">📑 Attestation de versements</button></div></div></div>';
+    html+='<div class="sub" id="s-doc"><div class="card"><strong>📁 Mes documents</strong><div style="display:flex; flex-direction:column; gap:12px; margin-top:12px; max-width:340px;"><button class="highlight-btn" style="background:#0077b6;" onclick="docEcheancier()">📅 Échéancier personnalisé</button><button class="highlight-btn" style="background:#0077b6;" onclick="docAttestation()">📑 Attestation de versements</button>'+sAttSoldeBtn()+'</div></div></div>';
     html+='<div class="sub" id="s-msg"><div class="card">'
       +'<strong style="font-size:1rem;">💬 Messagerie</strong>'
       +'<div style="margin:14px 0 12px;">'
@@ -1637,6 +1637,19 @@
     var c=S.client, total=parseFloat(c.montant_total)||0, apport=parseFloat(c.apport)||0, duree=parseInt(c.duree)||0, mens=duree?Math.ceil((total-apport)/duree):0, debut=new Date(c.date_debut||Date.now()), rows='';
     for(var i=0;i<duree;i++){ var ech=new Date(debut.getFullYear(),debut.getMonth()+i,1); rows+='<tr><td>'+(i+1)+'</td><td>'+ech.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})+'</td><td>'+fmt(mens)+' FCFA</td></tr>'; }
     imprimer('Échéancier '+(c.dossier||''),'<h2>Échéancier des paiements</h2><p>'+esc((c.prenoms||'')+' '+(c.nom||''))+' — Dossier '+esc(c.dossier||'')+'<br>Programme : '+esc(sProgNom())+' · Lot '+esc(sLotNum())+'</p><p>Apport : '+fmt(apport)+' FCFA · Mensualité : '+fmt(mens)+' FCFA × '+duree+'</p><table><thead><tr><th>N°</th><th>Mois</th><th>Montant</th></tr></thead><tbody>'+rows+'</tbody></table>');
+  }
+  /* Attestation de solde : n'apparaît que si la Direction l'a validée ET publiée pour ce souscripteur.
+     Le document validé est figé dans la fiche (attestation_solde.html) : on l'affiche tel quel. */
+  function sAttSoldeBtn(){
+    var a=S.client&&S.client.attestation_solde;
+    if(!a||a.statut!=='valide'||!a.publie_portail||!a.html) return '';
+    return '<button class="highlight-btn" style="background:#16a34a;" onclick="docAttSolde()">📜 Attestation de solde N° '+esc(a.numero||'')+'</button>';
+  }
+  function docAttSolde(){
+    var a=S.client&&S.client.attestation_solde;
+    if(!a||a.statut!=='valide'||!a.publie_portail||!a.html) return;
+    var w=window.open('','_blank','width=860,height=900'); if(!w) return;
+    w.document.write(a.html); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
   }
   function docAttestation(){
     var c=S.client, vs=sVers();
