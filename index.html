@@ -11,7 +11,7 @@
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version (ImmoSuite n'utilise pas de PWA). Garantit qu'on charge toujours la dernière
    version déployée sur Vercel, sur PC comme sur mobile. ── */
-window.IMMOSUITE_VERSION = 'v14.132 · 2026-10-08 — Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.133 · 2026-10-08 — Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -17340,11 +17340,25 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
           <div id="rd-cv-content" style="display:none;">
             <div class="card">
               <div class="card-title">📱 Message de Convocation WhatsApp / SMS</div>
+              <div id="rd-cv-bandeau" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"></div>
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+                <label style="font-size:12px;font-weight:600;">Modèle de message</label>
+                <select class="form-control" id="rd-cv-type" onchange="rdChargerModeleConv();rdRenderParticipantsConvoc(rdConvReunion())" style="max-width:340px;">
+                  <option value="convocation">Convocation</option>
+                  <option value="rappel">Rappel (veille de réunion)</option>
+                  <option value="relance">Relance des non-confirmés</option>
+                  <option value="rectificatif">Rectificatif (changement de date ou de lieu)</option>
+                </select>
+              </div>
               <textarea class="form-control" id="rd-cv-message" style="min-height:180px;font-family:monospace;font-size:12px;"></textarea>
+              <div style="font-size:11px;color:var(--dim);margin-top:4px;">Ce texte est la version générale. Les envois par le 📱 de chaque participant ou « Envoyer au suivant » sont personnalisés à son nom.</div>
               <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-                <button class="btn btn-success btn-sm" onclick="rdEnvoyerWhatsApp('rd-cv-message')">📱 WhatsApp</button>
+                <button class="btn btn-primary btn-sm" id="rd-cv-suivant" onclick="rdEnvoyerSuivant()">📱 Envoyer au suivant</button>
+                <button class="btn btn-success btn-sm" onclick="rdEnvoyerWhatsApp('rd-cv-message')">📱 WhatsApp (choisir le contact)</button>
                 <button class="btn btn-bleu btn-sm" onclick="rdCopier('rd-cv-message')">📋 Copier</button>
                 <button class="btn btn-secondary btn-sm" onclick="rdRelancerAbsents()">🔔 Relancer absents</button>
+                <button class="btn btn-secondary btn-sm" onclick="rdEmailGroupe()">✉️ E-mail groupé</button>
+                <button class="btn btn-secondary btn-sm" onclick="rdTelechargerICS()">📅 Calendrier (.ics)</button>
               </div>
             </div>
             <div class="card">
@@ -92056,80 +92070,183 @@ function rdPeuplerSelect(selectId, tenueSeulement) {
   }
 }
 
-function rdGenererMsgConvocation(r) {
-  var themes = (r.themes||[]).map(function(t){ return RD_THEMES[t]?RD_THEMES[t].icon+' '+RD_THEMES[t].label:t; }).join(', ');
+/* ══════════════════════════════════════════════════════════════════════════
+   CONVOCATIONS ET RELANCES
+   · 4 modèles de message : convocation, rappel, relance des non-confirmés, rectificatif
+     (ordre du jour, objectifs et documents à apporter repris de la réunion) ;
+   · statut par participant : en attente / confirmé / excusé, avec date d'envoi et nombre de relances ;
+   · envoi individuel personnalisé (WhatsApp au numéro du participant) ou « envoyer au suivant »,
+     qui enchaîne les participants restant à joindre ;
+   · bandeau de suivi (quorum, jours restants), e-mail groupé et fichier calendrier (.ics).
+   L'envoi WhatsApp reste un clic sur « Envoyer » dans WhatsApp : aucune API ne permet de l'automatiser.
+   ══════════════════════════════════════════════════════════════════════════ */
+var RD_CONV_MODELES = { convocation:'Convocation', rappel:'Rappel (veille de réunion)', relance:'Relance des non-confirmés', rectificatif:'Rectificatif (changement de date ou de lieu)' };
+var RD_CONV_CHAMP = { convocation:'convoque_le', rappel:'rappel_le', relance:'derniere_relance', rectificatif:'rectif_le' };
+
+function rdConvStatut(p) { return p.statut_conv || (p.confirme ? 'confirme' : 'attente'); }
+function rdConvReunion() { var id = (document.getElementById('rd-cv-select') || {}).value; return (DATA.reunions_direction || []).find(function(x){ return x.id === id; }); }
+function rdConvType() { return (document.getElementById('rd-cv-type') || {}).value || 'convocation'; }
+function rdJoursAvant(r) { var d = new Date(r.date); if (isNaN(d)) return null; var a = new Date(); a.setHours(0,0,0,0); d.setHours(0,0,0,0); return Math.round((d - a) / 86400000); }
+
+function rdGenererMsgConvocation(r, type, p) {
+  type = type || 'convocation';
   var societe = (DATA.params && DATA.params.societe) || 'ImmoSuite';
-  return '🏢 *'+societe+' — Réunion de Direction*\n\n'
-    +'📋 *CONVOCATION*\n\n'
-    +'📌 *Objet :* '+r.titre+'\n'
-    +'📅 *Date :* '+rdDateHeure(r.date)+'\n'
-    +'⏱ *Durée :* '+rdFmtDuree(r.duree)+'\n'
-    +'📍 *Lieu :* '+(r.lieu||'Salle de réunion Direction')+'\n'
-    +'🎙 *Président :* '+r.animateur+'\n\n'
-    +'🔍 *Ordre du jour (thèmes) :*\n'
-    +(r.themes||[]).map(function(t){ return RD_THEMES[t]?'• '+RD_THEMES[t].icon+' '+RD_THEMES[t].label:'• '+t; }).join('\n')+'\n\n'
-    +'👥 *Participants convoqués :*\n'
-    +(r.participants||[]).map(function(p){ return '• '+p.nom+' ('+p.role+')'+(p.contact?' — '+p.contact:''); }).join('\n')+'\n\n'
-    +'📎 Merci de confirmer votre présence par retour de message.\n'
-    +'_— Direction Générale '+societe+'_';
+  var salut = p ? 'Bonjour ' + p.nom + ',\n\n' : 'Bonjour,\n\n';
+  var themes = (r.themes || []).map(function(t){ return RD_THEMES[t] ? RD_THEMES[t].icon + ' ' + RD_THEMES[t].label : t; });
+  var odj = (r.odj || []).length
+    ? r.odj.map(function(x, i){ return (i + 1) + '. ' + x.titre + (x.duree ? ' (' + x.duree + ' min)' : '') + (x.responsable ? ' — ' + x.responsable : ''); })
+    : themes.map(function(t){ return '• ' + t; });
+  var docs = (r.docs_prepa || '').trim();
+  var cadre = '📌 *Objet :* ' + r.titre + '\n📅 *Date :* ' + rdDateHeure(r.date) + '\n⏱ *Durée :* ' + rdFmtDuree(r.duree) + '\n📍 *Lieu :* ' + (r.lieu || 'Salle de réunion Direction') + '\n🎙 *Président :* ' + r.animateur + '\n';
+  var pied = '\n_— Direction Générale ' + societe + '_';
+  var reponse = '\n✅ Merci de répondre *1* pour confirmer votre présence ou *2* si vous ne pouvez pas être présent(e).\n';
+  if (type === 'rappel') {
+    return '⏰ *RAPPEL — Réunion de Direction*\n_' + societe + '_\n\n' + salut + 'Pour rappel, la réunion a lieu *demain*.\n\n' + cadre
+      + (odj.length ? '\n📋 *Ordre du jour :*\n' + odj.join('\n') + '\n' : '') + (docs ? '\n📎 *À apporter / préparer :*\n' + docs + '\n' : '') + reponse + pied;
+  }
+  if (type === 'relance') {
+    return '🔔 *RELANCE — Réunion de Direction*\n_' + societe + '_\n\n' + salut + 'Nous n\'avons pas encore reçu votre réponse pour la réunion ci-dessous.\n\n' + cadre + reponse + pied;
+  }
+  if (type === 'rectificatif') {
+    return '⚠️ *RECTIFICATIF — Réunion de Direction*\n_' + societe + '_\n\n' + salut + 'Merci de noter la modification suivante : la réunion se tiendra désormais selon les informations ci-dessous.\n\n' + cadre + reponse + pied;
+  }
+  return '🏢 *' + societe + ' — Réunion de Direction*\n\n📋 *CONVOCATION*\n\n' + salut + 'Vous êtes convoqué(e) à la réunion suivante.\n\n' + cadre
+    + (r.objectifs ? '\n🎯 *Objectifs :*\n' + r.objectifs + '\n' : '')
+    + (odj.length ? '\n📋 *Ordre du jour :*\n' + odj.join('\n') + '\n' : '')
+    + (docs ? '\n📎 *À apporter / préparer :*\n' + docs + '\n' : '')
+    + '\n👥 *Participants convoqués :* ' + (r.participants || []).length + ' personne(s)\n' + reponse + pied;
 }
 
 function rdChargerConvocation() {
-  var id = document.getElementById('rd-cv-select').value;
-  var r = (DATA.reunions_direction||[]).find(function(x){ return x.id === id; });
+  var r = rdConvReunion();
   document.getElementById('rd-cv-content').style.display = r ? '' : 'none';
   if (!r) return;
-  document.getElementById('rd-cv-message').value = rdGenererMsgConvocation(r);
+  rdChargerModeleConv();
   rdRenderParticipantsConvoc(r);
+}
+/* Change de modèle : le texte affiché est la version générale ; les envois individuels sont personnalisés au nom. */
+function rdChargerModeleConv() {
+  var r = rdConvReunion(); if (!r) return;
+  document.getElementById('rd-cv-message').value = rdGenererMsgConvocation(r, rdConvType());
+  rdMajBandeauConv(r);
+}
+function rdConvAFaire(r, type) {
+  return (r.participants || []).filter(function(p){
+    var st = rdConvStatut(p);
+    if (type === 'relance') { if (st !== 'attente') return false; return p.derniere_relance !== today(); }
+    if (st === 'excuse') return false;
+    return type === 'convocation' ? !p.convoque_le : p[RD_CONV_CHAMP[type]] !== today();
+  });
+}
+function rdMajBandeauConv(r) {
+  var z = document.getElementById('rd-cv-bandeau'); if (!z) return;
+  var P = r.participants || [], n = P.length;
+  var c = P.filter(function(p){ return rdConvStatut(p) === 'confirme'; }).length;
+  var e = P.filter(function(p){ return rdConvStatut(p) === 'excuse'; }).length;
+  var a = n - c - e, j = rdJoursAvant(r);
+  var quorum = n ? Math.round(c / n * 100) : 0;
+  var alerte = '';
+  if (j != null && j >= 0 && j <= 2 && a > 0) alerte = ' <strong style="color:var(--rouge);">⚠️ Réunion ' + (j === 0 ? 'aujourd\'hui' : j === 1 ? 'demain' : 'dans 2 jours') + ' : ' + a + ' réponse(s) manquante(s) — relancez.</strong>';
+  else if (j != null && j < 0 && r.statut === 'planifiee') alerte = ' <strong style="color:var(--rouge);">⚠️ La date est dépassée : mettez à jour la réunion ou clôturez-la.</strong>';
+  z.innerHTML = '<span class="badge badge-vert">✅ ' + c + ' confirmé(s)</span> <span class="badge badge-or">⏳ ' + a + ' en attente</span> <span class="badge badge-rouge">❌ ' + e + ' excusé(s)</span> '
+    + '<span style="font-size:12px;color:var(--dim);">Présence confirmée : ' + quorum + ' %' + (j != null ? ' · réunion ' + (j > 0 ? 'dans ' + j + ' jour(s)' : j === 0 ? 'aujourd\'hui' : 'il y a ' + (-j) + ' jour(s)') : '') + '</span>' + alerte;
+  var type = rdConvType(), reste = rdConvAFaire(r, type).length;
+  var b = document.getElementById('rd-cv-suivant');
+  if (b) { b.textContent = '📱 Envoyer au suivant (' + reste + ' restant' + (reste > 1 ? 's' : '') + ')'; b.disabled = !reste; }
 }
 
 function rdRenderParticipantsConvoc(r) {
   var el = document.getElementById('rd-cv-participants');
-  el.innerHTML = (r.participants||[]).map(function(p,i){
+  el.innerHTML = (r.participants || []).map(function(p, i){
+    var st = rdConvStatut(p), q = '\'' + r.id + '\',\'' + p.id + '\'';
+    var suivi = (p.convoque_le ? 'Convoqué le ' + dateShort(p.convoque_le) : 'Pas encore convoqué') + (p.relances ? ' · ' + p.relances + ' relance(s)' : '') + (p.derniere_relance ? ' (dernière le ' + dateShort(p.derniere_relance) + ')' : '');
     return '<div class="rd-diff-item">'
-      +'<div class="rd-diff-avatar" style="background:'+RD_AVATARS[i%RD_AVATARS.length]+';">'+p.nom.charAt(0)+'</div>'
-      +'<div style="flex:1;"><div style="font-size:13px;font-weight:600;">'+rdEscape(p.nom)+'</div>'
-      +'<div style="font-size:11px;color:var(--dim);">'+rdEscape(p.role)+(p.contact?' · '+rdEscape(p.contact):'')+'</div></div>'
-      +'<button class="btn btn-sm '+(p.confirme?'btn-success':'btn-secondary')+'" onclick="rdToggleConfirmation(\''+r.id+'\',\''+p.id+'\');">'
-      +(p.confirme?'✅ Confirmé':'⏳ En attente')+'</button></div>';
+      + '<div class="rd-diff-avatar" style="background:' + RD_AVATARS[i % RD_AVATARS.length] + ';">' + rdEscape(p.nom.charAt(0)) + '</div>'
+      + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">' + rdEscape(p.nom) + '</div>'
+      + '<div style="font-size:11px;color:var(--dim);">' + rdEscape(p.role) + (p.contact ? ' · ' + rdEscape(p.contact) : ' · <span style="color:var(--rouge);">pas de numéro</span>') + '</div>'
+      + '<div style="font-size:10.5px;color:var(--dim);">' + rdEscape(suivi) + '</div></div>'
+      + '<button class="btn btn-secondary btn-sm btn-icon" title="Envoyer le message ' + rdEscape(RD_CONV_MODELES[rdConvType()]) + ' à ' + rdEscape(p.nom) + ' (WhatsApp)" onclick="rdEnvoyerPerso(' + q + ')">📱</button> '
+      + '<select class="form-control" style="width:130px;padding:4px 8px;font-size:11px;min-height:30px;" onchange="rdSetStatutConv(' + q + ',this.value)">'
+      + '<option value="attente"' + (st === 'attente' ? ' selected' : '') + '>⏳ En attente</option>'
+      + '<option value="confirme"' + (st === 'confirme' ? ' selected' : '') + '>✅ Confirmé</option>'
+      + '<option value="excuse"' + (st === 'excuse' ? ' selected' : '') + '>❌ Excusé</option></select></div>';
   }).join('');
+  rdMajBandeauConv(r);
 }
-
+async function rdSauverReunionConv(r) {
+  r.modifie_conv = new Date().toISOString();
+  await dbPut('reunions_direction', r); if (typeof syncToSupabase === 'function') syncToSupabase('pi_reunions_direction', r);
+}
+async function rdSetStatutConv(reunionId, participantId, val) {
+  var r = (DATA.reunions_direction || []).find(function(x){ return x.id === reunionId; }); if (!r) return;
+  var p = (r.participants || []).find(function(x){ return x.id === participantId; }); if (!p) return;
+  p.statut_conv = val; p.confirme = (val === 'confirme');
+  await rdSauverReunionConv(r);
+  rdRenderParticipantsConvoc(r);
+}
 async function rdToggleConfirmation(reunionId, participantId) {
-  var r = (DATA.reunions_direction||[]).find(function(x){ return x.id===reunionId; });
-  if (!r) return;
-  var p = (r.participants||[]).find(function(x){ return x.id===participantId; });
-  if (!p) return;
-  p.confirme = !p.confirme;
-  await dbPut('reunions_direction', r); if (typeof syncToSupabase==='function') syncToSupabase('pi_reunions_direction', r);
-  rdRenderParticipantsConvoc(r);
-  toast(p.confirme?'✅ '+p.nom+' confirmé':p.nom+' : en attente','info');
+  var r = (DATA.reunions_direction || []).find(function(x){ return x.id === reunionId; }); if (!r) return;
+  var p = (r.participants || []).find(function(x){ return x.id === participantId; }); if (!p) return;
+  await rdSetStatutConv(reunionId, participantId, rdConvStatut(p) === 'confirme' ? 'attente' : 'confirme');
 }
-
 async function rdTousConfirmes() {
-  var id = document.getElementById('rd-cv-select').value;
-  var r = (DATA.reunions_direction||[]).find(function(x){ return x.id===id; });
-  if (!r) return;
-  (r.participants||[]).forEach(function(p){ p.confirme=true; });
-  await dbPut('reunions_direction', r); if (typeof syncToSupabase==='function') syncToSupabase('pi_reunions_direction', r);
+  var r = rdConvReunion(); if (!r) return;
+  (r.participants || []).forEach(function(p){ if (rdConvStatut(p) !== 'excuse') { p.statut_conv = 'confirme'; p.confirme = true; } });
+  await rdSauverReunionConv(r);
   rdRenderParticipantsConvoc(r);
-  toast('✅ Tous participants confirmés','success');
+  toast('✅ Tous les participants non excusés sont confirmés', 'success');
 }
-
-async function rdRelancerAbsents() {
-  var id = document.getElementById('rd-cv-select').value;
-  var r = (DATA.reunions_direction||[]).find(function(x){ return x.id===id; });
-  if (!r) return;
-  var absents = (r.participants||[]).filter(function(p){ return !p.confirme; });
-  if (!absents.length) { toast('Tous ont confirmé !','success'); return; }
-  var societe = (DATA.params&&DATA.params.societe)||'ImmoSuite';
-  var msg = '🔔 *RELANCE — Réunion Direction*\n_'+societe+'_\n\n'
-    +'La réunion _'+r.titre+'_ est prévue le '+rdDateHeure(r.date)+'.\n\n'
-    +'Merci de confirmer votre présence :\n'
-    +absents.map(function(p){ return '• '+p.nom+(p.contact?' ('+p.contact+')':''); }).join('\n')
-    +'\n\n_— Direction Générale_';
-  document.getElementById('rd-cv-message').value = msg;
-  toast('📱 Message relance généré','info');
+/* Bouton historique « Relancer absents » : bascule sur le modèle de relance. */
+function rdRelancerAbsents() {
+  var r = rdConvReunion(); if (!r) return;
+  var sel = document.getElementById('rd-cv-type'); if (sel) sel.value = 'relance';
+  rdChargerModeleConv();
+  var n = rdConvAFaire(r, 'relance').length;
+  toast(n ? '🔔 Modèle de relance prêt : ' + n + ' participant(s) à relancer. Utilisez « Envoyer au suivant » ou le 📱 de chaque ligne.' : 'Tous les participants ont répondu.', n ? 'info' : 'success', 6000);
+}
+async function rdMarquerEnvoye(r, p, type) {
+  if (type === 'convocation') p.convoque_le = today();
+  else if (type === 'relance') { p.relances = (p.relances || 0) + 1; p.derniere_relance = today(); if (!p.convoque_le) p.convoque_le = today(); }
+  else p[RD_CONV_CHAMP[type]] = today();
+  await rdSauverReunionConv(r);
+}
+async function rdEnvoyerPerso(reunionId, participantId) {
+  var r = (DATA.reunions_direction || []).find(function(x){ return x.id === reunionId; }); if (!r) return;
+  var p = (r.participants || []).find(function(x){ return x.id === participantId; }); if (!p) return;
+  if (!p.contact) { toast('Aucun numéro pour ' + p.nom + ' : complétez-le dans la réunion ou la fiche du personnel.', 'error'); return; }
+  var type = rdConvType();
+  window.open('https://wa.me/' + telWhatsApp(p.contact) + '?text=' + encodeURIComponent(rdGenererMsgConvocation(r, type, p)), '_blank');
+  await rdMarquerEnvoye(r, p, type);
+  rdRenderParticipantsConvoc(r);
+}
+function rdEnvoyerSuivant() {
+  var r = rdConvReunion(); if (!r) return;
+  var type = rdConvType(), liste = rdConvAFaire(r, type);
+  var sansNum = liste.filter(function(p){ return !p.contact; });
+  var p = liste.filter(function(x){ return x.contact; })[0];
+  if (!p) { toast(sansNum.length ? sansNum.length + ' participant(s) restant(s) sans numéro de téléphone.' : 'Tout le monde a été joint pour ce modèle.', sansNum.length ? 'error' : 'success'); return; }
+  rdEnvoyerPerso(r.id, p.id);
+}
+function rdEmailGroupe() {
+  var r = rdConvReunion(); if (!r) return;
+  var mails = (r.participants || []).map(function(p){
+    var e = p.employe_id ? (DATA.employes || []).find(function(x){ return x.id === p.employe_id; }) : null; return e && e.email ? e.email : '';
+  }).filter(Boolean);
+  if (!mails.length) { toast('Aucune adresse e-mail connue (fiches du personnel).', 'error'); return; }
+  var sujet = { convocation:'Convocation', rappel:'Rappel', relance:'Relance', rectificatif:'Rectificatif' }[rdConvType()] + ' — ' + r.titre;
+  var corps = rdGenererMsgConvocation(r, rdConvType()).replace(/\*/g, '').replace(/_/g, '');
+  window.location.href = 'mailto:?bcc=' + encodeURIComponent(mails.join(',')) + '&subject=' + encodeURIComponent(sujet) + '&body=' + encodeURIComponent(corps);
+}
+function rdTelechargerICS() {
+  var r = rdConvReunion(); if (!r) return;
+  var m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/.exec(r.date || ''); if (!m) { toast('Date de réunion invalide.', 'error'); return; }
+  var debut = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]), fin = new Date(debut.getTime() + (r.duree || 60) * 60000);
+  var f = function(d){ var p2 = function(n){ return ('0' + n).slice(-2); }; return d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + 'T' + p2(d.getHours()) + p2(d.getMinutes()) + '00'; };
+  var esc = function(t){ return String(t || '').replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\n/g, '\\n'); };
+  var ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ImmoSuite//Reunion//FR', 'BEGIN:VEVENT', 'UID:' + r.id + '@immosuite', 'DTSTAMP:' + f(new Date()), 'DTSTART:' + f(debut), 'DTEND:' + f(fin),
+    'SUMMARY:' + esc(r.titre), 'LOCATION:' + esc(r.lieu || ''), 'DESCRIPTION:' + esc((r.objectifs || '') + (r.animateur ? '\nPrésident : ' + r.animateur : '')), 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], { type:'text/calendar' })); a.download = 'reunion-' + (r.date || '').slice(0, 10) + '.ics';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
 function rdEnvoyerWhatsApp(fieldId) {
