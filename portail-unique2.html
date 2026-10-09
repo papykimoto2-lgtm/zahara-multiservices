@@ -19,7 +19,7 @@
     .site-header { background:#fff; border-bottom:1px solid #e8e0d0; position:sticky; top:0; z-index:100; }
     .header-flex { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:16px 0; gap:16px; }
     .logo-area h1 { font-family:var(--pp-serif); font-weight:600; font-size:1.7rem; color:var(--pp-charbon); }
-    .logo-area p { font-size:0.7rem; color:#8a7f6b; }
+    .logo-area p { font-size:0.7rem; color:#6b6150; }
     .nav-tabs { display:flex; flex-wrap:wrap; gap:0.2rem; list-style:none; align-items:center; position:relative; }
     .tab-link { display:inline-flex; align-items:center; gap:6px; padding:10px 12px; font-size:0.78rem; font-weight:600; letter-spacing:.2px; color:var(--pp-charbon); background:transparent; border:none; border-radius:8px; cursor:pointer; transition:0.2s; }
     .tab-link:hover { background:#f3ede0; }
@@ -192,7 +192,7 @@
     .temoi-auteur{ display:flex; align-items:center; gap:10px; margin-top:16px; padding-top:14px; border-top:1px solid #efe8d8; }
     .temoi-avatar{ width:38px; height:38px; border-radius:50%; background:var(--pp-secondary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:.85rem; flex-shrink:0; }
     .temoi-nom{ font-weight:600; font-size:.85rem; }
-    .temoi-ville{ font-size:.72rem; color:#8a7f6b; }
+    .temoi-ville{ font-size:.72rem; color:#6b6150; }
     /* ── Bandeau statistiques héro ── */
     .hero-stats{ display:flex; justify-content:center; gap:40px; margin-top:32px; flex-wrap:wrap; }
     .hero-stat{ text-align:center; }
@@ -283,7 +283,7 @@
     <div class="grid-3" id="programme-cards" style="margin-top:8px; display:none;"></div>
     <p style="margin-top:14px; display:none;" id="programme-composition"></p>
     <h4 style="margin-top:24px;" id="programme-liste-titre"><i class="fas fa-building"></i> Tous nos programmes</h4>
-    <div class="grid-3" id="programme-liste-cards" style="margin-top:10px;"><div style="color:#8a7f6b;"><span class="spinner dark"></span> Chargement…</div></div>
+    <div class="grid-3" id="programme-liste-cards" style="margin-top:10px;"><div style="color:#6b6150;"><span class="spinner dark"></span> Chargement…</div></div>
     <div id="eden-videos-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-video"></i> Vidéos</h4><div id="eden-videos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:10px;"></div></div>
     <div id="eden-gallery-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-images"></i> Galerie photos</h4><div id="eden-gallery" class="photo-grid"></div></div>
     <div id="eden-docs-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-folder-open"></i> Documents à télécharger</h4><div id="eden-docs" style="display:flex;flex-direction:column;gap:8px;margin-top:10px;"></div></div>
@@ -512,14 +512,14 @@
   <!-- ══ FAQ ══ -->
   <div id="faq-pane" class="tab-pane">
     <h3><i class="fas fa-circle-question"></i> Questions fréquentes</h3>
-    <p style="margin:8px 0 20px;color:#8a7f6b;font-size:.9rem;">Les réponses aux questions que nos clients posent le plus souvent.</p>
+    <p style="margin:8px 0 20px;color:#6b6150;font-size:.9rem;">Les réponses aux questions que nos clients posent le plus souvent.</p>
     <div id="faq-liste"></div>
   </div>
 
   <!-- ══ TÉMOIGNAGES ══ -->
   <div id="temoignages-pane" class="tab-pane">
     <h3><i class="fas fa-star"></i> Ce qu'en disent nos clients</h3>
-    <p style="margin:8px 0 20px;color:#8a7f6b;font-size:.9rem;">Des familles et investisseurs qui nous ont fait confiance.</p>
+    <p style="margin:8px 0 20px;color:#6b6150;font-size:.9rem;">Des familles et investisseurs qui nous ont fait confiance.</p>
     <div class="grid-3" id="temoi-liste"></div>
   </div>
 
@@ -1345,7 +1345,7 @@
     var raps=sRapportsLies(), photos=[];
     raps.forEach(function(r){ (r.photos||[]).forEach(function(p){ if(p&&p.visible!==false) photos.push(p); }); });
     (MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='chantier'; }).forEach(function(m){ photos.push({ data:m.data, legende:m.titre }); });
-    var ph=photos.length?photos.map(function(p){ var src=p.data||p.url||''; return '<div class="photo-item"><img src="'+esc(src)+'" loading="lazy" alt="">'+(p.legende?'<div class="photo-cap">'+esc(p.legende)+'</div>':'')+'</div>'; }).join(''):'<p style="color:#4b6a8b;">Aucune photo disponible.</p>';
+    var ph=photos.length?photos.map(function(p){ var src=p.data||p.url||''; return '<div class="photo-item"><img src="'+esc(src)+'" loading="lazy" alt="Photo">'+(p.legende?'<div class="photo-cap">'+esc(p.legende)+'</div>':'')+'</div>'; }).join(''):'<p style="color:#4b6a8b;">Aucune photo disponible.</p>';
     var rp=raps.length?raps.map(function(r){ return '<div style="border:1px solid #eef2f8; border-radius:12px; padding:12px; margin-bottom:10px;"><strong>📅 '+dshort(r.date)+' — Avancement '+(parseFloat(r.avancement)||0)+'%</strong>'+(r.travaux?'<div style="font-size:.85rem; margin-top:6px;">'+esc(r.travaux)+'</div>':'')+'</div>'; }).join(''):'<p style="color:#4b6a8b;">Aucun rapport partagé.</p>';
     return '<div class="card"><strong>🚧 Photos de chantier</strong><div class="photo-grid">'+ph+'</div></div><div class="card"><strong>📋 Rapports d\'avancement</strong><div style="margin-top:10px;">'+rp+'</div></div>';
   }
@@ -1683,7 +1683,7 @@
     var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='location'; });
     if(!photos.length){ if(w) w.style.display='none'; return; }
     if(w) w.style.display='block';
-    g.innerHTML = photos.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('');
+    g.innerHTML = photos.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('');
   }
   window.choisirLocationPourReservation = choisirLocationPourReservation;
 
@@ -1772,7 +1772,7 @@
       g.className='';
       g.innerHTML=_grouperParRef(photos).map(function(gp){
         return (gp.label?'<div style="font-weight:700;margin:14px 0 8px;color:var(--pp-primary);">'+esc(gp.label)+'</div>':'')
-          + '<div class="photo-grid">'+gp.items.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('')+'</div>';
+          + '<div class="photo-grid">'+gp.items.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('')+'</div>';
       }).join('');
     }
     var d=document.getElementById('eden-docs'), dw=document.getElementById('eden-docs-wrap');
@@ -2041,7 +2041,7 @@
     var temoiEl = document.getElementById('temoi-liste');
     if (temoiEl) {
       if (!Array.isArray(temoi) || !temoi.length) {
-        temoiEl.innerHTML = '<div class="card" style="grid-column:1/-1;text-align:center;color:#8a7f6b;">Les témoignages de nos clients seront bientôt publiés ici.</div>';
+        temoiEl.innerHTML = '<div class="card" style="grid-column:1/-1;text-align:center;color:#6b6150;">Les témoignages de nos clients seront bientôt publiés ici.</div>';
       } else {
         temoiEl.innerHTML = temoi.map(function(t){
           var note = Math.max(1, Math.min(5, parseInt(t.note)||5));
@@ -2079,7 +2079,7 @@
   function renderCataloguePhoto(){
     var el=document.getElementById('photo-catalogue-grid'); if(!el) return;
     var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo'; });
-    el.innerHTML = photos.length ? photos.map(function(p){ return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="">'+(p.titre?'<div class="photo-cap">'+esc(p.titre)+'</div>':'')+'</div>'; }).join('') : '<div style="color:#4b6a8b;">Aucune photo publiée pour le moment.</div>';
+    el.innerHTML = photos.length ? photos.map(function(p){ return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(p.titre?'<div class="photo-cap">'+esc(p.titre)+'</div>':'')+'</div>'; }).join('') : '<div style="color:#4b6a8b;">Aucune photo publiée pour le moment.</div>';
   }
 
   /* ───── Souscription en ligne → pi_leads ───── */
@@ -3413,7 +3413,7 @@
       var progs = await sb('pi_programmes_public?select=*&order=nom.asc&limit=200');
       _programmesCharges = true;
       if (!progs || !progs.length) {
-        box.innerHTML = '<div style="color:#8a7f6b;grid-column:1/-1;">Aucun programme publié pour le moment.</div>';
+        box.innerHTML = '<div style="color:#6b6150;grid-column:1/-1;">Aucun programme publié pour le moment.</div>';
         return;
       }
       var statutLbl = { en_cours:'En commercialisation', livre:'Livré', prospection:'À venir' };
@@ -3422,18 +3422,18 @@
         var total = p.lots_prevus != null ? p.lots_prevus : (p.lots_morceles != null ? p.lots_morceles : null);
         return '<div class="card">'
           + '<h4 style="margin-bottom:4px;"><i class="fas fa-building"></i> ' + esc(p.nom || 'Programme') + '</h4>'
-          + (p.commune ? '<div style="font-size:.8rem;color:#8a7f6b;margin-bottom:6px;"><i class="fas fa-location-dot"></i> ' + esc(p.commune) + '</div>' : '')
+          + (p.commune ? '<div style="font-size:.8rem;color:#6b6150;margin-bottom:6px;"><i class="fas fa-location-dot"></i> ' + esc(p.commune) + '</div>' : '')
           + (p.description ? '<p style="font-size:.85rem;margin-bottom:8px;">' + esc(p.description) + '</p>' : '')
           + '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.78rem;">'
           + (dispo != null ? '<span class="badge">' + dispo + ' lot' + (dispo>1?'s':'') + ' disponible' + (dispo>1?'s':'') + '</span>' : '')
           + (total != null ? '<span class="badge">' + total + ' au total</span>' : '')
           + (statutLbl[p.statut] ? '<span class="badge">' + statutLbl[p.statut] + '</span>' : '')
           + '</div>'
-          + (p.date_livraison ? '<div style="font-size:.74rem;color:#8a7f6b;margin-top:6px;">Livraison prévue : ' + dshort(p.date_livraison) + '</div>' : '')
+          + (p.date_livraison ? '<div style="font-size:.74rem;color:#6b6150;margin-top:6px;">Livraison prévue : ' + dshort(p.date_livraison) + '</div>' : '')
           + '</div>';
       }).join('');
     } catch(e) {
-      box.innerHTML = '<div style="color:#8a7f6b;grid-column:1/-1;">Impossible de charger la liste des programmes pour le moment.</div>';
+      box.innerHTML = '<div style="color:#6b6150;grid-column:1/-1;">Impossible de charger la liste des programmes pour le moment.</div>';
     }
   }
   window.chargerListeProgrammes = chargerListeProgrammes;
@@ -4049,7 +4049,7 @@
               var estVideo=/\.(mp4|webm|mov)(\?|$)/i.test(String(u));
               h+= estVideo
                 ? '<a href="'+esc(u)+'" target="_blank" rel="noopener" style="font-size:.72rem;padding:4px 8px;background:#e6effa;border-radius:6px;">🎥 Vidéo '+(mm+1)+'</a>'
-                : '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;"></a>';
+                : '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="Photo" style="width:72px;height:72px;object-fit:cover;border-radius:6px;"></a>';
             }
             h+='</div>';
           }
@@ -4768,7 +4768,7 @@
               +(o.verif_droits?'✅':'⏳')+' Droits coutumiers vérifiés<br>'
               +(o.juridique_valide?'✅':'⏳')+' Validation juridique</div>'):'')
           +((o.lat&&o.lng)?('<button onclick="allerOnglet(\'carte\')" style="margin-top:8px;width:100%;padding:6px;border:1px solid #cfdfed;border-radius:20px;background:transparent;color:#0f4c81;cursor:pointer;font-size:.76rem;">📍 Situer sur la carte</button>'):'')
-          +(photos.length?('<div class="photo-grid" style="margin-top:10px;">'+photos.map(function(p){ return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt=""></div>'; }).join('')+'</div>'):'')
+          +(photos.length?('<div class="photo-grid" style="margin-top:10px;">'+photos.map(function(p){ return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo"></div>'; }).join('')+'</div>'):'')
           +(docs.length?('<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">'+docs.map(function(d){ return '<a href="'+esc(d.data||d.url||'')+'" download="'+esc(d.nom||d.titre||'document')+'" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;border:1px solid #cfdfed;border-radius:10px;padding:7px 10px;color:#0a2b3e;font-size:.78rem;"><i class="fas fa-file-pdf" style="color:#b91c1c;"></i> '+esc(d.titre||d.nom||'Document')+'</a>'; }).join('')+'</div>'):'')
           +(dispo?('<button class="highlight-btn" style="margin-top:10px;width:100%;" onclick="choisirOperation(\''+esc(o.id)+'\')">Demander le dossier</button>'):'')
           +'</div>';

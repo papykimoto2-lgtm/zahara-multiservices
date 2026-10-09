@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Espace souscripteur et apporteur d’affaires : consultez nos biens et programmes, suivez votre dossier, faites une demande de souscription ou de réservation.">
   <title>Espace Souscripteur & Apporteur</title>
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1B4332">
@@ -13,13 +14,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Espace Client">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+  <!-- Polices : aucune police distante (pas de requête vers Google Fonts) — polices du système en repli -->
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     :root{
       --pp-primary:#A6431C; --pp-secondary:#1B4332; --pp-primary-dark:#7A3115;
       --pp-or:#B08D3D; --pp-sable:#F6F1E7; --pp-charbon:#211D18;
-      --pp-hero:url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=2073&auto=format');
+      --pp-hero:linear-gradient(135deg,#1B4332 0%,#0a2a3b 100%); /* aucune image distante par défaut (pas de requête vers un tiers) */
       --pp-serif:'Fraunces',Georgia,serif;
     }
     body { font-family:'Inter',sans-serif; background:var(--pp-sable); color:var(--pp-charbon); }
@@ -27,7 +28,7 @@
     .site-header { background:#fff; border-bottom:1px solid #e8e0d0; position:sticky; top:0; z-index:100; }
     .header-flex { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:16px 0; gap:16px; }
     .logo-area h1 { font-family:var(--pp-serif); font-weight:600; font-size:1.7rem; color:var(--pp-charbon); }
-    .logo-area p { font-size:0.7rem; color:#8a7f6b; }
+    .logo-area p { font-size:0.7rem; color:#6b6150; }
     .nav-tabs { display:flex; flex-wrap:wrap; gap:0.2rem; list-style:none; align-items:center; position:relative; }
     .tab-link { display:inline-flex; align-items:center; gap:6px; padding:10px 12px; font-size:0.78rem; font-weight:600; letter-spacing:.2px; color:var(--pp-charbon); background:transparent; border:none; border-radius:8px; cursor:pointer; transition:0.2s; }
     .tab-link:hover { background:#f3ede0; }
@@ -53,7 +54,7 @@
     .motdg-corps p:last-child{ margin-bottom:0; }
     .motdg-signature{ margin-top:16px; padding-top:12px; border-top:1px solid #efe7d6; }
     .motdg-nom{ display:block; font-weight:700; color:var(--pp-charbon); }
-    .motdg-fonction{ display:block; font-size:.82rem; color:#8a7f6b; }
+    .motdg-fonction{ display:block; font-size:.82rem; color:#6b6150; }
     @media (max-width:860px){
       .motdg-grid{ grid-template-columns:minmax(0,1fr); }
       .motdg-photo, .motdg-photo img{ min-height:0; }
@@ -78,7 +79,7 @@
     .doc-corps{ flex:1 1 auto; min-width:0; }
     .doc-titre{ font-weight:700; font-size:.94rem; color:var(--pp-charbon); }
     .doc-desc{ font-size:.82rem; color:#4a4336; line-height:1.6; margin-top:2px; }
-    .doc-meta{ font-size:.72rem; color:#8a7f6b; margin-top:4px; letter-spacing:.02em; }
+    .doc-meta{ font-size:.72rem; color:#6b6150; margin-top:4px; letter-spacing:.02em; }
     .doc-liens{ flex:0 0 auto; display:flex; gap:8px; }
     .doc-btn{ display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:9px;
               font-size:.78rem; font-weight:600; text-decoration:none; white-space:nowrap;
@@ -103,12 +104,12 @@
     .produit-photo{ width:100%; aspect-ratio:4/3; object-fit:cover; background:#efe7d6; display:block; }
     .produit-photo-vide{ width:100%; aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; background:#efe7d6; color:#b4a789; font-size:2rem; }
     .produit-corps{ padding:14px 16px; display:flex; flex-direction:column; gap:6px; flex:1; }
-    .produit-cat{ font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#8a7f6b; }
+    .produit-cat{ font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#6b6150; }
     .produit-nom{ font-weight:700; font-size:1rem; color:var(--pp-charbon); line-height:1.3; }
     .produit-desc{ font-size:.85rem; color:#4a4336; line-height:1.6; }
     .produit-prix{ margin-top:auto; font-weight:800; color:var(--pp-primary); font-size:1.05rem; }
-    .produit-prix .unite{ font-weight:600; font-size:.78rem; color:#8a7f6b; }
-    .div-vide{ color:#8a7f6b; font-size:.9rem; padding:12px 0; }
+    .produit-prix .unite{ font-weight:600; font-size:.78rem; color:#6b6150; }
+    .div-vide{ color:#6b6150; font-size:.9rem; padding:12px 0; }
     .div-section-titre{ margin:26px 0 4px; font-family:var(--pp-serif); }
     .nav-dropdown{ position:relative; }
     .nav-dropdown-trigger{ display:inline-flex; align-items:center; gap:6px; padding:10px 12px; font-size:0.78rem; font-weight:600; letter-spacing:.2px; color:var(--pp-charbon); background:transparent; border:1px solid #e2d9c4; border-radius:8px; cursor:pointer; transition:0.2s; }
@@ -170,6 +171,16 @@
     .contact-form { display:flex; flex-direction:column; gap:20px; max-width:600px; }
     .contact-form input, .contact-form textarea { padding:14px 18px; border:1px solid #cfdfed; border-radius:18px; }
     footer { background:#0a2a3b; color:#cddfea; text-align:center; padding:28px 0; }
+    .pied-legal { display:flex; flex-wrap:wrap; justify-content:center; gap:6px 18px; font-size:.82rem; margin-top:10px; }
+    .pied-legal a, footer a { color:#fff; text-decoration:underline; text-underline-offset:2px; }
+    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline:3px solid #1b5ea8; outline-offset:2px; }
+    .pp-video-gate { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:14px; text-align:center; background:#211d18; color:#fff; font-size:.85rem; }
+    .pp-video-gate button { background:#fff; color:#211d18; border:0; border-radius:6px; padding:9px 16px; font-weight:700; cursor:pointer; }
+    .consent-ligne { display:flex; gap:8px; align-items:flex-start; font-weight:400; font-size:.85rem; line-height:1.5; }
+    .consent-ligne input { width:auto !important; margin-top:4px; flex:0 0 auto; }
+    #avis-info { position:fixed; left:12px; right:12px; bottom:12px; z-index:2000; max-width:640px; margin:0 auto; background:#211d18; color:#fff; border-radius:10px; padding:14px 16px; box-shadow:0 6px 24px rgba(0,0,0,.35); font-size:.85rem; line-height:1.5; }
+    #avis-info a { color:#fff; }
+    #avis-info button { margin-top:8px; background:#fff; color:#211d18; border:0; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; }
     .stat-card { background:white; border-radius:20px; padding:20px; box-shadow:0 4px 12px rgba(0,0,0,0.05); border:1px solid #eef2f8; margin-bottom:20px; }
     .badge-danger { background:#fee2e2; color:#991b1b; padding:8px 12px; border-radius:30px; display:none; margin-top:10px; font-size:.85rem; }
     .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:20px 0; }
@@ -307,7 +318,7 @@
     .temoi-auteur{ display:flex; align-items:center; gap:10px; margin-top:16px; padding-top:14px; border-top:1px solid #efe8d8; }
     .temoi-avatar{ width:38px; height:38px; border-radius:50%; background:var(--pp-secondary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:.85rem; flex-shrink:0; }
     .temoi-nom{ font-weight:600; font-size:.85rem; }
-    .temoi-ville{ font-size:.72rem; color:#8a7f6b; }
+    .temoi-ville{ font-size:.72rem; color:#6b6150; }
     /* ── Bandeau statistiques héro ── */
     .hero-stats{ display:flex; justify-content:center; gap:40px; margin-top:32px; flex-wrap:wrap; }
     .hero-stat{ text-align:center; }
@@ -321,6 +332,7 @@
   </style>
 </head>
 <body>
+<noscript><p style="padding:16px;background:#fff3b0;color:#4d3b00;font-family:system-ui,sans-serif;">Ce site a besoin de JavaScript pour afficher les biens, programmes et votre espace. Informations légales : <a href="/mentions-legales.html">mentions légales</a>, <a href="/confidentialite.html">confidentialité</a>, <a href="/cookies.html">cookies</a>, <a href="/conditions.html">conditions d’utilisation</a>, <a href="/remboursement.html">résiliation et remboursement</a>.</p></noscript>
 
 <!-- Lightbox portail : agrandissement photo/vidéo au clic, navigation gauche/droite -->
 <div class="pp-lb-overlay" id="pp-lb-overlay" onclick="if(event.target===this) ppLbClose();">
@@ -417,7 +429,7 @@
     <div class="card motdg" id="motdg-card" style="display:none;">
       <div class="motdg-grid">
         <figure class="motdg-photo" id="motdg-photo-wrap" style="display:none;">
-          <img id="motdg-photo" src="" alt="">
+          <img id="motdg-photo" src="" alt="Photo du Directeur Général">
         </figure>
         <div class="motdg-texte">
           <div class="motdg-sur">Bienvenue<span class="motdg-trait"></span></div>
@@ -459,7 +471,7 @@
     <div class="grid-3" id="programme-cards" style="margin-top:8px; display:none;"></div>
     <p style="margin-top:14px; display:none;" id="programme-composition"></p>
     <h4 style="margin-top:24px;" id="programme-liste-titre"><i class="fas fa-building"></i> Tous nos programmes</h4>
-    <div class="grid-3" id="programme-liste-cards" style="margin-top:10px;"><div style="color:#8a7f6b;"><span class="spinner dark"></span> Chargement…</div></div>
+    <div class="grid-3" id="programme-liste-cards" style="margin-top:10px;"><div style="color:#6b6150;"><span class="spinner dark"></span> Chargement…</div></div>
     <div id="eden-videos-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-video"></i> Vidéos</h4><div id="eden-videos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:10px;"></div></div>
     <div id="eden-gallery-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-images"></i> Galerie photos</h4><div id="eden-gallery" class="photo-grid"></div></div>
     <div id="eden-docs-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-folder-open"></i> Documents à télécharger</h4><div id="eden-docs" style="display:flex;flex-direction:column;gap:8px;margin-top:10px;"></div></div>
@@ -497,6 +509,7 @@
         <div class="form-group"><label>Bien souhaité *</label><select id="rl_bien" required></select></div>
         <div class="form-group"><label>Date d'entrée souhaitée</label><input type="date" id="rl_date"></div>
         <div class="form-group"><label>Message (optionnel)</label><textarea id="rl_message" rows="3" placeholder="Nombre d'occupants, durée souhaitée…"></textarea></div>
+        <div class="form-group"><label class="consent-ligne" for="rl_consent"><input type="checkbox" id="rl_consent" required><span>J’ai lu la <a href="/confidentialite.html" target="_blank" rel="noopener">politique de confidentialité</a> et j’accepte que mes données soient utilisées pour traiter ma demande et être recontacté(e). *</span></label></div>
         <button type="submit" id="btnReserverLocation" class="highlight-btn" style="width:100%;">📅 Envoyer ma demande de réservation</button>
       </form>
       <p style="font-size:.72rem; color:#4b6a8b; margin-top:10px;">Cette demande n'est pas un contrat de bail. Elle est transmise à notre équipe qui vous recontacte pour finaliser le dossier (pièces d'identité, caution, signature du bail).</p>
@@ -643,6 +656,7 @@
           <div class="form-group"><label>Mode de livraison *</label><select id="s_livraison" required onchange="majPrixEstime()"><option value="gros_oeuvre">Gros œuvre</option><option value="cle_en_main">Clé en main</option></select></div>
           <div class="form-group"><label>Budget estimé (FCFA)</label><input type="text" id="s_budget" readonly></div>
           <div class="form-group"><label>Message (optionnel)</label><textarea id="s_message" rows="3"></textarea></div>
+        <div class="form-group"><label class="consent-ligne" for="s_consent"><input type="checkbox" id="s_consent" required><span>J’ai lu la <a href="/confidentialite.html" target="_blank" rel="noopener">politique de confidentialité</a> et j’accepte que mes données soient utilisées pour traiter ma demande et être recontacté(e). *</span></label></div>
           <button type="submit" id="btnSouscrire" class="highlight-btn" style="width:100%;">📩 Envoyer ma demande</button>
         </form>
       </div>
@@ -688,14 +702,14 @@
   <!-- ══ FAQ ══ -->
   <div id="faq-pane" class="tab-pane">
     <h3><i class="fas fa-circle-question"></i> Questions fréquentes</h3>
-    <p style="margin:8px 0 20px;color:#8a7f6b;font-size:.9rem;">Les réponses aux questions que nos clients posent le plus souvent.</p>
+    <p style="margin:8px 0 20px;color:#6b6150;font-size:.9rem;">Les réponses aux questions que nos clients posent le plus souvent.</p>
     <div id="faq-liste"></div>
   </div>
 
   <!-- ══ TÉMOIGNAGES ══ -->
   <div id="temoignages-pane" class="tab-pane">
     <h3><i class="fas fa-star"></i> Ce qu'en disent nos clients</h3>
-    <p style="margin:8px 0 20px;color:#8a7f6b;font-size:.9rem;">Des familles et investisseurs qui nous ont fait confiance.</p>
+    <p style="margin:8px 0 20px;color:#6b6150;font-size:.9rem;">Des familles et investisseurs qui nous ont fait confiance.</p>
     <div class="grid-3" id="temoi-liste"></div>
   </div>
 
@@ -919,6 +933,14 @@
   <p style="margin-bottom:6px;" id="footer-brand"></p>
   <p style="font-size:.85rem;" id="footer-contact"></p>
   <p style="font-size:.8rem; margin-top:8px; opacity:.7;" id="footer-legal"></p>
+  <nav aria-label="Informations légales" class="pied-legal">
+    <a href="/mentions-legales.html">Mentions légales</a>
+    <a href="/confidentialite.html">Politique de confidentialité</a>
+    <a href="/cookies.html">Cookies</a>
+    <a href="/conditions.html">Conditions d’utilisation</a>
+    <a href="/remboursement.html">Résiliation et remboursement</a>
+    <a href="#" onclick="ppRetirerConsentement();return false;">Gérer mes choix</a>
+  </nav>
   <div class="signature">
     <span>🚀 Concept développé par <strong>Sanix Africa Division Technologies</strong></span>
     <span>👤 Cyrille KESSIE</span>
@@ -1103,7 +1125,7 @@
       var logo=BR('logo_url',''); if(!logo) return html;
       var m=/<body[^>]*>/i.exec(html), pos=m.index+m[0].length, tete=html.slice(pos,pos+6000);
       if(tete.indexOf('doc-logo-auto')!==-1 || tete.indexOf(logo.slice(0,80))!==-1 || /<img[^>]+src=["']?(data:image|[^"'>\s]*logo)/i.test(tete)) return html;
-      return html.slice(0,pos)+'<div class="doc-logo-auto" style="text-align:left;margin:0 0 12px;"><img src="'+String(logo).replace(/"/g,'&quot;')+'" alt="" style="height:56px;max-width:220px;object-fit:contain;"></div>'+html.slice(pos);
+      return html.slice(0,pos)+'<div class="doc-logo-auto" style="text-align:left;margin:0 0 12px;"><img src="'+String(logo).replace(/"/g,'&quot;')+'" alt="Logo de l’entreprise" style="height:56px;max-width:220px;object-fit:contain;"></div>'+html.slice(pos);
     }catch(e){ return html; }
   }
   (function(){
@@ -1638,7 +1660,7 @@
       });
     });
     (MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='chantier'; }).forEach(function(m){ photosGenerales.push({ data:m.data, legende:m.titre }); });
-    var vignette=function(p){ var src=p.data||p.url||''; return '<div class="photo-item"><img src="'+esc(src)+'" loading="lazy" alt="">'+(p.legende?'<div class="photo-cap">'+esc(p.legende)+'</div>':'')+'</div>'; };
+    var vignette=function(p){ var src=p.data||p.url||''; return '<div class="photo-item"><img src="'+esc(src)+'" loading="lazy" alt="Photo">'+(p.legende?'<div class="photo-cap">'+esc(p.legende)+'</div>':'')+'</div>'; };
     var blocMaison = photosMaison.length
       ? '<div class="card"><strong>🏠 Photos de votre maison</strong><div class="photo-grid">'+photosMaison.map(vignette).join('')+'</div></div>'
       : '';
@@ -1997,7 +2019,7 @@
     var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='location'; });
     if(!photos.length){ if(w) w.style.display='none'; return; }
     if(w) w.style.display='block';
-    g.innerHTML = photos.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('');
+    g.innerHTML = photos.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('');
   }
   window.choisirLocationPourReservation = choisirLocationPourReservation;
 
@@ -2006,6 +2028,7 @@
     var g=function(id){ return ((document.getElementById(id)||{}).value||'').trim(); };
     var nom=g('rl_nom'), prenoms=g('rl_prenoms'), email=g('rl_email'), tel=g('rl_tel'), bien=g('rl_bien');
     if(!nom||!prenoms||!email||!tel||!bien){ alert('Merci de remplir les champs obligatoires (*).'); return; }
+    if(!(document.getElementById('rl_consent')||{}).checked){ alert('Merci de cocher la case de consentement pour envoyer votre demande.'); return; }
     var date=g('rl_date'), message=g('rl_message');
     var btn=document.getElementById('btnReserverLocation'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Envoi…';
     var lead={ id:uid(), nom:nom, prenoms:prenoms, tel:tel, email:email,
@@ -2013,7 +2036,8 @@
       source:'site_web_location', stade:'prospect_location',
       notes:'Demande de réservation location — '+prenoms+' '+nom+' | Bien : '+bien+(date?(' | Entrée souhaitée : '+date):'')+(message?(' | Message : '+message):''),
       programme_id:'', commercial_id:'',
-      date_contact:new Date().toISOString().slice(0,10), created_at:new Date().toISOString() };
+      date_contact:new Date().toISOString().slice(0,10), created_at:new Date().toISOString(),
+      consentement:{ date:new Date().toISOString(), finalite:'traitement de la demande et recontact', politique:'2026-10-09' } };
     try{
       await sbInsert('pi_leads', { id:lead.id, data:lead });
       document.getElementById('form-reservation-location').reset();
@@ -2046,9 +2070,9 @@
     var t = '<div class="card pp-video-card" style="padding:10px;">'
       + '<button class="pp-video-expand" onclick="event.stopPropagation();ppLbOpenVideoFromButton(this)" title="Agrandir la vidéo">⛶</button>';
     if (m.provider==='youtube' && m.video_id){
-      t += '<div style="position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden;"><iframe src="https://www.youtube-nocookie.com/embed/'+esc(m.video_id)+'" loading="lazy" allowfullscreen allow="accelerometer; encrypted-media; picture-in-picture" style="position:absolute;inset:0;width:100%;height:100%;border:0;"></iframe></div>';
+      t += '<div style="position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden;">'+ppVideoGate('YouTube','https://www.youtube-nocookie.com/embed/'+esc(m.video_id),' allowfullscreen allow="accelerometer; encrypted-media; picture-in-picture"')+'</div>';
     } else if (m.provider==='vimeo' && m.video_id){
-      t += '<div style="position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden;"><iframe src="https://player.vimeo.com/video/'+esc(m.video_id)+'" loading="lazy" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0;"></iframe></div>';
+      t += '<div style="position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden;">'+ppVideoGate('Vimeo','https://player.vimeo.com/video/'+esc(m.video_id),' allowfullscreen')+'</div>';
     } else if (m.url || m.data){
       /* [FIX] Seul m.url etait teste. Or l'ERP enregistre une video
          televersee avec url:'' et le fichier dans data (base64), et l'URL
@@ -2100,7 +2124,7 @@
       g.className='';
       g.innerHTML=_grouperParRef(photos).map(function(gp){
         return (gp.label?'<div style="font-weight:700;margin:14px 0 8px;color:var(--pp-primary);">'+esc(gp.label)+'</div>':'')
-          + '<div class="photo-grid">'+gp.items.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('')+'</div>';
+          + '<div class="photo-grid">'+gp.items.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('')+'</div>';
       }).join('');
     }
     /* Documents : ceux rattachés à un programme restent ici, au plus près de
@@ -2241,7 +2265,7 @@
         html+='<div class="photo-grid">'+gl.map(function(m){
           var img=_imgSur(m.data||m.url); if(!img) return '';
           var cap=(m.titre?'<strong>'+esc(m.titre)+'</strong>':'')+(m.commentaire?((m.titre?' — ':'')+esc(m.commentaire)):'');
-          return '<div class="photo-item"><img src="'+esc(img)+'" loading="lazy" alt="">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>';
+          return '<div class="photo-item"><img src="'+esc(img)+'" loading="lazy" alt="Photo">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>';
         }).join('')+'</div>';
       }
 
@@ -2641,7 +2665,7 @@
     var temoiEl = document.getElementById('temoi-liste');
     if (temoiEl) {
       if (!Array.isArray(temoi) || !temoi.length) {
-        temoiEl.innerHTML = '<div class="card" style="grid-column:1/-1;text-align:center;color:#8a7f6b;">Les témoignages de nos clients seront bientôt publiés ici.</div>';
+        temoiEl.innerHTML = '<div class="card" style="grid-column:1/-1;text-align:center;color:#6b6150;">Les témoignages de nos clients seront bientôt publiés ici.</div>';
       } else {
         temoiEl.innerHTML = temoi.map(function(t){
           var note = Math.max(1, Math.min(5, parseInt(t.note)||5));
@@ -2680,7 +2704,7 @@
   function renderCataloguePhoto(){
     var el=document.getElementById('photo-catalogue-grid'); if(!el) return;
     var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo'; });
-    el.innerHTML = photos.length ? photos.map(function(p){ return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="">'+(p.titre?'<div class="photo-cap">'+esc(p.titre)+'</div>':'')+'</div>'; }).join('') : '<div style="color:#4b6a8b;">Aucune photo publiée pour le moment.</div>';
+    el.innerHTML = photos.length ? photos.map(function(p){ return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(p.titre?'<div class="photo-cap">'+esc(p.titre)+'</div>':'')+'</div>'; }).join('') : '<div style="color:#4b6a8b;">Aucune photo publiée pour le moment.</div>';
   }
 
   /* ───── Souscription en ligne → pi_leads ───── */
@@ -2699,6 +2723,7 @@
     var g=function(id){return ((document.getElementById(id)||{}).value||'').trim();};
     var nom=g('s_nom'), prenoms=g('s_prenoms'), email=g('s_email'), tel=g('s_tel'), villa=g('s_villa');
     if(!nom||!prenoms||!email||!tel||!villa){ alert('Merci de remplir les champs obligatoires (*).'); return; }
+    if(!(document.getElementById('s_consent')||{}).checked){ alert('Merci de cocher la case de consentement pour envoyer votre demande.'); return; }
     var liv=g('s_livraison'), pays=g('s_pays'), ville=g('s_ville'), message=g('s_message');
     var v=VILLAS.find(function(x){return x.nom===villa;})||{};
     var budget = liv==='cle_en_main' ? (v.cle||0) : (v.go||0);
@@ -2708,7 +2733,8 @@
       source:'site_web', stade:'prospect',
       notes:'Réservation en ligne — '+prenoms+' '+nom+' | '+(pays||'?')+(ville?(' / '+ville):'')+' | Modèle : '+villa+' ('+(liv==='cle_en_main'?'clé en main':'gros œuvre')+') | Budget estimé '+fmt(budget)+' F'+(message?(' | Message : '+message):''),
       programme_id:'', commercial_id:'',
-      date_contact:new Date().toISOString().slice(0,10), created_at:new Date().toISOString() };
+      date_contact:new Date().toISOString().slice(0,10), created_at:new Date().toISOString(),
+      consentement:{ date:new Date().toISOString(), finalite:'traitement de la demande et recontact', politique:'2026-10-09' } };
     try{
       await sbInsert('pi_leads', { id:lead.id, data:lead });
       document.getElementById('form-souscription').reset(); majPrixEstime();
@@ -4014,7 +4040,7 @@
       var progs = await sb('pi_programmes_public?select=*&order=nom.asc&limit=200');
       _programmesCharges = true;
       if (!progs || !progs.length) {
-        box.innerHTML = '<div style="color:#8a7f6b;grid-column:1/-1;">Aucun programme publié pour le moment.</div>';
+        box.innerHTML = '<div style="color:#6b6150;grid-column:1/-1;">Aucun programme publié pour le moment.</div>';
         return;
       }
       var statutLbl = { en_cours:'En commercialisation', livre:'Livré', prospection:'À venir' };
@@ -4023,18 +4049,18 @@
         var total = p.lots_prevus != null ? p.lots_prevus : (p.lots_morceles != null ? p.lots_morceles : null);
         return '<div class="card">'
           + '<h4 style="margin-bottom:4px;"><i class="fas fa-building"></i> ' + esc(p.nom || 'Programme') + '</h4>'
-          + (p.commune ? '<div style="font-size:.8rem;color:#8a7f6b;margin-bottom:6px;"><i class="fas fa-location-dot"></i> ' + esc(p.commune) + '</div>' : '')
+          + (p.commune ? '<div style="font-size:.8rem;color:#6b6150;margin-bottom:6px;"><i class="fas fa-location-dot"></i> ' + esc(p.commune) + '</div>' : '')
           + (p.description ? '<p style="font-size:.85rem;margin-bottom:8px;">' + esc(p.description) + '</p>' : '')
           + '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.78rem;">'
           + (dispo != null ? '<span class="badge">' + dispo + ' lot' + (dispo>1?'s':'') + ' disponible' + (dispo>1?'s':'') + '</span>' : '')
           + (total != null ? '<span class="badge">' + total + ' au total</span>' : '')
           + (statutLbl[p.statut] ? '<span class="badge">' + statutLbl[p.statut] + '</span>' : '')
           + '</div>'
-          + (p.date_livraison ? '<div style="font-size:.74rem;color:#8a7f6b;margin-top:6px;">Livraison prévue : ' + dshort(p.date_livraison) + '</div>' : '')
+          + (p.date_livraison ? '<div style="font-size:.74rem;color:#6b6150;margin-top:6px;">Livraison prévue : ' + dshort(p.date_livraison) + '</div>' : '')
           + '</div>';
       }).join('');
     } catch(e) {
-      box.innerHTML = '<div style="color:#8a7f6b;grid-column:1/-1;">Impossible de charger la liste des programmes pour le moment.</div>';
+      box.innerHTML = '<div style="color:#6b6150;grid-column:1/-1;">Impossible de charger la liste des programmes pour le moment.</div>';
     }
   }
   window.chargerListeProgrammes = chargerListeProgrammes;
@@ -4659,7 +4685,7 @@
               var estVideo=/\.(mp4|webm|mov)(\?|$)/i.test(String(u));
               h+= estVideo
                 ? '<a href="'+esc(u)+'" target="_blank" rel="noopener" style="font-size:.72rem;padding:4px 8px;background:#e6effa;border-radius:6px;">🎥 Vidéo '+(mm+1)+'</a>'
-                : '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;"></a>';
+                : '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="Photo" style="width:72px;height:72px;object-fit:cover;border-radius:6px;"></a>';
             }
             h+='</div>';
           }
@@ -5378,7 +5404,7 @@
               +(o.verif_droits?'✅':'⏳')+' Droits coutumiers vérifiés<br>'
               +(o.juridique_valide?'✅':'⏳')+' Validation juridique</div>'):'')
           +((o.lat&&o.lng)?('<button onclick="allerOnglet(\'carte\')" style="margin-top:8px;width:100%;padding:6px;border:1px solid #cfdfed;border-radius:20px;background:transparent;color:#0f4c81;cursor:pointer;font-size:.76rem;">📍 Situer sur la carte</button>'):'')
-          +(photos.length?('<div class="photo-grid" style="margin-top:10px;">'+photos.map(function(p){ return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt=""></div>'; }).join('')+'</div>'):'')
+          +(photos.length?('<div class="photo-grid" style="margin-top:10px;">'+photos.map(function(p){ return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo"></div>'; }).join('')+'</div>'):'')
           +(docs.length?('<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">'+docs.map(function(d){ return '<a href="'+esc(d.data||d.url||'')+'" download="'+esc(d.nom||d.titre||'document')+'" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;border:1px solid #cfdfed;border-radius:10px;padding:7px 10px;color:#0a2b3e;font-size:.78rem;"><i class="fas fa-file-pdf" style="color:#b91c1c;"></i> '+esc(d.titre||d.nom||'Document')+'</a>'; }).join('')+'</div>'):'')
           +(dispo?('<button class="highlight-btn" style="margin-top:10px;width:100%;" onclick="choisirOperation(\''+esc(o.id)+'\')">Demander le dossier</button>'):'')
           +'</div>';
@@ -5590,5 +5616,92 @@
 
   window.pwaInstaller = pwaInstaller;
 </script>
+
+<div id="avis-info" role="region" aria-label="Information sur le stockage local" hidden>
+  Ce site n’utilise <strong>aucun cookie publicitaire ni de suivi</strong>. Il enregistre sur votre appareil uniquement ce qui est nécessaire à son fonctionnement (connexion, préférences). Les vidéos externes ne se chargent qu’avec votre accord.
+  <a href="/cookies.html">En savoir plus</a><br>
+  <button type="button" onclick="ppAvisInfoOk()">J’ai compris</button>
+</div>
+<script>
+/* Consentement aux contenus externes (YouTube, Vimeo) et avis d'information — voir /cookies.html */
+function ppConsentMedia(){ try{ return localStorage.getItem('consent_media_externes')==='oui'; }catch(e){ return false; } }
+function ppVideoGate(fournisseur, url, attrs){
+  var ifr='<iframe src="'+url+'" title="Vidéo '+fournisseur+'" loading="lazy"'+attrs+' style="position:absolute;inset:0;width:100%;height:100%;border:0;"></iframe>';
+  if(ppConsentMedia()) return ifr;
+  return '<div class="pp-video-gate" data-embed="'+ifr.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'">'
+    +'<span>Cette vidéo est hébergée par '+fournisseur+'. En l’affichant, '+fournisseur+' recevra votre adresse IP et pourra déposer des cookies.</span>'
+    +'<button type="button" onclick="event.stopPropagation();ppChargerVideo(this)">Afficher la vidéo</button></div>';
+}
+function ppChargerVideo(btn){
+  try{ localStorage.setItem('consent_media_externes','oui'); }catch(e){}
+  var g=btn.closest('.pp-video-gate'); if(!g) return;
+  var h=document.createElement('div'); h.innerHTML=g.getAttribute('data-embed')||'';
+  var ifr=h.firstChild; if(ifr) g.replaceWith(ifr);
+}
+function ppRetirerConsentement(){
+  try{ localStorage.removeItem('consent_media_externes'); localStorage.removeItem('cookies_info_vu'); }catch(e){}
+  alert('Vos choix ont été effacés : les vidéos externes ne se chargeront plus sans votre accord.');
+  location.reload();
+}
+function ppAvisInfoOk(){ try{ localStorage.setItem('cookies_info_vu', String(Date.now())); }catch(e){} var a=document.getElementById('avis-info'); if(a) a.hidden=true; }
+(function(){ var vu=null; try{ vu=localStorage.getItem('cookies_info_vu'); }catch(e){} if(!vu){ var a=document.getElementById('avis-info'); if(a) a.hidden=false; } })();
+</script>
+<!-- a11y-auto:debut -->
+<script id="a11y-auto">
+/* Accessibilité automatique : relie chaque étiquette à son champ, nomme les boutons-icônes,
+   rend les entrées de menu utilisables au clavier. Aucune donnée n'est lue ni envoyée. */
+(function(){
+  var compteur=0, planifie=false;
+  function controle(l){
+    var e=l.nextElementSibling;
+    while(e){
+      if(e.tagName==='LABEL') return null;
+      var c=e.matches('input:not([type=hidden]),select,textarea')?e:e.querySelector('input:not([type=hidden]),select,textarea');
+      if(c) return c;
+      e=e.nextElementSibling;
+    }
+    return null;
+  }
+  function lier(){
+    planifie=false;
+    document.querySelectorAll('label:not([for])').forEach(function(l){
+      if(l.querySelector('input,select,textarea')) return;
+      var c=controle(l); if(!c) return;
+      if(!c.id){ c.id='a11y-champ-'+(++compteur); }
+      l.setAttribute('for',c.id);
+    });
+    var pour={}; document.querySelectorAll('label[for]').forEach(function(l){ pour[l.getAttribute('for')]=1; });
+    document.querySelectorAll('select,input:not([type=hidden]),textarea').forEach(function(c){
+      if(c.getAttribute('aria-label')||c.getAttribute('aria-labelledby')||c.getAttribute('title')) return;
+      if((c.id&&pour[c.id])||c.closest('label')) return;
+      var t='';
+      if(c.tagName==='SELECT'){ t=((c.options[0]&&c.options[0].text)||'').trim(); }
+      else if(c.type==='file'){ t='Choisir un fichier'; }
+      else if(c.type==='date'){ t='Date'; } else if(c.type==='month'){ t='Mois'; }
+      else { t=c.getAttribute('placeholder')||''; }
+      if(t) c.setAttribute('aria-label',t);
+    });
+    document.querySelectorAll('button:not([aria-label]),a[title]:not([aria-label]),[role=button]:not([aria-label])').forEach(function(b){
+      var t=(b.getAttribute('title')||'').trim(); var txt=(b.textContent||'').replace(/\s+/g,'').trim();
+      if(t && txt.length<=3) b.setAttribute('aria-label',t);
+    });
+    document.querySelectorAll('.nav-item[onclick]:not([tabindex])').forEach(function(n){
+      n.setAttribute('tabindex','0'); n.setAttribute('role','button');
+    });
+    var pane=document.getElementById('eden-pane'); if(pane&&pane.parentElement&&!pane.parentElement.getAttribute('role')) pane.parentElement.setAttribute('role','main');
+    document.querySelectorAll('.tab-link').forEach(function(t){ if(t.classList.contains('active')) t.setAttribute('aria-current','page'); else t.removeAttribute('aria-current'); });
+    var sb=document.querySelector('.sidebar'); if(sb && !sb.getAttribute('role')){ sb.setAttribute('role','navigation'); sb.setAttribute('aria-label','Menu principal'); }
+    var mc=document.querySelector('.main-content'); if(mc && !mc.getAttribute('role')){ mc.setAttribute('role','main'); }
+    var le=document.getElementById('login-error'); if(le && !le.getAttribute('role')){ le.setAttribute('role','alert'); }
+  }
+  function planifier(){ if(planifie) return; planifie=true; setTimeout(lier,400); }
+  document.addEventListener('keydown',function(ev){
+    if((ev.key==='Enter'||ev.key===' ') && ev.target && ev.target.classList && ev.target.classList.contains('nav-item')){ ev.preventDefault(); ev.target.click(); }
+  });
+  if(document.readyState!=='loading') lier(); else document.addEventListener('DOMContentLoaded',lier);
+  try{ new MutationObserver(planifier).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); }catch(e){}
+})();
+</script>
+<!-- a11y-auto:fin -->
 </body>
 </html>

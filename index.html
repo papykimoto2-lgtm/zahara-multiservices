@@ -14,12 +14,14 @@
 <meta name="apple-mobile-web-app-title" content="ERP">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <title>ERP — Logiciel de Gestion Immobilière</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Application de gestion immobilière — accès réservé aux utilisateurs autorisés.">
 <script>
 /* ── Auto-mise à jour : supprime tout service worker / cache laissé par une ancienne
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\'un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\'engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\'un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -2320,6 +2322,403 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- a11y-contrast:debut -->
+<style id="a11y-contrast">
+/* ═══ ACCESSIBILITÉ — contrastes WCAG 2.1 niveau AA (≥ 4,5:1 pour le texte courant) ═══
+   Zone claire (contenu, fenêtres, connexion) : teintes d'accent plus sombres.
+   Barre latérale, barre du haut et barre mobile restent sombres : elles gardent
+   les teintes claires d'origine. Les couleurs de texte posées « en ligne » sont
+   remplacées par leur équivalent foncé, sans toucher au code qui les produit. */
+body {
+  --or:#8B5520; --or-light:#8B5520; --dim:#55557F; --dim2:#4A4A7A; --blanc-dim:#55557F;
+  --rouge:#B02A2A; --vert:#1A6B3D; --bleu:#1B5EA8; --violet:#6B3BC4;
+}
+.sidebar, .topbar, .bottom-nav, .sidebar *, .topbar *, .bottom-nav * {
+  --or:#B87333; --or-light:#D4956A; --dim:#6B6B9A; --blanc-dim:#6B6B9A;
+  --rouge:#E05252; --vert:#4AC47A; --bleu:#4A94E0; --violet:#8A52E0;
+}
+body [style^="color:#888"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#888"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#888"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #888"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#6B6B6B !important; }
+body [style^="color:#888888"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#888888"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#888888"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #888888"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#6B6B6B !important; }
+body [style^="color:#999"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#999"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#999"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #999"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#6B6B6B !important; }
+body [style^="color:#999999"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#999999"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#999999"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #999999"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#6B6B6B !important; }
+body [style^="color:#AAA"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#AAA"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#AAA"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #AAA"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#aaa"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#aaa"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#aaa"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #aaa"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#6B6B6B !important; }
+body [style^="color:#AAAAAA"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#AAAAAA"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#AAAAAA"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #AAAAAA"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#aaaaaa"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#aaaaaa"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#aaaaaa"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #aaaaaa"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#6B6B6B !important; }
+body [style^="color:#94a3b8"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#94a3b8"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#94a3b8"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #94a3b8"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#94A3B8"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#94A3B8"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#94A3B8"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #94A3B8"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#5B6B80 !important; }
+body [style^="color:#64748b"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#64748b"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#64748b"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #64748b"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#64748B"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#64748B"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#64748B"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #64748B"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#526071 !important; }
+body [style^="color:#10b981"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#10b981"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#10b981"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #10b981"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#10B981"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#10B981"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#10B981"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #10B981"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#047857 !important; }
+body [style^="color:#3b82f6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#3b82f6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#3b82f6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #3b82f6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#3B82F6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#3B82F6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#3B82F6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #3B82F6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#1D4ED8 !important; }
+body [style^="color:#8B5CF6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#8B5CF6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#8B5CF6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #8B5CF6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#8b5cf6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#8b5cf6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#8b5cf6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #8b5cf6"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#6D28D9 !important; }
+body [style^="color:#F59E0B"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#F59E0B"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#F59E0B"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #F59E0B"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#f59e0b"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#f59e0b"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#f59e0b"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #f59e0b"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#B45309 !important; }
+body [style^="color:#0EA5E9"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#0EA5E9"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#0EA5E9"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #0EA5E9"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#0ea5e9"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#0ea5e9"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#0ea5e9"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #0ea5e9"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#0369A1 !important; }
+body [style^="color:#EF4444"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#EF4444"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#EF4444"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #EF4444"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#ef4444"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#ef4444"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#ef4444"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #ef4444"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#B91C1C !important; }
+body [style^="color:#22C55E"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#22C55E"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#22C55E"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #22C55E"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#22c55e"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#22c55e"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#22c55e"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #22c55e"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#15803D !important; }
+body [style^="color:#B87333"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#B87333"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#B87333"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #B87333"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#b87333"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#b87333"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#b87333"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #b87333"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#8B5520 !important; }
+body [style^="color:#d97706"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#d97706"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#d97706"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #d97706"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#D97706"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#D97706"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#D97706"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #D97706"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#9A5300 !important; }
+body [style^="color:#EA580C"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#EA580C"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#EA580C"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #EA580C"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#ea580c"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#ea580c"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#ea580c"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #ea580c"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#B8420A !important; }
+body [style^="color:#4A94E0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#4A94E0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#4A94E0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #4A94E0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#4a94e0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#4a94e0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#4a94e0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #4a94e0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#1B5EA8 !important; }
+body [style^="color:#4ac47a"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#4ac47a"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#4ac47a"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #4ac47a"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#4AC47A"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#4AC47A"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#4AC47A"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #4AC47A"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#1A6B3D !important; }
+body [style^="color:#e05252"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#e05252"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#e05252"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #e05252"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#E05252"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#E05252"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#E05252"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #E05252"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#B02A2A !important; }
+body [style^="color:#8A52E0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#8A52E0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#8A52E0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #8A52E0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#8a52e0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#8a52e0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#8a52e0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #8a52e0"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#6B3BC4 !important; }
+body [style^="color:#b8732f"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#b8732f"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#b8732f"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #b8732f"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#B8732F"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#B8732F"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#B8732F"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #B8732F"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#8B5520 !important; }
+body [style^="color:#059669"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#059669"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#059669"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #059669"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#047857 !important; }
+body [style^="color:#6366f1"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#6366f1"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#6366f1"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #6366f1"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#6366F1"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#6366F1"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#6366F1"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #6366F1"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#4F46E5 !important; }
+body [style^="color:#c5a880"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#c5a880"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#c5a880"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #c5a880"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#C5A880"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#C5A880"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#C5A880"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #C5A880"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#7A5A2B !important; }
+body [style^="color:#EF9F27"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#EF9F27"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#EF9F27"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #EF9F27"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style^="color:#ef9f27"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=";color:#ef9f27"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*=" color:#ef9f27"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *),
+body [style*="color: #ef9f27"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#8F5900 !important; }
+body [style*="background:#F59E0B"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#F59E0B"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#F59E0B"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#F59E0B"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#F59E0B"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#F59E0B"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #F59E0B"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #F59E0B"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #F59E0B"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #F59E0B"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #F59E0B"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #F59E0B"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#f59e0b"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#f59e0b"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#f59e0b"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#f59e0b"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#f59e0b"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#f59e0b"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #f59e0b"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #f59e0b"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #f59e0b"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #f59e0b"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #f59e0b"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background: #f59e0b"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B45309 !important; }
+body [style*="background:#0EA5E9"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#0EA5E9"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#0EA5E9"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#0EA5E9"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#0EA5E9"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#0EA5E9"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0EA5E9"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0EA5E9"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0EA5E9"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0EA5E9"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0EA5E9"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0EA5E9"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#0ea5e9"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#0ea5e9"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#0ea5e9"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#0ea5e9"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#0ea5e9"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#0ea5e9"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0ea5e9"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0ea5e9"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0ea5e9"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0ea5e9"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0ea5e9"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background: #0ea5e9"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#0369A1 !important; }
+body [style*="background:#10b981"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#10b981"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#10b981"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#10b981"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#10b981"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#10b981"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10b981"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10b981"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10b981"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10b981"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10b981"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10b981"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#10B981"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#10B981"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#10B981"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#10B981"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#10B981"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#10B981"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10B981"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10B981"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10B981"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10B981"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10B981"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background: #10B981"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#047857 !important; }
+body [style*="background:#3b82f6"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#3b82f6"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#3b82f6"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#3b82f6"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#3b82f6"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#3b82f6"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3b82f6"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3b82f6"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3b82f6"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3b82f6"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3b82f6"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3b82f6"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#3B82F6"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#3B82F6"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#3B82F6"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#3B82F6"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#3B82F6"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#3B82F6"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3B82F6"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3B82F6"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3B82F6"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3B82F6"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3B82F6"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background: #3B82F6"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#1D4ED8 !important; }
+body [style*="background:#EF4444"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#EF4444"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#EF4444"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#EF4444"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#EF4444"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#EF4444"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #EF4444"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #EF4444"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #EF4444"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #EF4444"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #EF4444"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #EF4444"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#ef4444"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#ef4444"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#ef4444"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#ef4444"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#ef4444"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#ef4444"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #ef4444"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #ef4444"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #ef4444"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #ef4444"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #ef4444"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background: #ef4444"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#B91C1C !important; }
+body [style*="background:#8B5CF6"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#8B5CF6"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#8B5CF6"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#8B5CF6"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#8B5CF6"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#8B5CF6"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8B5CF6"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8B5CF6"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8B5CF6"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8B5CF6"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8B5CF6"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8B5CF6"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#8b5cf6"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#8b5cf6"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#8b5cf6"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#8b5cf6"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#8b5cf6"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#8b5cf6"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8b5cf6"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8b5cf6"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8b5cf6"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8b5cf6"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8b5cf6"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background: #8b5cf6"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#6D28D9 !important; }
+body [style*="background:#B87333"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background:#B87333"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background:#B87333"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background:#B87333"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background:#B87333"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background:#B87333"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #B87333"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #B87333"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #B87333"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #B87333"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #B87333"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #B87333"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background:#b87333"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background:#b87333"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background:#b87333"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background:#b87333"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background:#b87333"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background:#b87333"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #b87333"][style*="color:#fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #b87333"][style*="color:#FFF"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #b87333"][style*="color:#ffffff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #b87333"][style*="color:white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #b87333"][style*="color: #fff"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="background: #b87333"][style*="color: white"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8B5520 !important; }
+body [style*="--muted,#aaa"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *), body [style*="--muted, #aaa"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#6B6B6B !important; }
+body [style*="color: rgb(234, 88, 12)"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { color:#9A3412 !important; }
+body [style*="background:#B8860B"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *), body [style*="background: #B8860B"]:not(.sidebar *):not(.topbar *):not(.bottom-nav *):not(#pt-selection-bar *) { background:#8A6508 !important; }
+body [style*="background:var(--or)"][style*="color:#1a1a1a"] { color:#fff !important; }
+body .flux-step:not(.sidebar *) { color:#fff; }
+body [style*="background:var(--or)"][style*="color:#000"] { color:#fff !important; }
+.topbar .topbar-portail { color:#8B5520 !important; }
+.dash-tab { color:#526071; }
+.nav-badge { background:#B02A2A !important; color:#fff !important; }
+body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
+*:focus-visible { outline:3px solid #1B5EA8 !important; outline-offset:2px; }
+.sidebar *:focus-visible, .topbar *:focus-visible, .bottom-nav *:focus-visible, #pt-selection-bar *:focus-visible { outline-color:#FFFFFF !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
+.login-legal { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 14px; margin-top:14px; font-size:12px; }
+.login-legal a { color:#1B5EA8; text-decoration:underline; }
+#pt-selection-bar { --or:#D4956A; --vert:#4AC47A; --rouge:#F28B8B; --violet:#BBA0F5; --bleu:#4A94E0; --dim:#9CA3C7; --blanc-dim:#9CA3C7; }
+</style>
+<!-- a11y-contrast:fin -->
 </head>
 <body>
 
@@ -2374,7 +2773,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
         <input type="password" id="login-pass" autocomplete="current-password" placeholder="••••••••"
                style="width:100%;padding-right:42px;box-sizing:border-box;"
                onkeydown="if(event.key==='Enter')doLogin()">
-        <button type="button" onclick="toggleLoginPass()" title="Afficher / masquer"
+        <button type="button" onclick="toggleLoginPass()" title="Afficher / masquer" aria-label="Afficher ou masquer le mot de passe" aria-label="Afficher ou masquer le mot de passe" aria-label="Afficher ou masquer le mot de passe"
                 style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;line-height:1;padding:4px;color:#6B6B9A;">
           <span id="login-pass-eye">👁️</span>
         </button>
@@ -2385,6 +2784,12 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
     <div id="login-attempts-warning" style="display:none;margin-top:8px;font-size:11px;text-align:center;color:var(--or);"></div>
     </div>
 
+    <nav class="login-legal" aria-label="Informations légales">
+      <a href="/mentions-legales.html">Mentions légales</a>
+      <a href="/confidentialite.html">Confidentialité</a>
+      <a href="/cookies.html">Cookies</a>
+      <a href="/conditions.html">Conditions d’utilisation</a>
+    </nav>
     <div id="setup-form" style="display:none;">
       <div style="text-align:center;margin-bottom:14px;font-size:13px;color:var(--or);font-weight:600;">Première utilisation — Créez le compte administrateur</div>
       <div class="login-field">
@@ -6129,7 +6534,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
               " onclick="document.getElementById('logo-file-input').click()"
                  onmouseover="this.style.borderColor='#B87333'"
                  onmouseout="this.style.borderColor=document.getElementById('logo-img-preview').src?'#B87333':'#E0E0EA'">
-                <img id="logo-img-preview" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;display:none;border-radius:8px;">
+                <img id="logo-img-preview" src="" alt="Aperçu du logo de l’entreprise" style="max-width:100%;max-height:100%;object-fit:contain;display:none;border-radius:8px;">
                 <div id="logo-placeholder" style="text-align:center;padding:12px;">
                   <div style="font-size:32px;opacity:0.3;">🏢</div>
                   <div style="font-size:11px;color:#6B6B9A;margin-top:6px;font-weight:500;">Cliquer pour<br>importer</div>
@@ -6435,7 +6840,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                   <input type="text" id="param-portail-logo-url" class="form-control" placeholder="https://... (laisser vide pour afficher le nom en texte)" oninput="updatePortailLogoPreview(this.value)" style="flex:1;min-width:200px;">
                   <div id="portail-logo-preview-zone" style="width:44px;height:44px;border:1px dashed #E0E0EA;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#F5F5F8;">
-                    <img id="portail-logo-preview" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;display:none;">
+                    <img id="portail-logo-preview" src="" alt="Aperçu du logo du portail" style="max-width:100%;max-height:100%;object-fit:contain;display:none;">
                     <span id="portail-logo-preview-icon" style="font-size:18px;opacity:.3;">🖼️</span>
                   </div>
                   <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('portail-logo-file-input').click()">📁 Importer</button>
@@ -6461,7 +6866,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                   <input type="text" id="param-portail-hero-image" class="form-control" placeholder="URL d'image (laisser vide pour garder l'image par défaut)" oninput="updatePortailHeroPreview(this.value)" style="flex:1;min-width:200px;">
                   <div id="portail-hero-preview-zone" style="width:70px;height:44px;border:1px dashed #E0E0EA;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#F5F5F8;">
-                    <img id="portail-hero-preview" src="" alt="" style="max-width:100%;max-height:100%;object-fit:cover;display:none;">
+                    <img id="portail-hero-preview" src="" alt="Aperçu de l’image d’accueil du portail" style="max-width:100%;max-height:100%;object-fit:cover;display:none;">
                     <span id="portail-hero-preview-icon" style="font-size:18px;opacity:.3;">🏞️</span>
                   </div>
                   <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('portail-hero-file-input').click()">📁 Importer</button>
@@ -6601,7 +7006,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
                 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                   <input type="text" id="param-portail-motdg-photo" class="form-control" placeholder="URL d'image, ou importez un fichier →" oninput="updatePortailMotDgPreview(this.value)" style="flex:1;min-width:200px;">
                   <div id="portail-motdg-preview-zone" style="width:44px;height:56px;border:1px dashed #E0E0EA;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#F5F5F8;">
-                    <img id="portail-motdg-preview" src="" alt="" style="max-width:100%;max-height:100%;object-fit:cover;display:none;">
+                    <img id="portail-motdg-preview" src="" alt="Photo du Directeur Général" style="max-width:100%;max-height:100%;object-fit:cover;display:none;">
                     <span id="portail-motdg-preview-icon" style="font-size:18px;opacity:.3;">👤</span>
                   </div>
                   <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('portail-motdg-file-input').click()">📁 Importer</button>
@@ -17809,6 +18214,41 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <label>Adresse</label>
             <input type="text" class="form-control" id="c-adresse">
           </div>
+          <div class="form-group span-2" id="c-famille-bloc" style="border:1px solid var(--bord,#D1D5DB);border-radius:8px;padding:10px 12px;">
+            <label style="font-weight:700;">👨‍👩‍👧 Souscription de famille / groupe — co-souscripteurs</label>
+            <div style="font-size:11px;color:var(--blanc-dim);margin:2px 0 8px;">Un seul dossier et un seul échéancier ; chaque co-souscripteur figure aux documents, avec sa part de propriété (facultative).</div>
+            <div id="c-cosous-liste"></div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="cfmCosousAjouter()">+ Ajouter un co-souscripteur</button>
+            <div id="c-cosous-parts" style="font-size:12px;margin-top:6px;"></div>
+          </div>
+          <div class="form-group span-2" id="c-mineur-wrap" style="border:1px solid var(--bord,#D1D5DB);border-radius:8px;padding:10px 12px;">
+            <label for="c-mineur-actif" style="display:flex;gap:8px;align-items:flex-start;font-weight:700;">
+              <input type="checkbox" id="c-mineur-actif" onchange="cfmMineurToggle()" style="width:auto;margin-top:3px;flex:0 0 auto;">
+              <span>🧒 Souscription au bénéfice d’un mineur — le souscripteur ci-dessus agit comme tuteur ou représentant légal</span>
+            </label>
+            <div id="c-mineur-bloc" style="display:none;margin-top:8px;">
+              <div class="form-grid">
+                <div class="form-group"><label>Nom du mineur *</label><input type="text" class="form-control" id="c-min-nom"></div>
+                <div class="form-group"><label>Prénoms du mineur *</label><input type="text" class="form-control" id="c-min-prenoms"></div>
+                <div class="form-group"><label>Date de naissance *</label><input type="date" class="form-control" id="c-min-ddn" onchange="cfmMineurInfo()"></div>
+                <div class="form-group"><label>Lieu de naissance</label><input type="text" class="form-control" id="c-min-lieu"></div>
+                <div class="form-group"><label>Pièce du mineur</label><select class="form-control" id="c-min-piece-type"><option value="acte_naissance">Acte de naissance</option><option value="extrait_naissance">Extrait de naissance</option><option value="cni">Carte d’identité</option><option value="passeport">Passeport</option></select></div>
+                <div class="form-group"><label>N° de la pièce</label><input type="text" class="form-control" id="c-min-piece-num"></div>
+                <div class="form-group"><label>Lien du souscripteur avec le mineur *</label><select class="form-control" id="c-tut-lien"><option value="pere">Père</option><option value="mere">Mère</option><option value="tuteur_legal">Tuteur légal (décision de justice)</option><option value="autre">Autre représentant légal</option></select></div>
+                <div class="form-group"><label>Justificatif de la qualité de représentant *</label><select class="form-control" id="c-tut-justif-type"><option value="acte_naissance">Acte de naissance du mineur</option><option value="jugement_tutelle">Jugement de tutelle</option><option value="jugement_delegation">Décision de délégation d’autorité</option><option value="autre">Autre justificatif</option></select></div>
+                <div class="form-group"><label>N° / référence du justificatif</label><input type="text" class="form-control" id="c-tut-justif-num"></div>
+                <div class="form-group"><label>Âge de la majorité civile (ans)</label><input type="number" class="form-control" id="c-min-age-maj" value="21" min="16" max="25" onchange="cfmMineurInfo()"></div>
+              </div>
+              <div id="c-min-info" style="font-size:12px;margin-top:6px;" role="status" aria-live="polite"></div>
+            </div>
+          </div>
+          <div class="form-group span-2">
+            <label for="c-info-donnees" style="display:flex;gap:8px;align-items:flex-start;font-weight:400;">
+              <input type="checkbox" id="c-info-donnees" style="width:auto;margin-top:3px;flex:0 0 auto;">
+              <span>Le souscripteur a été informé de l’utilisation de ses données personnelles (notice de confidentialité remise ou consultable sur le portail) et a donné son accord pour leur traitement dans le cadre de son dossier.</span>
+            </label>
+            <div id="c-info-donnees-date" style="font-size:11px;color:var(--blanc-dim);margin-top:2px;"></div>
+          </div>
           <div class="form-group span-2">
             <label>Commune / localisation <span style="font-weight:400;color:var(--blanc-dim);">— utilisée pour positionner le client sur la carte à défaut de position GPS réelle</span></label>
             <input type="text" class="form-control" id="c-commune" placeholder="Ex. Cocody, Yopougon...">
@@ -20657,7 +21097,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             width:90px;height:90px;border:2px dashed #E0E0EA;border-radius:10px;
             display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;
           " onclick="document.getElementById('div-logo-file-input').click()">
-            <img id="div-logo-img-preview" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;display:none;border-radius:8px;">
+            <img id="div-logo-img-preview" src="" alt="Aperçu du logo de l’entreprise" style="max-width:100%;max-height:100%;object-fit:contain;display:none;border-radius:8px;">
             <div id="div-logo-placeholder" style="text-align:center;font-size:11px;color:#6B6B9A;padding:6px;">Aucun logo</div>
           </div>
           <div>
@@ -22915,7 +23355,7 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
   display:none;align-items:center;justify-content:center;flex-direction:column;" onclick="planCloseLightbox()">
   <button style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.1);border:none;color:#fff;
     font-size:22px;width:40px;height:40px;border-radius:50%;cursor:pointer;" onclick="planCloseLightbox()">✕</button>
-  <img id="plan-lightbox-img" src="" style="max-width:92vw;max-height:85vh;object-fit:contain;border-radius:8px;" onclick="event.stopPropagation()">
+  <img alt="Plan agrandi" id="plan-lightbox-img" src="" style="max-width:92vw;max-height:85vh;object-fit:contain;border-radius:8px;" onclick="event.stopPropagation()">
   <div id="plan-lightbox-label" style="color:rgba(255,255,255,0.75);font-size:13px;margin-top:12px;"></div>
   <div style="display:flex;gap:12px;margin-top:10px;">
     <button id="plan-lb-prev" style="background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:18px;" onclick="event.stopPropagation();planLightboxNav(-1)">‹</button>
@@ -32334,6 +32774,9 @@ function openClientModal(id) {
     APP._clientBaseModifie = c._modifie || null;
     document.getElementById('modal-client-title').textContent = 'Modifier Souscripteur';
     fillClientForm(c);
+    if (typeof cfmRemplir === 'function') cfmRemplir(c);
+    var _idf1 = document.getElementById('c-info-donnees'); if (_idf1) _idf1.checked = !!c.info_donnees;
+    var _idd1 = document.getElementById('c-info-donnees-date'); if (_idd1) _idd1.textContent = c.info_donnees ? ('Enregistré le ' + c.info_donnees.date + (c.info_donnees.par ? ' par ' + c.info_donnees.par : '')) : '';
     // Boutons documents imprimables
     var docBtns = document.getElementById('doc-btns');
     docBtns.style.display = 'flex';
@@ -32392,6 +32835,9 @@ function clearClientForm() {
     if (el) el.value = el.id === 'c-nationalite' ? 'Ivoirienne' : el.id === 'c-duree' ? '60' : el.id === 'c-apport' ? '0' : '';
   });
   var modeAcqEl = document.getElementById('c-mode-acquisition'); if (modeAcqEl) modeAcqEl.value = '';
+  var _idf0 = document.getElementById('c-info-donnees'); if (_idf0) _idf0.checked = false;
+  var _idd0 = document.getElementById('c-info-donnees-date'); if (_idd0) _idd0.textContent = '';
+  if (typeof cfmReset === 'function') cfmReset();
   if (typeof clientToggleConjoint === 'function') clientToggleConjoint();
   var svEcart = document.getElementById('c-surface-ecart'); if (svEcart) svEcart.style.display = 'none';
   var cGeoStatutClear = document.getElementById('c-geoloc-statut'); if (cGeoStatutClear) cGeoStatutClear.textContent = '';
@@ -32661,6 +33107,8 @@ async function saveClient() {
   var _aTel = telAnalyser(tel), _aTel2 = telAnalyser(tel2);
   if (!_aTel.valide && tel !== (_exTel.tel || '')) { toast('Téléphone 1 : ' + _aTel.message, 'error'); return; }
   if (tel2 && !_aTel2.valide && tel2 !== (_exTel.tel2 || '')) { toast('Téléphone 2 : ' + _aTel2.message, 'error'); return; }
+  var _cfmErr = (typeof cfmValider === 'function') ? cfmValider() : '';
+  if (_cfmErr) { toast(_cfmErr, 'error'); return; }
   if (_aTel.valide && _aTel2.valide && _aTel.e164 === _aTel2.e164) { toast('Téléphone 1 et Téléphone 2 sont identiques : laissez le second vide ou saisissez un autre numéro.', 'error'); return; }
   if (_aTel.valide && tel !== (_exTel.tel || '')) tel = _aTel.stockage;
   if (tel2 && _aTel2.valide && tel2 !== (_exTel.tel2 || '')) tel2 = _aTel2.stockage;
@@ -32713,6 +33161,16 @@ async function saveClient() {
     tel: tel,
     tel2: tel2,
     email: document.getElementById('c-email').value,
+    /* information / consentement du souscripteur : date et auteur conservés, jamais écrasés par un simple ré-enregistrement */
+    info_donnees: (function () {
+      var cb = document.getElementById('c-info-donnees');
+      if (!cb || !cb.checked) return null;
+      if (_exTel && _exTel.info_donnees) return _exTel.info_donnees;
+      return { date: today(), par: (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || '', politique: '2026-10-09' };
+    })(),
+    /* souscription de famille / groupe et pour mineur (tuteur) */
+    co_souscripteurs: (typeof cfmCosousPropres === 'function') ? cfmCosousPropres() : [],
+    mineur: (typeof cfmLireMineur === 'function') ? cfmLireMineur() : null,
     adresse: document.getElementById('c-adresse').value,
     piece_type: document.getElementById('c-piece-type').value,
     piece_num: document.getElementById('c-piece-num').value,
@@ -32981,7 +33439,7 @@ function renderClients() {
   var idxAp = {}; DATA.apporteurs.forEach(function(a){ idxAp[a.id] = a; });
 
   var list = scopeFiltrer(DATA.clients, 'programme_id').filter(function(c) {
-    var match = !search || (c.nom + ' ' + c.prenoms + ' ' + c.tel + ' ' + (c.tel2 || '') + ' ' + (c.email || '')).toLowerCase().indexOf(search) !== -1;
+    var match = !search || (c.nom + ' ' + c.prenoms + ' ' + c.tel + ' ' + (c.tel2 || '') + ' ' + (c.email || '') + ' ' + (typeof cfmTexteRecherche === 'function' ? cfmTexteRecherche(c) : '')).toLowerCase().indexOf(search) !== -1;
     var prog = !filterProg || c.programme_id === filterProg;
     var stand = !filterStand || c.standing === filterStand;
     var matchFin = !filterFin || ((filterFin === 'bancaire') === clientFinancementBancaire(c));
@@ -33089,7 +33547,7 @@ function renderClients() {
     if (!commCell)  commCell  = '<span style="color:#EF4444;font-size:11px;font-weight:600;">⚠️ Non assigné</span>';
 
     rowsTableau.push('<tr' + (nonAssigne ? ' style="background:#FEF2F2;"' : '') + '>'
-      + '<td><strong>' + escHtml(c.nom + ' ' + c.prenoms) + '</strong>' + missingBadge + '<br><span style="font-size:11px;color:var(--blanc-dim);">' + escHtml((c.piece_type || '') + ' ' + (c.piece_num || '')) + '</span></td>'
+      + '<td><strong>' + escHtml(c.nom + ' ' + c.prenoms) + '</strong>' + missingBadge + (typeof cfmBadges === 'function' ? cfmBadges(c) : '') + '<br><span style="font-size:11px;color:var(--blanc-dim);">' + escHtml((c.piece_type || '') + ' ' + (c.piece_num || '')) + '</span></td>'
       + '<td>' + escHtml(c.tel) + '<br><span style="font-size:11px;color:var(--blanc-dim);">' + escHtml(c.email || '') + '</span></td>'
       + '<td>' + commCell + '</td>'
       + '<td>' + (prog ? escHtml(prog.nom) : '—') + '</td>'
@@ -33698,7 +34156,7 @@ function csuiviRapportImprimer() {
     + '.header{display:flex;align-items:center;border-bottom:3px solid #B87333;padding-bottom:14px;margin-bottom:18px;}'
     + '.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:8px;}.kpi{background:#F8FAFC;border:1px solid #E0E0EA;border-top:3px solid #B87333;border-radius:6px;padding:10px;text-align:center;}'
     + '.kpi-v{font-size:16px;font-weight:700;color:#B87333;}.kpi-l{font-size:9px;color:#6B6B9A;text-transform:uppercase;}@media print{body{padding:12px;}}</style></head><body>'
-    + '<div class="header">' + (logo ? '<img src="' + logo + '" style="height:44px;object-fit:contain;margin-right:12px;">' : '')
+    + '<div class="header">' + (logo ? '<img alt="Logo de l’entreprise" src="' + logo + '" style="height:44px;object-fit:contain;margin-right:12px;">' : '')
     + '<div><h1>' + escHtml(params.societe || 'ImmoSuite ERP') + '</h1><div style="color:#B87333;font-weight:700;">RAPPORT DE SUIVI SOUSCRIPTEURS</div><div style="font-size:11px;color:#6B6B9A;">Généré le ' + now + '</div></div></div>'
     + '<div class="kpi-row">' + kpi.map(function (k) { return '<div class="kpi"><div class="kpi-v">' + k[1] + '</div><div class="kpi-l">' + k[0] + '</div></div>'; }).join('') + '</div>'
     + '<h2>Répartition par statut</h2><table><thead><tr><th>Statut</th><th>Effectif</th><th>Reste dû</th><th>Action commerciale</th></tr></thead><tbody>' + lignesStatut + '</tbody></table>'
@@ -33750,6 +34208,7 @@ function csuiviHtmlActions() {
   });
   h += '</div>';
 
+  h += cfmAlerteMajorite();
   h += '<div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
     + '<input class="search-input" placeholder="Rechercher nom, dossier, téléphone…" value="' + escHtml(CSUIVI.recherche) + '" oninput="CSUIVI.recherche=this.value;csuiviRenderTableSeul()">'
     + '<select class="filter-select" onchange="csuiviFiltre(\'statut\',this.value)"><option value="">Tous les statuts</option>'
@@ -33938,6 +34397,205 @@ function csuiviSuivant() {
   CSUIVI.pos++;
   if (CSUIVI.pos >= CSUIVI.file.length) { CSUIVI.file = []; CSUIVI.pos = 0; CSUIVI.tab = 'portail'; toast('Envoi terminé.', 'success'); csuiviRender(); return; }
   csuiviPreparerCourant();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SOUSCRIPTION DE FAMILLE / GROUPE (co-souscripteurs) ET POUR MINEUR (tuteur)
+   — Un seul dossier, un seul échéancier : client.co_souscripteurs[] (autres
+     personnes au contrat, part de propriété facultative) et client.mineur
+     (bénéficiaire mineur ; le souscripteur du dossier agit comme tuteur ou
+     représentant légal). Tout vit dans la fiche client : aucune nouvelle table.
+   — L'âge de la majorité civile est enregistré dans chaque dossier (21 ans par
+     défaut, modifiable) : à faire confirmer par votre notaire.
+   ═══════════════════════════════════════════════════════════════════════ */
+var CFM_LIENS = { conjoint:'Conjoint(e)', enfant:'Enfant', parent:'Parent', frere_soeur:'Frère / sœur', autre:'Autre membre de la famille / du groupe' };
+var CFM_TUTEUR = { pere:'Père', mere:'Mère', tuteur_legal:'Tuteur légal (décision de justice)', autre:'Autre représentant légal' };
+var CFM_JUSTIF = { acte_naissance:'Acte de naissance du mineur', jugement_tutelle:'Jugement de tutelle', jugement_delegation:'Décision de délégation d’autorité', autre:'Autre justificatif' };
+APP._cfmCo = APP._cfmCo || [];
+
+function cfmOpts(map, sel) {
+  return Object.keys(map).map(function (k) { return '<option value="' + k + '"' + (sel === k ? ' selected' : '') + '>' + map[k] + '</option>'; }).join('');
+}
+function cfmDateMajorite(ddn, age) {
+  var p = String(ddn || '').split('-'); if (p.length < 3 || !(age > 0)) return '';
+  return (parseInt(p[0], 10) + age) + '-' + p[1] + '-' + p[2];
+}
+function cfmAge() { var el = document.getElementById('c-min-age-maj'); var v = el ? parseInt(el.value, 10) : NaN; return (v >= 16 && v <= 25) ? v : 21; }
+function cfmDateFr(iso) { var p = String(iso || '').split('-'); return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : (iso || '—'); }
+
+/* ── Co-souscripteurs ── */
+function cfmCosousRender() {
+  var box = document.getElementById('c-cosous-liste'); if (!box) return;
+  box.innerHTML = APP._cfmCo.map(function (x, i) {
+    var n = i + 1, E = escHtml, f = function (k, lib, type, extra) {
+      return '<div class="form-group"><label>' + lib + '</label><input type="' + (type || 'text') + '" class="form-control" value="' + E(x[k] || '') + '" aria-label="' + lib + ' du co-souscripteur ' + n + '" oninput="cfmCosousChamp(' + i + ',\'' + k + '\',this.value)"' + (extra || '') + '></div>';
+    };
+    return '<div style="border:1px dashed var(--bord,#D1D5DB);border-radius:8px;padding:8px 10px;margin-bottom:8px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><strong style="font-size:12px;">Co-souscripteur ' + n + '</strong>'
+      + '<button type="button" class="btn btn-secondary btn-sm" onclick="cfmCosousSupprimer(' + i + ')" aria-label="Retirer le co-souscripteur ' + n + '">Retirer</button></div>'
+      + '<div class="form-grid">' + f('nom', 'Nom *') + f('prenoms', 'Prénoms *') + f('ddn', 'Date de naissance', 'date')
+      + '<div class="form-group"><label>Lien avec le souscripteur *</label><select class="form-control" aria-label="Lien du co-souscripteur ' + n + '" onchange="cfmCosousChamp(' + i + ',\'lien\',this.value)">' + cfmOpts(CFM_LIENS, x.lien || 'conjoint') + '</select></div>'
+      + f('tel', 'Téléphone', 'tel') + f('email', 'E-mail', 'email') + f('piece_type', 'Type de pièce') + f('piece_num', 'N° de pièce')
+      + f('part', 'Part de propriété (%)', 'number', ' min="0" max="100" step="0.01"')
+      + '</div></div>';
+  }).join('');
+  cfmPartsInfo();
+}
+function cfmCosousAjouter() { APP._cfmCo.push({ id: uid(), nom: '', prenoms: '', ddn: '', lien: 'conjoint', tel: '', email: '', piece_type: '', piece_num: '', part: '' }); cfmCosousRender(); }
+function cfmCosousSupprimer(i) { APP._cfmCo.splice(i, 1); cfmCosousRender(); }
+function cfmCosousChamp(i, k, v) { if (APP._cfmCo[i]) { APP._cfmCo[i][k] = v; if (k === 'part') cfmPartsInfo(); } }
+function cfmCosousPropres() {
+  return (APP._cfmCo || []).filter(function (x) { return (x.nom || '').trim() || (x.prenoms || '').trim(); }).map(function (x) {
+    var o = {}; Object.keys(x).forEach(function (k) { o[k] = typeof x[k] === 'string' ? x[k].trim() : x[k]; });
+    if (o.part !== '' && o.part != null) o.part = parseFloat(o.part) || 0; else o.part = null;
+    return o;
+  });
+}
+function cfmPartsInfo() {
+  var el = document.getElementById('c-cosous-parts'); if (!el) return;
+  var l = cfmCosousPropres();
+  if (!l.length) { el.textContent = ''; return; }
+  var somme = l.reduce(function (s, x) { return s + (x.part || 0); }, 0), saisies = l.filter(function (x) { return x.part != null; }).length;
+  if (!saisies) { el.textContent = (l.length + 1) + ' personnes au contrat ; parts non précisées (à fixer au contrat).'; el.style.color = ''; return; }
+  var reste = Math.round((100 - somme) * 100) / 100;
+  el.textContent = 'Parts des co-souscripteurs : ' + somme + ' % — part du souscripteur principal : ' + reste + ' %';
+  el.style.color = reste < 0 ? 'var(--rouge)' : '';
+}
+
+/* ── Mineur / tuteur ── */
+function cfmMineurToggle() {
+  var cb = document.getElementById('c-mineur-actif'), bloc = document.getElementById('c-mineur-bloc');
+  if (bloc) bloc.style.display = (cb && cb.checked) ? '' : 'none';
+  cfmMineurInfo();
+}
+function cfmMineurInfo() {
+  var el = document.getElementById('c-min-info'); if (!el) return;
+  var ddn = (document.getElementById('c-min-ddn') || {}).value, age = cfmAge();
+  if (!ddn) { el.textContent = ''; return; }
+  var maj = cfmDateMajorite(ddn, age);
+  if (maj && maj <= today()) { el.style.color = 'var(--rouge)'; el.textContent = 'Ce bénéficiaire a atteint l’âge de la majorité fixé (' + age + ' ans) le ' + cfmDateFr(maj) + ' : ce n’est plus une souscription pour mineur.'; return; }
+  el.style.color = ''; el.textContent = 'Mineur(e) jusqu’au ' + cfmDateFr(maj) + ' (majorité civile fixée à ' + age + ' ans — à faire confirmer par votre notaire).';
+}
+function cfmReset() {
+  APP._cfmCo = []; cfmCosousRender();
+  var cb = document.getElementById('c-mineur-actif'); if (cb) cb.checked = false;
+  ['c-min-nom', 'c-min-prenoms', 'c-min-ddn', 'c-min-lieu', 'c-min-piece-num', 'c-tut-justif-num'].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+  var s = document.getElementById('c-min-piece-type'); if (s) s.value = 'acte_naissance';
+  var t = document.getElementById('c-tut-lien'); if (t) t.value = 'pere';
+  var j = document.getElementById('c-tut-justif-type'); if (j) j.value = 'acte_naissance';
+  var a = document.getElementById('c-min-age-maj'); if (a) a.value = '21';
+  cfmMineurToggle();
+}
+function cfmRemplir(c) {
+  APP._cfmCo = JSON.parse(JSON.stringify((c && c.co_souscripteurs) || [])); cfmCosousRender();
+  var m = c && c.mineur, cb = document.getElementById('c-mineur-actif'); if (cb) cb.checked = !!m;
+  var set = function (id, v) { var e = document.getElementById(id); if (e) e.value = v == null ? '' : v; };
+  if (m) {
+    set('c-min-nom', m.nom); set('c-min-prenoms', m.prenoms); set('c-min-ddn', m.ddn); set('c-min-lieu', m.lieu_naissance);
+    set('c-min-piece-type', m.piece_type || 'acte_naissance'); set('c-min-piece-num', m.piece_num);
+    set('c-tut-lien', m.tuteur_lien || 'pere'); set('c-tut-justif-type', m.tuteur_justificatif || 'acte_naissance'); set('c-tut-justif-num', m.tuteur_justificatif_num);
+    set('c-min-age-maj', m.age_majorite || 21);
+  }
+  cfmMineurToggle();
+}
+function cfmLireMineur() {
+  var cb = document.getElementById('c-mineur-actif'); if (!cb || !cb.checked) return null;
+  var g = function (id) { return String((document.getElementById(id) || {}).value || '').trim(); }, age = cfmAge(), ddn = g('c-min-ddn');
+  return { nom: g('c-min-nom'), prenoms: g('c-min-prenoms'), ddn: ddn, lieu_naissance: g('c-min-lieu'), piece_type: g('c-min-piece-type'), piece_num: g('c-min-piece-num'),
+    age_majorite: age, date_majorite: cfmDateMajorite(ddn, age),
+    tuteur_lien: g('c-tut-lien'), tuteur_justificatif: g('c-tut-justif-type'), tuteur_justificatif_num: g('c-tut-justif-num') };
+}
+function cfmValider() {
+  var co = cfmCosousPropres(), i, x;
+  for (i = 0; i < co.length; i++) {
+    x = co[i];
+    if (!x.nom || !x.prenoms) return 'Co-souscripteur ' + (i + 1) + ' : le nom et les prénoms sont obligatoires.';
+    if (x.ddn && x.ddn > today()) return 'Co-souscripteur ' + (i + 1) + ' : la date de naissance est dans le futur.';
+    if (x.part != null && (x.part < 0 || x.part > 100)) return 'Co-souscripteur ' + (i + 1) + ' : la part doit être comprise entre 0 et 100 %.';
+  }
+  var somme = co.reduce(function (s, y) { return s + (y.part || 0); }, 0);
+  if (somme > 100.0001) return 'La somme des parts des co-souscripteurs dépasse 100 % (' + somme + ' %).';
+  var m = cfmLireMineur();
+  if (m) {
+    if (!m.nom || !m.prenoms) return 'Mineur : le nom et les prénoms du bénéficiaire sont obligatoires.';
+    if (!m.ddn) return 'Mineur : la date de naissance du bénéficiaire est obligatoire (elle sert à calculer la majorité).';
+    if (m.ddn > today()) return 'Mineur : la date de naissance est dans le futur.';
+    if (m.date_majorite && m.date_majorite <= today()) return 'Mineur : ce bénéficiaire a atteint l’âge de la majorité fixé (' + m.age_majorite + ' ans). Décochez « souscription pour un mineur » ou corrigez la date.';
+    if (!m.tuteur_lien) return 'Mineur : indiquez le lien du souscripteur avec le mineur (père, mère, tuteur…).';
+    if (!m.tuteur_justificatif) return 'Mineur : indiquez le justificatif de la qualité de représentant légal.';
+  }
+  return '';
+}
+
+/* ── Affichage, recherche, alertes ── */
+function cfmBadges(c) {
+  var h = '', n = (c.co_souscripteurs || []).length;
+  if (c.mineur) h += ' <span class="badge badge-bleu" title="Souscription au bénéfice d’un mineur">🧒 Mineur</span>';
+  if (n) h += ' <span class="badge badge-or" title="Souscription de famille / groupe : ' + n + ' co-souscripteur(s)">👨‍👩‍👧 +' + n + '</span>';
+  return h;
+}
+function cfmTexteRecherche(c) {
+  var t = (c.co_souscripteurs || []).map(function (x) { return (x.nom || '') + ' ' + (x.prenoms || ''); }).join(' ');
+  if (c.mineur) t += ' ' + (c.mineur.nom || '') + ' ' + (c.mineur.prenoms || '');
+  return t;
+}
+function cfmAlerteMajorite() {
+  var lim = new Date(); lim.setFullYear(lim.getFullYear() + 1); var limIso = lim.toISOString().split('T')[0];
+  var l = (DATA.clients || []).filter(function (c) { return c.mineur && c.mineur.date_majorite && (c.statut || 'actif') === 'actif' && c.mineur.date_majorite <= limIso; })
+    .sort(function (a, b) { return a.mineur.date_majorite.localeCompare(b.mineur.date_majorite); });
+  if (!l.length) return '';
+  return '<div class="alert alert-warning" style="margin-bottom:12px;"><strong>🧒 ' + l.length + ' bénéficiaire(s) mineur(s) atteignent la majorité dans les 12 mois :</strong><ul style="margin:6px 0 0 18px;">'
+    + l.map(function (c) {
+      var dep = c.mineur.date_majorite <= today();
+      return '<li>' + escHtml(((c.mineur.prenoms || '') + ' ' + (c.mineur.nom || '')).trim()) + ' — dossier ' + escHtml(c.dossier || '') + ' — ' + (dep ? 'majorité atteinte le ' : 'majeur(e) le ') + cfmDateFr(c.mineur.date_majorite)
+        + ' (représentant : ' + escHtml(((c.prenoms || '') + ' ' + (c.nom || '')).trim()) + ')</li>';
+    }).join('') + '</ul><div style="font-size:11px;margin-top:4px;">À prévoir : régularisation du dossier au nom du bénéficiaire devenu majeur — voir votre notaire.</div></div>';
+}
+
+/* ── Documents (fiche de souscription, engagement, contrat) ── */
+function cfmNomComplet(o) { return ((o.prenoms ? o.prenoms + ' ' : '') + (o.nom || '')).trim(); }
+function cfmDocsHTML(d) {
+  var c = d.c, e = escHtml, h = '', m = c.mineur, co = c.co_souscripteurs || [];
+  var row = function (k, v) { return '<tr><th style="width:32%;">' + e(k) + '</th><td>' + e(v == null || v === '' ? '—' : String(v)) + '</td></tr>'; };
+  if (m) {
+    h += '<h3>2 bis. Souscription au bénéfice d’un mineur</h3><table>'
+      + row('Bénéficiaire (mineur)', cfmNomComplet(m)) + row('Date de naissance', m.ddn ? dateShort(m.ddn) : '') + row('Lieu de naissance', m.lieu_naissance)
+      + row('Pièce', ((CFM_JUSTIF[m.piece_type] || m.piece_type || '') + ' ' + (m.piece_num || '')).trim())
+      + row('Majorité civile (' + (m.age_majorite || 21) + ' ans)', m.date_majorite ? dateShort(m.date_majorite) : '')
+      + row('Représentant légal', d.nom + ' — ' + (CFM_TUTEUR[m.tuteur_lien] || m.tuteur_lien || ''))
+      + row('Justificatif de la qualité de représentant légal', ((CFM_JUSTIF[m.tuteur_justificatif] || m.tuteur_justificatif || '') + ' ' + (m.tuteur_justificatif_num || '')).trim())
+      + '</table><p style="font-size:11px;color:#555;">Le souscripteur ci-dessus agit en qualité de représentant légal du mineur, au nom et dans l’intérêt de qui le bien est acquis. Le justificatif de cette qualité est joint au dossier.</p>';
+  }
+  if (co.length) {
+    h += '<h3>2 ter. Co-souscripteurs (souscription de famille / groupe)</h3><table><thead><tr><th>Nom et prénoms</th><th>Lien</th><th>Naissance</th><th>Pièce</th><th>Téléphone</th><th>Part</th></tr></thead><tbody>'
+      + co.map(function (x) {
+        return '<tr><td>' + e(cfmNomComplet(x)) + '</td><td>' + e(CFM_LIENS[x.lien] || x.lien || '') + '</td><td>' + (x.ddn ? e(dateShort(x.ddn)) : '—') + '</td><td>' + e(((x.piece_type || '') + ' ' + (x.piece_num || '')).trim() || '—') + '</td><td>' + e(x.tel || '—') + '</td><td>' + (x.part != null ? e(x.part + ' %') : '—') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  return h;
+}
+function cfmSigLabel(c) { return c.mineur ? ('Le souscripteur, en qualité de représentant légal de ' + cfmNomComplet(c.mineur)) : 'Le souscripteur'; }
+function cfmSigExtra(c) {
+  return (c.co_souscripteurs || []).map(function (x) { return '<div><div class="etat-sign-line">' + escHtml(cfmNomComplet(x)) + ' — co-souscripteur<br>(lu et approuvé)</div></div>'; }).join('');
+}
+function cfmEngagementHTML(c) {
+  var t = '';
+  if (c.mineur) t += '<p style="font-size:12px;line-height:1.7;">Le présent engagement est pris par le souscripteur en sa qualité de ' + escHtml((CFM_TUTEUR[c.mineur.tuteur_lien] || 'représentant légal').toLowerCase()) + ', au nom et dans l’intérêt de <strong>' + escHtml(cfmNomComplet(c.mineur)) + '</strong>, né(e) le ' + (c.mineur.ddn ? escHtml(dateShort(c.mineur.ddn)) : '—') + '.</p>';
+  if ((c.co_souscripteurs || []).length) t += '<p style="font-size:12px;line-height:1.7;">Le présent engagement est souscrit conjointement avec : ' + c.co_souscripteurs.map(function (x) { return '<strong>' + escHtml(cfmNomComplet(x)) + '</strong>' + (x.part != null ? ' (' + escHtml(x.part + ' %') + ')' : ''); }).join(', ') + '.</p>';
+  return t;
+}
+function cfmContratHTML(c) {
+  var h = '', E = escHtml;
+  if (c.mineur) h += '<h4>BÉNÉFICIAIRE MINEUR — REPRÉSENTANT LÉGAL</h4><table><tr><td><strong>Bénéficiaire</strong></td><td>' + E(cfmNomComplet(c.mineur)) + ', né(e) le ' + (c.mineur.ddn ? E(dateShort(c.mineur.ddn)) : '—') + '</td></tr>'
+    + '<tr><td><strong>Représentant légal</strong></td><td>' + E(cfmNomComplet(c)) + ' — ' + E(CFM_TUTEUR[c.mineur.tuteur_lien] || '') + '</td></tr>'
+    + '<tr><td><strong>Justificatif</strong></td><td>' + E(((CFM_JUSTIF[c.mineur.tuteur_justificatif] || '') + ' ' + (c.mineur.tuteur_justificatif_num || '')).trim() || '—') + '</td></tr></table>';
+  if ((c.co_souscripteurs || []).length) h += '<h4>CO-SOUSCRIPTEURS</h4><table>' + c.co_souscripteurs.map(function (x) {
+    return '<tr><td><strong>' + E(cfmNomComplet(x)) + '</strong> (' + E(CFM_LIENS[x.lien] || '') + ')</td><td>' + E(((x.piece_type || '') + ' ' + (x.piece_num || '')).trim() || '—') + ' — ' + E(x.tel || '') + (x.part != null ? ' — part ' + E(x.part + ' %') : '') + '</td></tr>';
+  }).join('') + '</table>';
+  return h;
+}
+function cfmContratSig(c) {
+  return (c.co_souscripteurs || []).map(function (x) { return '<div class="sig-box">' + escHtml(cfmNomComplet(x)) + ' (co-souscripteur)<br><br><br></div>'; }).join('');
 }
 
 function exportClients() {
@@ -36690,7 +37348,7 @@ function showRecu(versement) {
   var html = '<div class="print-doc" style="font-family:Georgia,serif;">'
     + '<div class="print-header" style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #B87333;padding-bottom:16px;margin-bottom:20px;">'
     + '<div style="display:flex;align-items:center;gap:12px;">'
-    + (getLogoForPrint() ? '<img src="' + getLogoForPrint() + '" style="height:48px;object-fit:contain;"/>' : '')
+    + (getLogoForPrint() ? '<img alt="Logo de l’entreprise" src="' + getLogoForPrint() + '" style="height:48px;object-fit:contain;"/>' : '')
     + '<div><h2 style="color:#B87333;font-size:20px;">' + (params.societe || 'ImmoSuite ERP') + '</h2>'
     + '<p style="font-size:12px;color:#666;">' + (params.email || '') + ' | ' + (params.tel || '') + '</p></div></div>'
     + '<div style="text-align:right;"><h3 style="color:#B87333;">REÇU DE PAIEMENT</h3><p style="font-size:13px;">N° ' + (versement.ref || '—') + '</p></div>'
@@ -37043,7 +37701,7 @@ function renderModelePlans() {
   if (!plans.length) { box.innerHTML = '<span style="font-size:11px;color:var(--dim);">Aucun plan ajouté.</span>'; return; }
   box.innerHTML = plans.map(function(pl, i) {
     return '<div style="position:relative;width:90px;text-align:center;">'
-      + '<img src="' + pl.data + '" style="width:90px;height:70px;object-fit:cover;border:1px solid var(--bord);border-radius:6px;">'
+      + '<img alt="Plan du logement" src="' + pl.data + '" style="width:90px;height:70px;object-fit:cover;border:1px solid var(--bord);border-radius:6px;">'
       + '<input type="text" value="' + (pl.label || '').replace(/"/g,'&quot;') + '" oninput="APP._modelePlans[' + i + '].label=this.value" placeholder="Légende" style="width:90px;font-size:10px;margin-top:2px;padding:2px;border:1px solid var(--bord);border-radius:4px;">'
       + '<button onclick="APP._modelePlans.splice(' + i + ',1);renderModelePlans()" style="position:absolute;top:-6px;right:-6px;background:var(--rouge);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;">✕</button>'
       + '</div>';
@@ -37437,7 +38095,7 @@ function fillPlanForm(pl) {
   if (pl.fichier_nom) {
     document.getElementById('mrc-fichier-nom').textContent = pl.fichier_nom;
     if (pl.fichier_data && pl.fichier_type && pl.fichier_type.startsWith('image')) {
-      document.getElementById('mrc-fichier-preview').innerHTML = '<img src="' + pl.fichier_data + '" style="max-width:100%;max-height:200px;border-radius:8px;margin-top:8px;">';
+      document.getElementById('mrc-fichier-preview').innerHTML = '<img alt="Plan du logement" src="' + pl.fichier_data + '" style="max-width:100%;max-height:200px;border-radius:8px;margin-top:8px;">';
     } else if (pl.fichier_data) {
       document.getElementById('mrc-fichier-preview').innerHTML = '<a href="' + pl.fichier_data + '" target="_blank" style="font-size:12px;color:var(--bleu);">📄 Voir le document</a>';
     }
@@ -37468,7 +38126,7 @@ function handleMrcFichier(input) {
     APP._mrcFichierNom = file.name;
     APP._mrcFichierType = file.type;
     if (file.type.startsWith('image')) {
-      document.getElementById('mrc-fichier-preview').innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:200px;border-radius:8px;margin-top:8px;">';
+      document.getElementById('mrc-fichier-preview').innerHTML = '<img alt="Aperçu de l’image importée" src="' + e.target.result + '" style="max-width:100%;max-height:200px;border-radius:8px;margin-top:8px;">';
     } else {
       document.getElementById('mrc-fichier-preview').innerHTML = '<div style="font-size:12px;color:var(--vert);margin-top:6px;">✅ PDF prêt à enregistrer</div>';
     }
@@ -43557,7 +44215,7 @@ function genererConsolidation() {
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Comptes consolidés ' + annee + '</title><style>' + css + '</style></head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / PDF</button></div>'
-    + '<div class="hdr"><div style="display:flex;align-items:center;gap:10px;">' + (getLogoForPrint() ? '<img src="' + getLogoForPrint() + '" style="max-height:48px;max-width:130px;object-fit:contain;">' : '') + '<span><b>' + escHtml(p.societe || 'GROUPE') + '</b><br>Périmètre : ' + agr.length + ' entité(s) intégrée(s)</span></div>'
+    + '<div class="hdr"><div style="display:flex;align-items:center;gap:10px;">' + (getLogoForPrint() ? '<img alt="Logo de l’entreprise" src="' + getLogoForPrint() + '" style="max-height:48px;max-width:130px;object-fit:contain;">' : '') + '<span><b>' + escHtml(p.societe || 'GROUPE') + '</b><br>Périmètre : ' + agr.length + ' entité(s) intégrée(s)</span></div>'
     + '<div style="text-align:center;"><h1>COMPTES CONSOLIDÉS DU GROUPE</h1>'
     + '<div>SYSCOHADA révisé · Exercice clos le 31/12/' + annee + ' · Montants en FCFA</div></div>'
     + '<div style="text-align:right;font-size:8.5px;">Société mère :<br>' + escHtml(K.mere ? K.mere.nom : '—') + '</div></div>'
@@ -47323,6 +47981,7 @@ function printContrat(clientId) {
     + '<tr><td><strong>Email</strong></td><td>' + (client.email || 'N/A') + '</td></tr>'
     + '<tr><td><strong>Adresse</strong></td><td>' + (client.adresse || 'N/A') + '</td></tr>'
     + '<tr><td><strong>Pièce d\'identité</strong></td><td>' + (client.piece_type || '') + ' N°' + (client.piece_num || 'N/A') + '</td></tr></table>'
+    + cfmContratHTML(client)
     + '<h4>' + (estSolde ? 'BIEN VENDU (solde payé)' : 'BIEN RÉSERVÉ') + '</h4>'
     + '<table><tr><td><strong>Programme</strong></td><td>' + (prog ? prog.nom : 'N/A') + '</td></tr>'
     + '<tr><td><strong>Lot</strong></td><td>' + (lot ? 'Lot ' + lot.numero + (lot.ilot ? ', Îlot ' + lot.ilot : '') : 'N/A') + '</td></tr>'
@@ -47336,7 +47995,7 @@ function printContrat(clientId) {
     + '<tr><td><strong>Mensualité</strong></td><td>' + new Intl.NumberFormat('fr-FR').format(Math.ceil(((client.montant_total - (client.apport || 0)) / (client.duree || 60)))) + ' FCFA</td></tr>'
     + '<tr><td><strong>Date de souscription</strong></td><td>' + dateShort(client.date_souscription || client.date_debut) + '</td></tr>'
     + '<tr><td><strong>1ère mensualité</strong></td><td>' + dateShort(client.date_debut) + '</td></tr></table>'
-    + '<div class="signature"><div class="sig-box">Signature du Souscripteur<br><br><br></div>'
+    + '<div class="signature"><div class="sig-box">Signature du Souscripteur' + (client.mineur ? ' (représentant légal de ' + escHtml(cfmNomComplet(client.mineur)) + ')' : '') + '<br><br><br></div>' + cfmContratSig(client)
     + '<div class="sig-box">Pour ' + (params.societe || 'ImmoSuite ERP') + '<br><br><br></div></div>'
     + '</body></html>';
   win.document.write(html);
@@ -47527,7 +48186,7 @@ function docAjouterLogo(html) {
     if (tete.indexOf('doc-logo-auto') !== -1 || tete.indexOf(logo.slice(0, 80)) !== -1 || /<img[^>]+src=["']?(data:image|[^"'>\s]*logo)/i.test(tete)) return html;
     var titre = (/<title>([^<]*)/i.exec(html) || [])[1] || '';
     if (/badge|signature|étiquette|qr/i.test(titre)) return html;
-    return html.slice(0, pos) + '<div class="doc-logo-auto" style="text-align:left;margin:0 0 12px;"><img src="' + logo + '" alt="" style="height:56px;max-width:220px;object-fit:contain;"></div>' + html.slice(pos);
+    return html.slice(0, pos) + '<div class="doc-logo-auto" style="text-align:left;margin:0 0 12px;"><img src="' + logo + '" alt="Logo de l’entreprise" style="height:56px;max-width:220px;object-fit:contain;"></div>' + html.slice(pos);
   } catch (e) { return html; }
 }
 
@@ -47828,7 +48487,7 @@ function renderPortailHeroSlidesGrid() {
   if (!HERO_SLIDES_STATE.length) { grid.innerHTML = ''; return; }
   grid.innerHTML = HERO_SLIDES_STATE.map(function(s, i) {
     return '<div style="position:relative;border:1px solid #E0E0EA;border-radius:8px;overflow:hidden;background:#F5F5F8;">'
-      + '<img src="' + s.url + '" alt="" style="width:100%;height:80px;object-fit:cover;display:block;">'
+      + '<img src="' + s.url + '" alt="Image du site" style="width:100%;height:80px;object-fit:cover;display:block;">'
       + '<button type="button" onclick="heroSlideSupprimer(\'' + s.id + '\')" title="Retirer" style="position:absolute;top:3px;right:3px;background:#EF4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1;">✕</button>'
       + '<div style="display:flex;gap:2px;padding:3px;">'
       + '<button type="button" onclick="heroSlideDeplacer(\'' + s.id + '\',-1)" title="Déplacer avant" style="flex:1;font-size:10px;padding:2px;border:1px solid #E0E0EA;background:#fff;border-radius:4px;cursor:pointer;" ' + (i===0?'disabled':'') + '>◀</button>'
@@ -53947,7 +54606,7 @@ function imprimerContratTravail(empId) {
     + '@media print{.no-print{display:none;}body{padding:16px;}}</style>'
     + '</head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button></div>'
-    + '<div class="header">' + (logo ? '<img src="' + logo + '" style="height:48px;object-fit:contain;">' : '')
+    + '<div class="header">' + (logo ? '<img alt="Logo de l’entreprise" src="' + logo + '" style="height:48px;object-fit:contain;">' : '')
     + '<div style="text-align:center;flex:1;"><h1>' + typeLabel + '</h1>'
     + '<div style="font-size:11px;color:#6B6B9A;">Réf. : CTR-' + escHtml(e.matricule || '') + ' · Fait le ' + now + '</div></div>'
     + '<div style="text-align:right;font-size:11px;color:#6B6B9A;">' + escHtml(params.societe || 'ImmoSuite ERP') + '<br>' + (params.tel || '') + '</div></div>'
@@ -54024,7 +54683,7 @@ function genererAttestationTravail(empId) {
     + '@media print{.no-print{display:none;}body{padding:16px;}}</style>'
     + '</head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button></div>'
-    + '<div class="header">' + (logo ? '<img src="' + logo + '" style="height:48px;object-fit:contain;">' : '<div></div>')
+    + '<div class="header">' + (logo ? '<img alt="Logo de l’entreprise" src="' + logo + '" style="height:48px;object-fit:contain;">' : '<div></div>')
     + '<div style="text-align:right;font-size:11px;color:#6B6B9A;">' + escHtml(params.societe || 'ImmoSuite ERP') + '<br>' + (params.tel || '') + '<br>' + (params.adresse || '') + '</div></div>'
     + '<h1>Attestation de travail</h1>'
     + '<p style="margin-top:26px;">Je soussigné(e), représentant de <strong>' + escHtml(params.societe || 'l\'employeur') + '</strong>, atteste par la présente que :</p>'
@@ -54065,7 +54724,7 @@ function genererCertificatTravail(empId) {
     + '@media print{.no-print{display:none;}body{padding:16px;}}</style>'
     + '</head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button></div>'
-    + '<div class="header">' + (logo ? '<img src="' + logo + '" style="height:48px;object-fit:contain;">' : '<div></div>')
+    + '<div class="header">' + (logo ? '<img alt="Logo de l’entreprise" src="' + logo + '" style="height:48px;object-fit:contain;">' : '<div></div>')
     + '<div style="text-align:right;font-size:11px;color:#6B6B9A;">' + escHtml(params.societe || 'ImmoSuite ERP') + '<br>' + (params.tel || '') + '<br>' + (params.adresse || '') + '</div></div>'
     + '<h1>Certificat de travail</h1>'
     + '<p style="margin-top:26px;">Je soussigné(e), représentant de <strong>' + escHtml(params.societe || 'l\'employeur') + '</strong>, certifie que :</p>'
@@ -54156,7 +54815,7 @@ function genererSoldeToutCompte(empId) {
     + '@media print{.no-print{display:none;}body{padding:16px;}}</style>'
     + '</head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button></div>'
-    + '<div class="header">' + (logo ? '<img src="' + logo + '" style="height:48px;object-fit:contain;">' : '')
+    + '<div class="header">' + (logo ? '<img alt="Logo de l’entreprise" src="' + logo + '" style="height:48px;object-fit:contain;">' : '')
     + '<div style="text-align:center;flex:1;"><h1>REÇU POUR SOLDE DE TOUT COMPTE</h1>'
     + '<div style="font-size:11px;color:#6B6B9A;">Réf. : STC-' + escHtml(e.matricule || '') + ' · Fait le ' + now + '</div></div>'
     + '<div style="text-align:right;font-size:11px;color:#6B6B9A;">' + escHtml(params.societe || 'ImmoSuite ERP') + '<br>' + (params.tel || '') + '</div></div>'
@@ -54359,7 +55018,7 @@ function renderDivisions() {
   tbody.innerHTML = DATA.divisions.map(function(d) {
     var effectif = DATA.employes.filter(function(e) { return e.division === d.id; }).length;
     var logoCell = d.logo
-      ? '<img src="' + d.logo + '" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:6px;border:1px solid var(--bord);">'
+      ? '<img src="' + d.logo + '" alt="Logo de l’entreprise" style="width:32px;height:32px;object-fit:contain;border-radius:6px;border:1px solid var(--bord);">'
       : '<span style="color:var(--blanc-dim);font-size:11px;">—</span>';
     return '<tr>'
       + '<td>' + logoCell + '</td>'
@@ -55033,7 +55692,7 @@ function genererDossierMutation(mobId) {
     + '.no-print{text-align:center;margin-bottom:16px;} .no-print button{padding:9px 20px;background:#B87333;color:#fff;border:none;border-radius:6px;cursor:pointer;}'
     + '@media print{.no-print{display:none;}body{padding:14px;} .doc{page-break-after:always;}}';
   function head(titre, ref){
-    return '<div class="header">'+(logo?'<img src="'+logo+'" style="height:46px;object-fit:contain;">':'')
+    return '<div class="header">'+(logo?'<img alt="Logo de l’entreprise" src="'+logo+'" style="height:46px;object-fit:contain;">':'')
       + '<div style="text-align:center;flex:1;"><h1>'+titre+'</h1><div style="font-size:11px;color:#6B6B9A;">'+ref+' · Fait à '+escHtml(params.ville||'Abidjan')+', le '+now+'</div></div>'
       + '<div style="text-align:right;font-size:11px;color:#6B6B9A;">'+escHtml(params.societe||'')+'<br>'+escHtml(params.tel||'')+'</div></div>';
   }
@@ -55131,7 +55790,7 @@ function imprimerDecisionMutation(id) {
     + '@media print{.no-print{display:none;}body{padding:16px;}}</style>'
     + '</head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button></div>'
-    + '<div class="header">' + (logo ? '<img src="' + logo + '" style="height:48px;object-fit:contain;">' : '')
+    + '<div class="header">' + (logo ? '<img alt="Logo de l’entreprise" src="' + logo + '" style="height:48px;object-fit:contain;">' : '')
     + '<div style="text-align:center;flex:1;"><h1>' + titre + '</h1>'
     + '<div style="font-size:11px;color:#6B6B9A;">Réf. : ' + escHtml(m.ref_decision || ('MOB-' + escHtml(m.employe_matricule||''))) + ' · Fait le ' + now + '</div></div>'
     + '<div style="text-align:right;font-size:11px;color:#6B6B9A;">' + escHtml(params.societe || 'ImmoSuite ERP') + '<br>' + (params.tel || '') + '</div></div>'
@@ -56920,7 +57579,7 @@ function printBulletinData(d) {
     + '@media print{body{padding:4mm;}}'
     + '</style></head><body>');
   /* En-tête */
-  var logoImg = logoSoc ? '<img src="'+logoSoc+'" style="max-height:95px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;">' : '';
+  var logoImg = logoSoc ? '<img alt="Logo de l’entreprise" src="'+logoSoc+'" style="max-height:95px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;">' : '';
   var idsLegales = [rccmSoc ? 'RCCM '+rccmSoc : '', nccSoc ? 'NCC '+nccSoc : ''].filter(Boolean).join(' — ');
   win.document.write('<div class="hd"><div class="soc">'+logoImg+'<b>'+societe+'</b><br>'
     + adresseSoc+'<br>'
@@ -57896,7 +58555,7 @@ function printLivrePaie() {
     + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}'
     + '</style></head><body>'
     + '<div class="header-print">'
-    + '<div>' + (logoLP ? '<img src="' + logoLP + '" style="max-height:90px;max-width:210px;object-fit:contain;margin-bottom:6px;display:block;">' : '') + '<div class="company-name">' + ste + '</div>'
+    + '<div>' + (logoLP ? '<img alt="Logo de l’entreprise" src="' + logoLP + '" style="max-height:90px;max-width:210px;object-fit:contain;margin-bottom:6px;display:block;">' : '') + '<div class="company-name">' + ste + '</div>'
     + '<div style="font-size:10px;color:#555;">' + adresseLP + ' — CNPS ' + cnpsLP + (idsLegalesLP ? ' — ' + idsLegalesLP : '') + '</div></div>'
     + '<div style="text-align:right;">'
     + '<div class="doc-title">' + titreLP + '</div>'
@@ -62372,7 +63031,7 @@ function bpImprimer() {
     + '.no-print{text-align:center;margin-bottom:14px;}.no-print button{padding:8px 18px;background:#B87333;color:#fff;border:none;border-radius:6px;cursor:pointer;}'
     + '@media print{.no-print{display:none;}body{padding:0;}}</style></head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / PDF</button></div>'
-    + '<div class="header"><div style="display:flex;gap:10px;align-items:center;">' + (logo?'<img src="'+logo+'" style="height:44px;">':'')
+    + '<div class="header"><div style="display:flex;gap:10px;align-items:center;">' + (logo?'<img alt="Logo de l’entreprise" src="'+logo+'" style="height:44px;">':'')
     + '<div><div style="font-size:16px;font-weight:800;color:#B87333;">' + escHtml(params.societe||'') + '</div><div style="font-size:10px;color:#6B6B9A;">Bilan de promotion immobilière</div></div></div>'
     + '<div style="text-align:right;"><div style="font-weight:800;font-size:14px;">' + escHtml(b.prog.nom||'') + '</div><div style="font-size:10px;color:#6B6B9A;">Édité le ' + new Date().toLocaleDateString('fr-FR') + '</div></div></div>'
     + '<h2>PRODUITS</h2><table>'
@@ -65341,7 +66000,7 @@ function imprimerContratApporteur(id) {
     +'.sign{margin-top:60px;display:grid;grid-template-columns:1fr 1fr;gap:40px;}'
     +'.sign-box{border-top:1px solid #1C1C2E;padding-top:8px;font-size:11px;} @media print{body{padding:16px;}}</style>'
     +'</head><body>'
-    +'<div class="header">'+(logo?'<img src="'+logo+'" style="height:48px;object-fit:contain;">':'')
+    +'<div class="header">'+(logo?'<img alt="Logo de l’entreprise" src="'+logo+'" style="height:48px;object-fit:contain;">':'')
     +'<div style="text-align:center;flex:1;"><h1>CONTRAT D\'APPORTEUR D\'AFFAIRE</h1>'
     +'<div style="font-size:11px;color:#6B6B9A;">Réf. : CONT-AP-'+(id?id.slice(-6).toUpperCase():'PROVISOIRE')+' · Fait le '+now+'</div></div>'
     +'<div style="text-align:right;font-size:11px;color:#6B6B9A;">'+escHtml(params.societe||'ImmoSuite ERP')+'<br>'+(params.tel||'')+'</div></div>'
@@ -65385,7 +66044,7 @@ function imprimerNonContournement(id) {
     +'.sign{margin-top:50px;display:grid;grid-template-columns:1fr 1fr;gap:40px;}'
     +'.sign-box{border-top:1px solid #1C1C2E;padding-top:8px;font-size:11px;} @media print{body{padding:16px;}}</style>'
     +'</head><body>'
-    +'<div class="header">'+(logo?'<img src="'+logo+'" style="height:44px;object-fit:contain;">':'')
+    +'<div class="header">'+(logo?'<img alt="Logo de l’entreprise" src="'+logo+'" style="height:44px;object-fit:contain;">':'')
     +'<div style="text-align:center;flex:1;"><h1>ACCORD DE CONFIDENTIALITÉ<br>ET DE NON-CONTOURNEMENT</h1>'
     +'<div style="font-size:10px;color:#6B6B9A;">Réf. : NC-'+(id?id.slice(-6).toUpperCase():'PROVISOIRE')+' · Fait le '+now+'</div></div>'
     +'<div style="text-align:right;font-size:10px;color:#6B6B9A;">'+escHtml(params.societe||'')+'<br>'+(params.tel||'')+'</div></div>'
@@ -66008,7 +66667,7 @@ function printRapportCommercial() {
     +'.kpi-v{font-size:16px;font-weight:700;color:#B87333;}.kpi-l{font-size:9px;color:#6B6B9A;text-transform:uppercase;}'
     +'@media print{body{padding:12px;}}</style></head><body>'
     +'<div class="header">'
-    +(logo?'<img src="'+logo+'" style="height:44px;object-fit:contain;margin-right:12px;">':'')
+    +(logo?'<img alt="Logo de l’entreprise" src="'+logo+'" style="height:44px;object-fit:contain;margin-right:12px;">':'')
     +'<div><h1>'+escHtml(params.societe||'ImmoSuite ERP')+'</h1><h3>RAPPORT COMMERCIAL — '+pLabels[periode]+'</h3>'
     +'<div style="font-size:11px;color:#6B6B9A;">Généré le '+now+'</div></div>'
     +'<div style="text-align:right;font-size:11px;color:#6B6B9A;">'+(params.tel||'')+'<br>'+(params.email||'')+'</div>'
@@ -68788,7 +69447,7 @@ function _faVoirDocument(factureId, idx) {
   if (!f || !f.documents[idx]) return;
   var d = f.documents[idx];
   var win = window.open('');
-  if (d.mime.indexOf('image') === 0) win.document.write('<img src="' + d.data + '" style="max-width:100%;">');
+  if (d.mime.indexOf('image') === 0) win.document.write('<img alt="Document (image)" src="' + d.data + '" style="max-width:100%;">');
   else win.document.write('<iframe src="' + d.data + '" style="width:100%;height:100vh;border:none;"></iframe>');
 }
 window._faVoirDocument = _faVoirDocument;
@@ -72002,7 +72661,7 @@ function lbRenderPhotosGrid(){
   if(!_lbPhotos.length){ el.innerHTML='<div style="grid-column:1/-1;color:var(--dim);font-size:12px;">Aucune photo pour le moment.</div>'; return; }
   el.innerHTML=_lbPhotos.map(function(p){
     return '<div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;border:1px solid var(--bord);">'
-      +'<img src="'+(p.data||p.url)+'" style="width:100%;height:100%;object-fit:cover;">'
+      +'<img alt="Photo" src="'+(p.data||p.url)+'" style="width:100%;height:100%;object-fit:cover;">'
       +'<button class="btn btn-danger btn-sm btn-icon" style="position:absolute;top:4px;right:4px;padding:2px 6px;" onclick="lbSupprimerPhoto(\''+p.id+'\')" title="Supprimer">🗑️</button>'
       +'</div>';
   }).join('');
@@ -72584,7 +73243,7 @@ function locRenderBaux(){
       return '<tr><td><strong>'+escHtml(b.ref)+'</strong></td><td>'+escHtml(_locNom(b))+'</td>'
         +'<td style="font-size:11px;">'+(propNom?escHtml(propNom):'<span style="color:var(--dim);">Propre</span>')+'</td>'
         +'<td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
-        +((b.photos&&b.photos.length)?'<img src="'+b.photos[0].data+'" style="width:22px;height:22px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:5px;">':'')
+        +((b.photos&&b.photos.length)?'<img alt="Photo du bien" src="'+b.photos[0].data+'" style="width:22px;height:22px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:5px;">':'')
         +escHtml(b.bien||'')+((b.photos&&b.photos.length)?' <span style="color:var(--dim);">('+b.photos.length+'📸)</span>':'')
         +((b.lat!=null&&b.lng!=null)?' <a href="'+_lbMapsUrl(b.lat,b.lng)+'" target="_blank" rel="noopener" title="Voir sur Google Maps">🗺️</a>':'')+'</td>'
         +'<td style="font-size:11px;">'+(b.meuble==='meuble'?'🛋️ Meublé':'Non meublé')+'</td>'
@@ -76309,7 +76968,7 @@ function imprimerTdbChantiers() {
     + '.no-print{text-align:center;margin-bottom:10px;} .no-print button{padding:8px 18px;background:#B87333;color:#fff;border:none;border-radius:5px;cursor:pointer;}'
     + '@media print{.no-print{display:none;}}</style></head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer</button></div>'
-    + '<div style="display:flex;justify-content:space-between;align-items:center;">' + (getLogoForPrint() ? '<img src="' + getLogoForPrint() + '" style="max-height:50px;max-width:150px;object-fit:contain;">' : '<span></span>') + '<div style="text-align:right;font-size:9.5px;">' + E(p.societe || '') + ' · ' + new Date().toLocaleDateString('fr-FR') + '</div></div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;">' + (getLogoForPrint() ? '<img alt="Logo de l’entreprise" src="' + getLogoForPrint() + '" style="max-height:50px;max-width:150px;object-fit:contain;">' : '<span></span>') + '<div style="text-align:right;font-size:9.5px;">' + E(p.societe || '') + ' · ' + new Date().toLocaleDateString('fr-FR') + '</div></div>'
     + '<h1>ÉTAT D\'AVANCEMENT DES CHANTIERS</h1>'
     + '<table><thead><tr><th>Marché</th><th>Entreprise</th><th class="num">Montant HT</th><th class="num">Facturé</th>'
     + '<th class="num">Av. fact.</th><th class="num">Av. constaté</th><th class="num">Écart</th>'
@@ -77482,13 +78141,13 @@ function pmRender(){
     var srcPhoto = m.data || m.url;
     var srcVideo = m.data || m.url;
     if (m.type==='produit') thumb = (m.data||m.url)
-      ? '<img src="'+escHtml(m.data||m.url)+'" style="width:100%;height:120px;object-fit:cover;border-radius:8px;">'
+      ? '<img alt="Photo" src="'+escHtml(m.data||m.url)+'" style="width:100%;height:120px;object-fit:cover;border-radius:8px;">'
       : '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:#ecfdf5;border-radius:8px;font-size:36px;">🛒</div>';
     else if (m.type==='photo') thumb = srcPhoto
-      ? '<img src="'+escHtml(srcPhoto)+'" style="width:100%;height:120px;object-fit:cover;border-radius:8px;">'
+      ? '<img alt="Photo" src="'+escHtml(srcPhoto)+'" style="width:100%;height:120px;object-fit:cover;border-radius:8px;">'
       : '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:#F1F5F9;border-radius:8px;font-size:36px;">🖼️</div>';
     else if (m.type==='video') thumb = (m.provider==='youtube' && m.video_id)
-      ? '<div style="position:relative;"><img src="https://img.youtube.com/vi/'+escHtml(m.video_id)+'/hqdefault.jpg" style="width:100%;height:120px;object-fit:cover;border-radius:8px;"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px;text-shadow:0 2px 8px rgba(0,0,0,.6);">▶️</div></div>'
+      ? '<div style="position:relative;"><img alt="Miniature de la vidéo" src="https://img.youtube.com/vi/'+escHtml(m.video_id)+'/hqdefault.jpg" style="width:100%;height:120px;object-fit:cover;border-radius:8px;"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px;text-shadow:0 2px 8px rgba(0,0,0,.6);">▶️</div></div>'
       : (m.provider==='upload' && srcVideo)
         ? '<video src="'+escHtml(srcVideo)+'" controls preload="metadata" style="width:100%;height:120px;object-fit:cover;border-radius:8px;background:#0f172a;"></video>'
         : '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:#0f172a;border-radius:8px;font-size:36px;">🎬</div>';
@@ -85648,7 +86307,7 @@ function printRapportId(id){
   var ec=r.avancement-(r.avancement_prevu||r.avancement);
   /* [AUDIT FIX v17] Photos dans impression — récupérée lors de la fusion des deux
      versions dupliquées de printRapportId (2026-06-30) */
-  var photosHtml='';if(r.photos&&r.photos.length){photosHtml='<h3>\u{1F4F8} Photos de chantier ('+r.photos.length+')</h3><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0;">'+(r.photos.slice(0,9).map(function(p){return'<div style="text-align:center;"><img src="'+(p.data||p.url)+'" style="width:100%;max-height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd;"><div style="font-size:10px;color:#666;margin-top:2px;">'+p.legende+'</div></div>';}).join(''))+'</div>';}
+  var photosHtml='';if(r.photos&&r.photos.length){photosHtml='<h3>\u{1F4F8} Photos de chantier ('+r.photos.length+')</h3><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0;">'+(r.photos.slice(0,9).map(function(p){return'<div style="text-align:center;"><img alt="Photo" src="'+(p.data||p.url)+'" style="width:100%;max-height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd;"><div style="font-size:10px;color:#666;margin-top:2px;">'+p.legende+'</div></div>';}).join(''))+'</div>';}
   var win=window.open('','','width=850,height=750');
   win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapport '+r.numero+'</title><style>body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#222;}h1{color:#1A6B3A;border-bottom:3px solid #1A6B3A;padding-bottom:8px;}h3{color:#444;margin:18px 0 8px;border-bottom:1px solid #eee;padding-bottom:5px;}table{border-collapse:collapse;width:100%;margin:8px 0;}td,th{border:1px solid #ccc;padding:7px 12px;}th{background:#E8F4EE;text-align:left;}.kpi{display:inline-block;background:#F3F4EF;border:1px solid #D4D9D1;border-radius:8px;padding:12px 20px;margin:6px;text-align:center;min-width:100px;}.kv{font-size:22px;font-weight:bold;color:#1A6B3A;}.kl{font-size:11px;color:#8A9E92;margin-top:3px;}.travaux{background:#F8F9F5;border:1px solid #D4D9D1;border-radius:4px;padding:12px;white-space:pre-line;font-size:12px;}.diff{background:#FDECEA;border-left:4px solid #C93535;padding:10px;border-radius:4px;}.sig{display:flex;justify-content:space-between;margin-top:50px;}.sb{border-top:1px solid #999;width:40%;padding-top:8px;font-size:12px;color:#666;}</style></head><body>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><div><strong style="font-size:18px;color:#1A6B3A;">'+societe+'</strong><br><span style="font-size:11px;color:#888;">Promoteur immobilier — Côte d\'Ivoire</span></div><div style="text-align:right;font-size:12px;"><strong>RAPPORT DE CHANTIER N° '+r.numero+'</strong></div></div>'
@@ -88377,7 +89036,7 @@ function imprimerAnalyse360() {
   var win = window.open('', '_blank');
   win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Analyse 360° — '+soc+'</title>'
     +'<style>body{font-family:Arial,sans-serif;padding:32px;font-size:13px;color:#1C1C2E;}h1{color:#7C3AED;border-bottom:2px solid #7C3AED;padding-bottom:8px;}h2{color:#2563EB;margin-top:22px;font-size:15px;}table{border-collapse:collapse;width:100%;margin:8px 0;}td,th{border:1px solid #ccc;padding:6px 10px;text-align:left;vertical-align:top;}th{background:#F3F0FF;}ul{margin:4px 0;}</style></head><body>'
-    +(getLogoForPrint()?'<div style="margin-bottom:8px;"><img src="'+getLogoForPrint()+'" style="max-height:54px;max-width:160px;object-fit:contain;"></div>':'')
+    +(getLogoForPrint()?'<div style="margin-bottom:8px;"><img alt="Logo de l’entreprise" src="'+getLogoForPrint()+'" style="max-height:54px;max-width:160px;object-fit:contain;"></div>':'')
     +'<h1>Analyse 360° — Diagnostic & Plan d\'action</h1>'
     +'<p>'+soc+' · Édité le '+now+'</p>'
     +'<h2>Indicateurs clés</h2><table>'
@@ -88530,7 +89189,7 @@ async function imprimerBadgeEmploye(empId) {
     + '@media print{.no-print{display:none;}body{padding:0;}}</style></head><body>'
     + '<div><div class="no-print"><button onclick="window.print()">🖨️ Imprimer badge</button></div>'
     + '<div class="badge">'
-    + '<div class="badge-top">' + (logo?'<img src="'+logo+'">':'') + '<div><div style="font-weight:800;font-size:15px;">' + escHtml(params.societe || 'ImmoSuite ERP') + '</div><div style="font-size:10px;opacity:0.85;">BADGE PERSONNEL</div></div></div>'
+    + '<div class="badge-top">' + (logo?'<img alt="Logo de l’entreprise" src="'+logo+'">':'') + '<div><div style="font-weight:800;font-size:15px;">' + escHtml(params.societe || 'ImmoSuite ERP') + '</div><div style="font-size:10px;opacity:0.85;">BADGE PERSONNEL</div></div></div>'
     + '<div class="badge-body">'
     + '<div class="badge-photo">' + ((e.prenoms||'?')[0] || '?').toUpperCase() + ((e.nom||'?')[0]||'').toUpperCase() + '</div>'
     + '<div class="badge-nom">' + nomComplet + '</div>'
@@ -88960,7 +89619,7 @@ function quinzGenererBulletin(id) {
     + '.no-print{text-align:center;margin-bottom:14px;} .no-print button{padding:8px 18px;background:#B87333;color:#fff;border:none;border-radius:6px;cursor:pointer;}'
     + '@media print{.no-print{display:none;}body{padding:0;}}</style></head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / PDF</button></div>'
-    + '<div class="header">' + (logo?'<img src="'+logo+'" style="height:44px;">':'') + '<div style="text-align:center;flex:1;"><div style="font-size:14px;font-weight:800;color:#B87333;">' + escHtml(params.societe||'ImmoSuite ERP') + '</div><div style="font-size:10px;color:#6B6B9A;">' + escHtml(params.adresse||'') + '</div></div>'
+    + '<div class="header">' + (logo?'<img alt="Logo de l’entreprise" src="'+logo+'" style="height:44px;">':'') + '<div style="text-align:center;flex:1;"><div style="font-size:14px;font-weight:800;color:#B87333;">' + escHtml(params.societe||'ImmoSuite ERP') + '</div><div style="font-size:10px;color:#6B6B9A;">' + escHtml(params.adresse||'') + '</div></div>'
     + '<div style="text-align:right;font-size:10px;"><div style="font-size:12px;font-weight:800;color:#d97706;">FICHE PAIE QUINZAINE</div><div>' + pLabel + '</div><div style="font-weight:700;">' + moisLbl + '</div></div></div>'
     + '<div class="title">' + escHtml(prenoms + ' ' + nom) + ' — ' + escHtml(nature) + ' (' + (type==='temporaire'?'Temporaire CDD':'Journalier') + ')</div>'
     + '<table><tr><th>Taux horaire</th><th>Heures normales</th><th>H. suppl.</th><th>Brut imposable</th></tr>'
@@ -89595,7 +90254,7 @@ function imprimerOrdreMission(id) {
     + '@media print{.no-print{display:none;}body{padding:16px;}}</style>'
     + '</head><body>'
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button></div>'
-    + '<div class="header">' + (logo ? '<img src="' + logo + '" style="height:95px;max-width:220px;object-fit:contain;">' : '')
+    + '<div class="header">' + (logo ? '<img alt="Logo de l’entreprise" src="' + logo + '" style="height:95px;max-width:220px;object-fit:contain;">' : '')
     + '<div style="text-align:center;flex:1;"><h1>ORDRE DE MISSION</h1>'
     + '<div style="font-size:11px;color:#6B6B9A;">Réf. : ' + escHtml(o.numero) + ' · Fait le ' + now + '</div></div>'
     + '<div style="text-align:right;font-size:11px;color:#6B6B9A;">' + escHtml(params.societe || 'ImmoSuite ERP') + '<br>' + (params.tel || '') + '</div></div>'
@@ -90066,7 +90725,7 @@ function genererCahierCharges(opts) {
   var plansHTML = plans.length
     ? plans.map(function(pl){
         return '<div class="cdc-plan"><div class="cdc-plan-t">' + escHtml(pl.label || 'Plan') + '</div>'
-          + '<img src="' + pl.data + '" style="max-width:100%;max-height:430px;object-fit:contain;border:1px solid #ddd;border-radius:6px;"></div>';
+          + '<img alt="Plan du logement" src="' + pl.data + '" style="max-width:100%;max-height:430px;object-fit:contain;border:1px solid #ddd;border-radius:6px;"></div>';
       }).join('')
     : '<div style="font-size:11px;color:#999;font-style:italic;">Aucun plan attaché. Ajoutez les vues (plan architectural, fondation, toiture, coupes, façades, électricité, plomberie, fosse septique, 3D) sur le modèle de logement.</div>';
 
@@ -90410,6 +91069,7 @@ function _docsFicheSouscriptionHTML(d) {
   } else {
     h += '<p style="color:#555;">Sans objet — situation matrimoniale : ' + e(matLbl) + '.</p>';
   }
+  h += cfmDocsHTML(d);
   h += '<h3>3. Logement choisi</h3><table>'
     + row('Programme', d.prog ? d.prog.nom : '') + row('Logement / lot(s)', d.logement)
     + row('Type de logement', c.type_logement) + row('Standing', d.standing)
@@ -90428,7 +91088,7 @@ function _docsFicheSouscriptionHTML(d) {
         ? '<div style="font-weight:700;margin-top:8px;">Cahier des charges du programme « ' + escHtml(d.prog.nom || '') + ' »</div>' + _cdcPara(String(d.prog.rappel_cgv).trim())
         : '')
     + '</div>';
-  h += '<div class="etat-signatures"><div><div class="etat-sign-line">Le souscripteur (lu et approuvé)</div></div>'
+  h += '<div class="etat-signatures"><div><div class="etat-sign-line">' + escHtml(cfmSigLabel(c)) + ' (lu et approuvé)</div></div>' + cfmSigExtra(c)
     + '<div><div class="etat-sign-line">Pour ' + e(_identiteSociete().nom || 'le promoteur') + '</div></div></div>';
   return h;
 }
@@ -90448,8 +91108,9 @@ function _docsEngagementHTML(d) {
   return '<div style="text-align:center;margin:0 0 14px;"><div style="font-size:16px;font-weight:700;text-transform:uppercase;">Engagement ferme et irrévocable d\'acquisition de logement</div>'
     + '<div style="font-size:11px;color:#555;">Dossier ' + escHtml(c.dossier || c.id) + '</div></div>'
     + '<div style="font-size:12px;line-height:1.8;text-align:justify;">' + _cdcPara(texte).replace('font-size:11px;line-height:1.6;', 'font-size:12px;line-height:1.8;') + '</div>'
+    + cfmEngagementHTML(c)
     + '<p style="margin-top:18px;">Fait à ' + escHtml(ville) + ', le ' + new Date().toLocaleDateString('fr-FR') + '</p>'
-    + '<div class="etat-signatures"><div><div class="etat-sign-line">Le souscripteur<br>(mention « Lu et approuvé — bon pour engagement ferme et irrévocable »)</div></div>'
+    + '<div class="etat-signatures"><div><div class="etat-sign-line">' + escHtml(cfmSigLabel(c)) + '<br>(mention « Lu et approuvé — bon pour engagement ferme et irrévocable »)</div></div>' + cfmSigExtra(c)
     + '<div><div class="etat-sign-line">Pour ' + escHtml(s.nom || 'le promoteur') + '</div></div></div>';
 }
 
@@ -96034,7 +96695,7 @@ function planRenderVuesGrid() {
       miniGallery = '<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin-top:4px;">'
         + vues.slice(0,4).map(function(v,i){
             return v.type && v.type.startsWith('image/')
-              ? '<img src="'+(v.data||v.url)+'" style="width:22px;height:22px;object-fit:cover;border-radius:3px;cursor:pointer;" onclick="event.stopPropagation();planOuvrirLightboxAngle(\''+angle.id+'\','+i+')">'
+              ? '<img alt="Vue du plan" src="'+(v.data||v.url)+'" style="width:22px;height:22px;object-fit:cover;border-radius:3px;cursor:pointer;" onclick="event.stopPropagation();planOuvrirLightboxAngle(\''+angle.id+'\','+i+')">'
               : (planEstFichierCAO(v.nom) ? '<span style="font-size:14px;cursor:pointer;" title="'+escHtml(v.nom)+' — clic pour télécharger" onclick="event.stopPropagation();planTelechargerVue(\''+v.id+'\')">📐</span>' : '<span style="font-size:14px;">📄</span>');
           }).join('')
         + (vues.length > 4 ? '<span style="font-size:10px;color:var(--dim);">+'+( vues.length-4)+'</span>' : '')
@@ -96079,7 +96740,7 @@ function planRenderVuesLibres() {
     var angle = PLAN_ANGLES.find(function(a){ return a.id === v.angle_id; }) || { icon:'📄', label:'Autre' };
     return '<div class="plan-vue-item" id="pv-'+v.id+'">'
       + (isImg
-          ? '<img class="plan-vue-thumb" src="'+v.data+'" onclick="planOuvrirLightboxVue(\''+v.id+'\')">'
+          ? '<img alt="Vue du plan" class="plan-vue-thumb" src="'+v.data+'" onclick="planOuvrirLightboxVue(\''+v.id+'\')">'
           : '<div style="width:48px;height:48px;border-radius:6px;background:rgba(74,148,224,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;">'+(isCAO?'📐':'📄')+'</div>')
       + '<div class="plan-vue-info">'
       + '<div class="plan-vue-nom">'+escHtml(v.nom)+'</div>'
@@ -96334,7 +96995,7 @@ function renderPlansFull() {
             + imgVues.slice(0,6).map(function(v,i){
                 var angle = PLAN_ANGLES.find(function(a){return a.id===v.angle_id;})||{icon:'📄',label:''};
                 return '<div style="position:relative;flex-shrink:0;">'
-                  + '<img class="plan-card-gallery-thumb" src="'+v.data+'"'
+                  + '<img alt="Vue du plan" class="plan-card-gallery-thumb" src="'+v.data+'"'
                   + ' title="'+angle.label+(v.label_custom?' — '+v.label_custom:'')+'"'
                   + ' onclick="planOuvrirGalerieCarte(\''+p.id+'\','+i+')">'
                   + '<div style="position:absolute;bottom:2px;left:2px;font-size:8px;background:rgba(0,0,0,0.55);color:#fff;border-radius:3px;padding:1px 3px;line-height:1.2;">'+angle.icon+'</div>'
@@ -97603,7 +98264,7 @@ function msgRenderAttachPreview() {
     var icone = isImg ? '🖼️' : (f.type==='application/pdf'?'📕':'📎');
     var taille = f.taille>1048576?(f.taille/1048576).toFixed(1)+' Mo':Math.round(f.taille/1024)+' Ko';
     return '<div class="msg-attach-chip">'
-      +(isImg?'<img src="'+(f.data||f.url)+'" style="width:24px;height:24px;border-radius:3px;object-fit:cover;">':icone)
+      +(isImg?'<img alt="Pièce jointe (image)" src="'+(f.data||f.url)+'" style="width:24px;height:24px;border-radius:3px;object-fit:cover;">':icone)
       +'<span style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+msgEscape(f.nom)+'</span>'
       +'<span style="color:var(--dim);font-size:9px;">'+taille+'</span>'
       +'<span class="chip-del" onclick="msgRetirerFichier(\''+f.id+'\')">×</span>'
@@ -106897,7 +107558,7 @@ function imprimerDA(id) {
   var html = '<div style="font-family:Georgia,serif;max-width:680px;margin:0 auto;">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #B87333;padding-bottom:16px;margin-bottom:20px;">'
     + '<div style="display:flex;align-items:center;gap:12px;">'
-    + (getLogoForPrint() ? '<img src="'+getLogoForPrint()+'" style="height:48px;object-fit:contain;"/>' : '')
+    + (getLogoForPrint() ? '<img alt="Logo de l’entreprise" src="'+getLogoForPrint()+'" style="height:48px;object-fit:contain;"/>' : '')
     + '<div><h2 style="color:#B87333;font-size:18px;margin:0;">'+escHtml(p.societe||'ImmoSuite ERP')+'</h2></div></div>'
     + '<div style="text-align:right;"><h3 style="color:#B87333;margin:0;">DEMANDE D\'ACHAT</h3><p style="font-size:13px;margin:2px 0 0;">'+escHtml(d.numero_da||'')+'</p></div>'
     + '</div>'
@@ -107193,7 +107854,7 @@ function budgetImprimerLigne(ligneCompte, divisionId, exercice) {
     + '.visa-box{border:1px solid #999;border-radius:6px;padding:14px;width:46%;min-height:90px;}'
     + '.visa-titre{font-weight:700;font-size:12px;color:#444;margin-bottom:30px;}</style></head><body>'
     + '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
-      + '<div>' + (s.logo ? '<img src="'+s.logo+'" style="max-height:56px;max-width:150px;object-fit:contain;margin-bottom:6px;"><br>' : '')
+      + '<div>' + (s.logo ? '<img alt="Logo de l’entreprise" src="'+s.logo+'" style="max-height:56px;max-width:150px;object-fit:contain;margin-bottom:6px;"><br>' : '')
       + '<strong style="font-size:16px;">'+escHtml(s.nom)+'</strong><br>'
       + '<span class="muted">'+escHtml([s.forme, s.adresse].filter(Boolean).join(' · '))+'</span><br>'
       + '<span class="muted">'+escHtml([s.rccm?'RCCM '+s.rccm:'', s.cc?'CC '+s.cc:''].filter(Boolean).join(' · '))+'</span></div>'
@@ -107261,7 +107922,7 @@ function budgetEtatPeriodique() {
     + '.kpi{display:flex;gap:14px;margin:14px 0;flex-wrap:wrap;}.kpibox{border:1px solid #ddd;border-radius:6px;padding:10px 14px;flex:1;min-width:140px;}'
     + '.kpiv{font-size:17px;font-weight:700;color:#B87333;}.kpil{font-size:10.5px;color:#666;text-transform:uppercase;letter-spacing:.04em;}</style></head><body>'
     + '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
-      + '<div>' + (s.logo ? '<img src="'+s.logo+'" style="max-height:56px;max-width:150px;object-fit:contain;margin-bottom:6px;"><br>' : '')
+      + '<div>' + (s.logo ? '<img alt="Logo de l’entreprise" src="'+s.logo+'" style="max-height:56px;max-width:150px;object-fit:contain;margin-bottom:6px;"><br>' : '')
       + '<strong style="font-size:15px;">'+escHtml(s.nom)+'</strong><br>'
       + '<span class="muted">'+escHtml([s.forme, s.adresse].filter(Boolean).join(' · '))+'</span></div>'
       + '<div class="r muted">Exercice '+exercice+'<br>Édité le '+today()+'</div>'
@@ -108293,7 +108954,7 @@ function imprimerTransfert(id) {
   var html = '<div style="font-family:Georgia,serif;max-width:680px;margin:0 auto;">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #B87333;padding-bottom:16px;margin-bottom:20px;">'
     + '<div style="display:flex;align-items:center;gap:12px;">'
-    + (getLogoForPrint() ? '<img src="'+getLogoForPrint()+'" style="height:48px;object-fit:contain;"/>' : '')
+    + (getLogoForPrint() ? '<img alt="Logo de l’entreprise" src="'+getLogoForPrint()+'" style="height:48px;object-fit:contain;"/>' : '')
     + '<div><h2 style="color:#B87333;font-size:18px;margin:0;">'+escHtml(p.societe||'ImmoSuite ERP')+'</h2></div></div>'
     + '<div style="text-align:right;"><h3 style="color:#B87333;margin:0;">TRANSFERT BUDGÉTAIRE</h3></div>'
     + '</div>'
@@ -116715,7 +117376,7 @@ function doPrintPreview() {
 /* ── Helpers HTML réutilisables ────────────────────────────────── */
 function _ppLogo() {
   var logo = (typeof getLogoBase64 === 'function') ? getLogoBase64() : '';
-  return logo ? '<div style="text-align:right;margin-bottom:10px;"><img src="' + logo + '" style="height:46px;object-fit:contain;border-radius:4px;"></div>' : '';
+  return logo ? '<div style="text-align:right;margin-bottom:10px;"><img alt="Logo de l’entreprise" src="' + logo + '" style="height:46px;object-fit:contain;border-radius:4px;"></div>' : '';
 }
 function _ppSoc() {
   return escHtml((DATA.params && DATA.params.societe) || 'ImmoSuite ERP');
@@ -116736,7 +117397,7 @@ function _ppQR(texte, taille) {
     q.addData(texte);
     q.make();
     var url = q.createDataURL(taille || 4, 8);
-    return '<img src="' + url + '" style="width:74px;height:74px;">';
+    return '<img alt="Code QR" src="' + url + '" style="width:74px;height:74px;">';
   } catch (e) { return ''; }
 }
 
@@ -123525,7 +124186,7 @@ function qrSvgTag(text){
       + '<script>window.onload=function(){window.print();}<\/script></head><body>'
       + '<div class="header"><h1>📐 ' + titre + '</h1>'
       + '<div class="meta"><div>' + soc + '</div><div>' + date + '</div><div>Terrain : ' + L + ' × ' + W + ' m</div></div></div>'
-      + '<div class="body"><img src="' + dataURL + '">' + surfTable + '</div>'
+      + '<div class="body"><img alt="Plan du terrain" src="' + dataURL + '">' + surfTable + '</div>'
       + '<div class="footer" style="margin:0 24px 16px;"><span>' + soc + ' · Édité par ImmoSuite</span><span>' + date + '</span></div>'
       + '</body></html>';
 
@@ -126054,7 +126715,7 @@ function imprimerFactureFNE(facId) {
     try {
       var qrUrl = /^https?:\/\//.test(f.fne_token) ? f.fne_token : (fneBaseUrl().replace(/\/ws$/,'') + '/fr/verification/' + f.fne_token);
       var q = qrcode(0, 'M'); q.addData(qrUrl); q.make();
-      qrSvg = '<img src="' + q.createDataURL(4, 4) + '" style="width:90px;height:90px;">';
+      qrSvg = '<img alt="Code QR" src="' + q.createDataURL(4, 4) + '" style="width:90px;height:90px;">';
     } catch (eQr) { qrSvg = ''; }
   }
   var typeLabel = f.type === 'cession' ? 'Cession foncière' : f.type === 'avoir' ? 'Avoir' : 'Vente immobilière';
@@ -126082,7 +126743,7 @@ function imprimerFactureFNE(facId) {
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / PDF</button>'
     + (enErreur ? '<button onclick="window.opener && window.opener.fneRecertifier(\'' + f.id + '\')">🔁 Retenter la certification DGI</button>' : '')
     + '</div>'
-    + '<div class="header"><div style="display:flex;gap:12px;align-items:center;">' + (logo?'<img src="'+logo+'" style="height:50px;">':'')
+    + '<div class="header"><div style="display:flex;gap:12px;align-items:center;">' + (logo?'<img alt="Logo de l’entreprise" src="'+logo+'" style="height:50px;">':'')
     + '<div><div style="font-size:18px;font-weight:800;color:#B87333;">' + escHtml(p.societe || 'ImmoSuite ERP') + '</div>'
     + '<div style="font-size:10px;color:#6B6B9A;">' + escHtml(p.adresse || '') + '</div>'
     + '<div style="font-size:10px;color:#6B6B9A;">RCCM ' + escHtml(p.rccm || '—') + ' · NCC ' + escHtml(p.dgi || '—') + '</div></div></div>'
@@ -127155,7 +127816,7 @@ function imprimerRapportAuditCaisse() {
      de l'app (reçu de versement, etc.) : logo + société + coordonnées. */
   var entete = '<div class="print-header" style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #B87333;padding-bottom:16px;margin-bottom:20px;">'
     + '<div style="display:flex;align-items:center;gap:12px;">'
-    + (getLogoForPrint() ? '<img src="'+getLogoForPrint()+'" style="height:48px;object-fit:contain;"/>' : '')
+    + (getLogoForPrint() ? '<img alt="Logo de l’entreprise" src="'+getLogoForPrint()+'" style="height:48px;object-fit:contain;"/>' : '')
     + '<div><h2 style="color:#B87333;font-size:20px;margin:0;">'+escHtml(params.societe||'ImmoSuite ERP')+'</h2>'
     + '<p style="font-size:12px;color:#666;margin:2px 0 0;">'+escHtml(params.email||'')+(params.email&&params.tel?' | ':'')+escHtml(params.tel||'')+'</p></div></div>'
     + '<div style="text-align:right;"><h3 style="color:#B87333;margin:0;">🔍 RAPPORT D\'AUDIT</h3>'
@@ -128977,7 +129638,7 @@ function cvImprimerBordereau(id) {
     + '<div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><div style="font-size:15px;font-weight:800;">' + escHtml(p.societe || '') + '</div>'
     + '<div style="font-size:18px;font-weight:800;margin-top:6px;">BORDEREAU DE TRANSMISSION DES PIÈCES DE CAISSE</div>'
     + '<div>N° <b>' + escHtml(b.numero) + '</b> — émis le ' + dateShort(b.cree_le.slice(0,10)) + ' par ' + escHtml(b.cree_par) + '</div></div>'
-    + (qr ? '<img src="' + qr + '" style="width:90px;height:90px;">' : '') + '</div>'
+    + (qr ? '<img alt="Code QR" src="' + qr + '" style="width:90px;height:90px;">' : '') + '</div>'
     + '<table style="width:100%;border-collapse:collapse;margin-top:12px;" border="1" cellpadding="4"><thead><tr><th>#</th><th>Date</th><th>Bon</th><th>Caisse</th><th>Type</th><th>Motif</th><th>Compte</th><th>Montant (F)</th><th>Visa Gérant</th></tr></thead><tbody>' + rows + '</tbody></table>'
     + '<div style="margin-top:8px;">Total entrées : <b>' + fmtF(b.total_entrees) + ' F</b> — Total sorties : <b>' + fmtF(b.total_sorties) + ' F</b> — ' + (b.mvt_ids || []).length + ' pièce(s) jointe(s)</div>'
     + '<div style="display:flex;justify-content:space-between;margin-top:40px;">'
@@ -129720,7 +130381,7 @@ async function caisseViewDocs(mvtId){
       +'<span>'+_cbIcon(d.type)+'</span><div style="flex:1;font-weight:600;">'+escHtml(d.name)+'</div>'
       +'<span style="font-size:10px;color:var(--blanc-dim);">'+_cbSize(d.size)+'</span>'
       +'<a class="btn btn-secondary btn-sm" href="'+d.blob+'" download="'+escHtml(d.name)+'">⬇</a></div>'
-      +(isImg?'<img src="'+d.blob+'" style="max-width:100%;border-radius:6px;">':'')
+      +(isImg?'<img alt="Document (image)" src="'+d.blob+'" style="max-width:100%;border-radius:6px;">':'')
       +'</div>';
   }).join('');
 }
@@ -130183,7 +130844,7 @@ function caisseImprimerBon(mvtId) {
     + (dejaImprime ? '<div style="position:absolute;top:140px;left:0;right:0;text-align:center;font-size:64px;color:rgba(200,0,0,.12);font-weight:900;transform:rotate(-18deg);">DUPLICATA</div>' : '')
     + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">'
     + '<div><div style="font-size:16px;font-weight:800;">' + escHtml(p.societe || 'ImmoSuite ERP') + '</div><div style="font-size:11px;color:#666;">' + escHtml(p.adresse||'') + '</div></div>'
-    + (qr ? '<img src="' + qr + '" style="width:78px;height:78px;">' : '') + '</div>'
+    + (qr ? '<img alt="Code QR" src="' + qr + '" style="width:78px;height:78px;">' : '') + '</div>'
     + '<div style="text-align:center;font-size:18px;font-weight:800;border:2px solid #333;padding:8px;margin-bottom:12px;">' + titre + (dejaImprime ? ' — DUPLICATA' : '') + '</div>'
     + '<table style="width:100%;border-collapse:collapse;font-size:12.5px;">'
     + '<tr><td style="padding:5px 0;width:38%;color:#666;">N° du bon</td><td style="font-weight:700;">' + escHtml(m.numero) + '</td></tr>'
@@ -133851,7 +134512,7 @@ function plrRenderPhotosGrid() {
   var el = document.getElementById('plr-photos-grid');
   el.innerHTML = PLR_STATE.photos.map(function(p,i) {
     return '<div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;border:1px solid var(--bord);">'
-      + '<img src="'+(p.data||p.url)+'" style="width:100%;height:100%;object-fit:cover;">'
+      + '<img alt="Photo" src="'+(p.data||p.url)+'" style="width:100%;height:100%;object-fit:cover;">'
       + '<button type="button" onclick="plrSupprimerPhoto('+i+')" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(224,82,82,.85);border:none;color:#fff;cursor:pointer;">✕</button>'
       + '</div>';
   }).join('');
@@ -134355,7 +135016,7 @@ function portmandRenderBaux() {
   el.innerHTML = baux.map(function(b){
     var photosHtml = (b.photos&&b.photos.length)
       ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-top:8px;">'
-        + b.photos.map(function(p){ return '<img src="'+(p.data||p.url)+'" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--bord);">'; }).join('')
+        + b.photos.map(function(p){ return '<img alt="Photo" src="'+(p.data||p.url)+'" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--bord);">'; }).join('')
         + '</div>' : '<div style="font-size:11px;color:var(--dim);margin-top:6px;">Aucune photo disponible.</div>';
     var mapHtml = (b.lat!=null&&b.lng!=null)
       ? '<div style="margin-top:8px;"><iframe src="https://maps.google.com/maps?q='+b.lat+','+b.lng+'&z=15&output=embed" style="width:100%;height:160px;border:0;border-radius:8px;" loading="lazy"></iframe>'
@@ -138117,5 +138778,62 @@ function dossierTechniqueLot(lotId){
 }
 
 </script>
+<!-- a11y-auto:debut -->
+<script id="a11y-auto">
+/* Accessibilité automatique : relie chaque étiquette à son champ, nomme les boutons-icônes,
+   rend les entrées de menu utilisables au clavier. Aucune donnée n'est lue ni envoyée. */
+(function(){
+  var compteur=0, planifie=false;
+  function controle(l){
+    var e=l.nextElementSibling;
+    while(e){
+      if(e.tagName==='LABEL') return null;
+      var c=e.matches('input:not([type=hidden]),select,textarea')?e:e.querySelector('input:not([type=hidden]),select,textarea');
+      if(c) return c;
+      e=e.nextElementSibling;
+    }
+    return null;
+  }
+  function lier(){
+    planifie=false;
+    document.querySelectorAll('label:not([for])').forEach(function(l){
+      if(l.querySelector('input,select,textarea')) return;
+      var c=controle(l); if(!c) return;
+      if(!c.id){ c.id='a11y-champ-'+(++compteur); }
+      l.setAttribute('for',c.id);
+    });
+    var pour={}; document.querySelectorAll('label[for]').forEach(function(l){ pour[l.getAttribute('for')]=1; });
+    document.querySelectorAll('select,input:not([type=hidden]),textarea').forEach(function(c){
+      if(c.getAttribute('aria-label')||c.getAttribute('aria-labelledby')||c.getAttribute('title')) return;
+      if((c.id&&pour[c.id])||c.closest('label')) return;
+      var t='';
+      if(c.tagName==='SELECT'){ t=((c.options[0]&&c.options[0].text)||'').trim(); }
+      else if(c.type==='file'){ t='Choisir un fichier'; }
+      else if(c.type==='date'){ t='Date'; } else if(c.type==='month'){ t='Mois'; }
+      else { t=c.getAttribute('placeholder')||''; }
+      if(t) c.setAttribute('aria-label',t);
+    });
+    document.querySelectorAll('button:not([aria-label]),a[title]:not([aria-label]),[role=button]:not([aria-label])').forEach(function(b){
+      var t=(b.getAttribute('title')||'').trim(); var txt=(b.textContent||'').replace(/\s+/g,'').trim();
+      if(t && txt.length<=3) b.setAttribute('aria-label',t);
+    });
+    document.querySelectorAll('.nav-item[onclick]:not([tabindex])').forEach(function(n){
+      n.setAttribute('tabindex','0'); n.setAttribute('role','button');
+    });
+    var pane=document.getElementById('eden-pane'); if(pane&&pane.parentElement&&!pane.parentElement.getAttribute('role')) pane.parentElement.setAttribute('role','main');
+    document.querySelectorAll('.tab-link').forEach(function(t){ if(t.classList.contains('active')) t.setAttribute('aria-current','page'); else t.removeAttribute('aria-current'); });
+    var sb=document.querySelector('.sidebar'); if(sb && !sb.getAttribute('role')){ sb.setAttribute('role','navigation'); sb.setAttribute('aria-label','Menu principal'); }
+    var mc=document.querySelector('.main-content'); if(mc && !mc.getAttribute('role')){ mc.setAttribute('role','main'); }
+    var le=document.getElementById('login-error'); if(le && !le.getAttribute('role')){ le.setAttribute('role','alert'); }
+  }
+  function planifier(){ if(planifie) return; planifie=true; setTimeout(lier,400); }
+  document.addEventListener('keydown',function(ev){
+    if((ev.key==='Enter'||ev.key===' ') && ev.target && ev.target.classList && ev.target.classList.contains('nav-item')){ ev.preventDefault(); ev.target.click(); }
+  });
+  if(document.readyState!=='loading') lier(); else document.addEventListener('DOMContentLoaded',lier);
+  try{ new MutationObserver(planifier).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); }catch(e){}
+})();
+</script>
+<!-- a11y-auto:fin -->
 </body>
 </html>

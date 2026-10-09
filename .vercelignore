@@ -4,3 +4,8 @@
 # contiennent aucun secret, mais exposeraient inutilement les noms de tables
 # et la logique d'authentification du portail.
 supabase/
+
+# Anciennes versions du portail : plus servies (elles contournent le consentement et les pages légales).
+portail-unique1.html
+portail-unique2.html
+portail-unique3.html
