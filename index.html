@@ -26719,6 +26719,29 @@ async function syncToSupabase(table, obj, opts) {
   }
   if (!SB.url || !SB.key) return false;
   if (!navigator.onLine) { _outboxEnqueue({ op:'upsert', table:table, id:obj.id, obj:obj }); return false; }
+  /* ── Statut monotone (demandes de réapprovisionnement, sessions de caisse) : une copie locale périmée ne doit
+     jamais faire reculer un état déjà avancé sur le cloud (servie → validée, clôturée → ouverte). Dans ce cas on
+     n'envoie rien et on reprend l'état du cloud. ── */
+  if ((table === 'pi_demandes_reappro' || table === 'pi_caisse_sessions') && obj && obj.id && !_pulling && !obj._forceCloture) {
+    var _RANG = (table === 'pi_demandes_reappro') ? { brouillon:0, soumise:1, validee:2, rejetee:2, servie:3 } : { ouverte:0, cloturee:1 };
+    try {
+      var _rs = await sbFetch(table + '?id=eq.' + encodeURIComponent(obj.id) + '&select=id,s:data->>statut', 'GET');
+      var _stCloud = (_rs && _rs.length) ? _rs[0].s : null;
+      if (_stCloud && _RANG[_stCloud] !== undefined && _RANG[obj.statut] !== undefined && _RANG[_stCloud] > _RANG[obj.statut]) {
+        console.warn('[STATUT] Recul refusé', table, obj.id, obj.statut, '<', _stCloud);
+        var _full2 = await sbFetch(table + '?id=eq.' + encodeURIComponent(obj.id) + '&select=*', 'GET');
+        var _row2 = (_full2 && _full2.length) ? _supaUnwrap(table, _full2[0]) : null;
+        var _store2 = (SUPA_STORE_MAP.find(function(x){ return x[0]===table; })||[])[1];
+        if (_row2 && _store2) {
+          Object.keys(obj).forEach(function(k){ delete obj[k]; });
+          Object.assign(obj, _row2);
+          try { await dbPut(_store2, obj, { forceRole: true }); } catch(e){}
+        }
+        try { if (typeof toast === 'function') toast('⚠️ Statut déjà plus avancé sur le cloud (' + _stCloud + ') : votre copie était périmée, elle a été remplacée par l\'état du cloud.', 'error', 8000); } catch(e){}
+        return true;
+      }
+    } catch(e) { /* vérification impossible → on procède comme avant */ }
+  }
   /* ── Détection de conflit — étendue aux stores financiers sensibles ──
      Si un tiers a modifié l'enregistrement côté cloud depuis notre dernière lecture,
      on n'écrase pas silencieusement : on journalise le conflit et on alerte.
@@ -129172,6 +129195,14 @@ async function caisseTransfererFonds() {
 
   var _gt = caisseGardeNouveauMouvement(mvtSortie) || caisseGardeNouveauMouvement(mvtEntree);
   if (_gt) { toast('⛔ ' + _gt, 'error', 7000); return; }
+  /* Un virement qui sert une demande de réapprovisionnement validée doit y être rattaché : sinon la demande
+     reste « validée » alors que les fonds sont versés, et peut être servie une seconde fois. */
+  var _demLiee = (DATA.demandes_reappro || []).find(function(x){
+    return x.statut === 'validee' && x.caisse_id === destId && Math.round(parseFloat(x.montant_accorde) || 0) === Math.round(montant);
+  });
+  if (_demLiee && confirm('Ce virement correspond à la demande de réapprovisionnement ' + (_demLiee.numero || '') + ' (validée, ' + fmtF(_demLiee.montant_accorde) + ' FCFA pour « ' + (dest.nom || '') + ' »).\n\nLe rattacher à cette demande ? Elle passera « servie ».\n\nOK = oui, rattacher · Annuler = non, virement indépendant')) {
+    mvtSortie.reappro_id = _demLiee.id; mvtEntree.reappro_id = _demLiee.id;
+  } else { _demLiee = null; }
   DATA.caisse_mouvements.push(mvtSortie);
   DATA.caisse_mouvements.push(mvtEntree);
   mvtSortie._baseModifie = mvtSortie._modifie || null;
@@ -129180,6 +129211,13 @@ async function caisseTransfererFonds() {
   await dbPut('caisse_mouvements', mvtEntree);
   await caisseSyncEtAlerter('pi_caisse_mouvements', mvtSortie);
   await caisseSyncEtAlerter('pi_caisse_mouvements', mvtEntree);
+  if (_demLiee) {
+    _demLiee.statut = 'servie'; _demLiee.mouvement_id = mvtEntree.id; _demLiee.mouvement_source_id = mvtSortie.id; _demLiee.caisse_source_id = sourceId;
+    _demLiee.servi_par = (APP.currentUser && APP.currentUser.nom) || '—'; _demLiee.servi_le = new Date().toISOString(); _demLiee._modifie = new Date().toISOString();
+    await dbPut('demandes_reappro', _demLiee, { forceRole: true });
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_demandes_reappro', _demLiee);
+    if (typeof reapRender === 'function') reapRender();
+  }
 
   closeModal('modal-caisse-transfert');
   toast('🔄 Transfert de ' + fmtF(montant) + ' FCFA enregistré (bons ' + numeroSortie + ' / ' + numeroEntree + ') — en attente de validation avant impact sur les soldes. Ventilation automatique sur le compte ' + compte585 + ' dès approbation.', 'info', 8000);
@@ -129311,6 +129349,13 @@ async function reapSauver() {
   var existant = id ? (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }) : null;
   if (existant && existant.statut !== 'brouillon') { toast('Seule une demande en brouillon peut être modifiée.', 'error'); return; }
 
+  if (!existant) {
+    var _dupD = (DATA.demandes_reappro || []).find(function(x){
+      return x.caisse_id === caisseId && x.statut !== 'rejetee' && Math.round(parseFloat(x.montant_demande) || 0) === Math.round(montant)
+        && x.created_at && (Date.now() - new Date(x.created_at).getTime()) < 24 * 3600000;
+    });
+    if (_dupD && !confirm('⚠️ Une demande identique (même caisse, même montant) a déjà été créée il y a moins de 24 h : ' + (_dupD.numero || '') + ' (' + _dupD.statut + ').\n\nCréer quand même une nouvelle demande ?')) return;
+  }
   var d = existant || { id: uid(), numero: reapGenererNumero(), statut: 'brouillon', created_at: new Date().toISOString() };
   d.division_id = divisionId; d.caisse_id = caisseId;
   d.montant_demande = montant; d.motif = motif;
@@ -129319,6 +129364,7 @@ async function reapSauver() {
      juger, pas celle — forcément différente — du jour de la validation. */
   d.solde_constate = reapSoldeCaisse(caisseId);
   d.demande_par = d.demande_par || ((APP.currentUser && APP.currentUser.nom) || '—');
+  d.demande_par_id = d.demande_par_id || ((APP.currentUser && APP.currentUser.id) || null);
   d.demande_le = d.demande_le || new Date().toISOString();
   d._modifie = new Date().toISOString();
   if (!existant) DATA.demandes_reappro.push(d);
@@ -129364,7 +129410,9 @@ async function reapValider(id, montantAccorde) {
      demandée, validée puis servie par la même personne en 11 secondes (soumission → versement).
      Le demandeur ne peut pas être son propre validateur. */
   var _moi = (APP.currentUser && APP.currentUser.nom) || '';
-  if (_moi && d.demande_par && String(d.demande_par).trim().toLowerCase() === _moi.trim().toLowerCase()) {
+  var _memeDem = (d.demande_par_id && APP.currentUser && APP.currentUser.id) ? (d.demande_par_id === APP.currentUser.id)
+    : !!(_moi && d.demande_par && String(d.demande_par).trim().toLowerCase() === _moi.trim().toLowerCase());
+  if (_memeDem) {
     toast('🔒 Vous êtes l\'auteur(e) de la demande ' + (d.numero||'') + ' : elle doit être validée par un autre responsable habilité.', 'error', 7000);
     return;
   }
