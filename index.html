@@ -129375,9 +129375,16 @@ async function caisseTransfererFonds() {
   var _demLiee = (DATA.demandes_reappro || []).find(function(x){
     return x.statut === 'validee' && x.caisse_id === destId && Math.round(parseFloat(x.montant_accorde) || 0) === Math.round(montant);
   });
+  var _lienPropose = !!_demLiee;
   if (_demLiee && confirm('Ce virement correspond à la demande de réapprovisionnement ' + (_demLiee.numero || '') + ' (validée, ' + fmtF(_demLiee.montant_accorde) + ' FCFA pour « ' + (dest.nom || '') + ' »).\n\nLe rattacher à cette demande ? Elle passera « servie ».\n\nOK = oui, rattacher · Annuler = non, virement indépendant')) {
     mvtSortie.reappro_id = _demLiee.id; mvtEntree.reappro_id = _demLiee.id;
   } else { _demLiee = null; }
+  if (!_demLiee && !_lienPropose) {
+    var _ouvertes = (DATA.demandes_reappro || []).filter(function(x){ return (x.statut === 'validee' || x.statut === 'soumise') && x.caisse_id === destId; });
+    if (_ouvertes.length && !confirm('⚠️ « ' + (dest.nom || '') + ' » a ' + _ouvertes.length + ' demande(s) de réapprovisionnement encore ouverte(s) : '
+      + _ouvertes.slice(0, 3).map(function(x){ return (x.numero || '') + ' (' + fmtF(x.montant_accorde || x.montant_demande) + ' FCFA, ' + x.statut + ')'; }).join(', ')
+      + '.\n\nCe virement de ' + fmtF(montant) + ' FCFA ne correspond à aucune d\'elles : il ne la soldera pas.\n\nEnregistrer quand même ce virement indépendant ?')) return;
+  }
   DATA.caisse_mouvements.push(mvtSortie);
   DATA.caisse_mouvements.push(mvtEntree);
   mvtSortie._baseModifie = mvtSortie._modifie || null;
@@ -129758,6 +129765,8 @@ async function reapServirConfirmer() {
   };
   if (externe) mvt.provenance_externe = justif;
   else { mvt.transfert_id = transfertId; mvt.transfert_depuis = sourceId; }
+  var _gr = caisseGardeNouveauMouvement(mvt);
+  if (_gr) { toast('⛔ ' + _gr, 'error', 7000); return; }
 
   var mvtSortie = null;
   if (!externe) {
@@ -129776,6 +129785,8 @@ async function reapServirConfirmer() {
       reappro_id: d.id,
       created_by: auteurNom, created_at: new Date().toISOString()
     };
+    var _grs = caisseGardeNouveauMouvement(mvtSortie);
+    if (_grs) { toast('⛔ ' + _grs, 'error', 7000); return; }
     DATA.caisse_mouvements.push(mvtSortie);
     mvtSortie._baseModifie = mvtSortie._modifie || null;
     await dbPut('caisse_mouvements', mvtSortie);
@@ -130450,7 +130461,7 @@ async function caisseImportCSVConfirmer() {
     if (!isNaN(n) && (!(pfx in maxParPrefixe) || n > maxParPrefixe[pfx])) maxParPrefixe[pfx] = n;
   });
 
-  var nCrees = 0, nDoublons = 0, nSuggeres = 0, doublonsDetail = [];
+  var nCrees = 0, nDoublons = 0, nSuggeres = 0, doublonsDetail = [], nRefuses = 0, nReprise = 0;
   for (var i=0; i<valides.length; i++) {
     var l = valides[i].l;
     var type = l.entree > 0 ? 'entree' : 'sortie';
@@ -130466,14 +130477,18 @@ async function caisseImportCSVConfirmer() {
     var numero = pfxNum + _caissePad3(maxN + 1);
     maxParPrefixe[pfxNum] = maxN + 1;
 
+    /* Ligne datée d'avant le démarrage de la caisse : reprise d'historique (session technique, sans effet sur le tiroir). */
+    var _repLigne = caisseEstReprise(caisseId, l.date);
+    var _sessLigne = _repLigne ? await caisseSessionHistorique(caisseId) : session;
     var mvt = {
-      id: uid(), session_id: session.id, caisse_id: caisseId,
+      id: uid(), session_id: _sessLigne.id, caisse_id: caisseId,
       date: l.date + 'T' + new Date().toISOString().slice(11,19), numero: numero,
       type: type, montant: montant, motif: l.libelle, beneficiaire: l.libelle,
       piece_ref: l.piece, statut: 'a_ventiler', compte_ventile: null, ecriture_id: null,
       ventile_par: null, ventile_le: null,
       compte_suggere: _caisseRuleMatch(l.libelle) || null,
       import_batch_id: importBatchId,
+      reprise_historique: _repLigne ? true : undefined,
       created_by: user + ' (import CSV)', created_at: new Date().toISOString()
     };
     /* [FIX] Ce chemin de création (import CSV) ne posait jamais
@@ -130488,14 +130503,18 @@ async function caisseImportCSVConfirmer() {
     mvt.demande_par = user;
     mvt.demande_role = (APP.currentUser && APP.currentUser.role) || '';
     mvt.demande_le = new Date().toISOString();
+    if (caisseGardeNouveauMouvement(mvt)) { nRefuses++; continue; }
     DATA.caisse_mouvements.push(mvt);
     mvt._baseModifie = mvt._modifie || null;
     await dbPut('caisse_mouvements', mvt);
     await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
     if (mvt.compte_suggere) nSuggeres++;
+    if (_repLigne) nReprise++;
     nCrees++;
   }
   closeModal('modal-caisse-import');
+  if (nRefuses) toast('⚠️ ' + nRefuses + ' ligne(s) refusée(s) par les contrôles de saisie (session ou numéro de bon invalide).', 'error', 9000);
+  if (nReprise) toast('📜 ' + nReprise + ' ligne(s) datée(s) d\'avant le démarrage de la caisse : classée(s) en reprise d\'historique, sans effet sur le solde du tiroir.', 'info', 8000);
   window._cimDernierDoublons = doublonsDetail;
   if (nCrees > 0) {
     DATA.params = DATA.params || {};
