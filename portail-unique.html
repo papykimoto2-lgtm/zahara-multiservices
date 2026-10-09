@@ -635,6 +635,7 @@
         <div class="form-group"><label>Capacité d'engagement (FCFA)</label><input type="number" id="inv-montant" placeholder="30000000"></div>
       </div>
       <div class="form-group"><label>Message</label><textarea id="inv-message" rows="3" placeholder="Précisez vos attentes, votre horizon de placement, vos éventuelles conditions."></textarea></div>
+      <div class="form-group"><label class="consent-ligne" for="inv-consent"><input type="checkbox" id="inv-consent" required><span>J’ai lu la <a href="/confidentialite.html" target="_blank" rel="noopener">politique de confidentialité</a> et j’accepte que mes données soient utilisées pour traiter ma candidature et être recontacté(e). *</span></label></div>
       <div id="inv-result" style="margin-bottom:10px;"></div>
       <button class="highlight-btn" style="width:100%;" id="inv-btn" onclick="envoyerCandidatureFin()">📨 Me faire connaître</button>
       <p style="font-size:.7rem;color:#4b6a8b;margin-top:10px;">Vos données servent uniquement à traiter votre candidature. Vous pouvez demander leur suppression à tout moment.</p>
@@ -1498,9 +1499,9 @@
     try{
       var r=await Promise.all([
         sb('pi_versements?select=id,data&data->>client_id=eq.'+cid),
-        sb('pi_programmes?select=id,data').catch(function(){return [];}),
-        sb('pi_lots?select=id,data').catch(function(){return [];}),
-        sb('pi_rapports_chantier?select=id,data').catch(function(){return [];}),
+        sb('pi_programmes_portail?select=*').catch(function(){return [];}),
+        sb('pi_lots_client?select=*').catch(function(){return [];}),
+        sb('pi_rapports_chantier_portail?select=*').catch(function(){return [];}),
         sb('pi_conventions?select=id,data&data->>client_id=eq.'+cid).catch(function(){return [];}),
         sb('pi_receptions_dossiers?select=id,data&data->>client_id=eq.'+cid).catch(function(){return [];})
       ]);
@@ -1747,9 +1748,9 @@
     var aid=encodeURIComponent(A.app.id);
     try{
       var r=await Promise.all([
-        sb('pi_clients?select=id,data&data->>apporteur_id=eq.'+aid).catch(function(){return [];}),
+        sb('pi_clients_apporteur?select=*&apporteur_id=eq.'+aid).catch(function(){return [];}),
         sb('pi_commissions?select=id,data&data->>beneficiaire_id=eq.'+aid).catch(function(){return [];}),
-        sb('pi_programmes?select=id,data').catch(function(){return [];})
+        sb('pi_programmes_portail?select=*').catch(function(){return [];})
       ]);
       A.clients=unwrap(r[0]);
       A.commissions=unwrap(r[1]).filter(function(c){return c.type_beneficiaire==='apporteur';});
@@ -2690,8 +2691,7 @@
   }
   async function majBandeau(){
     var nbSous=0, av=0;
-    try{ var cs=unwrap(await sb('pi_clients?select=id,data')); nbSous=cs.filter(function(c){return c && c.statut!=='resilie';}).length; }catch(e){}
-    try{ var raps=unwrap(await sb('pi_rapports_chantier?select=id,data')); if(raps.length) av=Math.round(raps.reduce(function(a,r){return a+(parseFloat(r.avancement)||0);},0)/raps.length); }catch(e){}
+    try{ var st=(await sb('pi_stats_publiques?select=*'))[0]||{}; nbSous=parseInt(st.nb_souscripteurs,10)||0; av=parseInt(st.avancement_moyen,10)||0; }catch(e){}
     var perso = (PARAMS.bandeau_texte||'').trim();
     var telB = BR('tel','') || BR('contact_whatsapp','');
     var msg = '🏠 '+nbSous+' familles nous font déjà confiance.   📊 Avancement moyen des chantiers : '+av+'%.   ✨ Souscrivez en ligne, même depuis l\'étranger (diaspora).'+(telB?('   📞 '+telB+'.'):'')+(perso?('   📢 '+perso):'')+'   ';
@@ -3037,12 +3037,12 @@
   var CHAINE_SQ = [];
   async function chargerSquelette(){
     try{
-      var r=await fetch(SB_URL+'/rest/v1/pi_diaspo_preuves?select=data->>index,data->>hash,data->>prev_hash',
+      var r=await fetch(SB_URL+'/rest/v1/pi_diaspo_chaine?select=idx,hash,prev_hash',
         { headers:_authHdr() });
       if(!r.ok) return [];
       var rows=await r.json();
       return (rows||[]).map(function(x){
-        return { index:parseInt(x.index,10)||0, hash:x.hash||'', prev_hash:x.prev_hash||'' };
+        return { index:parseInt(x.idx,10)||0, hash:x.hash||'', prev_hash:x.prev_hash||'' };
       }).sort(function(a,b){ return a.index-b.index; });
     }catch(e){ return []; }
   }
@@ -5422,11 +5422,13 @@
     var nom=g('inv-nom'), tel=g('inv-tel');
     if(!nom){ res.innerHTML='<div class="badge-danger" style="display:block;">Indiquez votre nom ou votre raison sociale.</div>'; return; }
     if(!tel){ res.innerHTML='<div class="badge-danger" style="display:block;">Un numéro de téléphone est indispensable pour vous recontacter.</div>'; return; }
+    if(!(document.getElementById('inv-consent')||{}).checked){ res.innerHTML='<div class="badge-danger" style="display:block;">Merci de cocher la case de consentement pour envoyer votre candidature.</div>'; return; }
     var btn=document.getElementById('inv-btn'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Envoi…';
     var id='mf_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
     var obj={ id:id, nom:nom, type_personne:g('inv-type')||'physique', tel:tel, email:g('inv-email'),
       operation_id:g('inv-operation'), montant:parseFloat(g('inv-montant'))||0,
       message:g('inv-message'), statut:'nouvelle', source:'portail',
+      consentement:{ date:new Date().toISOString(), finalite:'traitement de la candidature et recontact', politique:'2026-10-09' },
       cree_le:new Date().toISOString(), _modifie:new Date().toISOString() };
     try{
       var r=await fetch(SB_URL+'/rest/v1/pi_af_manifestations',{
