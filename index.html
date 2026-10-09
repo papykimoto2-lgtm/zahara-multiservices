@@ -127056,7 +127056,7 @@ function caisseGetSessionOuverte(caisseId) {
 }
 
 function caisseDernièreSessionCloturee(caisseId) {
-  var list = (DATA.caisse_sessions || []).filter(function(s){ return s.caisse_id === caisseId && s.statut === 'cloturee'; });
+  var list = (DATA.caisse_sessions || []).filter(function(s){ return s.caisse_id === caisseId && s.statut === 'cloturee' && !s.session_technique; });
   list.sort(function(a,b){ return (b.cloturee_le||'').localeCompare(a.cloturee_le||''); });
   return list[0] || null;
 }
@@ -127120,7 +127120,7 @@ function caisseBanniereAnciennes() {
 async function caisseRecalculerSiCloturee(mvt) {
   if (!mvt || !mvt.session_id) return;
   var sess = (DATA.caisse_sessions || []).find(function(x){ return x.id === mvt.session_id; });
-  if (!sess || sess.statut !== 'cloturee' || sess.ecart_regularise) return;
+  if (!sess || sess.statut !== 'cloturee' || sess.ecart_regularise || sess.session_technique) return;
   var avant = parseFloat(sess.fond_cloture_theorique) || 0;
   var theo = caisseSoldeSession(sess);
   if (theo === avant) return;
@@ -127131,6 +127131,105 @@ async function caisseRecalculerSiCloturee(mvt) {
   sess._baseModifie = sess._modifie || null;
   await dbPut('caisse_sessions', sess);
   await caisseSyncEtAlerter('pi_caisse_sessions', sess);
+}
+
+/* ═══ REPRISE D'HISTORIQUE ═══════════════════════════════════════════════
+   Pendant le déploiement, on ressaisit après coup des bons antérieurs au démarrage du module sur une caisse.
+   Un bon daté d'avant le premier jour de la caisse est classé dans une session HISTORIQUE technique : il suit
+   le circuit normal (validation, ventilation, écriture) mais ne touche JAMAIS le solde du tiroir ni les écarts. */
+function caisseDateDemarrage(caisseId) {
+  var ds = (DATA.caisse_sessions || []).filter(function(s){ return s.caisse_id === caisseId && !s.session_technique; })
+    .map(function(s){ return String(s.date || '').slice(0,10); }).filter(Boolean).sort();
+  return ds[0] || '';
+}
+function caisseEstReprise(caisseId, date) {
+  var dem = caisseDateDemarrage(caisseId);
+  return !!(dem && date && String(date).slice(0,10) < dem);
+}
+async function caisseSessionHistorique(caisseId) {
+  var ex = (DATA.caisse_sessions || []).find(function(s){ return s.caisse_id === caisseId && s.reprise_historique; });
+  if (ex) return ex;
+  var dem = caisseDateDemarrage(caisseId) || today();
+  var veille = new Date(new Date(dem + 'T00:00:00Z').getTime() - 86400000).toISOString().slice(0,10);
+  var sess = {
+    id: 'hist_' + caisseId, caisse_id: caisseId, date: veille, statut: 'cloturee',
+    fond_ouverture: 0, fond_cloture_theorique: 0, fond_cloture_reel: 0, ecart: 0,
+    ouverte_par: 'Reprise d\'historique', cloturee_par: 'Reprise d\'historique',
+    ouverte_le: veille + 'T00:00:00.000Z', cloturee_le: veille + 'T00:01:00.000Z',
+    envoye_journalier: false, envoye_journalier_le: null,
+    session_technique: true, reprise_historique: true,
+    note_correction: 'Session technique de reprise d\'historique : regroupe les bons datés d\'avant le démarrage de la caisse. Aucun comptage, sans effet sur le solde du tiroir.'
+  };
+  DATA.caisse_sessions.push(sess);
+  sess._baseModifie = null;
+  await dbPut('caisse_sessions', sess);
+  await caisseSyncEtAlerter('pi_caisse_sessions', sess);
+  return sess;
+}
+function caisseBonsRattachables(caisseId) {
+  var dem = caisseDateDemarrage(caisseId);
+  if (!dem) return [];
+  var ouverte = caisseGetSessionOuverte(caisseId);
+  if (!ouverte) return [];
+  return (DATA.caisse_mouvements || []).filter(function(m){
+    return m.session_id === ouverte.id && !m.reprise_historique && String(m.date || '').slice(0,10) < dem;
+  });
+}
+function caisseBanniereReprise() {
+  if (!caisseRoleAdminLike()) return '';
+  var out = '';
+  (caissesVisibles() || []).forEach(function(c){
+    var l = caisseBonsRattachables(c.id);
+    if (!l.length) return;
+    var tot = l.reduce(function(a,m){ return a + (parseFloat(m.montant)||0); }, 0);
+    out += '<div style="grid-column:1/-1;padding:10px 14px;border:1px solid var(--or,#B87333);border-radius:var(--r);background:var(--card2);font-size:13px;">'
+      + '<strong>📜 Reprise d\'historique — ' + escHtml(c.nom) + ' :</strong> ' + l.length + ' bon(s) datés d\'avant le démarrage de la caisse (' + dateShort(caisseDateDemarrage(c.id)) + ') sont encore dans la session en cours (total ' + fmtF(tot) + ' FCFA) et faussent son solde. '
+      + '<button class="btn btn-secondary btn-sm" onclick="caisseRattacherHistorique(\'' + c.id + '\')">Rattacher à l\'historique</button></div>';
+  });
+  return out;
+}
+async function caisseRattacherHistorique(caisseId) {
+  if (!exigerDroit('Caisse','v','le rattachement à l\'historique')) return;
+  var l = caisseBonsRattachables(caisseId);
+  if (!l.length) { toast('Aucun bon à rattacher.', 'info'); return; }
+  var ouverte = caisseGetSessionOuverte(caisseId);
+  var avant = caisseSoldeSession(ouverte), avantSi = caisseSoldeSiToutValide(ouverte);
+  var delta = 0, deltaSi = 0;
+  l.forEach(function(m){
+    var v = (m.type === 'entree' ? 1 : -1) * (parseFloat(m.montant) || 0);
+    deltaSi += v;
+    if (!m.requiert_validation || m.valide === true) delta += v;
+  });
+  var c = (DATA.caisses || []).find(function(x){ return x.id === caisseId; });
+  if (!confirm('Rattacher ' + l.length + ' bon(s) datés d\'avant le ' + caisseDateDemarrage(caisseId) + ' à la session HISTORIQUE de ' + (c ? c.nom : '') + ' ?\n\n'
+    + 'Solde théorique de la session en cours : ' + fmtF(avant) + ' → ' + fmtF(avant - delta) + ' FCFA\n'
+    + 'Si tout est validé : ' + fmtF(avantSi) + ' → ' + fmtF(avantSi - deltaSi) + ' FCFA\n\n'
+    + 'Les bons gardent leur statut (validation, ventilation) ; ils ne comptent plus dans le solde du tiroir.')) return;
+  var hist = await caisseSessionHistorique(caisseId);
+  for (var i = 0; i < l.length; i++) {
+    var m = l[i];
+    m.session_precedente = m.session_id;
+    m.session_id = hist.id;
+    m.reprise_historique = true;
+    m.session_rattachee_le = new Date().toISOString();
+    m._baseModifie = m._modifie || null;
+    await dbPut('caisse_mouvements', m);
+    await caisseSyncEtAlerter('pi_caisse_mouvements', m);
+  }
+  toast('📜 ' + l.length + ' bon(s) rattaché(s) à la session historique.', 'success');
+  caisseRenderListe();
+  if (typeof caisseRenderDashboard === 'function') caisseRenderDashboard();
+  if (typeof caisseRenderValidations === 'function') caisseRenderValidations();
+}
+function caisseBonDateChange() {
+  var h = document.getElementById('cb-date-reprise');
+  if (!h) return;
+  var cid = (document.getElementById('cb-caisse-id') || {}).value;
+  var d = (document.getElementById('cb-date') || {}).value;
+  if (cid && d && caisseEstReprise(cid, d)) {
+    h.style.display = '';
+    h.textContent = '📜 Reprise d\'historique : cette date est antérieure au démarrage de la caisse (' + dateShort(caisseDateDemarrage(cid)) + '). Le bon sera classé dans la session historique : il suivra la validation et la ventilation, mais ne touchera pas le solde du tiroir.';
+  } else { h.style.display = 'none'; }
 }
 
 function caisseNomUser(userId) {
@@ -128158,7 +128257,7 @@ function caisseRenderListe() {
       + '</div>';
     return;
   }
-  el.innerHTML = caisseBanniereAnciennes() + liste.map(function(c) {
+  el.innerHTML = caisseBanniereAnciennes() + caisseBanniereReprise() + liste.map(function(c) {
     var session = caisseGetSessionOuverte(c.id);
     var ouverte = !!session;
     var solde = ouverte ? caisseSoldeSession(session) : null;
@@ -128535,6 +128634,7 @@ function caisseOuvrirBonModal(caisseId, type) {
   document.getElementById('cb-caisse-id').value = caisseId;
   document.getElementById('cb-type').value = type;
   document.getElementById('cb-date').value = today();
+  caisseBonDateChange();
   document.getElementById('cb-montant').value = 0;
   document.getElementById('cb-piece').value = '';
   document.getElementById('cb-motif').value = '';
@@ -128692,6 +128792,7 @@ async function caisseSaveBon() {
     mvt.type = type; mvt.date = date + (mvt.date && mvt.date.indexOf('T')>=0 ? mvt.date.slice(10) : 'T' + new Date().toISOString().slice(11,19));
     mvt.montant = montant; mvt.motif = motif; mvt.beneficiaire = beneficiaire;
     mvt.piece_ref = piece;
+    if (caisseEstReprise(mvt.caisse_id, date) && !mvt.reprise_historique) { var _hEd = await caisseSessionHistorique(mvt.caisse_id); mvt.session_precedente = mvt.session_id; mvt.session_id = _hEd.id; mvt.reprise_historique = true; }
     mvt.modifie_par = (APP.currentUser && APP.currentUser.nom) || '—';
     mvt.modifie_le = new Date().toISOString();
 
@@ -128744,12 +128845,13 @@ async function caisseSaveBon() {
   }
 
   /* ── MODE CRÉATION ────────────────────────────────────────────────────── */
-  var session = caisseGetSessionOuverte(caisseId);
+  var _reprise = caisseEstReprise(caisseId, date);
+  var session = _reprise ? await caisseSessionHistorique(caisseId) : caisseGetSessionOuverte(caisseId);
   if (!session) { toast('La caisse a été clôturée entre-temps — impossible d\'enregistrer ce bon.', 'error'); closeModal('modal-caisse-bon'); return; }
   /* Revérifié ici (pas seulement à l'ouverture de la modale) : la modale a pu
      rester ouverte pendant qu'un autre utilisateur prenait la caisse — le
      contrôle définitif doit être au moment réel de l'enregistrement. */
-  if (!caisseSessionEstOperable(session)) {
+  if (!_reprise && !caisseSessionEstOperable(session)) {
     toast('🔒 Cette caisse est désormais tenue par ' + (session.ouverte_par || 'un(e) autre utilisateur(rice)') + ' — enregistrement refusé.', 'error', 6000);
     closeModal('modal-caisse-bon');
     return;
@@ -128779,7 +128881,7 @@ async function caisseSaveBon() {
     }
   }
 
-  if (type === 'sortie') {
+  if (type === 'sortie' && !_reprise) {
     var soldeCourant = caisseSoldeSession(session);
     if (montant > soldeCourant) {
       if (!confirm('⚠️ Solde de caisse insuffisant (solde actuel : ' + fmtF(soldeCourant) + ' FCFA pour une sortie de ' + fmtF(montant) + ' FCFA).\n\nConfirmer tout de même l\'enregistrement de ce bon de sortie ?')) return;
@@ -128797,7 +128899,7 @@ async function caisseSaveBon() {
     id: uid(), session_id: session.id, caisse_id: caisseId,
     date: date + 'T' + new Date().toISOString().slice(11,19), numero: numero,
     type: type, montant: montant, motif: motif, beneficiaire: beneficiaire,
-    piece_ref: piece,
+    piece_ref: piece, reprise_historique: _reprise ? true : undefined,
     statut: 'a_ventiler', compte_ventile: null, ecriture_id: null,
     ventile_par: null, ventile_le: null,
     created_by: (APP.currentUser && APP.currentUser.nom) || '—', created_at: new Date().toISOString()
@@ -128862,6 +128964,7 @@ async function caisseSaveBon() {
   } else {
     toast('✅ ' + (type === 'entree' ? 'Bon d\'entrée' : 'Bon de sortie') + ' ' + numero + ' enregistré.', 'success');
   }
+  if (_reprise) toast('📜 Reprise d\'historique : bon classé dans la session historique, sans effet sur le solde du tiroir.', 'info', 6000);
   caisseRenderListe();
   if (typeof caisseRenderDashboard === 'function') caisseRenderDashboard();
   if (typeof caisseRenderValidations === 'function') caisseRenderValidations();
@@ -131956,7 +132059,7 @@ function caisseControleIntegrite() {
      réutilise directement caisseSoldeSession() pour garantir que l'audit
      recalcule EXACTEMENT comme la clôture elle-même — une seule source de vérité. */
   var ecartsSolde = [];
-  sessions.filter(function(s){ return s.statut==='cloturee'; }).forEach(function(s){
+  sessions.filter(function(s){ return s.statut==='cloturee' && !s.session_technique; }).forEach(function(s){
     var theorique = caisseSoldeSession(s);
     var enregistre = (s.fond_cloture_theorique != null) ? (parseFloat(s.fond_cloture_theorique)||0) : null;
     if (enregistre !== null && Math.abs(theorique - enregistre) > 1) {
@@ -136645,7 +136748,8 @@ goTo = function(page) {
       <div id="cb-solde-actuel" style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;"></div>
       <div id="cb-edit-warn" style="display:none;font-size:12px;background:rgba(184,115,51,.12);border:1px solid var(--or,#B87333);color:var(--or,#B87333);border-radius:6px;padding:8px 10px;margin-bottom:10px;"></div>
       <div class="form-grid">
-        <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="cb-date"></div>
+        <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="cb-date" oninput="caisseBonDateChange()" onchange="caisseBonDateChange()">
+        <div id="cb-date-reprise" style="display:none;font-size:11px;color:var(--or,#B87333);margin-top:4px;"></div></div>
         <div class="form-group"><label>Montant (FCFA) *</label><input type="number" class="form-control" id="cb-montant" value="0"></div>
         <div class="form-group span-2"><label>N° de pièce justificative (facture, reçu…)</label><input class="form-control" id="cb-piece" placeholder="Ex : FAC-2026-0148, reçu n°037"></div>
         <div class="form-group span-2">
