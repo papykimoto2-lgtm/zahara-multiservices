@@ -97477,6 +97477,10 @@ function rchGenererApercu() {
        (onglet Aperçu souscripteur, case Visibilité), n'y arrivaient jamais.
        On stocke désormais le programme hérité de la convention. */
     var convPourProgramme = (DATA.conventions||[]).find(function(c){ return c.id===convId; });
+    /* Alerte : sans programme, un rapport « visible » reste invisible dans le portail souscripteur. */
+    if (!(convPourProgramme && convPourProgramme.programme_id) && ((document.getElementById('rch-visibilite')||{}).value||'souscripteurs')!=='interne') {
+      if (!confirm('⚠️ La convention choisie n\'est rattachée à aucun programme.\n\nCe rapport ne sera PAS visible par les souscripteurs dans le portail.\n\nOK = enregistrer quand même\nAnnuler = revenir pour corriger (rattachez la convention à un programme, ou choisissez « Interne seulement »)')) return;
+    }
     var r = {
       id: APP.editingId || uid(),
       convention_id: convId,
