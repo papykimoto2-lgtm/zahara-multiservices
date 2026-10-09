@@ -12867,6 +12867,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <button class="btn btn-secondary btn-sm" id="btn-caisse-nouvelle" onclick="caisseConfigModal(null)" style="display:none;">➕ Nouvelle caisse</button>
           <button class="btn btn-secondary btn-sm" onclick="caisseAuditDoublonsModal()">🔍 Audit doublons</button>
           <button class="btn btn-secondary btn-sm" onclick="caisseControleIntegrite()">🩺 Contrôle d'intégrité</button>
+          <button class="btn btn-secondary btn-sm" onclick="caisseRapprochement()">📊 Rapprochement</button>
           <button class="btn btn-secondary btn-sm" onclick="vrsEspecesControle()" title="Versements souscripteurs en espèces sans bon de caisse rattaché">💵 Versements espèces</button>
           <button class="btn btn-secondary btn-sm" onclick="caisseSnapshotsModal()">♻️ Points de restauration</button>
         </div>
@@ -127331,6 +127332,128 @@ function caisseBanniereApresCloture() {
     + '. Le solde et l\'écart de ces sessions ont été recalculés : vérifiez-les avant toute régularisation.</div>';
 }
 
+/* ═══ RAPPROCHEMENT CUMULÉ PAR CAISSE ═══════════════════════════════════
+   Écart réel = dernier comptage − (premier fond + tous les mouvements validés des sessions clôturées).
+   Indépendant des écarts enregistrés session par session, qui peuvent se compenser ou se masquer
+   (clôture tardive, mouvement validé après coup, fond d'ouverture modifié à la main). */
+function caisseCalculerRapprochement(caisseId) {
+  var sess = (DATA.caisse_sessions || []).filter(function(s){ return s.caisse_id === caisseId && !s.session_technique; })
+    .sort(function(a,b){ return String(a.ouverte_le || a.date || '').localeCompare(String(b.ouverte_le || b.date || '')); });
+  if (!sess.length) return null;
+  var clot = sess.filter(function(s){ return s.statut === 'cloturee'; })
+    .sort(function(a,b){ return String(a.cloturee_le || '').localeCompare(String(b.cloturee_le || '')); });
+  if (!clot.length) return null;
+  var derniere = clot[clot.length - 1], premier = sess[0];
+  var ids = {}; clot.forEach(function(s){ ids[s.id] = true; });
+  var ouverteId = null; sess.forEach(function(s){ if (s.statut === 'ouverte') ouverteId = s.id; });
+  var entrees = 0, sorties = 0, attE = 0, attS = 0;
+  (DATA.caisse_mouvements || []).forEach(function(m){
+    if (m.rejete) return;
+    var v = parseFloat(m.montant) || 0;
+    var enAttente = m.requiert_validation && m.valide !== true;
+    if (ids[m.session_id]) { if (enAttente) { if (m.type === 'entree') attE += v; else attS += v; } else if (m.type === 'entree') entrees += v; else sorties += v; }
+  });
+  var fondInitial = parseFloat(premier.fond_ouverture) || 0;
+  var attendu = fondInitial + entrees - sorties;
+  var reel = parseFloat(derniere.fond_cloture_reel) || 0;
+  var somme = clot.reduce(function(a,s){ return a + (parseFloat(s.ecart) || 0); }, 0);
+  var ruptures = [];
+  var precedent = null;
+  sess.forEach(function(s){
+    if (precedent) {
+      var d = (parseFloat(s.fond_ouverture) || 0) - (parseFloat(precedent.fond_cloture_reel) || 0);
+      if (d !== 0) ruptures.push({ date: String(s.date || '').slice(0,10), fond: parseFloat(s.fond_ouverture) || 0, precedent: parseFloat(precedent.fond_cloture_reel) || 0, diff: d, par: s.ouverte_par || '', motif: s.fond_ouverture_motif || '' });
+    }
+    if (s.statut === 'cloturee') precedent = s;
+  });
+  return { caisse_id: caisseId, fondInitial: fondInitial, entrees: entrees, sorties: sorties, attendu: attendu, reel: reel, ecartReel: reel - attendu,
+    sommeEcarts: somme, attenteEntrees: attE, attenteSorties: attS, ruptures: ruptures, nbSessions: clot.length,
+    derniereDate: String(derniere.date || '').slice(0,10), sessionOuverte: !!ouverteId };
+}
+function caisseRapprochement() {
+  var box = document.getElementById('crp-contenu'); if (!box) return;
+  var html = '';
+  (caissesVisibles() || []).forEach(function(c){
+    var r = caisseCalculerRapprochement(c.id);
+    if (!r) { html += '<div class="card" style="padding:12px;margin-bottom:10px;"><strong>' + escHtml(c.nom || '') + '</strong><div style="font-size:12px;color:var(--blanc-dim);">Aucune session clôturée : rien à rapprocher.</div></div>'; return; }
+    var couleur = r.ecartReel === 0 ? 'var(--vert)' : 'var(--rouge)';
+    html += '<div class="card" style="padding:14px;margin-bottom:12px;">'
+      + '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;"><strong>' + escHtml(c.nom || '') + '</strong><span style="font-size:12px;color:var(--blanc-dim);">' + r.nbSessions + ' session(s) clôturée(s) · dernière : ' + dateShort(r.derniereDate) + '</span></div>'
+      + '<table class="data-table" style="margin-top:8px;font-size:12px;"><tbody>'
+      + '<tr><td>Fond initial (première session)</td><td style="text-align:right;">' + fmtF(r.fondInitial) + '</td></tr>'
+      + '<tr><td>+ Entrées validées</td><td style="text-align:right;">' + fmtF(r.entrees) + '</td></tr>'
+      + '<tr><td>− Sorties validées</td><td style="text-align:right;">' + fmtF(r.sorties) + '</td></tr>'
+      + '<tr style="font-weight:700;"><td>= Solde attendu</td><td style="text-align:right;">' + fmtF(r.attendu) + '</td></tr>'
+      + '<tr><td>Dernier comptage réel</td><td style="text-align:right;">' + fmtF(r.reel) + '</td></tr>'
+      + '<tr style="font-weight:800;"><td>Écart réel cumulé</td><td style="text-align:right;color:' + couleur + ';">' + (r.ecartReel > 0 ? '+' : '') + fmtF(r.ecartReel) + ' FCFA</td></tr>'
+      + '<tr><td style="color:var(--blanc-dim);">Somme des écarts enregistrés session par session</td><td style="text-align:right;color:var(--blanc-dim);">' + (r.sommeEcarts > 0 ? '+' : '') + fmtF(r.sommeEcarts) + '</td></tr>'
+      + ((r.attenteEntrees || r.attenteSorties) ? '<tr><td style="color:var(--rouge);">Mouvements en attente de validation (non comptés)</td><td style="text-align:right;color:var(--rouge);">+' + fmtF(r.attenteEntrees) + ' / −' + fmtF(r.attenteSorties) + '</td></tr>' : '')
+      + '</tbody></table>'
+      + (r.ruptures.length ? '<div style="margin-top:8px;font-size:12px;"><strong>Ruptures de chaîne</strong> (fond d\'ouverture différent du dernier comptage) : ' + r.ruptures.length
+        + '<table class="data-table" style="margin-top:4px;font-size:11px;"><thead><tr><th>Date</th><th>Fond saisi</th><th>Dernier comptage</th><th>Différence</th><th>Par</th><th>Motif</th></tr></thead><tbody>'
+        + r.ruptures.slice(-10).map(function(x){ return '<tr><td>' + dateShort(x.date) + '</td><td style="text-align:right;">' + fmtF(x.fond) + '</td><td style="text-align:right;">' + fmtF(x.precedent) + '</td><td style="text-align:right;">' + (x.diff > 0 ? '+' : '') + fmtF(x.diff) + '</td><td>' + escHtml(x.par) + '</td><td>' + escHtml(x.motif || '—') + '</td></tr>'; }).join('')
+        + '</tbody></table></div>' : '')
+      + '</div>';
+  });
+  box.innerHTML = html || '<div style="padding:12px;">Aucune caisse à rapprocher.</div>';
+  openModal('modal-caisse-rapprochement');
+}
+
+/* ═══ REMISES (banque / direction) ═════════════════════════════════════
+   Cause probable des gros écarts ronds : de l'argent sort du tiroir sans mouvement saisi. Une remise est une
+   sortie dédiée : pièce (bordereau / reçu) obligatoire, validation habituelle, puis CONFIRMATION de réception
+   par une autre personne, avec la référence de la preuve. Tant qu'elle n'est pas confirmée, elle reste signalée. */
+function caisseRemiseModal(caisseId, genre) {
+  caisseOuvrirBonModal(caisseId, 'sortie');
+  if (!document.getElementById('cb-motif')) return;
+  CAISSE_UI._remise = genre;
+  var lib = genre === 'banque' ? 'Remise en banque' : 'Remise à la direction';
+  document.getElementById('cb-motif').value = lib + ' — ';
+  var pc = document.getElementById('cb-piece'); if (pc) pc.placeholder = genre === 'banque' ? 'N° du bordereau de versement (obligatoire)' : 'N° du reçu signé par la direction (obligatoire)';
+}
+function caisseRemisesAConfirmer() {
+  var vis = caissesVisibles().map(function(c){ return c.id; });
+  return (DATA.caisse_mouvements || []).filter(function(m){ return m.remise_a_confirmer && !m.rejete && vis.indexOf(m.caisse_id) >= 0; });
+}
+function caisseBanniereRemises() {
+  var l = caisseRemisesAConfirmer();
+  if (!l.length) return '';
+  return '<div style="grid-column:1/-1;padding:10px 14px;border:1px solid var(--or,#B87333);border-radius:var(--r);background:var(--card2);font-size:13px;">'
+    + '<strong>🏦 Remises à confirmer (' + l.length + ') :</strong> une remise n\'est soldée que lorsque sa réception est confirmée par une autre personne que celle qui l\'a saisie.'
+    + l.map(function(m){
+        var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
+        return '<div style="margin-top:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;"><span>' + escHtml(c ? c.nom : '?') + ' — ' + escHtml(m.numero || '') + ' — <strong>' + fmtF(m.montant) + ' FCFA</strong> ('
+          + (m.remise_type === 'banque' ? 'banque' : 'direction') + ', pièce ' + escHtml(m.piece_ref || '—') + ', saisie par ' + escHtml(m.created_by || '—') + (m.valide ? '' : ', en attente de validation') + ')</span>'
+          + '<button class="btn btn-secondary btn-sm" onclick="caisseConfirmerRemise(\'' + m.id + '\')">✅ Confirmer la réception</button></div>';
+      }).join('')
+    + '</div>';
+}
+async function caisseConfirmerRemise(mvtId) {
+  var m = (DATA.caisse_mouvements || []).find(function(x){ return x.id === mvtId; });
+  if (!m || !m.remise_a_confirmer) return;
+  if (!exigerDroit('Caisse', 'v', 'la confirmation de réception d\'une remise')) return;
+  if (caisseEstMemeDemandeur(m) || String(m.created_by || '').trim().toLowerCase() === String((APP.currentUser && APP.currentUser.nom) || '').trim().toLowerCase()) {
+    toast('⛔ La réception d\'une remise doit être confirmée par une autre personne que celle qui l\'a saisie.', 'error', 7000); return;
+  }
+  var ref = prompt('Référence de la preuve de réception (n° de reçu bancaire, accusé signé de la direction) :', '');
+  if (ref === null) return;
+  ref = ref.trim();
+  if (!ref) { toast('⚠️ La référence de la preuve de réception est obligatoire.', 'error'); return; }
+  m.remise_a_confirmer = false;
+  m.remise_confirmee_par = (APP.currentUser && APP.currentUser.nom) || '—';
+  m.remise_confirmee_le = new Date().toISOString();
+  m.remise_preuve = ref;
+  m._baseModifie = m._modifie || null;
+  await dbPut('caisse_mouvements', m);
+  await caisseSyncEtAlerter('pi_caisse_mouvements', m);
+  toast('✅ Réception de la remise ' + (m.numero || '') + ' confirmée.', 'success');
+  caisseRenderListe();
+}
+/* Un écart de clôture doit être expliqué à la source, sauf s'il correspond exactement aux mouvements en attente. */
+function caisseEcartAExpliquer(ecart, fondReel, soldeSiValide) {
+  return Math.round(ecart) !== 0 && Math.round(fondReel) !== Math.round(soldeSiValide);
+}
+
 function caisseNomUser(userId) {
   var u = (DATA.users || []).find(function(x){ return x.id === userId; });
   return u ? u.nom : userId;
@@ -128356,7 +128479,7 @@ function caisseRenderListe() {
       + '</div>';
     return;
   }
-  el.innerHTML = caisseBanniereAnciennes() + caisseBanniereReprise() + caisseBanniereApresCloture() + liste.map(function(c) {
+  el.innerHTML = caisseBanniereAnciennes() + caisseBanniereReprise() + caisseBanniereApresCloture() + caisseBanniereRemises() + liste.map(function(c) {
     var session = caisseGetSessionOuverte(c.id);
     var ouverte = !!session;
     var solde = ouverte ? caisseSoldeSession(session) : null;
@@ -128370,6 +128493,8 @@ function caisseRenderListe() {
     } else {
       actions += '<button class="btn btn-secondary btn-sm" onclick="caisseOuvrirBonModal(\'' + c.id + '\',\'entree\')">📥 Entrée</button>'
         + '<button class="btn btn-secondary btn-sm" onclick="caisseOuvrirBonModal(\'' + c.id + '\',\'sortie\')">📤 Sortie</button>'
+        + '<button class="btn btn-secondary btn-sm" onclick="caisseRemiseModal(\'' + c.id + '\',\'banque\')" title="Argent déposé à la banque : bordereau obligatoire">🏦 Remise banque</button>'
+        + '<button class="btn btn-secondary btn-sm" onclick="caisseRemiseModal(\'' + c.id + '\',\'direction\')" title="Argent remis à la direction : reçu signé obligatoire">👤 Remise direction</button>'
         + '<button class="btn btn-secondary btn-sm" onclick="caisseTransfertModal(\'' + c.id + '\')" title="Provisionner une autre caisse (virement interne, compte relais 585)">🔄 Transférer</button>'
         + '<button class="btn btn-secondary btn-sm" onclick="caisseAfficherBrouillard(\'' + c.id + '\')">📋 Brouillard</button>'
         + '<button class="btn btn-secondary btn-sm" onclick="caisseImportCSVModal(\'' + c.id + '\')">📥 Import CSV</button>'
@@ -128763,6 +128888,7 @@ function caisseOuvrirBonModal(caisseId, type) {
      d'être ventilé normalement, sans aucune erreur visible. Seul
      daOuvrirDecaissement() refixe ce flag, juste après cet appel. */
   window._daPourDecaissement = null;
+  CAISSE_UI._remise = null;
   if (CAISSE_UI.verrouille) { toast('🔒 Caisse verrouillée par inactivité — déverrouillez d\'abord.', 'error'); return; }
   var session = caisseGetSessionOuverte(caisseId);
   if (!session) { toast('Cette caisse n\'est pas ouverte.', 'error'); return; }
@@ -128866,6 +128992,7 @@ function caisseCanEditBon(mvt) {
 }
 
 function caisseEditBonModal(mvtId) {
+  CAISSE_UI._remise = null;
   window._daPourDecaissement = null; /* [Sécurité] même précaution qu'à l'ouverture — voir caisseOuvrirBonModal */
   var m = (DATA.caisse_mouvements||[]).find(function(x){ return x.id===mvtId; });
   if (!m) return;
@@ -128907,6 +129034,7 @@ async function caisseSaveBon() {
   if (montant <= 0) { toast('Le montant doit être supérieur à zéro.', 'error'); return; }
   if (!motif) { toast('Le motif est obligatoire.', 'error'); return; }
   if (!beneficiaire) { toast((type === 'entree' ? 'Le déposant' : 'Le bénéficiaire') + ' est obligatoire.', 'error'); return; }
+  if (CAISSE_UI._remise && !editId && !piece) { toast('⚠️ Une remise exige la pièce : ' + (CAISSE_UI._remise === 'banque' ? 'n° du bordereau de versement' : 'n° du reçu signé par la direction') + '.', 'error', 7000); return; }
 
   var c = (DATA.caisses || []).find(function(x){ return x.id === caisseId; });
 
@@ -129043,6 +129171,7 @@ async function caisseSaveBon() {
     date: date + 'T' + new Date().toISOString().slice(11,19), numero: numero,
     type: type, montant: montant, motif: motif, beneficiaire: beneficiaire,
     piece_ref: piece, reprise_historique: _reprise ? true : undefined,
+    remise_type: CAISSE_UI._remise || undefined, remise_a_confirmer: CAISSE_UI._remise ? true : undefined,
     statut: 'a_ventiler', compte_ventile: null, ecriture_id: null,
     ventile_par: null, ventile_le: null,
     created_by: (APP.currentUser && APP.currentUser.nom) || '—', created_at: new Date().toISOString()
@@ -129106,6 +129235,7 @@ async function caisseSaveBon() {
     if (typeof caisseRenderDecaissementsAFaire === 'function') caisseRenderDecaissementsAFaire();
   }
   await cbCommitDocs(nouveau.id);
+  CAISSE_UI._remise = null;
   closeModal('modal-caisse-bon');
   if (nouveau.requiert_validation) {
     toast('🔐 Bon ' + numero + ' enregistré — décaissement de ' + fmtF(montant) + ' FCFA au-delà de votre plafond de validation (' + fmtF(nouveau.plafond_demandeur||0) + ' FCFA). En attente de l\'approbation d\'un responsable habilité.', 'info');
@@ -131358,6 +131488,7 @@ function caisseClôturerModal(caisseId) {
   _inReel.value = '';
   _inReel.dataset.theorique = solde;
   _inReel.dataset.siValide = soldeSiValide;
+  var _exEl = document.getElementById('ccl-explication'); if (_exEl) _exEl.value = '';
   caisseUpdateEcartPreview();
   openModal('modal-caisse-cloturer');
 }
@@ -131375,6 +131506,8 @@ function caisseUpdateEcartPreview() {
   var siValide = (input.dataset.siValide !== undefined && input.dataset.siValide !== '') ? parseFloat(input.dataset.siValide) : theorique;
   var reel = parseFloat(input.value) || 0;
   var ecart = reel - theorique;
+  var _bx = document.getElementById('ccl-explication-box');
+  if (_bx) _bx.style.display = caisseEcartAExpliquer(ecart, reel, siValide) ? '' : 'none';
   el.style.color = ecart === 0 ? 'var(--vert)' : 'var(--rouge)';
   el.textContent = ecart === 0 ? 'Aucun écart.' : 'Écart : ' + (ecart > 0 ? '+' : '') + fmtF(ecart) + ' FCFA';
   if (siValide !== theorique) {
@@ -131419,6 +131552,8 @@ async function caisseCloturer() {
   if (_attente.length && !_motifAttente) { toast('⚠️ ' + _attente.length + ' mouvement(s) sont en attente de validation : précisez-les dans le champ prévu avant de clôturer.', 'error', 7000); return; }
   var fondReel = parseFloat(_inputReel.value) || 0;
   var ecart = fondReel - soldeTheorique;
+  var _explication = ((document.getElementById('ccl-explication') || {}).value || '').trim();
+  if (caisseEcartAExpliquer(ecart, fondReel, caisseSoldeSiToutValide(session)) && !_explication) { toast('⚠️ Un écart de ' + fmtF(ecart) + ' FCFA doit être expliqué avant de clôturer : renseignez le champ prévu.', 'error', 7000); return; }
 
   /* [FIX] Le comptage physique d'une caisse ne peut JAMAIS être négatif — on
      ne compte pas des billets négatifs. Avant ce garde-fou, un solde
@@ -131457,6 +131592,7 @@ async function caisseCloturer() {
   session.statut = 'cloturee';
   if (_tiersC) session.cloture_administrative = true;
   if (_motifAdmin) { session.cloture_motif = _motifAdmin; session.cloture_tardive_h = Math.round(_heuresC); }
+  if (_explication) session.ecart_explication = _explication;
   session.fond_cloture_theorique = soldeTheorique;
   session.fond_cloture_reel = fondReel;
   session.ecart = ecart;
@@ -137998,6 +138134,23 @@ goTo = function(page) {
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-caisse-rapprochement">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>📊 Rapprochement cumulé par caisse</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-caisse-rapprochement')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--blanc-dim);margin-bottom:10px;">Lecture seule. L'écart réel compare le dernier comptage au fond initial augmenté de tous les mouvements validés des sessions clôturées. Il ne dépend pas des écarts enregistrés session par session, qui peuvent se compenser ou se masquer.</div>
+      <div id="crp-contenu"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-caisse-rapprochement')">Fermer</button>
+      <button class="btn btn-primary" onclick="caisseRapprochement()">🔄 Actualiser</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-caisse-integrite">
   <div class="modal modal-lg">
     <div class="modal-header">
@@ -138127,6 +138280,11 @@ goTo = function(page) {
         <input type="number" class="form-control" id="ccl-fond-reel" value="" min="0" placeholder="Comptez le tiroir puis saisissez le montant" oninput="caisseUpdateEcartPreview()">
       </div>
       <div id="ccl-ecart" style="margin-top:8px;font-weight:700;"></div>
+      <div id="ccl-explication-box" style="display:none;margin-top:10px;">
+        <label style="font-weight:600;">Explication de l'écart (obligatoire) *</label>
+        <input type="text" class="form-control" id="ccl-explication" placeholder="Ex. : remise en banque non saisie, erreur de rendu de monnaie…">
+        <div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">Si de l'argent a quitté le tiroir (banque, direction), saisissez la remise avant de clôturer.</div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-caisse-cloturer')">Annuler</button>

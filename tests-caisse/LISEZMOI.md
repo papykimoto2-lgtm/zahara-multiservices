@@ -12,6 +12,8 @@ et simule le cloud. Ils protègent les règles ajoutées à la caisse :
 | `regularisation.test.js` | net par caisse, motif obligatoire, confirmation de la régularisation en masse |
 | `cloture-encadree.test.js` | clôture par un tiers ou tardive (motif obligatoire, marque administrative), clôture existante jamais écrasée (cloud et synchro) |
 | `apres-cloture.test.js` | bons validés ou rattachés après la clôture : marque, badge, bannière, alerte, recalcul |
+| `rapprochement.test.js` | écart réel cumulé par caisse, ruptures de chaîne, sessions techniques et rejets ignorés |
+| `remise.test.js` | remises banque/direction (pièce obligatoire, confirmation de réception par une autre personne), explication obligatoire d'un écart de clôture |
 | `reappro.test.js` | virement lié à la demande, doublon de demande, validation par un autre, statut monotone à la synchro |
 
 Lancer : `npm run test:caisse` (ou `node --test tests-caisse/*.test.js`).
