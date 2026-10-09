@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cookies et stockage local — Zahara Multi-Services</title>
+<meta name="description" content="Ce que le site enregistre sur votre appareil, pourquoi, et comment gérer vos choix.">
+<!-- RETIRER la ligne ci-dessous quand tous les champs « À COMPLÉTER » sont renseignés : tant qu'ils ne le sont pas, la page ne doit pas être référencée. -->
+<meta name="robots" content="noindex,follow">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
+<style>
+:root{--txt:#1c1c2e;--fond:#ffffff;--gris:#f4f4f8;--bord:#d0d0dc;--lien:#1b5ea8;--accent:#8b5520}
+*{box-sizing:border-box}
+html{font-size:100%;scroll-behavior:smooth}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.65;color:var(--txt);background:var(--fond)}
+a{color:var(--lien);text-decoration:underline;text-underline-offset:2px}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #1b5ea8;outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-999px;top:8px;background:#1c1c2e;color:#fff;padding:8px 14px;border-radius:6px;z-index:10}
+.skip:focus{left:8px}
+header.site{background:#1c1c2e;color:#fff;padding:14px 20px}
+header.site .in{max-width:900px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px 24px;align-items:center;justify-content:space-between}
+header.site .marque{font-weight:700;font-size:1.1rem;color:#fff;text-decoration:none}
+header.site nav ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 18px}
+header.site nav a{color:#fff;font-size:.9rem}
+main{max-width:900px;margin:0 auto;padding:28px 20px 56px}
+h1{font-size:1.9rem;line-height:1.25;margin:.2em 0 .3em}
+h2{font-size:1.3rem;margin:2em 0 .5em;padding-top:.4em;border-top:1px solid var(--bord)}
+h3{font-size:1.05rem;margin:1.4em 0 .3em}
+.maj{color:#4a4a62;font-size:.92rem}
+.note{background:var(--gris);border-left:4px solid var(--accent);padding:12px 16px;margin:18px 0;border-radius:0 6px 6px 0}
+.a-completer{background:#fff3b0;color:#4d3b00;padding:0 4px;border-radius:3px}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:.93rem}
+th,td{border:1px solid var(--bord);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--gris)}
+.scroll{overflow-x:auto}
+footer.site{border-top:1px solid var(--bord);background:var(--gris);padding:22px 20px;font-size:.9rem}
+footer.site .in{max-width:900px;margin:0 auto}
+footer.site ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 18px}
+button.btn{background:#1b5ea8;color:#fff;border:0;border-radius:6px;padding:10px 16px;font-size:1rem;cursor:pointer}
+button.btn.sec{background:#fff;color:#1b5ea8;border:2px solid #1b5ea8}
+@media print{header.site nav,footer.site,.skip,.noprint{display:none}main{padding:0}}
+</style>
+</head>
+<body>
+<a class="skip" href="#contenu">Aller au contenu</a>
+<header class="site"><div class="in">
+<a class="marque" href="/portail-unique.html">Zahara Multi-Services</a>
+<nav aria-label="Informations légales"><ul><li><a href="/mentions-legales.html">Mentions légales</a></li><li><a href="/confidentialite.html">Confidentialité</a></li><li><a href="/cookies.html" aria-current="page">Cookies</a></li><li><a href="/conditions.html">Conditions d’utilisation</a></li><li><a href="/remboursement.html">Résiliation et remboursement</a></li></ul></nav>
+</div></header>
+<main id="contenu">
+<h1>Cookies et stockage local</h1>
+<p class="maj">Dernière mise à jour : 9 octobre 2026</p>
+
+<h2>En bref</h2>
+<ul>
+<li>Le site <strong>ne dépose aucun cookie</strong> de suivi, de publicité ou de mesure d’audience.</li>
+<li>Il utilise le <strong>stockage local de votre navigateur</strong> pour fonctionner (connexion, préférences). Ces éléments sont indispensables et ne demandent pas de consentement.</li>
+<li>Les contenus externes facultatifs (vidéos YouTube et Vimeo) <strong>ne se chargent qu’après votre clic</strong>, car leurs hébergeurs peuvent alors recevoir votre adresse IP et déposer leurs propres cookies.</li>
+</ul>
+<div class="note"><strong>Pourquoi pas de bandeau de consentement bloquant ?</strong> Seuls des éléments strictement nécessaires au service sont utilisés par défaut ; un simple avis d’information suffit. Dès que vous cliquez sur une vidéo externe, nous vous demandons votre accord. <mark class="a-completer">[À VÉRIFIER : confirmer cette analyse avec un juriste et auprès de l’ARTCI ; si un outil de mesure d’audience ou de publicité est ajouté un jour, un vrai consentement préalable devra être recueilli]</mark></div>
+
+<h2>Éléments enregistrés sur votre appareil</h2>
+<div class="scroll"><table>
+<thead><tr><th scope="col">Nom</th><th scope="col">Finalité</th><th scope="col">Durée</th><th scope="col">Nature</th></tr></thead>
+<tbody>
+<tr><td>session_*, *_token, _sous_hmac_key</td><td>Maintenir votre connexion à votre espace (souscripteur, apporteur, partenaire)</td><td>Jusqu’à déconnexion ou expiration de la session</td><td>Stockage local — nécessaire</td></tr>
+<tr><td>*_login_attempts</td><td>Limiter les tentatives de connexion répétées (sécurité)</td><td>Quelques heures</td><td>Stockage local — nécessaire</td></tr>
+<tr><td>cookies_info_vu</td><td>Mémoriser que vous avez lu l’avis d’information</td><td>12 mois</td><td>Stockage local — nécessaire</td></tr>
+<tr><td>consent_media_externes</td><td>Mémoriser votre accord pour afficher les vidéos externes</td><td>Jusqu’à ce que vous retiriez votre choix</td><td>Stockage local — choix</td></tr>
+<tr><td>Préférences d’affichage et données de travail hors ligne</td><td>Confort d’utilisation de l’application de gestion (vues, filtres, copie locale de travail)</td><td>Jusqu’à effacement par vos soins</td><td>Stockage local et base du navigateur — nécessaire</td></tr>
+</tbody></table></div>
+
+<h2>Gérer vos choix</h2>
+<p>Vous pouvez effacer ces éléments à tout moment depuis les réglages de votre navigateur (« Effacer les données de navigation »). Pour retirer votre accord aux vidéos externes :</p>
+<p><button class="btn" type="button" id="btn-retirer">Retirer mon accord aux contenus externes</button></p>
+<p id="etat-choix" role="status" aria-live="polite"></p>
+<p>Pour en savoir plus sur le traitement de vos données : <a href="/confidentialite.html">politique de confidentialité</a>.</p>
+
+</main>
+<footer class="site"><div class="in">
+<p>© Zahara Multi-Services. Retour au <a href="/portail-unique.html">portail</a>.</p>
+<nav aria-label="Pied de page — informations légales"><ul><li><a href="/mentions-legales.html">Mentions légales</a></li><li><a href="/confidentialite.html">Confidentialité</a></li><li><a href="/cookies.html" aria-current="page">Cookies</a></li><li><a href="/conditions.html">Conditions d’utilisation</a></li><li><a href="/remboursement.html">Résiliation et remboursement</a></li></ul></nav>
+</div></footer>
+<script>
+(function(){
+  var b=document.getElementById('btn-retirer'),e=document.getElementById('etat-choix');
+  function maj(){ var o=false; try{ o=localStorage.getItem('consent_media_externes')==='oui'; }catch(x){} e.textContent=o?'Votre accord est actuellement enregistré.':'Aucun accord enregistré : les vidéos externes ne se chargent pas automatiquement.'; }
+  b.addEventListener('click',function(){ try{ localStorage.removeItem('consent_media_externes'); }catch(x){} maj(); });
+  maj();
+})();
+</script>
+</body>
+</html>

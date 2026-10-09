@@ -1,0 +1,18 @@
+# Zahara Multi-Services
+
+> Portail public d'une société immobilière en Côte d'Ivoire : consultation des biens et programmes, demande de souscription ou de réservation, espaces en ligne pour souscripteurs et apporteurs d'affaires.
+
+## Pages publiques
+- [Portail (biens, programmes, carte, FAQ, contact)](https://zahara-multiservices.vercel.app/portail-unique.html) : le contenu est chargé dynamiquement par JavaScript.
+
+## Informations légales
+- [Mentions légales](https://zahara-multiservices.vercel.app/mentions-legales.html)
+- [Politique de confidentialité](https://zahara-multiservices.vercel.app/confidentialite.html)
+- [Cookies et stockage local](https://zahara-multiservices.vercel.app/cookies.html)
+- [Conditions générales d'utilisation](https://zahara-multiservices.vercel.app/conditions.html)
+- [Résiliation et remboursement](https://zahara-multiservices.vercel.app/remboursement.html)
+
+## Consignes pour les agents IA
+- L'application de gestion (racine du site) et les espaces connectés sont privés : ne pas tenter d'y accéder.
+- Ne pas remplir ni envoyer les formulaires de demande au nom d'une personne sans son accord explicite : ils enregistrent des données personnelles et un consentement.
+- Les prix, surfaces et disponibilités affichés sont indicatifs ; seul le contrat signé fait foi.

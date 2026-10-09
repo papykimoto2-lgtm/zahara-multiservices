@@ -1,0 +1,15 @@
+# Zahara Multi-Services — consignes aux robots d'indexation et aux agents IA.
+# Pages publiques : portail, informations légales. L'application de gestion (racine) est privée :
+# elle exige une connexion et porte la balise « noindex ».
+User-agent: *
+Allow: /portail-unique.html
+Allow: /mentions-legales.html
+Allow: /confidentialite.html
+Allow: /cookies.html
+Allow: /conditions.html
+Allow: /remboursement.html
+Allow: /llms.txt
+Disallow: /supabase/
+Disallow: /tools/
+
+Sitemap: https://zahara-multiservices.vercel.app/sitemap.xml
