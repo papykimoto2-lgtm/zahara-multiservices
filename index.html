@@ -21,7 +21,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\'un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\'engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\'un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -18214,6 +18214,34 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <label>Adresse</label>
             <input type="text" class="form-control" id="c-adresse">
           </div>
+          <div class="form-group span-2" id="c-famille-bloc" style="border:1px solid var(--bord,#D1D5DB);border-radius:8px;padding:10px 12px;">
+            <label style="font-weight:700;">👨‍👩‍👧 Souscription de famille / groupe — co-souscripteurs</label>
+            <div style="font-size:11px;color:var(--blanc-dim);margin:2px 0 8px;">Un seul dossier et un seul échéancier ; chaque co-souscripteur figure aux documents, avec sa part de propriété (facultative).</div>
+            <div id="c-cosous-liste"></div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="cfmCosousAjouter()">+ Ajouter un co-souscripteur</button>
+            <div id="c-cosous-parts" style="font-size:12px;margin-top:6px;"></div>
+          </div>
+          <div class="form-group span-2" id="c-mineur-wrap" style="border:1px solid var(--bord,#D1D5DB);border-radius:8px;padding:10px 12px;">
+            <label for="c-mineur-actif" style="display:flex;gap:8px;align-items:flex-start;font-weight:700;">
+              <input type="checkbox" id="c-mineur-actif" onchange="cfmMineurToggle()" style="width:auto;margin-top:3px;flex:0 0 auto;">
+              <span>🧒 Souscription au bénéfice d’un mineur — le souscripteur ci-dessus agit comme tuteur ou représentant légal</span>
+            </label>
+            <div id="c-mineur-bloc" style="display:none;margin-top:8px;">
+              <div class="form-grid">
+                <div class="form-group"><label>Nom du mineur *</label><input type="text" class="form-control" id="c-min-nom"></div>
+                <div class="form-group"><label>Prénoms du mineur *</label><input type="text" class="form-control" id="c-min-prenoms"></div>
+                <div class="form-group"><label>Date de naissance *</label><input type="date" class="form-control" id="c-min-ddn" onchange="cfmMineurInfo()"></div>
+                <div class="form-group"><label>Lieu de naissance</label><input type="text" class="form-control" id="c-min-lieu"></div>
+                <div class="form-group"><label>Pièce du mineur</label><select class="form-control" id="c-min-piece-type"><option value="acte_naissance">Acte de naissance</option><option value="extrait_naissance">Extrait de naissance</option><option value="cni">Carte d’identité</option><option value="passeport">Passeport</option></select></div>
+                <div class="form-group"><label>N° de la pièce</label><input type="text" class="form-control" id="c-min-piece-num"></div>
+                <div class="form-group"><label>Lien du souscripteur avec le mineur *</label><select class="form-control" id="c-tut-lien"><option value="pere">Père</option><option value="mere">Mère</option><option value="tuteur_legal">Tuteur légal (décision de justice)</option><option value="autre">Autre représentant légal</option></select></div>
+                <div class="form-group"><label>Justificatif de la qualité de représentant *</label><select class="form-control" id="c-tut-justif-type"><option value="acte_naissance">Acte de naissance du mineur</option><option value="jugement_tutelle">Jugement de tutelle</option><option value="jugement_delegation">Décision de délégation d’autorité</option><option value="autre">Autre justificatif</option></select></div>
+                <div class="form-group"><label>N° / référence du justificatif</label><input type="text" class="form-control" id="c-tut-justif-num"></div>
+                <div class="form-group"><label>Âge de la majorité civile (ans)</label><input type="number" class="form-control" id="c-min-age-maj" value="21" min="16" max="25" onchange="cfmMineurInfo()"></div>
+              </div>
+              <div id="c-min-info" style="font-size:12px;margin-top:6px;" role="status" aria-live="polite"></div>
+            </div>
+          </div>
           <div class="form-group span-2">
             <label for="c-info-donnees" style="display:flex;gap:8px;align-items:flex-start;font-weight:400;">
               <input type="checkbox" id="c-info-donnees" style="width:auto;margin-top:3px;flex:0 0 auto;">
@@ -32746,6 +32774,7 @@ function openClientModal(id) {
     APP._clientBaseModifie = c._modifie || null;
     document.getElementById('modal-client-title').textContent = 'Modifier Souscripteur';
     fillClientForm(c);
+    if (typeof cfmRemplir === 'function') cfmRemplir(c);
     var _idf1 = document.getElementById('c-info-donnees'); if (_idf1) _idf1.checked = !!c.info_donnees;
     var _idd1 = document.getElementById('c-info-donnees-date'); if (_idd1) _idd1.textContent = c.info_donnees ? ('Enregistré le ' + c.info_donnees.date + (c.info_donnees.par ? ' par ' + c.info_donnees.par : '')) : '';
     // Boutons documents imprimables
@@ -32808,6 +32837,7 @@ function clearClientForm() {
   var modeAcqEl = document.getElementById('c-mode-acquisition'); if (modeAcqEl) modeAcqEl.value = '';
   var _idf0 = document.getElementById('c-info-donnees'); if (_idf0) _idf0.checked = false;
   var _idd0 = document.getElementById('c-info-donnees-date'); if (_idd0) _idd0.textContent = '';
+  if (typeof cfmReset === 'function') cfmReset();
   if (typeof clientToggleConjoint === 'function') clientToggleConjoint();
   var svEcart = document.getElementById('c-surface-ecart'); if (svEcart) svEcart.style.display = 'none';
   var cGeoStatutClear = document.getElementById('c-geoloc-statut'); if (cGeoStatutClear) cGeoStatutClear.textContent = '';
@@ -33077,6 +33107,8 @@ async function saveClient() {
   var _aTel = telAnalyser(tel), _aTel2 = telAnalyser(tel2);
   if (!_aTel.valide && tel !== (_exTel.tel || '')) { toast('Téléphone 1 : ' + _aTel.message, 'error'); return; }
   if (tel2 && !_aTel2.valide && tel2 !== (_exTel.tel2 || '')) { toast('Téléphone 2 : ' + _aTel2.message, 'error'); return; }
+  var _cfmErr = (typeof cfmValider === 'function') ? cfmValider() : '';
+  if (_cfmErr) { toast(_cfmErr, 'error'); return; }
   if (_aTel.valide && _aTel2.valide && _aTel.e164 === _aTel2.e164) { toast('Téléphone 1 et Téléphone 2 sont identiques : laissez le second vide ou saisissez un autre numéro.', 'error'); return; }
   if (_aTel.valide && tel !== (_exTel.tel || '')) tel = _aTel.stockage;
   if (tel2 && _aTel2.valide && tel2 !== (_exTel.tel2 || '')) tel2 = _aTel2.stockage;
@@ -33136,6 +33168,9 @@ async function saveClient() {
       if (_exTel && _exTel.info_donnees) return _exTel.info_donnees;
       return { date: today(), par: (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || '', politique: '2026-10-09' };
     })(),
+    /* souscription de famille / groupe et pour mineur (tuteur) */
+    co_souscripteurs: (typeof cfmCosousPropres === 'function') ? cfmCosousPropres() : [],
+    mineur: (typeof cfmLireMineur === 'function') ? cfmLireMineur() : null,
     adresse: document.getElementById('c-adresse').value,
     piece_type: document.getElementById('c-piece-type').value,
     piece_num: document.getElementById('c-piece-num').value,
@@ -33404,7 +33439,7 @@ function renderClients() {
   var idxAp = {}; DATA.apporteurs.forEach(function(a){ idxAp[a.id] = a; });
 
   var list = scopeFiltrer(DATA.clients, 'programme_id').filter(function(c) {
-    var match = !search || (c.nom + ' ' + c.prenoms + ' ' + c.tel + ' ' + (c.tel2 || '') + ' ' + (c.email || '')).toLowerCase().indexOf(search) !== -1;
+    var match = !search || (c.nom + ' ' + c.prenoms + ' ' + c.tel + ' ' + (c.tel2 || '') + ' ' + (c.email || '') + ' ' + (typeof cfmTexteRecherche === 'function' ? cfmTexteRecherche(c) : '')).toLowerCase().indexOf(search) !== -1;
     var prog = !filterProg || c.programme_id === filterProg;
     var stand = !filterStand || c.standing === filterStand;
     var matchFin = !filterFin || ((filterFin === 'bancaire') === clientFinancementBancaire(c));
@@ -33512,7 +33547,7 @@ function renderClients() {
     if (!commCell)  commCell  = '<span style="color:#EF4444;font-size:11px;font-weight:600;">⚠️ Non assigné</span>';
 
     rowsTableau.push('<tr' + (nonAssigne ? ' style="background:#FEF2F2;"' : '') + '>'
-      + '<td><strong>' + escHtml(c.nom + ' ' + c.prenoms) + '</strong>' + missingBadge + '<br><span style="font-size:11px;color:var(--blanc-dim);">' + escHtml((c.piece_type || '') + ' ' + (c.piece_num || '')) + '</span></td>'
+      + '<td><strong>' + escHtml(c.nom + ' ' + c.prenoms) + '</strong>' + missingBadge + (typeof cfmBadges === 'function' ? cfmBadges(c) : '') + '<br><span style="font-size:11px;color:var(--blanc-dim);">' + escHtml((c.piece_type || '') + ' ' + (c.piece_num || '')) + '</span></td>'
       + '<td>' + escHtml(c.tel) + '<br><span style="font-size:11px;color:var(--blanc-dim);">' + escHtml(c.email || '') + '</span></td>'
       + '<td>' + commCell + '</td>'
       + '<td>' + (prog ? escHtml(prog.nom) : '—') + '</td>'
@@ -34173,6 +34208,7 @@ function csuiviHtmlActions() {
   });
   h += '</div>';
 
+  h += cfmAlerteMajorite();
   h += '<div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
     + '<input class="search-input" placeholder="Rechercher nom, dossier, téléphone…" value="' + escHtml(CSUIVI.recherche) + '" oninput="CSUIVI.recherche=this.value;csuiviRenderTableSeul()">'
     + '<select class="filter-select" onchange="csuiviFiltre(\'statut\',this.value)"><option value="">Tous les statuts</option>'
@@ -34361,6 +34397,205 @@ function csuiviSuivant() {
   CSUIVI.pos++;
   if (CSUIVI.pos >= CSUIVI.file.length) { CSUIVI.file = []; CSUIVI.pos = 0; CSUIVI.tab = 'portail'; toast('Envoi terminé.', 'success'); csuiviRender(); return; }
   csuiviPreparerCourant();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SOUSCRIPTION DE FAMILLE / GROUPE (co-souscripteurs) ET POUR MINEUR (tuteur)
+   — Un seul dossier, un seul échéancier : client.co_souscripteurs[] (autres
+     personnes au contrat, part de propriété facultative) et client.mineur
+     (bénéficiaire mineur ; le souscripteur du dossier agit comme tuteur ou
+     représentant légal). Tout vit dans la fiche client : aucune nouvelle table.
+   — L'âge de la majorité civile est enregistré dans chaque dossier (21 ans par
+     défaut, modifiable) : à faire confirmer par votre notaire.
+   ═══════════════════════════════════════════════════════════════════════ */
+var CFM_LIENS = { conjoint:'Conjoint(e)', enfant:'Enfant', parent:'Parent', frere_soeur:'Frère / sœur', autre:'Autre membre de la famille / du groupe' };
+var CFM_TUTEUR = { pere:'Père', mere:'Mère', tuteur_legal:'Tuteur légal (décision de justice)', autre:'Autre représentant légal' };
+var CFM_JUSTIF = { acte_naissance:'Acte de naissance du mineur', jugement_tutelle:'Jugement de tutelle', jugement_delegation:'Décision de délégation d’autorité', autre:'Autre justificatif' };
+APP._cfmCo = APP._cfmCo || [];
+
+function cfmOpts(map, sel) {
+  return Object.keys(map).map(function (k) { return '<option value="' + k + '"' + (sel === k ? ' selected' : '') + '>' + map[k] + '</option>'; }).join('');
+}
+function cfmDateMajorite(ddn, age) {
+  var p = String(ddn || '').split('-'); if (p.length < 3 || !(age > 0)) return '';
+  return (parseInt(p[0], 10) + age) + '-' + p[1] + '-' + p[2];
+}
+function cfmAge() { var el = document.getElementById('c-min-age-maj'); var v = el ? parseInt(el.value, 10) : NaN; return (v >= 16 && v <= 25) ? v : 21; }
+function cfmDateFr(iso) { var p = String(iso || '').split('-'); return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : (iso || '—'); }
+
+/* ── Co-souscripteurs ── */
+function cfmCosousRender() {
+  var box = document.getElementById('c-cosous-liste'); if (!box) return;
+  box.innerHTML = APP._cfmCo.map(function (x, i) {
+    var n = i + 1, E = escHtml, f = function (k, lib, type, extra) {
+      return '<div class="form-group"><label>' + lib + '</label><input type="' + (type || 'text') + '" class="form-control" value="' + E(x[k] || '') + '" aria-label="' + lib + ' du co-souscripteur ' + n + '" oninput="cfmCosousChamp(' + i + ',\'' + k + '\',this.value)"' + (extra || '') + '></div>';
+    };
+    return '<div style="border:1px dashed var(--bord,#D1D5DB);border-radius:8px;padding:8px 10px;margin-bottom:8px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><strong style="font-size:12px;">Co-souscripteur ' + n + '</strong>'
+      + '<button type="button" class="btn btn-secondary btn-sm" onclick="cfmCosousSupprimer(' + i + ')" aria-label="Retirer le co-souscripteur ' + n + '">Retirer</button></div>'
+      + '<div class="form-grid">' + f('nom', 'Nom *') + f('prenoms', 'Prénoms *') + f('ddn', 'Date de naissance', 'date')
+      + '<div class="form-group"><label>Lien avec le souscripteur *</label><select class="form-control" aria-label="Lien du co-souscripteur ' + n + '" onchange="cfmCosousChamp(' + i + ',\'lien\',this.value)">' + cfmOpts(CFM_LIENS, x.lien || 'conjoint') + '</select></div>'
+      + f('tel', 'Téléphone', 'tel') + f('email', 'E-mail', 'email') + f('piece_type', 'Type de pièce') + f('piece_num', 'N° de pièce')
+      + f('part', 'Part de propriété (%)', 'number', ' min="0" max="100" step="0.01"')
+      + '</div></div>';
+  }).join('');
+  cfmPartsInfo();
+}
+function cfmCosousAjouter() { APP._cfmCo.push({ id: uid(), nom: '', prenoms: '', ddn: '', lien: 'conjoint', tel: '', email: '', piece_type: '', piece_num: '', part: '' }); cfmCosousRender(); }
+function cfmCosousSupprimer(i) { APP._cfmCo.splice(i, 1); cfmCosousRender(); }
+function cfmCosousChamp(i, k, v) { if (APP._cfmCo[i]) { APP._cfmCo[i][k] = v; if (k === 'part') cfmPartsInfo(); } }
+function cfmCosousPropres() {
+  return (APP._cfmCo || []).filter(function (x) { return (x.nom || '').trim() || (x.prenoms || '').trim(); }).map(function (x) {
+    var o = {}; Object.keys(x).forEach(function (k) { o[k] = typeof x[k] === 'string' ? x[k].trim() : x[k]; });
+    if (o.part !== '' && o.part != null) o.part = parseFloat(o.part) || 0; else o.part = null;
+    return o;
+  });
+}
+function cfmPartsInfo() {
+  var el = document.getElementById('c-cosous-parts'); if (!el) return;
+  var l = cfmCosousPropres();
+  if (!l.length) { el.textContent = ''; return; }
+  var somme = l.reduce(function (s, x) { return s + (x.part || 0); }, 0), saisies = l.filter(function (x) { return x.part != null; }).length;
+  if (!saisies) { el.textContent = (l.length + 1) + ' personnes au contrat ; parts non précisées (à fixer au contrat).'; el.style.color = ''; return; }
+  var reste = Math.round((100 - somme) * 100) / 100;
+  el.textContent = 'Parts des co-souscripteurs : ' + somme + ' % — part du souscripteur principal : ' + reste + ' %';
+  el.style.color = reste < 0 ? 'var(--rouge)' : '';
+}
+
+/* ── Mineur / tuteur ── */
+function cfmMineurToggle() {
+  var cb = document.getElementById('c-mineur-actif'), bloc = document.getElementById('c-mineur-bloc');
+  if (bloc) bloc.style.display = (cb && cb.checked) ? '' : 'none';
+  cfmMineurInfo();
+}
+function cfmMineurInfo() {
+  var el = document.getElementById('c-min-info'); if (!el) return;
+  var ddn = (document.getElementById('c-min-ddn') || {}).value, age = cfmAge();
+  if (!ddn) { el.textContent = ''; return; }
+  var maj = cfmDateMajorite(ddn, age);
+  if (maj && maj <= today()) { el.style.color = 'var(--rouge)'; el.textContent = 'Ce bénéficiaire a atteint l’âge de la majorité fixé (' + age + ' ans) le ' + cfmDateFr(maj) + ' : ce n’est plus une souscription pour mineur.'; return; }
+  el.style.color = ''; el.textContent = 'Mineur(e) jusqu’au ' + cfmDateFr(maj) + ' (majorité civile fixée à ' + age + ' ans — à faire confirmer par votre notaire).';
+}
+function cfmReset() {
+  APP._cfmCo = []; cfmCosousRender();
+  var cb = document.getElementById('c-mineur-actif'); if (cb) cb.checked = false;
+  ['c-min-nom', 'c-min-prenoms', 'c-min-ddn', 'c-min-lieu', 'c-min-piece-num', 'c-tut-justif-num'].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+  var s = document.getElementById('c-min-piece-type'); if (s) s.value = 'acte_naissance';
+  var t = document.getElementById('c-tut-lien'); if (t) t.value = 'pere';
+  var j = document.getElementById('c-tut-justif-type'); if (j) j.value = 'acte_naissance';
+  var a = document.getElementById('c-min-age-maj'); if (a) a.value = '21';
+  cfmMineurToggle();
+}
+function cfmRemplir(c) {
+  APP._cfmCo = JSON.parse(JSON.stringify((c && c.co_souscripteurs) || [])); cfmCosousRender();
+  var m = c && c.mineur, cb = document.getElementById('c-mineur-actif'); if (cb) cb.checked = !!m;
+  var set = function (id, v) { var e = document.getElementById(id); if (e) e.value = v == null ? '' : v; };
+  if (m) {
+    set('c-min-nom', m.nom); set('c-min-prenoms', m.prenoms); set('c-min-ddn', m.ddn); set('c-min-lieu', m.lieu_naissance);
+    set('c-min-piece-type', m.piece_type || 'acte_naissance'); set('c-min-piece-num', m.piece_num);
+    set('c-tut-lien', m.tuteur_lien || 'pere'); set('c-tut-justif-type', m.tuteur_justificatif || 'acte_naissance'); set('c-tut-justif-num', m.tuteur_justificatif_num);
+    set('c-min-age-maj', m.age_majorite || 21);
+  }
+  cfmMineurToggle();
+}
+function cfmLireMineur() {
+  var cb = document.getElementById('c-mineur-actif'); if (!cb || !cb.checked) return null;
+  var g = function (id) { return String((document.getElementById(id) || {}).value || '').trim(); }, age = cfmAge(), ddn = g('c-min-ddn');
+  return { nom: g('c-min-nom'), prenoms: g('c-min-prenoms'), ddn: ddn, lieu_naissance: g('c-min-lieu'), piece_type: g('c-min-piece-type'), piece_num: g('c-min-piece-num'),
+    age_majorite: age, date_majorite: cfmDateMajorite(ddn, age),
+    tuteur_lien: g('c-tut-lien'), tuteur_justificatif: g('c-tut-justif-type'), tuteur_justificatif_num: g('c-tut-justif-num') };
+}
+function cfmValider() {
+  var co = cfmCosousPropres(), i, x;
+  for (i = 0; i < co.length; i++) {
+    x = co[i];
+    if (!x.nom || !x.prenoms) return 'Co-souscripteur ' + (i + 1) + ' : le nom et les prénoms sont obligatoires.';
+    if (x.ddn && x.ddn > today()) return 'Co-souscripteur ' + (i + 1) + ' : la date de naissance est dans le futur.';
+    if (x.part != null && (x.part < 0 || x.part > 100)) return 'Co-souscripteur ' + (i + 1) + ' : la part doit être comprise entre 0 et 100 %.';
+  }
+  var somme = co.reduce(function (s, y) { return s + (y.part || 0); }, 0);
+  if (somme > 100.0001) return 'La somme des parts des co-souscripteurs dépasse 100 % (' + somme + ' %).';
+  var m = cfmLireMineur();
+  if (m) {
+    if (!m.nom || !m.prenoms) return 'Mineur : le nom et les prénoms du bénéficiaire sont obligatoires.';
+    if (!m.ddn) return 'Mineur : la date de naissance du bénéficiaire est obligatoire (elle sert à calculer la majorité).';
+    if (m.ddn > today()) return 'Mineur : la date de naissance est dans le futur.';
+    if (m.date_majorite && m.date_majorite <= today()) return 'Mineur : ce bénéficiaire a atteint l’âge de la majorité fixé (' + m.age_majorite + ' ans). Décochez « souscription pour un mineur » ou corrigez la date.';
+    if (!m.tuteur_lien) return 'Mineur : indiquez le lien du souscripteur avec le mineur (père, mère, tuteur…).';
+    if (!m.tuteur_justificatif) return 'Mineur : indiquez le justificatif de la qualité de représentant légal.';
+  }
+  return '';
+}
+
+/* ── Affichage, recherche, alertes ── */
+function cfmBadges(c) {
+  var h = '', n = (c.co_souscripteurs || []).length;
+  if (c.mineur) h += ' <span class="badge badge-bleu" title="Souscription au bénéfice d’un mineur">🧒 Mineur</span>';
+  if (n) h += ' <span class="badge badge-or" title="Souscription de famille / groupe : ' + n + ' co-souscripteur(s)">👨‍👩‍👧 +' + n + '</span>';
+  return h;
+}
+function cfmTexteRecherche(c) {
+  var t = (c.co_souscripteurs || []).map(function (x) { return (x.nom || '') + ' ' + (x.prenoms || ''); }).join(' ');
+  if (c.mineur) t += ' ' + (c.mineur.nom || '') + ' ' + (c.mineur.prenoms || '');
+  return t;
+}
+function cfmAlerteMajorite() {
+  var lim = new Date(); lim.setFullYear(lim.getFullYear() + 1); var limIso = lim.toISOString().split('T')[0];
+  var l = (DATA.clients || []).filter(function (c) { return c.mineur && c.mineur.date_majorite && (c.statut || 'actif') === 'actif' && c.mineur.date_majorite <= limIso; })
+    .sort(function (a, b) { return a.mineur.date_majorite.localeCompare(b.mineur.date_majorite); });
+  if (!l.length) return '';
+  return '<div class="alert alert-warning" style="margin-bottom:12px;"><strong>🧒 ' + l.length + ' bénéficiaire(s) mineur(s) atteignent la majorité dans les 12 mois :</strong><ul style="margin:6px 0 0 18px;">'
+    + l.map(function (c) {
+      var dep = c.mineur.date_majorite <= today();
+      return '<li>' + escHtml(((c.mineur.prenoms || '') + ' ' + (c.mineur.nom || '')).trim()) + ' — dossier ' + escHtml(c.dossier || '') + ' — ' + (dep ? 'majorité atteinte le ' : 'majeur(e) le ') + cfmDateFr(c.mineur.date_majorite)
+        + ' (représentant : ' + escHtml(((c.prenoms || '') + ' ' + (c.nom || '')).trim()) + ')</li>';
+    }).join('') + '</ul><div style="font-size:11px;margin-top:4px;">À prévoir : régularisation du dossier au nom du bénéficiaire devenu majeur — voir votre notaire.</div></div>';
+}
+
+/* ── Documents (fiche de souscription, engagement, contrat) ── */
+function cfmNomComplet(o) { return ((o.prenoms ? o.prenoms + ' ' : '') + (o.nom || '')).trim(); }
+function cfmDocsHTML(d) {
+  var c = d.c, e = escHtml, h = '', m = c.mineur, co = c.co_souscripteurs || [];
+  var row = function (k, v) { return '<tr><th style="width:32%;">' + e(k) + '</th><td>' + e(v == null || v === '' ? '—' : String(v)) + '</td></tr>'; };
+  if (m) {
+    h += '<h3>2 bis. Souscription au bénéfice d’un mineur</h3><table>'
+      + row('Bénéficiaire (mineur)', cfmNomComplet(m)) + row('Date de naissance', m.ddn ? dateShort(m.ddn) : '') + row('Lieu de naissance', m.lieu_naissance)
+      + row('Pièce', ((CFM_JUSTIF[m.piece_type] || m.piece_type || '') + ' ' + (m.piece_num || '')).trim())
+      + row('Majorité civile (' + (m.age_majorite || 21) + ' ans)', m.date_majorite ? dateShort(m.date_majorite) : '')
+      + row('Représentant légal', d.nom + ' — ' + (CFM_TUTEUR[m.tuteur_lien] || m.tuteur_lien || ''))
+      + row('Justificatif de la qualité de représentant légal', ((CFM_JUSTIF[m.tuteur_justificatif] || m.tuteur_justificatif || '') + ' ' + (m.tuteur_justificatif_num || '')).trim())
+      + '</table><p style="font-size:11px;color:#555;">Le souscripteur ci-dessus agit en qualité de représentant légal du mineur, au nom et dans l’intérêt de qui le bien est acquis. Le justificatif de cette qualité est joint au dossier.</p>';
+  }
+  if (co.length) {
+    h += '<h3>2 ter. Co-souscripteurs (souscription de famille / groupe)</h3><table><thead><tr><th>Nom et prénoms</th><th>Lien</th><th>Naissance</th><th>Pièce</th><th>Téléphone</th><th>Part</th></tr></thead><tbody>'
+      + co.map(function (x) {
+        return '<tr><td>' + e(cfmNomComplet(x)) + '</td><td>' + e(CFM_LIENS[x.lien] || x.lien || '') + '</td><td>' + (x.ddn ? e(dateShort(x.ddn)) : '—') + '</td><td>' + e(((x.piece_type || '') + ' ' + (x.piece_num || '')).trim() || '—') + '</td><td>' + e(x.tel || '—') + '</td><td>' + (x.part != null ? e(x.part + ' %') : '—') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  return h;
+}
+function cfmSigLabel(c) { return c.mineur ? ('Le souscripteur, en qualité de représentant légal de ' + cfmNomComplet(c.mineur)) : 'Le souscripteur'; }
+function cfmSigExtra(c) {
+  return (c.co_souscripteurs || []).map(function (x) { return '<div><div class="etat-sign-line">' + escHtml(cfmNomComplet(x)) + ' — co-souscripteur<br>(lu et approuvé)</div></div>'; }).join('');
+}
+function cfmEngagementHTML(c) {
+  var t = '';
+  if (c.mineur) t += '<p style="font-size:12px;line-height:1.7;">Le présent engagement est pris par le souscripteur en sa qualité de ' + escHtml((CFM_TUTEUR[c.mineur.tuteur_lien] || 'représentant légal').toLowerCase()) + ', au nom et dans l’intérêt de <strong>' + escHtml(cfmNomComplet(c.mineur)) + '</strong>, né(e) le ' + (c.mineur.ddn ? escHtml(dateShort(c.mineur.ddn)) : '—') + '.</p>';
+  if ((c.co_souscripteurs || []).length) t += '<p style="font-size:12px;line-height:1.7;">Le présent engagement est souscrit conjointement avec : ' + c.co_souscripteurs.map(function (x) { return '<strong>' + escHtml(cfmNomComplet(x)) + '</strong>' + (x.part != null ? ' (' + escHtml(x.part + ' %') + ')' : ''); }).join(', ') + '.</p>';
+  return t;
+}
+function cfmContratHTML(c) {
+  var h = '', E = escHtml;
+  if (c.mineur) h += '<h4>BÉNÉFICIAIRE MINEUR — REPRÉSENTANT LÉGAL</h4><table><tr><td><strong>Bénéficiaire</strong></td><td>' + E(cfmNomComplet(c.mineur)) + ', né(e) le ' + (c.mineur.ddn ? E(dateShort(c.mineur.ddn)) : '—') + '</td></tr>'
+    + '<tr><td><strong>Représentant légal</strong></td><td>' + E(cfmNomComplet(c)) + ' — ' + E(CFM_TUTEUR[c.mineur.tuteur_lien] || '') + '</td></tr>'
+    + '<tr><td><strong>Justificatif</strong></td><td>' + E(((CFM_JUSTIF[c.mineur.tuteur_justificatif] || '') + ' ' + (c.mineur.tuteur_justificatif_num || '')).trim() || '—') + '</td></tr></table>';
+  if ((c.co_souscripteurs || []).length) h += '<h4>CO-SOUSCRIPTEURS</h4><table>' + c.co_souscripteurs.map(function (x) {
+    return '<tr><td><strong>' + E(cfmNomComplet(x)) + '</strong> (' + E(CFM_LIENS[x.lien] || '') + ')</td><td>' + E(((x.piece_type || '') + ' ' + (x.piece_num || '')).trim() || '—') + ' — ' + E(x.tel || '') + (x.part != null ? ' — part ' + E(x.part + ' %') : '') + '</td></tr>';
+  }).join('') + '</table>';
+  return h;
+}
+function cfmContratSig(c) {
+  return (c.co_souscripteurs || []).map(function (x) { return '<div class="sig-box">' + escHtml(cfmNomComplet(x)) + ' (co-souscripteur)<br><br><br></div>'; }).join('');
 }
 
 function exportClients() {
@@ -47746,6 +47981,7 @@ function printContrat(clientId) {
     + '<tr><td><strong>Email</strong></td><td>' + (client.email || 'N/A') + '</td></tr>'
     + '<tr><td><strong>Adresse</strong></td><td>' + (client.adresse || 'N/A') + '</td></tr>'
     + '<tr><td><strong>Pièce d\'identité</strong></td><td>' + (client.piece_type || '') + ' N°' + (client.piece_num || 'N/A') + '</td></tr></table>'
+    + cfmContratHTML(client)
     + '<h4>' + (estSolde ? 'BIEN VENDU (solde payé)' : 'BIEN RÉSERVÉ') + '</h4>'
     + '<table><tr><td><strong>Programme</strong></td><td>' + (prog ? prog.nom : 'N/A') + '</td></tr>'
     + '<tr><td><strong>Lot</strong></td><td>' + (lot ? 'Lot ' + lot.numero + (lot.ilot ? ', Îlot ' + lot.ilot : '') : 'N/A') + '</td></tr>'
@@ -47759,7 +47995,7 @@ function printContrat(clientId) {
     + '<tr><td><strong>Mensualité</strong></td><td>' + new Intl.NumberFormat('fr-FR').format(Math.ceil(((client.montant_total - (client.apport || 0)) / (client.duree || 60)))) + ' FCFA</td></tr>'
     + '<tr><td><strong>Date de souscription</strong></td><td>' + dateShort(client.date_souscription || client.date_debut) + '</td></tr>'
     + '<tr><td><strong>1ère mensualité</strong></td><td>' + dateShort(client.date_debut) + '</td></tr></table>'
-    + '<div class="signature"><div class="sig-box">Signature du Souscripteur<br><br><br></div>'
+    + '<div class="signature"><div class="sig-box">Signature du Souscripteur' + (client.mineur ? ' (représentant légal de ' + escHtml(cfmNomComplet(client.mineur)) + ')' : '') + '<br><br><br></div>' + cfmContratSig(client)
     + '<div class="sig-box">Pour ' + (params.societe || 'ImmoSuite ERP') + '<br><br><br></div></div>'
     + '</body></html>';
   win.document.write(html);
@@ -90833,6 +91069,7 @@ function _docsFicheSouscriptionHTML(d) {
   } else {
     h += '<p style="color:#555;">Sans objet — situation matrimoniale : ' + e(matLbl) + '.</p>';
   }
+  h += cfmDocsHTML(d);
   h += '<h3>3. Logement choisi</h3><table>'
     + row('Programme', d.prog ? d.prog.nom : '') + row('Logement / lot(s)', d.logement)
     + row('Type de logement', c.type_logement) + row('Standing', d.standing)
@@ -90851,7 +91088,7 @@ function _docsFicheSouscriptionHTML(d) {
         ? '<div style="font-weight:700;margin-top:8px;">Cahier des charges du programme « ' + escHtml(d.prog.nom || '') + ' »</div>' + _cdcPara(String(d.prog.rappel_cgv).trim())
         : '')
     + '</div>';
-  h += '<div class="etat-signatures"><div><div class="etat-sign-line">Le souscripteur (lu et approuvé)</div></div>'
+  h += '<div class="etat-signatures"><div><div class="etat-sign-line">' + escHtml(cfmSigLabel(c)) + ' (lu et approuvé)</div></div>' + cfmSigExtra(c)
     + '<div><div class="etat-sign-line">Pour ' + e(_identiteSociete().nom || 'le promoteur') + '</div></div></div>';
   return h;
 }
@@ -90871,8 +91108,9 @@ function _docsEngagementHTML(d) {
   return '<div style="text-align:center;margin:0 0 14px;"><div style="font-size:16px;font-weight:700;text-transform:uppercase;">Engagement ferme et irrévocable d\'acquisition de logement</div>'
     + '<div style="font-size:11px;color:#555;">Dossier ' + escHtml(c.dossier || c.id) + '</div></div>'
     + '<div style="font-size:12px;line-height:1.8;text-align:justify;">' + _cdcPara(texte).replace('font-size:11px;line-height:1.6;', 'font-size:12px;line-height:1.8;') + '</div>'
+    + cfmEngagementHTML(c)
     + '<p style="margin-top:18px;">Fait à ' + escHtml(ville) + ', le ' + new Date().toLocaleDateString('fr-FR') + '</p>'
-    + '<div class="etat-signatures"><div><div class="etat-sign-line">Le souscripteur<br>(mention « Lu et approuvé — bon pour engagement ferme et irrévocable »)</div></div>'
+    + '<div class="etat-signatures"><div><div class="etat-sign-line">' + escHtml(cfmSigLabel(c)) + '<br>(mention « Lu et approuvé — bon pour engagement ferme et irrévocable »)</div></div>' + cfmSigExtra(c)
     + '<div><div class="etat-sign-line">Pour ' + escHtml(s.nom || 'le promoteur') + '</div></div></div>';
 }
 
