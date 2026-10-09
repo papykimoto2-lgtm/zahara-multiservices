@@ -127082,6 +127082,57 @@ function caisseSoldeSession(session) {
   return (parseFloat(session.fond_ouverture)||0) + entrees - sorties;
 }
 
+/* ── Écarts de caisse : mouvements en attente, solde « si tout est validé », sessions anciennes ── */
+function caisseMvtsEnAttente(session) {
+  if (!session) return [];
+  return (DATA.caisse_mouvements || []).filter(function(m){
+    return m.session_id === session.id && m.requiert_validation && m.valide !== true && !m.rejete;
+  });
+}
+function caisseSoldeSiToutValide(session) {
+  var s = caisseSoldeSession(session);
+  caisseMvtsEnAttente(session).forEach(function(m){ var v = parseFloat(m.montant) || 0; s += (m.type === 'entree' ? v : -v); });
+  return s;
+}
+function caisseHeuresOuverte(session) {
+  if (!session || !session.ouverte_le) return 0;
+  return (Date.now() - new Date(session.ouverte_le).getTime()) / 3600000;
+}
+function caisseSessionsAnciennes(seuilHeures) {
+  var vis = caissesVisibles().map(function(c){ return c.id; });
+  return (DATA.caisse_sessions || []).filter(function(s){
+    return s.statut === 'ouverte' && vis.indexOf(s.caisse_id) >= 0 && caisseHeuresOuverte(s) > seuilHeures;
+  });
+}
+function caisseBanniereAnciennes() {
+  var l = caisseSessionsAnciennes(24);
+  if (!l.length) return '';
+  return '<div style="grid-column:1/-1;padding:10px 14px;border:1px solid var(--rouge);border-radius:var(--r);background:var(--card2);color:var(--rouge);font-size:13px;">'
+    + '<strong>⚠️ Session(s) ouverte(s) depuis plus de 24 h :</strong> '
+    + l.map(function(s){
+        var c = (DATA.caisses || []).find(function(x){ return x.id === s.caisse_id; });
+        return escHtml(c ? c.nom : '?') + ' — ouverte le ' + dateShort(String(s.date || '').slice(0,10)) + ' par ' + escHtml(s.ouverte_par || '—') + ' (' + Math.round(caisseHeuresOuverte(s)) + ' h)';
+      }).join(' ; ')
+    + '. Clôturez-la avec un comptage réel avant d\'en ouvrir une autre : une clôture tardive fausse les fonds d\'ouverture suivants.</div>';
+}
+/* Un mouvement validé APRÈS la clôture de sa session change le solde théorique : sans recalcul,
+   le solde et l'écart enregistrés restaient périmés et l'écart réapparaissait à la session suivante. */
+async function caisseRecalculerSiCloturee(mvt) {
+  if (!mvt || !mvt.session_id) return;
+  var sess = (DATA.caisse_sessions || []).find(function(x){ return x.id === mvt.session_id; });
+  if (!sess || sess.statut !== 'cloturee' || sess.ecart_regularise) return;
+  var avant = parseFloat(sess.fond_cloture_theorique) || 0;
+  var theo = caisseSoldeSession(sess);
+  if (theo === avant) return;
+  sess.fond_cloture_theorique = theo;
+  if (sess.fond_cloture_reel !== null && sess.fond_cloture_reel !== undefined) sess.ecart = (parseFloat(sess.fond_cloture_reel) || 0) - theo;
+  sess.recalcule_le = new Date().toISOString();
+  sess.recalcule_motif = 'Mouvement validé après la clôture';
+  sess._baseModifie = sess._modifie || null;
+  await dbPut('caisse_sessions', sess);
+  await caisseSyncEtAlerter('pi_caisse_sessions', sess);
+}
+
 function caisseNomUser(userId) {
   var u = (DATA.users || []).find(function(x){ return x.id === userId; });
   return u ? u.nom : userId;
@@ -128107,7 +128158,7 @@ function caisseRenderListe() {
       + '</div>';
     return;
   }
-  el.innerHTML = liste.map(function(c) {
+  el.innerHTML = caisseBanniereAnciennes() + liste.map(function(c) {
     var session = caisseGetSessionOuverte(c.id);
     var ouverte = !!session;
     var solde = ouverte ? caisseSoldeSession(session) : null;
@@ -128281,6 +128332,9 @@ async function caisseOuvrirModal(caisseId) {
   document.getElementById('co-caisse-id').value = caisseId;
   document.getElementById('co-caisse-nom').textContent = c.nom;
   document.getElementById('co-fond').value = fondSuggere;
+  CAISSE_UI._fondSuggere = derniere ? fondSuggere : null;
+  var _mf = document.getElementById('co-fond-motif'); if (_mf) _mf.value = '';
+  caisseOuvrirFondChange();
   /* [FIX incident 2026-09-10, Menko Agro] Une session ouverte le 20 août,
      oubliée pendant 21 jours, clôturée tardivement ce matin sans compte
      réel (théorique accepté tel quel), s'est retrouvée « plus récemment
@@ -128380,10 +128434,27 @@ async function caisseDefinirPinConfirmer() {
   }
 }
 
+function caisseOuvrirFondChange() {
+  var g = document.getElementById('co-fond-motif-group');
+  if (!g) return;
+  var sug = CAISSE_UI._fondSuggere;
+  var v = parseFloat(document.getElementById('co-fond').value);
+  var diff = (sug === null || sug === undefined || isNaN(v)) ? 0 : v - sug;
+  if (diff !== 0) {
+    document.getElementById('co-fond-diff').textContent = '⚠️ Le fond saisi (' + fmtF(v) + ' FCFA) diffère du comptage de la dernière clôture (' + fmtF(sug) + ' FCFA) de ' + (diff > 0 ? '+' : '') + fmtF(diff) + ' FCFA.';
+    g.style.display = '';
+  } else { g.style.display = 'none'; }
+}
+
 async function caisseOuvrir() {
   if (!exigerDroit('Caisse','c','une session de caisse')) return;
   var caisseId = document.getElementById('co-caisse-id').value;
   var fond = parseFloat(document.getElementById('co-fond').value) || 0;
+  if (fond < 0) { toast('⛔ Le fond de caisse ne peut pas être négatif.', 'error'); return; }
+  var _sug = CAISSE_UI._fondSuggere;
+  var _motifFond = ((document.getElementById('co-fond-motif') || {}).value || '').trim();
+  var _ecartOuv = (_sug === null || _sug === undefined) ? 0 : fond - _sug;
+  if (_ecartOuv !== 0 && !_motifFond) { toast('⚠️ Le fond saisi diffère du dernier comptage : indiquez le motif de la différence.', 'error', 6000); return; }
   if (caisseGetSessionOuverte(caisseId)) {
     var _soL = caisseGetSessionOuverte(caisseId);
     var _hOuvL = _soL && _soL.ouverte_le ? new Date(_soL.ouverte_le).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
@@ -128430,6 +128501,7 @@ async function caisseOuvrir() {
     cloturee_par: null, cloturee_le: null,
     envoye_journalier: false, envoye_journalier_le: null
   };
+  if (_ecartOuv !== 0) { session.fond_ouverture_suggere = _sug; session.fond_ouverture_ecart = _ecartOuv; session.fond_ouverture_motif = _motifFond; }
   DATA.caisse_sessions.push(session);
   session._baseModifie = session._modifie || null;
   await dbPut('caisse_sessions', session);
@@ -130972,24 +131044,56 @@ function caisseClôturerModal(caisseId) {
   }
   var c = (DATA.caisses || []).find(function(x){ return x.id === caisseId; });
   var solde = caisseSoldeSession(session);
+  var attente = caisseMvtsEnAttente(session);
+  var soldeSiValide = caisseSoldeSiToutValide(session);
+  var heures = caisseHeuresOuverte(session);
   document.getElementById('ccl-caisse-id').value = caisseId;
-  document.getElementById('ccl-recap').innerHTML = '<strong>' + escHtml(c.nom) + '</strong><br>'
+  var rec = '<strong>' + escHtml(c.nom) + '</strong><br>'
     + 'Fond d\'ouverture : ' + fmtF(session.fond_ouverture) + ' FCFA<br>'
-    + 'Solde théorique actuel (fond + entrées − sorties) : <strong>' + fmtF(solde) + ' FCFA</strong>';
-  document.getElementById('ccl-fond-reel').value = solde;
-  document.getElementById('ccl-fond-reel').dataset.theorique = solde;
-  document.getElementById('ccl-ecart').textContent = '';
+    + 'Solde théorique actuel (mouvements validés : fond + entrées − sorties) : <strong>' + fmtF(solde) + ' FCFA</strong>';
+  if (attente.length) {
+    rec += '<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--rouge);border-radius:var(--r);background:var(--card2);">'
+      + '<div style="color:var(--rouge);font-weight:700;margin-bottom:6px;">⚠️ ' + attente.length + ' mouvement(s) en attente de validation — NON compris dans le solde théorique</div>'
+      + attente.map(function(m){
+          return '<div style="font-size:12px;">• ' + escHtml(m.numero || '') + ' — ' + (m.type === 'entree' ? 'entrée' : 'sortie') + ' de <strong>' + fmtF(m.montant) + ' FCFA</strong> (' + escHtml(m.motif || '') + ')</div>';
+        }).join('')
+      + '<div style="margin-top:6px;">Solde théorique <strong>si tout est validé</strong> : <strong>' + fmtF(soldeSiValide) + ' FCFA</strong></div>'
+      + '<div style="font-size:11px;margin-top:4px;color:var(--blanc-dim);">Comptez l\'argent réellement présent dans le tiroir. Si ces mouvements ont déjà eu lieu physiquement, votre comptage sera proche de « si tout est validé » ; l\'écart sera recalculé automatiquement quand ils seront validés.</div>'
+      + '<label style="margin-top:8px;display:block;font-weight:600;">Précision sur ces mouvements en attente (obligatoire) *</label>'
+      + '<input type="text" class="form-control" id="ccl-motif-attente" placeholder="Ex. : sortie remise à la caisse principale, validation à venir">'
+      + '</div>';
+  }
+  if (heures > 24) {
+    rec += '<div style="margin-top:10px;padding:8px 12px;border:1px solid var(--rouge);border-radius:var(--r);color:var(--rouge);font-size:12px;">⚠️ Cette session est ouverte depuis ' + Math.round(heures) + ' h : une clôture tardive fausse les fonds d\'ouverture des sessions suivantes. Comptez le tiroir tel qu\'il est maintenant.</div>';
+  }
+  document.getElementById('ccl-recap').innerHTML = rec;
+  var _inReel = document.getElementById('ccl-fond-reel');
+  _inReel.value = '';
+  _inReel.dataset.theorique = solde;
+  _inReel.dataset.siValide = soldeSiValide;
+  caisseUpdateEcartPreview();
   openModal('modal-caisse-cloturer');
 }
 
 function caisseUpdateEcartPreview() {
   var input = document.getElementById('ccl-fond-reel');
+  var el = document.getElementById('ccl-ecart');
+  if (!input || !el) return;
+  if (input.value === '') {
+    el.style.color = 'var(--blanc-dim)';
+    el.textContent = 'Comptez les billets et pièces du tiroir, puis saisissez le montant : le champ n\'est volontairement pas prérempli.';
+    return;
+  }
   var theorique = parseFloat(input.dataset.theorique) || 0;
+  var siValide = (input.dataset.siValide !== undefined && input.dataset.siValide !== '') ? parseFloat(input.dataset.siValide) : theorique;
   var reel = parseFloat(input.value) || 0;
   var ecart = reel - theorique;
-  var el = document.getElementById('ccl-ecart');
   el.style.color = ecart === 0 ? 'var(--vert)' : 'var(--rouge)';
   el.textContent = ecart === 0 ? 'Aucun écart.' : 'Écart : ' + (ecart > 0 ? '+' : '') + fmtF(ecart) + ' FCFA';
+  if (siValide !== theorique) {
+    var e2 = reel - siValide;
+    el.textContent += ' · Écart si tout est validé : ' + (e2 > 0 ? '+' : '') + fmtF(e2) + ' FCFA';
+  }
 }
 
 async function caisseCloturer() {
@@ -131021,7 +131125,12 @@ async function caisseCloturer() {
      l'opération la plus sensible du module. On contrôle désormais le solde réel
      de la session effectivement clôturée. */
   if (!exigerPlafond(soldeTheorique, 'Cette clôture')) return;
-  var fondReel = parseFloat(document.getElementById('ccl-fond-reel').value) || 0;
+  var _inputReel = document.getElementById('ccl-fond-reel');
+  if (!_inputReel || _inputReel.value === '') { toast('⚠️ Saisissez le montant réellement compté dans le tiroir avant de clôturer.', 'error', 6000); return; }
+  var _attente = caisseMvtsEnAttente(session);
+  var _motifAttente = ((document.getElementById('ccl-motif-attente') || {}).value || '').trim();
+  if (_attente.length && !_motifAttente) { toast('⚠️ ' + _attente.length + ' mouvement(s) sont en attente de validation : précisez-les dans le champ prévu avant de clôturer.', 'error', 7000); return; }
+  var fondReel = parseFloat(_inputReel.value) || 0;
   var ecart = fondReel - soldeTheorique;
 
   /* [FIX] Le comptage physique d'une caisse ne peut JAMAIS être négatif — on
@@ -131049,6 +131158,11 @@ async function caisseCloturer() {
   session.fond_cloture_theorique = soldeTheorique;
   session.fond_cloture_reel = fondReel;
   session.ecart = ecart;
+  if (_attente.length) {
+    session.mvts_attente_a_la_cloture = _attente.map(function(m){ return m.id; });
+    session.motif_attente_cloture = _motifAttente;
+    session.fond_cloture_si_valide = caisseSoldeSiToutValide(session);
+  }
   session.cloturee_par = (APP.currentUser && APP.currentUser.nom) || '—';
   session.cloturee_le = new Date().toISOString();
 
@@ -132654,11 +132768,13 @@ async function caisseValiderDecaissement(mvtId) {
   mvt._baseModifie = mvt._modifie || null;
   await dbPut('caisse_mouvements', mvt);
   await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
+  await caisseRecalculerSiCloturee(mvt);
   if (jumeauAValider) {
     jumeau.valide = true; jumeau.valide_par = mvt.valide_par; jumeau.valide_role = mvt.valide_role; jumeau.valide_le = mvt.valide_le;
     jumeau._baseModifie = jumeau._modifie || null;
     await dbPut('caisse_mouvements', jumeau);
     await caisseSyncEtAlerter('pi_caisse_mouvements', jumeau);
+    await caisseRecalculerSiCloturee(jumeau);
   }
   toast('✅ ' + (mvt.type==='entree'?'Entrée':'Décaissement') + ' de ' + fmtF(montant) + ' FCFA validé' + (mvt.type==='entree'?'e':'') + (jumeauAValider ? ' (avec le bon lié ' + (jumeau.numero||'') + ')' : '') + '.', 'success');
   caisseRenderValidations();
@@ -136364,8 +136480,13 @@ goTo = function(page) {
       </div>
       <div class="form-group">
         <label>Fond de caisse à l'ouverture (FCFA)</label>
-        <input type="number" class="form-control" id="co-fond" value="0">
+        <input type="number" class="form-control" id="co-fond" value="0" min="0" oninput="caisseOuvrirFondChange()">
         <div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;" id="co-fond-note"></div>
+        <div id="co-fond-motif-group" style="display:none;margin-top:10px;padding:10px 12px;border:1px solid var(--rouge);border-radius:var(--r);background:var(--card2);">
+          <div style="font-size:12px;color:var(--rouge);font-weight:600;margin-bottom:6px;" id="co-fond-diff"></div>
+          <label>Motif de la différence (obligatoire) *</label>
+          <input type="text" class="form-control" id="co-fond-motif" placeholder="Ex. : recomptage ce matin, somme reçue de la direction…">
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -137641,7 +137762,7 @@ goTo = function(page) {
       <div id="ccl-recap" style="margin-bottom:12px;font-size:13px;"></div>
       <div class="form-group">
         <label>Comptage réel du fond de caisse (FCFA) *</label>
-        <input type="number" class="form-control" id="ccl-fond-reel" value="0" oninput="caisseUpdateEcartPreview()">
+        <input type="number" class="form-control" id="ccl-fond-reel" value="" min="0" placeholder="Comptez le tiroir puis saisissez le montant" oninput="caisseUpdateEcartPreview()">
       </div>
       <div id="ccl-ecart" style="margin-top:8px;font-weight:700;"></div>
     </div>
