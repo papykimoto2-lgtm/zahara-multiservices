@@ -19,7 +19,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -2573,6 +2573,9 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
       </div>
           <div class="nav-item" onclick="goTo('crm-apporteurs')" data-page="crm-apporteurs">
         <span class="nav-icon">🤝</span><span>Apporteurs d'affaire</span>
+      </div>
+          <div class="nav-item" onclick="goTo('crm-souscripteurs')" data-page="crm-souscripteurs" title="Actions commerciales par statut du souscripteur et remise des accès au portail">
+        <span class="nav-icon">📇</span><span>Suivi souscripteurs</span>
       </div>
           <div class="nav-item" onclick="goTo('portail-apporteur')" data-page="portail-apporteur" title="Accès portail des apporteurs d'affaire">
         <span class="nav-icon">🤝</span><span>Accès Portail Apporteur</span>
@@ -11867,6 +11870,20 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             </table>
           </div>
         </div>
+      </div>
+
+      <!-- ── SUIVI SOUSCRIPTEURS (lien direction commerciale) ───────────────── -->
+      <div class="page" id="page-crm-souscripteurs">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Suivi souscripteurs</div>
+            <div class="page-subtitle">Actions commerciales selon le statut · Remise des accès au portail</div>
+          </div>
+          <div class="spacer"></div>
+          <button class="btn btn-sm btn-primary" id="csuivi-tab-actions" onclick="csuiviSetTab('actions')">🎯 Actions commerciales</button>
+          <button class="btn btn-sm btn-secondary" id="csuivi-tab-portail" onclick="csuiviSetTab('portail')">🔑 Accès portail</button>
+        </div>
+        <div id="csuivi-contenu"></div>
       </div>
 
       <!-- ── RAPPORTS COMMERCIAUX ───────────────────── -->
@@ -29966,6 +29983,7 @@ function goTo(page) {
   if (page === 'crm-itineraires') { loadPageItineraires(); }
   if (page === 'ordres-mission') { loadPageOrdresMission(); }
   if (page === 'crm-rapports')   { buildRapportsCommerciaux(); }
+  if (page === 'crm-souscripteurs') { csuiviRender(); }
   if (page === 'crm-apporteurs') { renderApporteurs(); buildKPIsApporteurs(); }
   if (page === 'tresorerie-page') { buildTresorerieDetaille(); }
   if (page === 'caisse') { caisseEnter(); }
@@ -33512,6 +33530,315 @@ function getRetardataires() {
     }
   });
   return result;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SUIVI SOUSCRIPTEURS — lien Souscripteur ↔ Direction commerciale
+   1) Actions commerciales proposées selon le statut du souscripteur
+      (retard, nouveau, financement bancaire, bientôt soldé, soldé, à jour…),
+      rattachées à son commercial, avec message prêt (WhatsApp / e-mail)
+      et journal des actions faites (client.actions_commerciales).
+   2) Remise des accès au portail souscripteur, un par un (« envoyer au
+      suivant ») : code généré, message prêt dans WhatsApp ou e-mail.
+   Le journal et l'état d'envoi vivent dans la fiche client : ils se
+   synchronisent avec elle, sans nouvelle table.
+   ═══════════════════════════════════════════════════════════════════════ */
+var CSUIVI = { tab: 'actions', statut: '', commercial: '', recherche: '', file: [], pos: 0, code: '', codeId: '' };
+
+var CSUIVI_STATUTS = {
+  retard_grave: { ico: '🔴', lib: 'Retard ≥ 3 mois', ordre: 1, action: 'Relance ferme + rendez-vous', canal: 'appel' },
+  retard:       { ico: '🟠', lib: 'En retard',        ordre: 2, action: 'Relance amiable (rappel d’échéance)', canal: 'whatsapp' },
+  nouveau:      { ico: '🆕', lib: 'Nouveau (≤ 30 j)', ordre: 3, action: 'Appel de bienvenue + remise des accès portail', canal: 'appel' },
+  bancaire:     { ico: '🏦', lib: 'Financement bancaire', ordre: 4, action: 'Suivi du dossier de financement (pièces, déblocage)', canal: 'appel' },
+  bientot_solde:{ ico: '🟡', lib: 'Bientôt soldé (≥ 80 %)', ordre: 5, action: 'Préparer le solde, l’attestation et la livraison', canal: 'whatsapp' },
+  solde:        { ico: '✅', lib: 'Soldé',            ordre: 6, action: 'Remise attestation / livraison + demande de parrainage', canal: 'whatsapp' },
+  a_jour:       { ico: '🟢', lib: 'À jour',           ordre: 7, action: 'Point de relation (merci, avancement, parrainage)', canal: 'whatsapp' },
+  sortie:       { ico: '⚪', lib: 'Résilié / inactif', ordre: 8, action: 'Entretien de rétention ou clôture du dossier', canal: 'appel' }
+};
+
+function csuiviSociete() { return (DATA.params && DATA.params.societe) || 'ImmoSuite ERP'; }
+function csuiviCommercialNom(c) {
+  var e = c.commercial_id ? (DATA.employes || []).find(function (x) { return x.id === c.commercial_id; }) : null;
+  return e ? ((e.prenoms || '') + ' ' + (e.nom || '')).trim() : (c.commercial || '');
+}
+
+/* Calcule le statut commercial de chaque souscripteur (un seul passage). */
+function csuiviCalculer() {
+  var retards = {};
+  getRetardataires().forEach(function (r) { retards[r.id] = r; });
+  var verses = {};
+  (DATA.versements || []).forEach(function (v) {
+    if (v.statut === 'annule' || !_versementSurPrix(v)) return;
+    verses[v.client_id] = (verses[v.client_id] || 0) + (parseFloat(v.montant) || 0);
+  });
+  var lim = new Date(); lim.setDate(lim.getDate() - 30);
+  var limIso = lim.toISOString().split('T')[0];
+  return (DATA.clients || []).map(function (c) {
+    var total = parseFloat(c.montant_total) || 0, verse = verses[c.id] || 0, r = retards[c.id];
+    var code;
+    if (c.statut === 'resilie' || c.statut === 'inactif') code = 'sortie';
+    else if (total > 0 && verse >= total) code = 'solde';
+    else if (c.date_souscription && c.date_souscription >= limIso) code = 'nouveau';   /* accueil d'abord, même si l'apport n'est pas encore versé */
+    else if (r && !(r.moisRetard < 3)) code = 'retard_grave';   /* inclut une mensualité non calculable (moisRetard infini) */
+    else if (r) code = 'retard';
+    else if (clientFinancementBancaire(c)) code = 'bancaire';
+    else if (total > 0 && verse / total >= 0.8) code = 'bientot_solde';
+    else code = 'a_jour';
+    var lot = (DATA.lots || []).find(function (l) { return l.id === c.lot_id; });
+    var acts = (c.actions_commerciales || []).filter(function (a) { return a.code === code; });
+    return { c: c, code: code, total: total, verse: verse, reste: Math.max(0, total - verse), retard: r || null,
+             lot: lot ? lot.numero : '', commercial: csuiviCommercialNom(c),
+             derniere: (c.actions_commerciales || []).slice(-1)[0] || null,
+             faite: acts.length ? acts[acts.length - 1] : null };
+  });
+}
+
+function csuiviDureeRetard(r) { return isFinite(r.moisRetard) ? (r.moisRetard + ' mois de retard') : 'échéance dépassée'; }
+function csuiviMessage(x) {
+  var c = x.c, soc = csuiviSociete(), pre = (c.prenoms || c.nom || '').trim();
+  var lot = x.lot ? ' (lot ' + x.lot + ')' : '';
+  var base = 'Bonjour ' + pre + ',\n\n';
+  var fin = '\n\nCordialement,\n' + (x.commercial ? x.commercial + ' — ' : '') + soc;
+  switch (x.code) {
+    case 'retard_grave': case 'retard':
+      return base + 'Sauf erreur de notre part, votre dossier' + lot + ' accuse un retard de paiement'
+        + (x.retard ? ' (' + csuiviDureeRetard(x.retard) + ', ' + fmtF(x.retard.montantDu) + ' F)' : '')
+        + '. Pouvons-nous convenir d’une date de règlement ou d’un rendez-vous pour faire le point ?' + fin;
+    case 'nouveau':
+      return base + 'Bienvenue chez ' + soc + ' ! Votre souscription' + lot + ' est bien enregistrée. Je reste votre interlocuteur pour tout besoin. Vous recevrez aussi vos accès à l’espace souscripteur pour suivre vos paiements et documents.' + fin;
+    case 'bancaire':
+      return base + 'Nous suivons votre dossier de financement bancaire' + lot + '. N’hésitez pas à nous dire s’il vous manque des pièces ou si la banque a besoin d’un document de notre part.' + fin;
+    case 'bientot_solde':
+      return base + 'Votre dossier' + lot + ' est bien avancé : il reste ' + fmtF(x.reste) + ' F pour le solder. Nous pouvons préparer dès maintenant votre attestation de solde et la livraison.' + fin;
+    case 'solde':
+      return base + 'Félicitations, votre dossier' + lot + ' est entièrement soldé ! Nous préparons votre attestation et les formalités de livraison. Si un proche souhaite investir, nous serons ravis de l’accueillir sur vos recommandations.' + fin;
+    case 'sortie':
+      return base + 'Nous souhaitons faire le point avec vous sur votre dossier' + lot + '. Seriez-vous disponible pour un échange ?' + fin;
+    default:
+      return base + 'Merci pour la régularité de vos paiements' + lot + '. Votre dossier est à jour ; n’hésitez pas à nous contacter pour toute question, et à recommander ' + soc + ' autour de vous.' + fin;
+  }
+}
+
+function csuiviSetTab(t) { CSUIVI.tab = t; CSUIVI.file = []; csuiviRender(); }
+function csuiviFiltre(k, v) { CSUIVI[k] = v; csuiviRender(); }
+
+function csuiviRender() {
+  var box = document.getElementById('csuivi-contenu'); if (!box) return;
+  ['actions', 'portail'].forEach(function (t) {
+    var b = document.getElementById('csuivi-tab-' + t);
+    if (b) b.className = 'btn btn-sm ' + (CSUIVI.tab === t ? 'btn-primary' : 'btn-secondary');
+  });
+  box.innerHTML = CSUIVI.tab === 'portail' ? csuiviHtmlPortail() : csuiviHtmlActions();
+}
+
+/* ── Onglet 1 : actions commerciales par statut ───────────────────────── */
+function csuiviHtmlActions() {
+  var tous = csuiviCalculer();
+  var nbParStatut = {};
+  tous.forEach(function (x) { nbParStatut[x.code] = (nbParStatut[x.code] || 0) + 1; });
+  var comms = {};
+  tous.forEach(function (x) { if (x.commercial) comms[x.commercial] = 1; });
+  var q = (CSUIVI.recherche || '').toLowerCase();
+  var liste = tous.filter(function (x) {
+    if (CSUIVI.statut && x.code !== CSUIVI.statut) return false;
+    if (CSUIVI.commercial === '__none__' ? !!x.commercial : (CSUIVI.commercial && x.commercial !== CSUIVI.commercial)) return false;
+    if (q && ((x.c.nom || '') + ' ' + (x.c.prenoms || '') + ' ' + (x.c.dossier || '') + ' ' + (x.c.tel || '')).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  }).sort(function (a, b) {
+    return CSUIVI_STATUTS[a.code].ordre - CSUIVI_STATUTS[b.code].ordre || (b.retard ? b.retard.montantDu : 0) - (a.retard ? a.retard.montantDu : 0);
+  });
+
+  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;">';
+  Object.keys(CSUIVI_STATUTS).forEach(function (k) {
+    var s = CSUIVI_STATUTS[k], on = CSUIVI.statut === k;
+    h += '<div class="card" style="padding:10px;cursor:pointer;' + (on ? 'outline:2px solid var(--or);' : '') + '" onclick="csuiviFiltre(\'statut\',\'' + (on ? '' : k) + '\')">'
+      + '<div style="font-size:11px;color:var(--blanc-dim);">' + s.ico + ' ' + s.lib + '</div>'
+      + '<div style="font-size:22px;font-weight:800;">' + (nbParStatut[k] || 0) + '</div></div>';
+  });
+  h += '</div>';
+
+  h += '<div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
+    + '<input class="search-input" placeholder="Rechercher nom, dossier, téléphone…" value="' + escHtml(CSUIVI.recherche) + '" oninput="CSUIVI.recherche=this.value;csuiviRenderTableSeul()">'
+    + '<select class="filter-select" onchange="csuiviFiltre(\'commercial\',this.value)"><option value="">Tous les commerciaux</option><option value="__none__"' + (CSUIVI.commercial === '__none__' ? ' selected' : '') + '>— Non assigné —</option>'
+    + Object.keys(comms).sort().map(function (n) { return '<option value="' + escHtml(n) + '"' + (CSUIVI.commercial === n ? ' selected' : '') + '>' + escHtml(n) + '</option>'; }).join('')
+    + '</select><div style="align-self:center;font-size:12px;color:var(--blanc-dim);">' + liste.length + ' souscripteur(s)</div></div>';
+
+  h += '<div id="csuivi-table">' + csuiviHtmlTable(liste) + '</div>';
+  return h;
+}
+function csuiviRenderTableSeul() {
+  /* recherche au fil de la frappe : ne reconstruit que le tableau (le champ garde le focus) */
+  var t = document.getElementById('csuivi-table'); if (!t) return;
+  var q = (CSUIVI.recherche || '').toLowerCase();
+  var liste = csuiviCalculer().filter(function (x) {
+    if (CSUIVI.statut && x.code !== CSUIVI.statut) return false;
+    if (CSUIVI.commercial === '__none__' ? !!x.commercial : (CSUIVI.commercial && x.commercial !== CSUIVI.commercial)) return false;
+    return !q || ((x.c.nom || '') + ' ' + (x.c.prenoms || '') + ' ' + (x.c.dossier || '') + ' ' + (x.c.tel || '')).toLowerCase().indexOf(q) >= 0;
+  }).sort(function (a, b) { return CSUIVI_STATUTS[a.code].ordre - CSUIVI_STATUTS[b.code].ordre; });
+  t.innerHTML = csuiviHtmlTable(liste);
+}
+function csuiviHtmlTable(liste) {
+  if (!liste.length) return '<div class="alert alert-info">Aucun souscripteur pour ce filtre.</div>';
+  var h = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Souscripteur</th><th>Commercial</th><th>Statut</th><th>Reste dû</th><th>Action proposée</th><th>Dernière action</th><th></th></tr></thead><tbody>';
+  liste.slice(0, 400).forEach(function (x) {
+    var s = CSUIVI_STATUTS[x.code], c = x.c, id = escHtml(c.id);
+    var tel = c.tel ? telWhatsApp(String(c.tel).split('/')[0]) : '';
+    h += '<tr><td><strong>' + escHtml(((c.prenoms || '') + ' ' + (c.nom || '')).trim()) + '</strong><div style="font-size:11px;color:var(--blanc-dim);">' + escHtml(c.dossier || '') + (x.lot ? ' · lot ' + escHtml(x.lot) : '') + '</div></td>'
+      + '<td style="font-size:12px;">' + (x.commercial ? escHtml(x.commercial) : '<span style="color:var(--rouge);">— non assigné —</span>') + '</td>'
+      + '<td>' + s.ico + ' ' + s.lib + ((x.retard && x.code.indexOf('retard') === 0) ? '<div style="font-size:11px;color:var(--rouge);">' + csuiviDureeRetard(x.retard) + ' · ' + fmtF(x.retard.montantDu) + ' F</div>' : '') + '</td>'
+      + '<td style="text-align:right;">' + (x.total ? fmtF(x.reste) + ' F' : '—') + '</td>'
+      + '<td style="font-size:12px;">' + s.action + (x.faite ? '<div style="font-size:11px;color:var(--vert);">✔ fait le ' + escHtml(x.faite.date) + '</div>' : '') + '</td>'
+      + '<td style="font-size:11px;color:var(--blanc-dim);">' + (x.derniere ? escHtml(x.derniere.date) + ' · ' + escHtml(x.derniere.canal || '') : '—') + '</td>'
+      + '<td style="white-space:nowrap;">'
+      + (tel ? '<a class="btn btn-secondary btn-sm btn-icon" target="_blank" rel="noopener" title="WhatsApp (message prêt)" href="https://wa.me/' + tel + '?text=' + encodeURIComponent(csuiviMessage(x)) + '" onclick="csuiviLoguer(\'' + id + '\',\'' + x.code + '\',\'whatsapp\')">💬</a> ' : '')
+      + (c.email ? '<a class="btn btn-secondary btn-sm btn-icon" title="E-mail (message prêt)" href="mailto:' + escHtml(c.email) + '?subject=' + encodeURIComponent('Votre dossier — ' + csuiviSociete()) + '&body=' + encodeURIComponent(csuiviMessage(x)) + '" onclick="csuiviLoguer(\'' + id + '\',\'' + x.code + '\',\'email\')">✉️</a> ' : '')
+      + '<button class="btn btn-secondary btn-sm btn-icon" title="Marquer l’action comme faite (appel, rendez-vous…)" onclick="csuiviMarquerFait(\'' + id + '\',\'' + x.code + '\')">✔</button></td></tr>';
+  });
+  return h + '</tbody></table></div>' + (liste.length > 400 ? '<div class="alert alert-info">Affichage limité aux 400 premiers : affinez avec les filtres.</div>' : '');
+}
+
+async function csuiviLoguer(clientId, code, canal, note) {
+  var c = (DATA.clients || []).find(function (x) { return x.id === clientId; }); if (!c) return;
+  if (!c.actions_commerciales) c.actions_commerciales = [];
+  var par = (APP.currentUser && (APP.currentUser.nom || APP.currentUser.email || APP.currentUser.login)) || '';
+  c.actions_commerciales.push({ date: today(), code: code, canal: canal || '', note: note || '', par: par });
+  await dbPut('clients', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+  setTimeout(function () { if (CSUIVI.tab === 'actions') csuiviRenderTableSeul(); }, 400);
+}
+async function csuiviMarquerFait(clientId, code) {
+  var note = prompt('Compte rendu de l’action (appel, rendez-vous, promesse de paiement…) — facultatif :', '');
+  if (note === null) return;
+  await csuiviLoguer(clientId, code, 'appel / rdv', note);
+  toast('Action enregistrée dans le journal du souscripteur.', 'success');
+  csuiviRenderTableSeul();
+}
+
+/* ── Onglet 2 : accès au portail souscripteur ─────────────────────────── */
+function csuiviAccesEtat(c) {
+  if (c.portail_acces_envoye) return 'envoye';
+  if (c.code_acces_hash || c.derniere_connexion_portail) return 'code';
+  return 'aucun';
+}
+function csuiviCandidats() {
+  return (DATA.clients || []).filter(function (c) { return (c.statut || 'actif') === 'actif' && csuiviAccesEtat(c) === 'aucun'; });
+}
+function csuiviHtmlPortail() {
+  var actifs = (DATA.clients || []).filter(function (c) { return (c.statut || 'actif') === 'actif'; });
+  var cand = csuiviCandidats(), joignables = cand.filter(function (c) { return c.tel || c.email; });
+  var envoye = actifs.filter(function (c) { return csuiviAccesEtat(c) === 'envoye'; }).length;
+  var code = actifs.filter(function (c) { return csuiviAccesEtat(c) === 'code'; }).length;
+  var connectes = actifs.filter(function (c) { return c.derniere_connexion_portail; }).length;
+  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;">'
+    + '<div class="card" style="padding:10px;"><div style="font-size:11px;color:var(--blanc-dim);">Souscripteurs actifs</div><div style="font-size:22px;font-weight:800;">' + actifs.length + '</div></div>'
+    + '<div class="card" style="padding:10px;"><div style="font-size:11px;color:var(--blanc-dim);">⏳ Accès à remettre</div><div style="font-size:22px;font-weight:800;color:var(--or);">' + cand.length + '</div></div>'
+    + '<div class="card" style="padding:10px;"><div style="font-size:11px;color:var(--blanc-dim);">✅ Accès envoyés (via cet écran)</div><div style="font-size:22px;font-weight:800;color:var(--vert);">' + envoye + '</div></div>'
+    + '<div class="card" style="padding:10px;"><div style="font-size:11px;color:var(--blanc-dim);">🔑 Code déjà existant</div><div style="font-size:22px;font-weight:800;">' + code + '</div></div>'
+    + '<div class="card" style="padding:10px;"><div style="font-size:11px;color:var(--blanc-dim);">🌐 Déjà connectés</div><div style="font-size:22px;font-weight:800;">' + connectes + '</div></div></div>';
+
+  if (CSUIVI.file.length) return h + csuiviHtmlFile();
+
+  h += '<div class="alert alert-info" style="font-size:12px;">Pour chaque souscripteur actif qui n’a pas encore d’accès, l’application crée un code personnel (6 chiffres, conservé chiffré) et prépare le message dans WhatsApp — ou par e-mail s’il n’a pas de téléphone. Vous cliquez sur « Envoyer » dans WhatsApp, puis sur « Suivant ». Ceux qui ont déjà un code ne sont pas touchés : leur code reste valable.</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
+    + '<button class="btn btn-primary" ' + (joignables.length ? '' : 'disabled ') + 'onclick="csuiviDemarrerEnvoi()">📨 Démarrer l’envoi (' + joignables.length + ')</button>'
+    + '</div>';
+  if (cand.length > joignables.length) {
+    h += '<div class="alert alert-warning" style="font-size:12px;">' + (cand.length - joignables.length) + ' souscripteur(s) sans téléphone ni e-mail : complétez leur fiche pour pouvoir leur envoyer l’accès.</div>';
+  }
+  if (!cand.length) h += '<div class="alert alert-success">Tous les souscripteurs actifs ont déjà reçu ou possèdent un accès.</div>';
+  return h;
+}
+
+function csuiviDemarrerEnvoi() {
+  if (!hasRole('admin') && !hasRole('manager') && !hasRole('commercial')) { toast('⛔ Accès refusé.', 'error'); return; }
+  CSUIVI.file = csuiviCandidats().filter(function (c) { return c.tel || c.email; }).map(function (c) { return c.id; });
+  CSUIVI.pos = 0; CSUIVI.code = ''; CSUIVI.codeId = '';
+  csuiviRender(); csuiviPreparerCourant();
+}
+function csuiviCourant() { return (DATA.clients || []).find(function (c) { return c.id === CSUIVI.file[CSUIVI.pos]; }) || null; }
+
+/* Génère le code du souscripteur affiché (une seule fois, stocké haché). */
+async function csuiviPreparerCourant() {
+  var c = csuiviCourant();
+  if (!c) { csuiviRender(); return; }
+  if (CSUIVI.codeId !== c.id) {
+    var code = Math.floor(100000 + Math.random() * 900000).toString();
+    var salt = generateSalt();
+    c.code_acces_hash = await hashPassword(code, salt);
+    c.code_acces_salt = salt;
+    c.code_acces_date = new Date().toISOString();
+    delete c.code_acces; delete c.mot_de_passe;
+    await dbPut('clients', c);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+    CSUIVI.code = code; CSUIVI.codeId = c.id;
+  }
+  csuiviRender();
+}
+function csuiviMessageAcces(c, code) {
+  var soc = csuiviSociete(), url = getAppUrl();
+  return 'Bonjour ' + ((c.prenoms || c.nom || '').trim()) + ',\n\n'
+    + 'Vous avez maintenant accès à ' + soc + ' (votre Espace Souscripteur) pour suivre vos paiements, documents et échéances.\n\n'
+    + (url ? '🔗 Lien : ' + url + '\n' : '')
+    + '👤 Identifiant : ' + (c.dossier || c.tel || c.id) + '\n'
+    + '🔑 Code d’accès : ' + code + '\n\n'
+    + 'Ouvrez le lien, cliquez sur « Espace souscripteur », puis saisissez votre identifiant et ce code.\n\n'
+    + 'Cordialement,\n' + soc;
+}
+function csuiviHtmlFile() {
+  var c = csuiviCourant(), n = CSUIVI.file.length;
+  if (!c) {
+    return '<div class="alert alert-success">✅ Envoi terminé : tous les souscripteurs de la liste ont été traités.</div>'
+      + '<button class="btn btn-secondary" onclick="csuiviSetTab(\'portail\')">Retour au récapitulatif</button>';
+  }
+  if (CSUIVI.codeId !== c.id) return '<div class="alert alert-info">Création du code…</div>';
+  var msg = csuiviMessageAcces(c, CSUIVI.code), id = escHtml(c.id);
+  var tel = c.tel ? telWhatsApp(String(c.tel).split('/')[0]) : '';
+  return '<div class="card" style="padding:16px;max-width:640px;">'
+    + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">Souscripteur ' + (CSUIVI.pos + 1) + ' / ' + n + '</div>'
+    + '<div style="font-size:18px;font-weight:800;">' + escHtml(((c.prenoms || '') + ' ' + (c.nom || '')).trim()) + '</div>'
+    + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">Dossier ' + escHtml(c.dossier || '—') + ' · ' + escHtml(c.tel || 'pas de téléphone') + ' · ' + escHtml(c.email || 'pas d’e-mail') + '</div>'
+    + '<textarea class="form-control" rows="9" readonly style="font-size:12px;">' + escHtml(msg) + '</textarea>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+    + (tel ? '<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/' + tel + '?text=' + encodeURIComponent(msg) + '" onclick="csuiviAccesEnvoye(\'' + id + '\',\'whatsapp\')">💬 Envoyer par WhatsApp</a>' : '')
+    + (c.email ? '<button class="btn btn-secondary" onclick="csuiviAccesEmail(\'' + id + '\')">✉️ Envoyer par e-mail</button>' : '')
+    + '<button class="btn btn-secondary" onclick="csuiviCopier()">📋 Copier</button>'
+    + '<button class="btn btn-secondary" onclick="csuiviSuivant()">Suivant ▶</button>'
+    + '<button class="btn btn-secondary" onclick="csuiviSetTab(\'portail\')">Arrêter</button></div>'
+    + '<div id="csuivi-etat" style="font-size:12px;margin-top:10px;color:var(--vert);"></div></div>';
+}
+async function csuiviAccesEnvoye(clientId, canal) {
+  var c = (DATA.clients || []).find(function (x) { return x.id === clientId; }); if (!c) return;
+  c.portail_acces_envoye = { date: today(), canal: canal };
+  await dbPut('clients', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+  var e = document.getElementById('csuivi-etat');
+  if (e) e.textContent = '✔ Accès marqué comme envoyé par ' + canal + '. Cliquez sur « Envoyer » dans la fenêtre ouverte, puis « Suivant ».';
+}
+async function csuiviAccesEmail(clientId) {
+  var c = (DATA.clients || []).find(function (x) { return x.id === clientId; }); if (!c || !c.email) return;
+  var msg = csuiviMessageAcces(c, CSUIVI.code), soc = csuiviSociete(), sujet = 'Vos accès à ' + soc, p = DATA.params || {};
+  if (p.emailjs_service && p.emailjs_template && p.emailjs_key && typeof emailjs !== 'undefined') {
+    try {
+      emailjs.init(p.emailjs_key);
+      await emailjs.send(p.emailjs_service, p.emailjs_template, { to_email: c.email, to_name: c.nom || '', subject: sujet, message: msg, from_name: soc, reply_to: p.email || '' });
+      await csuiviAccesEnvoye(clientId, 'email');
+      toast('✅ E-mail envoyé à ' + c.email, 'success');
+      csuiviSuivant();
+    } catch (err) { toast('❌ Erreur EmailJS : ' + ((err && err.text) || err), 'error'); }
+  } else {
+    await csuiviAccesEnvoye(clientId, 'email');
+    window.location.href = 'mailto:' + c.email + '?subject=' + encodeURIComponent(sujet) + '&body=' + encodeURIComponent(msg);
+  }
+}
+function csuiviCopier() {
+  var c = csuiviCourant(); if (!c) return;
+  var t = csuiviMessageAcces(c, CSUIVI.code);
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { toast('Message copié.', 'success'); });
+}
+function csuiviSuivant() {
+  CSUIVI.pos++;
+  if (CSUIVI.pos >= CSUIVI.file.length) { CSUIVI.file = []; CSUIVI.pos = 0; CSUIVI.tab = 'portail'; toast('Envoi terminé.', 'success'); csuiviRender(); return; }
+  csuiviPreparerCourant();
 }
 
 function exportClients() {
@@ -97622,6 +97949,7 @@ var PAGE_MODULE_MAP = {
   'crm-itineraires':    'Itineraires Terrain',
   'ordres-mission':     'Ordres de Mission',
   'crm-rapports':       'Rapports Commerciaux',
+  'crm-souscripteurs':  'Suivi souscripteurs',
   'crm-apporteurs':     'Rapports Commerciaux',
   'lots':               'Lots & Reservations',
   'commercialisation':  'Commercialisation',
