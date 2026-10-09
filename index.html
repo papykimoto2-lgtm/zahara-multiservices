@@ -36592,6 +36592,8 @@ async function _vrsCreerBonCaisse(versement, caisseId) {
     saisi_apres_cloture: diag.cloturee || undefined,
     created_by: auteur, created_at: new Date().toISOString()
   };
+  var _gv = caisseGardeNouveauMouvement(mvt);
+  if (_gv) return { mvt: null, raison: _gv };
   DATA.caisse_mouvements.push(mvt);
   mvt._baseModifie = mvt._modifie || null;
   await dbPut('caisse_mouvements', mvt);
@@ -127232,6 +127234,35 @@ function caisseBonDateChange() {
   } else { h.style.display = 'none'; }
 }
 
+/* ── Garde-fous de saisie et de validation ── */
+function caisseGardeNouveauMouvement(m) {
+  if (!m.session_id || !(DATA.caisse_sessions || []).some(function(s){ return s.id === m.session_id; })) {
+    return 'Ce bon n\'est rattaché à aucune session de caisse : enregistrement refusé.';
+  }
+  if (m.numero && (DATA.caisse_mouvements || []).some(function(x){ return x.id !== m.id && x.caisse_id === m.caisse_id && x.numero === m.numero; })) {
+    return 'Le numéro de bon ' + m.numero + ' existe déjà sur cette caisse : enregistrement refusé (rechargez la page puis recommencez).';
+  }
+  return null;
+}
+function caisseBonSimilaireRecent(m) {
+  var now = Date.now();
+  var norm = function(x){ return String(x || '').trim().toLowerCase(); };
+  return (DATA.caisse_mouvements || []).find(function(x){
+    return x.id !== m.id && x.caisse_id === m.caisse_id && x.type === m.type && !x.rejete
+      && Math.round(parseFloat(x.montant) || 0) === Math.round(parseFloat(m.montant) || 0)
+      && norm(x.beneficiaire) === norm(m.beneficiaire)
+      && x.created_at && (now - new Date(x.created_at).getTime()) < 10 * 60000;
+  }) || null;
+}
+/* Règle : on ne valide pas sa propre demande (le rejet reste possible : retrait de sa demande). */
+function caisseEstMemeDemandeur(mvt) {
+  var u = APP.currentUser || {};
+  if (mvt.demande_par_id && u.id) return mvt.demande_par_id === u.id;
+  var norm = function(x){ return String(x || '').trim().toLowerCase(); };
+  var d = norm(mvt.demande_par || mvt.created_by);
+  return !!d && d === norm(u.nom);
+}
+
 function caisseNomUser(userId) {
   var u = (DATA.users || []).find(function(x){ return x.id === userId; });
   return u ? u.nom : userId;
@@ -128805,6 +128836,7 @@ async function caisseSaveBon() {
       mvt.requiert_validation = true; mvt.valide = false; mvt.rejete = false;
       mvt.plafond_demandeur = _plafondMod;
       mvt.demande_par = (APP.currentUser && APP.currentUser.nom) || '—';
+      mvt.demande_par_id = (APP.currentUser && APP.currentUser.id) || null;
       mvt.demande_role = (APP.currentUser && APP.currentUser.role) || '';
       mvt.demande_le = new Date().toISOString();
       var _nouvelleDemande = !_etaitDejaEnAttente;
@@ -128923,9 +128955,14 @@ async function caisseSaveBon() {
     nouveau.rejete = false;
     nouveau.plafond_demandeur = _plafondAuteur;
     nouveau.demande_par = (APP.currentUser && APP.currentUser.nom) || '—';
+    nouveau.demande_par_id = (APP.currentUser && APP.currentUser.id) || null;
     nouveau.demande_role = (APP.currentUser && APP.currentUser.role) || '';
     nouveau.demande_le = new Date().toISOString();
   }
+  var _gm = caisseGardeNouveauMouvement(nouveau);
+  if (_gm) { toast('⛔ ' + _gm, 'error', 7000); return; }
+  var _sim = caisseBonSimilaireRecent(nouveau);
+  if (_sim && !confirm('⚠️ Un bon identique (même caisse, type, montant et ' + (type === 'entree' ? 'déposant' : 'bénéficiaire') + ') a été enregistré il y a moins de 10 minutes (n° ' + (_sim.numero || '') + ').\n\nEnregistrer quand même ce nouveau bon ?')) return;
   DATA.caisse_mouvements.push(nouveau);
   nouveau._baseModifie = nouveau._modifie || null;
   await dbPut('caisse_mouvements', nouveau);
@@ -129075,7 +129112,7 @@ async function caisseTransfererFonds() {
     piece_ref: '', statut: 'a_ventiler', compte_ventile: null, ecriture_id: null,
     ventile_par: null, ventile_le: null, transfert_id: transfertId, transfert_vers: destId,
     requiert_validation: true, valide: false, rejete: false,
-    plafond_demandeur: plafondAuteur, demande_par: auteurNom, demande_role: auteurRole, demande_le: new Date().toISOString(),
+    plafond_demandeur: plafondAuteur, demande_par: auteurNom, demande_par_id: (APP.currentUser && APP.currentUser.id) || null, demande_role: auteurRole, demande_le: new Date().toISOString(),
     created_by: auteurNom, created_at: new Date().toISOString()
   };
   var numeroEntree = await caisseProchainNumero(destId, 'entree', date, dest.compte);
@@ -129086,10 +129123,12 @@ async function caisseTransfererFonds() {
     piece_ref: '', statut: 'a_ventiler', compte_ventile: null, ecriture_id: null,
     ventile_par: null, ventile_le: null, transfert_id: transfertId, transfert_depuis: sourceId,
     requiert_validation: true, valide: false, rejete: false,
-    plafond_demandeur: plafondAuteur, demande_par: auteurNom, demande_role: auteurRole, demande_le: new Date().toISOString(),
+    plafond_demandeur: plafondAuteur, demande_par: auteurNom, demande_par_id: (APP.currentUser && APP.currentUser.id) || null, demande_role: auteurRole, demande_le: new Date().toISOString(),
     created_by: auteurNom, created_at: new Date().toISOString()
   };
 
+  var _gt = caisseGardeNouveauMouvement(mvtSortie) || caisseGardeNouveauMouvement(mvtEntree);
+  if (_gt) { toast('⛔ ' + _gt, 'error', 7000); return; }
   DATA.caisse_mouvements.push(mvtSortie);
   DATA.caisse_mouvements.push(mvtEntree);
   mvtSortie._baseModifie = mvtSortie._modifie || null;
@@ -129447,7 +129486,7 @@ async function reapServirConfirmer() {
     ventile_par: null, ventile_le: null,
     requiert_validation: true, valide: false, rejete: false,
     plafond_demandeur: plafond,
-    demande_par: auteurNom, demande_role: auteurRole, demande_le: new Date().toISOString(),
+    demande_par: auteurNom, demande_par_id: (APP.currentUser && APP.currentUser.id) || null, demande_role: auteurRole, demande_le: new Date().toISOString(),
     reappro_id: d.id,
     created_by: auteurNom, created_at: new Date().toISOString()
   };
@@ -129467,7 +129506,7 @@ async function reapServirConfirmer() {
       ventile_par: null, ventile_le: null, transfert_id: transfertId, transfert_vers: d.caisse_id,
       requiert_validation: true, valide: false, rejete: false,
       plafond_demandeur: plafond,
-      demande_par: auteurNom, demande_role: auteurRole, demande_le: new Date().toISOString(),
+      demande_par: auteurNom, demande_par_id: (APP.currentUser && APP.currentUser.id) || null, demande_role: auteurRole, demande_le: new Date().toISOString(),
       reappro_id: d.id,
       created_by: auteurNom, created_at: new Date().toISOString()
     };
@@ -132836,6 +132875,7 @@ async function caisseValiderDecaissement(mvtId) {
   var mvt = (DATA.caisse_mouvements || []).find(function(m){ return m.id === mvtId; });
   if (!mvt) return;
   if (!exigerDroit('Caisse', 'v', 'la validation de ce décaissement')) return;
+  if (caisseEstMemeDemandeur(mvt)) { toast('⛔ Vous ne pouvez pas valider votre propre demande : un autre validateur doit la valider.', 'error', 7000); return; }
   var montant = parseFloat(mvt.montant) || 0;
   if (!exigerPlafond(montant, 'Cette validation')) return;
   var jumeau = _caisseMvtJumeau(mvt);
