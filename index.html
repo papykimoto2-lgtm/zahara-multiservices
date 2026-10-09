@@ -19,7 +19,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -11880,6 +11880,9 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
             <div class="page-subtitle">Actions commerciales selon le statut · Remise des accès au portail</div>
           </div>
           <div class="spacer"></div>
+          <button class="btn btn-sm btn-secondary" onclick="csuiviRapportImprimer()" title="Rapport imprimable / PDF, généré à partir des données">📄 Rapport</button>
+          <button class="btn btn-sm btn-secondary" onclick="csuiviRapportWhatsApp()" title="Envoyer la synthèse par WhatsApp">💬 Envoyer</button>
+          <button class="btn btn-sm btn-secondary" onclick="csuiviRapportEmail()" title="Envoyer la synthèse par e-mail">✉️</button>
           <button class="btn btn-sm btn-primary" id="csuivi-tab-actions" onclick="csuiviSetTab('actions')">🎯 Actions commerciales</button>
           <button class="btn btn-sm btn-secondary" id="csuivi-tab-portail" onclick="csuiviSetTab('portail')">🔑 Accès portail</button>
         </div>
@@ -33619,6 +33622,96 @@ function csuiviMessage(x) {
   }
 }
 
+/* ── Rapport de suivi souscripteurs (généré à partir des données) ─────── */
+function csuiviRapportDonnees() {
+  var tous = csuiviCalculer(), il30 = new Date(); il30.setDate(il30.getDate() - 30);
+  var lim = il30.toISOString().split('T')[0];
+  var par = {}, parComm = {}, actions30 = 0, enRetard = 0, montantRetard = 0;
+  Object.keys(CSUIVI_STATUTS).forEach(function (k) { par[k] = { n: 0, reste: 0 }; });
+  tous.forEach(function (x) {
+    par[x.code].n++; par[x.code].reste += x.reste;
+    var nom = x.commercial || '— Non assigné —';
+    var g = parComm[nom] || (parComm[nom] = { nom: nom, n: 0, retards: 0, montant: 0, actions: 0, aTraiter: 0, accesOk: 0, accesManque: 0 });
+    g.n++;
+    var recentes = (x.c.actions_commerciales || []).filter(function (a) { return a.date >= lim; });
+    g.actions += recentes.length; actions30 += recentes.length;
+    if (x.code === 'retard' || x.code === 'retard_grave') {
+      g.retards++; g.montant += x.retard ? x.retard.montantDu : 0;
+      enRetard++; montantRetard += x.retard ? x.retard.montantDu : 0;
+      if (!recentes.length) g.aTraiter++;
+    }
+    if ((x.c.statut || 'actif') === 'actif') { if (csuiviAccesEtat(x.c) === 'aucun') g.accesManque++; else g.accesOk++; }
+  });
+  var prioritaires = tous.filter(function (x) { return x.code === 'retard' || x.code === 'retard_grave'; })
+    .sort(function (a, b) { return (b.retard ? b.retard.montantDu : 0) - (a.retard ? a.retard.montantDu : 0); }).slice(0, 25);
+  var actifs = (DATA.clients || []).filter(function (c) { return (c.statut || 'actif') === 'actif'; });
+  return {
+    total: tous.length, par: par, comms: Object.keys(parComm).map(function (k) { return parComm[k]; }).sort(function (a, b) { return b.montant - a.montant; }),
+    actions30: actions30, enRetard: enRetard, montantRetard: montantRetard, prioritaires: prioritaires,
+    portail: { actifs: actifs.length,
+      envoye: actifs.filter(function (c) { return csuiviAccesEtat(c) === 'envoye'; }).length,
+      code: actifs.filter(function (c) { return csuiviAccesEtat(c) === 'code'; }).length,
+      aucun: actifs.filter(function (c) { return csuiviAccesEtat(c) === 'aucun'; }).length,
+      connectes: actifs.filter(function (c) { return c.derniere_connexion_portail; }).length }
+  };
+}
+function csuiviRapportTexte() {
+  var d = csuiviRapportDonnees(), soc = csuiviSociete();
+  var t = '📇 Rapport de suivi souscripteurs — ' + soc + '\n' + new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }) + '\n\n'
+    + 'Souscripteurs : ' + d.total + '\n';
+  Object.keys(CSUIVI_STATUTS).forEach(function (k) {
+    if (d.par[k].n) t += CSUIVI_STATUTS[k].ico + ' ' + CSUIVI_STATUTS[k].lib + ' : ' + d.par[k].n + (d.par[k].reste && k !== 'solde' && k !== 'sortie' ? ' (reste dû ' + fmtF(d.par[k].reste) + ' F)' : '') + '\n';
+  });
+  t += '\nEn retard : ' + d.enRetard + ' souscripteur(s), ' + fmtF(d.montantRetard) + ' F\n'
+    + 'Actions commerciales (30 derniers jours) : ' + d.actions30 + '\n'
+    + 'Accès portail : ' + d.portail.envoye + ' envoyés, ' + d.portail.code + ' avec code, ' + d.portail.aucun + ' à remettre, ' + d.portail.connectes + ' déjà connectés\n\n'
+    + 'Par commercial (retards sans action récente) :\n';
+  d.comms.filter(function (g) { return g.retards; }).slice(0, 10).forEach(function (g) {
+    t += '• ' + g.nom + ' : ' + g.retards + ' retard(s), ' + fmtF(g.montant) + ' F, ' + g.aTraiter + ' sans action en 30 j\n';
+  });
+  return t;
+}
+function csuiviRapportWhatsApp() { window.open('https://wa.me/?text=' + encodeURIComponent(csuiviRapportTexte()), '_blank'); }
+function csuiviRapportEmail() {
+  var p = DATA.params || {};
+  window.location.href = 'mailto:' + (p.email_direction || '') + '?subject=' + encodeURIComponent('Rapport de suivi souscripteurs — ' + csuiviSociete()) + '&body=' + encodeURIComponent(csuiviRapportTexte());
+}
+function csuiviRapportImprimer() {
+  var d = csuiviRapportDonnees(), params = DATA.params || {};
+  var logo = (typeof getLogoForPrint === 'function') ? getLogoForPrint() : '';
+  var now = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
+  var td = 'padding:7px 9px;border:1px solid #E0E0EA;', tdr = td + 'text-align:right;';
+  var kpi = [['Souscripteurs', d.total], ['En retard', d.enRetard], ['Montant en retard', fmtF(d.montantRetard) + ' F'], ['Actions (30 j)', d.actions30]];
+  var lignesStatut = Object.keys(CSUIVI_STATUTS).map(function (k) {
+    var s = CSUIVI_STATUTS[k];
+    return '<tr><td style="' + td + '">' + s.ico + ' ' + s.lib + '</td><td style="' + tdr + '">' + d.par[k].n + '</td><td style="' + tdr + '">' + ((k === 'solde' || k === 'sortie') ? '—' : fmtF(d.par[k].reste) + ' F') + '</td><td style="' + td + '">' + s.action + '</td></tr>';
+  }).join('');
+  var lignesComm = d.comms.map(function (g) {
+    return '<tr><td style="' + td + 'font-weight:600;">' + escHtml(g.nom) + '</td><td style="' + tdr + '">' + g.n + '</td><td style="' + tdr + '">' + g.retards + '</td><td style="' + tdr + '">' + fmtF(g.montant) + ' F</td><td style="' + tdr + '">' + g.actions + '</td><td style="' + tdr + 'color:' + (g.aTraiter ? '#EF4444' : '#10B981') + ';font-weight:700;">' + g.aTraiter + '</td><td style="' + tdr + '">' + g.accesManque + '</td></tr>';
+  }).join('');
+  var lignesPrio = d.prioritaires.map(function (x, i) {
+    return '<tr><td style="' + td + '">' + (i + 1) + '. ' + escHtml(((x.c.prenoms || '') + ' ' + (x.c.nom || '')).trim()) + '<br><span style="color:#6B6B9A;font-size:10px;">' + escHtml(x.c.dossier || '') + (x.lot ? ' · lot ' + escHtml(x.lot) : '') + '</span></td><td style="' + td + '">' + escHtml(x.commercial || '—') + '</td><td style="' + td + '">' + csuiviDureeRetard(x.retard || { moisRetard: Infinity }) + '</td><td style="' + tdr + '">' + fmtF(x.retard ? x.retard.montantDu : 0) + ' F</td><td style="' + td + '">' + (x.derniere ? escHtml(x.derniere.date) : '—') + '</td></tr>';
+  }).join('');
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapport de suivi souscripteurs — ' + escHtml(params.societe || '') + '</title>'
+    + '<style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;color:#1C1C2E;}table{border-collapse:collapse;width:100%;font-size:11px;margin-bottom:18px;}'
+    + 'th{background:#1C1C2E;color:#fff;padding:8px 9px;text-align:left;}h1{font-size:18px;margin:0;}h2{font-size:13px;color:#B87333;margin:18px 0 6px;}'
+    + '.header{display:flex;align-items:center;border-bottom:3px solid #B87333;padding-bottom:14px;margin-bottom:18px;}'
+    + '.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:8px;}.kpi{background:#F8FAFC;border:1px solid #E0E0EA;border-top:3px solid #B87333;border-radius:6px;padding:10px;text-align:center;}'
+    + '.kpi-v{font-size:16px;font-weight:700;color:#B87333;}.kpi-l{font-size:9px;color:#6B6B9A;text-transform:uppercase;}@media print{body{padding:12px;}}</style></head><body>'
+    + '<div class="header">' + (logo ? '<img src="' + logo + '" style="height:44px;object-fit:contain;margin-right:12px;">' : '')
+    + '<div><h1>' + escHtml(params.societe || 'ImmoSuite ERP') + '</h1><div style="color:#B87333;font-weight:700;">RAPPORT DE SUIVI SOUSCRIPTEURS</div><div style="font-size:11px;color:#6B6B9A;">Généré le ' + now + '</div></div></div>'
+    + '<div class="kpi-row">' + kpi.map(function (k) { return '<div class="kpi"><div class="kpi-v">' + k[1] + '</div><div class="kpi-l">' + k[0] + '</div></div>'; }).join('') + '</div>'
+    + '<h2>Répartition par statut</h2><table><thead><tr><th>Statut</th><th>Effectif</th><th>Reste dû</th><th>Action commerciale</th></tr></thead><tbody>' + lignesStatut + '</tbody></table>'
+    + '<h2>Par commercial</h2><table><thead><tr><th>Commercial</th><th>Souscripteurs</th><th>En retard</th><th>Montant en retard</th><th>Actions (30 j)</th><th>Retards sans action</th><th>Accès à remettre</th></tr></thead><tbody>' + lignesComm + '</tbody></table>'
+    + '<h2>Accès au portail souscripteur</h2><div>Actifs : <b>' + d.portail.actifs + '</b> · envoyés : <b>' + d.portail.envoye + '</b> · code existant : <b>' + d.portail.code + '</b> · à remettre : <b>' + d.portail.aucun + '</b> · déjà connectés : <b>' + d.portail.connectes + '</b></div>'
+    + '<h2>Souscripteurs en retard à traiter en priorité (25 plus gros montants)</h2><table><thead><tr><th>Souscripteur</th><th>Commercial</th><th>Retard</th><th>Montant dû</th><th>Dernière action</th></tr></thead><tbody>' + (lignesPrio || '<tr><td colspan="5" style="' + td + '">Aucun retard.</td></tr>') + '</tbody></table>'
+    + '<div style="margin-top:24px;font-size:10px;color:#94A3B8;border-top:1px solid #E0E0EA;padding-top:10px;">Document confidentiel — ' + escHtml(params.societe || 'ImmoSuite ERP') + ' · ' + now + '</div></body></html>';
+  var win = window.open('', '_blank'); if (!win) { toast('Autorisez les fenêtres pop-up pour imprimer le rapport.', 'error'); return; }
+  win.document.write(typeof docStamp === 'function' ? docStamp(html, 'RPT-SUIVI-SOUSCRIPTEURS') : html);
+  win.document.close();
+  setTimeout(function () { win.print(); }, 400);
+}
+
 function csuiviSetTab(t) { CSUIVI.tab = t; CSUIVI.file = []; csuiviRender(); }
 function csuiviFiltre(k, v) { CSUIVI[k] = v; csuiviRender(); }
 
@@ -33651,7 +33744,7 @@ function csuiviHtmlActions() {
   var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;">';
   Object.keys(CSUIVI_STATUTS).forEach(function (k) {
     var s = CSUIVI_STATUTS[k], on = CSUIVI.statut === k;
-    h += '<div class="card" style="padding:10px;cursor:pointer;' + (on ? 'outline:2px solid var(--or);' : '') + '" onclick="csuiviFiltre(\'statut\',\'' + (on ? '' : k) + '\')">'
+    h += '<div class="card" style="padding:10px;cursor:pointer;' + (on ? 'outline:2px solid var(--or);' : '') + '" title="Cliquer pour filtrer par ce statut" onclick="csuiviFiltre(\'statut\',\'' + (on ? '' : k) + '\')">'
       + '<div style="font-size:11px;color:var(--blanc-dim);">' + s.ico + ' ' + s.lib + '</div>'
       + '<div style="font-size:22px;font-weight:800;">' + (nbParStatut[k] || 0) + '</div></div>';
   });
@@ -33659,6 +33752,9 @@ function csuiviHtmlActions() {
 
   h += '<div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
     + '<input class="search-input" placeholder="Rechercher nom, dossier, téléphone…" value="' + escHtml(CSUIVI.recherche) + '" oninput="CSUIVI.recherche=this.value;csuiviRenderTableSeul()">'
+    + '<select class="filter-select" onchange="csuiviFiltre(\'statut\',this.value)"><option value="">Tous les statuts</option>'
+    + Object.keys(CSUIVI_STATUTS).map(function (k) { return '<option value="' + k + '"' + (CSUIVI.statut === k ? ' selected' : '') + '>' + CSUIVI_STATUTS[k].ico + ' ' + CSUIVI_STATUTS[k].lib + ' (' + (nbParStatut[k] || 0) + ')</option>'; }).join('')
+    + '</select>'
     + '<select class="filter-select" onchange="csuiviFiltre(\'commercial\',this.value)"><option value="">Tous les commerciaux</option><option value="__none__"' + (CSUIVI.commercial === '__none__' ? ' selected' : '') + '>— Non assigné —</option>'
     + Object.keys(comms).sort().map(function (n) { return '<option value="' + escHtml(n) + '"' + (CSUIVI.commercial === n ? ' selected' : '') + '>' + escHtml(n) + '</option>'; }).join('')
     + '</select><div style="align-self:center;font-size:12px;color:var(--blanc-dim);">' + liste.length + ' souscripteur(s)</div></div>';
