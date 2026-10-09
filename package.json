@@ -1,0 +1,7 @@
+{
+  "name": "zahara-multiservices",
+  "private": true,
+  "scripts": {
+    "test:caisse": "node --test tests-caisse/*.test.js"
+  }
+}
