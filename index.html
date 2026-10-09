@@ -133356,6 +133356,28 @@ function _caisseEcartsEnAttente(){
   }).sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
 }
 
+/* Net des écarts non régularisés, par caisse : permet de voir qu'un écart se compense avec un autre
+   (clôture tardive, mouvement validé après coup) AVANT de comptabiliser une perte. */
+function _caisseResumeEcarts(liste){
+  var par = {}, ordre = [];
+  liste.forEach(function(s){
+    var ec = parseFloat(s.ecart) || 0, k = s.caisse_id;
+    if (!par[k]) { par[k] = { plus:0, moins:0, n:0 }; ordre.push(k); }
+    if (ec > 0) par[k].plus += ec; else par[k].moins += ec;
+    par[k].n++;
+  });
+  return ordre.map(function(k){
+    var c = (DATA.caisses||[]).find(function(x){ return x.id===k; });
+    var r = par[k];
+    return { caisse_id:k, nom:(c?c.nom:k), n:r.n, plus:r.plus, moins:r.moins, net:r.plus + r.moins };
+  });
+}
+function _caisseResumeEcartsTexte(liste){
+  return _caisseResumeEcarts(liste).map(function(r){
+    return '• ' + r.nom + ' : ' + r.n + ' écart(s) — excédents +' + fmtF(r.plus) + ', manquants ' + fmtF(r.moins) + ', NET ' + (r.net>0?'+':'') + fmtF(r.net) + ' FCFA';
+  }).join('\n');
+}
+
 function caisseRenderEcarts(){
   var box = document.getElementById('caisse-ecarts-box');
   if (!box) return;
@@ -133373,6 +133395,10 @@ function caisseRenderEcarts(){
       + 'Manquant → débit <strong>'+_caisseCompteEcart('manquant')+'</strong> / crédit 571. '
       + 'Excédent → débit 571 / crédit <strong>'+_caisseCompteEcart('excedent')+'</strong>. '
       + '<span style="color:var(--or,#B87333);">Mali de caisse : charge non déductible fiscalement en CI — à justifier.</span></div>'
+    + '<div style="font-size:12px;margin-bottom:10px;padding:8px 12px;border:1px solid var(--rouge);border-radius:var(--r);background:var(--card2);">'
+      + '<strong>Net par caisse (écarts non régularisés) :</strong><br>'
+      + _caisseResumeEcarts(liste).map(function(r){ return escHtml(r.nom) + ' : ' + r.n + ' écart(s), excédents +' + fmtF(r.plus) + ', manquants ' + fmtF(r.moins) + ', <strong>net ' + (r.net>0?'+':'') + fmtF(r.net) + ' FCFA</strong>'; }).join('<br>')
+      + '<br><span style="color:var(--blanc-dim);">Avant toute écriture, vérifiez que ces écarts ne se compensent pas (clôture tardive, mouvement validé après la clôture) et conservez les pièces justificatives.</span></div>'
     + '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>'
       + '<th>Date</th><th>Caisse</th><th>Théorique</th><th>Réel compté</th><th>Écart</th><th>Sens</th><th></th>'
     + '</tr></thead><tbody>';
@@ -133394,7 +133420,7 @@ function caisseRenderEcarts(){
   box.innerHTML = html;
 }
 
-async function genererEcritureEcartCaisse(session){
+async function genererEcritureEcartCaisse(session, motif){
   var ec = parseFloat(session.ecart)||0;
   if (ec === 0) return null;
   var caisse = (DATA.caisses||[]).find(function(c){ return c.id===session.caisse_id; });
@@ -133411,7 +133437,7 @@ async function genererEcritureEcartCaisse(session){
     compte_credit: exc ? contrepartie : compteCaisse,
     compte: compteCaisse, montant: Math.abs(ec), type: exc?'produit':'charge', mode: 'especes',
     division: (caisse && caisse.division_id) || '',
-    notes: 'Régularisé par ' + ((APP.currentUser&&APP.currentUser.nom)||'—'), created_at: today()
+    notes: 'Régularisé par ' + ((APP.currentUser&&APP.currentUser.nom)||'—') + (motif ? ' — motif : ' + motif : ''), created_at: today()
   };
   var idx = DATA.ecritures.findIndex(function(e){ return e.id===ecr.id; });
   if (idx>=0) DATA.ecritures[idx]=ecr; else DATA.ecritures.push(ecr);
@@ -133432,6 +133458,8 @@ async function genererEcritureEcartCaisse(session){
   session.ecart_ecriture_id = ecr.id;
   session.ecart_regularise_par = (APP.currentUser&&APP.currentUser.nom)||'—';
   session.ecart_regularise_le = new Date().toISOString();
+  session.ecart_regularise_motif = motif || '';
+  session.ecart_regularise_montant = ec;
   session._baseModifie = session._modifie || null;
   await dbPut('caisse_sessions', session);
   await caisseSyncEtAlerter('pi_caisse_sessions', session);
@@ -133443,7 +133471,21 @@ async function caisseRegulariserEcart(sessionId){
   var s = (DATA.caisse_sessions||[]).find(function(x){ return x.id===sessionId; });
   if (!s) return;
   if (s.ecart_regularise) { toast('Écart déjà régularisé.', 'info'); return; }
-  var _ecrEcart = await genererEcritureEcartCaisse(s);
+  if (caisseMvtsEnAttente(s).length) { toast('⛔ Cette session a encore des mouvements en attente de validation : validez-les ou rejetez-les avant de régulariser l\'écart.', 'error', 7000); return; }
+  var _cs = (DATA.caisses||[]).find(function(x){ return x.id===s.caisse_id; });
+  var _ec = parseFloat(s.ecart) || 0;
+  var _memeCaisse = _caisseEcartsEnAttente().filter(function(x){ return x.caisse_id===s.caisse_id; });
+  var _net = _memeCaisse.reduce(function(a,x){ return a + (parseFloat(x.ecart)||0); }, 0);
+  if (!confirm('Régulariser ' + (_ec>0?'l\'EXCÉDENT':'le MANQUANT') + ' de ' + fmtF(Math.abs(_ec)) + ' FCFA ?\n\n'
+    + (_cs?_cs.nom:'') + ' — session du ' + (s.date||'') + '\nThéorique : ' + fmtF(s.fond_cloture_theorique) + ' · Réel compté : ' + fmtF(s.fond_cloture_reel) + '\n\n'
+    + 'Cette caisse compte ' + _memeCaisse.length + ' écart(s) non régularisé(s), net ' + (_net>0?'+':'') + fmtF(_net) + ' FCFA.\n'
+    + 'Vérifiez que cet écart ne se compense pas avec un autre (clôture tardive, mouvement validé après coup) avant de comptabiliser une ' + (_ec>0?'recette':'perte') + '.\n\n'
+    + 'Il s\'agit d\'une écriture comptable : conservez les pièces justificatives.')) return;
+  var _motif = prompt('Motif / justification de cette régularisation (obligatoire) :', '');
+  if (_motif === null) return;
+  _motif = _motif.trim();
+  if (!_motif) { toast('⚠️ Un motif est obligatoire pour régulariser un écart.', 'error'); return; }
+  var _ecrEcart = await genererEcritureEcartCaisse(s, _motif);
   if (!_ecrEcart) { caisseRenderEcarts(); return; }   /* échec déjà signalé */
   if (typeof buildBalance==='function') buildBalance();
   if (typeof buildGrandLivre==='function') buildGrandLivre();
@@ -133454,10 +133496,26 @@ async function caisseRegulariserEcart(sessionId){
 
 async function caisseRegulariserTousEcarts(){
   if (!exigerDroit('Caisse','v','les écarts de caisse')) return;
-  var liste = _caisseEcartsEnAttente();
-  if (!liste.length) return;
+  var toutes = _caisseEcartsEnAttente();
+  var liste = toutes.filter(function(x){ return !caisseMvtsEnAttente(x).length; });
+  var exclues = toutes.length - liste.length;
+  if (!liste.length) { toast(exclues ? '⛔ Tous les écarts ont des mouvements en attente de validation : rien à régulariser.' : 'Aucun écart à régulariser.', 'info'); return; }
+  var manq = liste.reduce(function(a,x){ var e=parseFloat(x.ecart)||0; return a + (e<0?e:0); }, 0);
+  var exc  = liste.reduce(function(a,x){ var e=parseFloat(x.ecart)||0; return a + (e>0?e:0); }, 0);
+  var msg = 'RÉGULARISATION EN MASSE de ' + liste.length + ' écart(s) :\n'
+    + 'Manquants (charges) : ' + fmtF(manq) + ' FCFA · Excédents (produits) : +' + fmtF(exc) + ' FCFA\n\n'
+    + _caisseResumeEcartsTexte(liste) + '\n\n'
+    + (exclues ? exclues + ' écart(s) exclu(s) car des mouvements sont en attente de validation.\n\n' : '')
+    + 'Vérifiez que ces écarts ne se compensent pas (clôture tardive, mouvement validé après coup) et que chaque perte est justifiée. '
+    + 'Les écritures comptables ne se défont pas d\'un clic.\n\nPour confirmer, tapez REGULARISER :';
+  var rep = prompt(msg, '');
+  if (rep === null || rep.trim() !== 'REGULARISER') { if (rep !== null) toast('Confirmation incorrecte : aucune écriture générée.', 'info'); return; }
+  var _motif = prompt('Motif / justification commune de cette régularisation (obligatoire) :', '');
+  if (_motif === null) return;
+  _motif = _motif.trim();
+  if (!_motif) { toast('⚠️ Un motif est obligatoire pour régulariser des écarts.', 'error'); return; }
   var _nbOk = 0;
-  for (var i=0;i<liste.length;i++){ if (await genererEcritureEcartCaisse(liste[i])) _nbOk++; }
+  for (var i=0;i<liste.length;i++){ if (await genererEcritureEcartCaisse(liste[i], _motif)) _nbOk++; }
   if (typeof buildBalance==='function') buildBalance();
   if (typeof buildGrandLivre==='function') buildGrandLivre();
   toast(_nbOk === liste.length
