@@ -71,6 +71,7 @@ function preparer() {
   window.caisseSyncEtAlerter = async function () { return true; };
   window.syncToSupabase = async function () { return true; };
   window.syncPullStore = async function () {};
+  window.sbFetch = async function () { return []; };     /* cloud simulé : « rien d'ouvert, rien de clôturé » */
   window.caisseNotifierValidation = function () {};
   window._reapNotifier = function () {};
   window._caisseAjouterRegle = async function () {};
