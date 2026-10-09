@@ -128576,6 +128576,20 @@ function caisseOuvrirFondChange() {
   } else { g.style.display = 'none'; }
 }
 
+/* Vérifie sur le CLOUD (pas sur la copie locale) qu'aucune session n'est ouverte pour cette caisse.
+   Résultat : { ouverte: session } | { echec: true } | { hors_ligne: true } | { libre: true }.
+   Le verrou « caisse déjà ouverte » ne doit jamais reposer sur une copie locale possiblement périmée. */
+async function caisseVerifierSessionCloud(caisseId) {
+  if (!navigator.onLine || typeof sbFetch !== 'function') return { hors_ligne: true };
+  var rows;
+  try {
+    rows = await sbFetch('pi_caisse_sessions?select=id,data&data->>caisse_id=eq.' + encodeURIComponent(caisseId) + '&data->>statut=eq.ouverte', 'GET');
+  } catch (e) { rows = null; }
+  if (rows === null || rows === undefined) return { echec: true };
+  if (rows.length) return { ouverte: rows[0].data || { id: rows[0].id } };
+  return { libre: true };
+}
+
 async function caisseOuvrir() {
   if (!exigerDroit('Caisse','c','une session de caisse')) return;
   var caisseId = document.getElementById('co-caisse-id').value;
@@ -128598,6 +128612,20 @@ async function caisseOuvrir() {
      la session, seule la copie locale (potentiellement périmée) était
      revérifiée : deux sessions 'ouverte' pouvaient coexister sans qu'aucun
      message n'alerte personne avant l'audit d'intégrité. */
+  var _vc = await caisseVerifierSessionCloud(caisseId);
+  if (_vc.ouverte) {
+    var _hC = _vc.ouverte.ouverte_le ? new Date(_vc.ouverte.ouverte_le).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '';
+    toast('🔒 Cette caisse est déjà ouverte par ' + (_vc.ouverte.ouverte_par || 'un(e) autre utilisateur(rice)') + (_hC ? ' depuis ' + _hC : '') + ' (vérifié sur le cloud) — impossible d\'en ouvrir une deuxième.', 'error', 7000);
+    if (typeof syncPullStore === 'function') { try { await syncPullStore('caisse_sessions'); } catch(e){} }
+    closeModal('modal-caisse-ouvrir');
+    caisseRenderListe();
+    return;
+  }
+  if (_vc.echec) {
+    toast('⛔ Impossible de vérifier l\'état de la caisse sur le cloud : ouverture refusée pour éviter une double session. Réessayez dans un instant.', 'error', 8000);
+    return;
+  }
+  if (_vc.hors_ligne && !confirm('📴 Vous êtes hors ligne : impossible de vérifier qu\'aucune autre session n\'est ouverte sur cette caisse.\n\nSi un autre poste l\'a déjà ouverte, vous créerez une DOUBLE session qu\'il faudra corriger ensuite.\n\nOuvrir quand même ?')) return;
   if (navigator.onLine && typeof syncPullStore === 'function') {
     try { await syncPullStore('caisse_sessions'); } catch(e){}
     var _dejaOuverte = caisseGetSessionOuverte(caisseId);
@@ -128635,7 +128663,22 @@ async function caisseOuvrir() {
   DATA.caisse_sessions.push(session);
   session._baseModifie = session._modifie || null;
   await dbPut('caisse_sessions', session);
-  await caisseSyncEtAlerter('pi_caisse_sessions', session);
+  var _okSync = await caisseSyncEtAlerter('pi_caisse_sessions', session);
+  if (_okSync === false && navigator.onLine) {
+    /* Le cloud a refusé l'envoi : si une AUTRE session est ouverte pour cette caisse (règle « une seule session
+       ouverte par caisse » côté base), on annule l'ouverture locale au lieu de laisser une double session. */
+    var _vc2 = await caisseVerifierSessionCloud(caisseId);
+    if (_vc2.ouverte && _vc2.ouverte.id !== session.id) {
+      DATA.caisse_sessions = (DATA.caisse_sessions || []).filter(function(x){ return x.id !== session.id; });
+      try { await dbDelete('caisse_sessions', session.id); } catch(e){}
+      try { _outboxWrite(_outboxRead().filter(function(e){ return !(e.table === 'pi_caisse_sessions' && e.id === session.id); })); } catch(e){}
+      if (typeof syncPullStore === 'function') { try { await syncPullStore('caisse_sessions'); } catch(e){} }
+      closeModal('modal-caisse-ouvrir');
+      toast('🔒 Ouverture annulée : cette caisse a été ouverte entre-temps par ' + (_vc2.ouverte.ouverte_par || 'un(e) autre utilisateur(rice)') + '.', 'error', 8000);
+      caisseRenderListe();
+      return;
+    }
+  }
   closeModal('modal-caisse-ouvrir');
   toast('🔓 Caisse ouverte avec un fond de ' + fmtF(fond) + ' FCFA.', 'success');
   caisseRenderListe();
