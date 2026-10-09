@@ -26725,9 +26725,10 @@ async function syncToSupabase(table, obj, opts) {
   if ((table === 'pi_demandes_reappro' || table === 'pi_caisse_sessions') && obj && obj.id && !_pulling && !obj._forceCloture) {
     var _RANG = (table === 'pi_demandes_reappro') ? { brouillon:0, soumise:1, validee:2, rejetee:2, servie:3 } : { ouverte:0, cloturee:1 };
     try {
-      var _rs = await sbFetch(table + '?id=eq.' + encodeURIComponent(obj.id) + '&select=id,s:data->>statut', 'GET');
+      var _rs = await sbFetch(table + '?id=eq.' + encodeURIComponent(obj.id) + '&select=id,s:data->>statut,c:data->>cloturee_le', 'GET');
       var _stCloud = (_rs && _rs.length) ? _rs[0].s : null;
-      if (_stCloud && _RANG[_stCloud] !== undefined && _RANG[obj.statut] !== undefined && _RANG[_stCloud] > _RANG[obj.statut]) {
+      var _clotAutre = (table === 'pi_caisse_sessions' && _stCloud === 'cloturee' && obj.statut === 'cloturee' && _rs[0].c && obj.cloturee_le && String(_rs[0].c).slice(0,19) !== String(obj.cloturee_le).slice(0,19));
+      if (_stCloud && _RANG[_stCloud] !== undefined && _RANG[obj.statut] !== undefined && (_RANG[_stCloud] > _RANG[obj.statut] || _clotAutre)) {
         console.warn('[STATUT] Recul refusé', table, obj.id, obj.statut, '<', _stCloud);
         var _full2 = await sbFetch(table + '?id=eq.' + encodeURIComponent(obj.id) + '&select=*', 'GET');
         var _row2 = (_full2 && _full2.length) ? _supaUnwrap(table, _full2[0]) : null;
@@ -36621,7 +36622,10 @@ async function _vrsCreerBonCaisse(versement, caisseId) {
   mvt._baseModifie = mvt._modifie || null;
   await dbPut('caisse_mouvements', mvt);
   await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
-  if (diag.cloturee) await _vrsRecalculerSessionCloturee(session);
+  if (diag.cloturee) {
+    await _vrsRecalculerSessionCloturee(session);
+    try { toast('⚠️ Ce versement en espèces a été rattaché à la session CLÔTURÉE du ' + dateShort(String(session.date || '').slice(0,10)) + ' de la caisse « ' + (caisse.nom || '') + ' » : son solde et son écart ont été recalculés.', 'error', 9000); } catch(e){}
+  }
   try { localStorage.setItem('vrs_caisse_defaut', caisseId); } catch(e){}
   return { mvt: mvt, cloturee: diag.cloturee };
 }
@@ -127145,6 +127149,12 @@ function caisseBanniereAnciennes() {
 async function caisseRecalculerSiCloturee(mvt) {
   if (!mvt || !mvt.session_id) return;
   var sess = (DATA.caisse_sessions || []).find(function(x){ return x.id === mvt.session_id; });
+  if (sess && sess.statut === 'cloturee' && !sess.session_technique && mvt.valide_le && sess.cloturee_le && mvt.valide_le > sess.cloturee_le && !mvt.valide_apres_cloture) {
+    mvt.valide_apres_cloture = true;
+    mvt._baseModifie = mvt._modifie || null;
+    await dbPut('caisse_mouvements', mvt);
+    await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
+  }
   if (!sess || sess.statut !== 'cloturee' || sess.ecart_regularise || sess.session_technique) return;
   var avant = parseFloat(sess.fond_cloture_theorique) || 0;
   var theo = caisseSoldeSession(sess);
@@ -127284,6 +127294,41 @@ function caisseEstMemeDemandeur(mvt) {
   var norm = function(x){ return String(x || '').trim().toLowerCase(); };
   var d = norm(mvt.demande_par || mvt.created_by);
   return !!d && d === norm(u.nom);
+}
+
+/* ── Clôture encadrée et bons ajoutés après clôture ── */
+async function caisseEtatSessionCloud(sessionId) {
+  if (!navigator.onLine || typeof sbFetch !== 'function') return { hors_ligne: true };
+  var rows;
+  try { rows = await sbFetch('pi_caisse_sessions?id=eq.' + encodeURIComponent(sessionId) + '&select=id,data', 'GET'); } catch (e) { rows = null; }
+  if (rows === null || rows === undefined) return { echec: true };
+  if (rows.length && rows[0].data && rows[0].data.statut === 'cloturee') return { cloturee: rows[0].data };
+  return { ouverte: true };
+}
+function caisseBadgeApresCloture(m) {
+  if (!m || !(m.saisi_apres_cloture || m.valide_apres_cloture)) return '';
+  return ' <span title="Bon saisi ou validé après la clôture de sa session : le solde et l\'écart de cette session ont été recalculés." style="color:var(--rouge);font-size:11px;font-weight:700;">⚠️ après clôture</span>';
+}
+function caisseBanniereApresCloture() {
+  if (!caisseRoleAdminLike()) return '';
+  var limite = Date.now() - 7 * 86400000;
+  var vis = caissesVisibles().map(function(c){ return c.id; });
+  var l = (DATA.caisse_mouvements || []).filter(function(m){
+    var t = new Date(m.valide_le || m.created_at || 0).getTime();
+    return (m.saisi_apres_cloture || m.valide_apres_cloture) && vis.indexOf(m.caisse_id) >= 0 && t >= limite;
+  });
+  if (!l.length) return '';
+  var par = {};
+  l.forEach(function(m){
+    var s = (DATA.caisse_sessions || []).find(function(x){ return x.id === m.session_id; });
+    var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
+    var k = (c ? c.nom : '?') + ' — session du ' + (s ? dateShort(String(s.date || '').slice(0,10)) : '?');
+    par[k] = (par[k] || 0) + 1;
+  });
+  return '<div style="grid-column:1/-1;padding:10px 14px;border:1px solid var(--rouge);border-radius:var(--r);background:var(--card2);font-size:13px;">'
+    + '<strong>⚠️ Bons ajoutés ou validés après la clôture de leur session (7 derniers jours) :</strong> '
+    + Object.keys(par).map(function(k){ return escHtml(k) + ' (' + par[k] + ')'; }).join(' ; ')
+    + '. Le solde et l\'écart de ces sessions ont été recalculés : vérifiez-les avant toute régularisation.</div>';
 }
 
 function caisseNomUser(userId) {
@@ -128311,7 +128356,7 @@ function caisseRenderListe() {
       + '</div>';
     return;
   }
-  el.innerHTML = caisseBanniereAnciennes() + caisseBanniereReprise() + liste.map(function(c) {
+  el.innerHTML = caisseBanniereAnciennes() + caisseBanniereReprise() + caisseBanniereApresCloture() + liste.map(function(c) {
     var session = caisseGetSessionOuverte(c.id);
     var ouverte = !!session;
     var solde = ouverte ? caisseSoldeSession(session) : null;
@@ -130219,7 +130264,7 @@ function caisseEtatDernierImport(caisseId) {
           + '<td>' + (m.date||'').slice(0,10) + '</td>'
           + '<td>' + escHtml(m.numero||'') + '</td>'
           + '<td>' + (m.type==='entree'?'Entrée':'Sortie') + '</td>'
-          + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + '</td>'
+          + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + caisseBadgeApresCloture(m) + '</td>'
           + '<td style="text-align:right;">' + fmtF(m.montant) + '</td>'
           + '<td>' + (m.compte_suggere ? escHtml(m.compte_suggere) + ' <span style="color:#B87333;">(suggéré, non validé)</span>' : '<span style="color:#dc2626;">— aucune suggestion —</span>') + '</td>'
           + '</tr>';
@@ -130879,7 +130924,7 @@ function caisseRenderBrouillardPeriode() {
       + '<td>' + (m.date||'').slice(0,10) + '</td>'
       + '<td>' + (l.session ? l.session.date : '—') + (estImporte ? ' <span title="Donnée importée — date réelle peut différer de la session" style="color:var(--or);">📥</span>' : '') + '</td>'
       + '<td>' + escHtml(m.numero||'') + '</td>'
-      + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + (m.requiert_validation && !m.valide && !m.rejete ? ' <span title="En attente de validation — n\'impacte pas encore le solde" style="color:var(--or);">🔐</span>' : '') + (m.rejete ? ' <span title="Rejeté — jamais compté" style="color:var(--rouge);">✖</span>' : '') + '</td>'
+      + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + caisseBadgeApresCloture(m) + (m.requiert_validation && !m.valide && !m.rejete ? ' <span title="En attente de validation — n\'impacte pas encore le solde" style="color:var(--or);">🔐</span>' : '') + (m.rejete ? ' <span title="Rejeté — jamais compté" style="color:var(--rouge);">✖</span>' : '') + '</td>'
       + '<td style="text-align:right;color:var(--vert);">' + (m.type==='entree' ? fmtF(m.montant) : '') + '</td>'
       + '<td style="text-align:right;color:var(--rouge);">' + (m.type==='sortie' ? fmtF(m.montant) : '') + '</td>'
       + '<td style="text-align:right;">' + (effectif ? fmtF(l.solde) : '<span style="color:var(--or);font-size:11px;">— en attente —</span>') + '</td>'
@@ -130968,7 +131013,7 @@ function comptaBrouillardsRender() {
       return '<tr' + (l.effectif ? '' : ' style="opacity:.55;"') + '>'
         + '<td>' + (m.date||'').slice(0,10) + '</td>'
         + '<td>' + escHtml(m.numero||'') + '</td>'
-        + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + (m.requiert_validation && !m.valide && !m.rejete ? ' <span title="En attente de validation" style="color:var(--or);">🔐</span>' : '') + (m.rejete ? ' <span title="Rejeté" style="color:var(--rouge);">✖</span>' : '') + '</td>'
+        + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + caisseBadgeApresCloture(m) + (m.requiert_validation && !m.valide && !m.rejete ? ' <span title="En attente de validation" style="color:var(--or);">🔐</span>' : '') + (m.rejete ? ' <span title="Rejeté" style="color:var(--rouge);">✖</span>' : '') + '</td>'
         + '<td style="text-align:right;color:var(--vert);">' + (m.type==='entree' ? fmtF(m.montant) : '') + '</td>'
         + '<td style="text-align:right;color:var(--rouge);">' + (m.type==='sortie' ? fmtF(m.montant) : '') + '</td>'
         + '<td style="text-align:right;">' + (l.effectif ? fmtF(l.solde) : '<span style="color:var(--or);font-size:11px;">— en attente —</span>') + '</td>'
@@ -131080,7 +131125,7 @@ function caisseRenderBrouillardSession(sessionId) {
     rows += '<tr' + (effectif ? '' : ' style="opacity:.55;"') + '>'
       + '<td>' + (m.date||'').slice(11,16) + '</td>'
       + '<td>' + escHtml(m.numero||'') + '</td>'
-      + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + '</td>'
+      + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + caisseBadgeApresCloture(m) + '</td>'
       + '<td style="text-align:right;color:var(--vert);">' + (m.type==='entree' ? fmtF(m.montant) : '') + '</td>'
       + '<td style="text-align:right;color:var(--rouge);">' + (m.type==='sortie' ? fmtF(m.montant) : '') + '</td>'
       + '<td style="text-align:right;">' + (effectif ? fmtF(solde) : '<span style="color:var(--or);font-size:11px;">— en attente —</span>') + '</td>'
@@ -131299,6 +131344,15 @@ function caisseClôturerModal(caisseId) {
   if (heures > 24) {
     rec += '<div style="margin-top:10px;padding:8px 12px;border:1px solid var(--rouge);border-radius:var(--r);color:var(--rouge);font-size:12px;">⚠️ Cette session est ouverte depuis ' + Math.round(heures) + ' h : une clôture tardive fausse les fonds d\'ouverture des sessions suivantes. Comptez le tiroir tel qu\'il est maintenant.</div>';
   }
+  var _tiers = !!(session.ouverte_par_id && APP.currentUser && session.ouverte_par_id !== APP.currentUser.id);
+  if (_tiers || heures > 24) {
+    rec += '<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--rouge);border-radius:var(--r);background:var(--card2);">'
+      + '<div style="color:var(--rouge);font-weight:700;margin-bottom:6px;">🛡️ Clôture ' + (_tiers ? 'par un tiers (session ouverte par ' + escHtml(session.ouverte_par || '—') + ')' : 'tardive') + '</div>'
+      + '<div style="font-size:11px;color:var(--blanc-dim);">Elle sera enregistrée comme clôture ' + (_tiers ? 'administrative' : 'tardive') + ' et ne pourra pas écraser une clôture déjà faite par la caissière. Comptez le tiroir tel qu\'il est.</div>'
+      + '<label style="margin-top:8px;display:block;font-weight:600;">Motif de cette clôture (obligatoire) *</label>'
+      + '<input type="text" class="form-control" id="ccl-motif-admin" placeholder="Ex. : session oubliée ouverte, clôturée en l\'absence de la caissière">'
+      + '</div>';
+  }
   document.getElementById('ccl-recap').innerHTML = rec;
   var _inReel = document.getElementById('ccl-fond-reel');
   _inReel.value = '';
@@ -131387,7 +131441,22 @@ async function caisseCloturer() {
       + 'Confirmer la clôture EN L\'ÉTAT malgré ce signal ?')) return;
   } else if (ecart !== 0 && !confirm('Écart de ' + fmtF(ecart) + ' FCFA entre le solde théorique (' + fmtF(soldeTheorique) + ') et le comptage réel (' + fmtF(fondReel) + ').\n\nConfirmer la clôture malgré l\'écart ?')) return;
 
+  var _tiersC = !!(session.ouverte_par_id && APP.currentUser && session.ouverte_par_id !== APP.currentUser.id);
+  var _heuresC = caisseHeuresOuverte(session);
+  var _motifAdmin = ((document.getElementById('ccl-motif-admin') || {}).value || '').trim();
+  if ((_tiersC || _heuresC > 24) && !_motifAdmin) { toast('⚠️ Une clôture ' + (_tiersC ? 'par un tiers' : 'tardive') + ' exige un motif : renseignez le champ prévu.', 'error', 7000); return; }
+  /* Une session déjà clôturée sur le cloud ne doit jamais être écrasée par une seconde clôture. */
+  var _ec = await caisseEtatSessionCloud(session.id);
+  if (_ec.cloturee) {
+    toast('🔒 Cette session a déjà été clôturée' + (_ec.cloturee.cloturee_par ? ' par ' + _ec.cloturee.cloturee_par : '') + ' : clôture refusée, elle ne peut pas être écrasée.', 'error', 8000);
+    if (typeof syncPullStore === 'function') { try { await syncPullStore('caisse_sessions'); } catch(e){} }
+    closeModal('modal-caisse-cloturer'); caisseRenderListe(); return;
+  }
+  if (_ec.echec) { toast('⛔ Impossible de vérifier l\'état de la session sur le cloud : clôture refusée pour éviter d\'écraser une clôture existante. Réessayez dans un instant.', 'error', 8000); return; }
+  if (_ec.hors_ligne && !confirm('📴 Vous êtes hors ligne : impossible de vérifier que cette session n\'a pas déjà été clôturée sur un autre poste.\n\nClôturer quand même ?')) return;
   session.statut = 'cloturee';
+  if (_tiersC) session.cloture_administrative = true;
+  if (_motifAdmin) { session.cloture_motif = _motifAdmin; session.cloture_tardive_h = Math.round(_heuresC); }
   session.fond_cloture_theorique = soldeTheorique;
   session.fond_cloture_reel = fondReel;
   session.ecart = ecart;
@@ -131985,7 +132054,7 @@ function caisseRenderVentilation() {
         + ((DATA.divisions||[]).length ? '<td style="font-size:11px;">' + escHtml(_nomDivision(c && c.division_id)) + '</td>' : '')
         + '<td>' + escHtml(m.numero||'') + '</td>'
         + '<td>' + (m.type === 'entree' ? '<span style="color:var(--vert);">Entrée</span>' : '<span style="color:var(--rouge);">Sortie</span>') + '</td>'
-        + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + '</td>'
+        + '<td>' + escHtml(m.motif||'') + (m.beneficiaire ? ' — ' + escHtml(m.beneficiaire) : '') + caisseBadgeApresCloture(m) + '</td>'
         + '<td style="text-align:right;">' + fmtF(m.montant) + '</td>'
         + '<td style="min-width:250px;">'
         + (m.compte_suggere ? '<div style="font-size:10px;color:var(--or,#B87333);margin-bottom:2px;">💡 Suggestion auto : ' + escHtml(m.compte_suggere) + '</div>' : '')

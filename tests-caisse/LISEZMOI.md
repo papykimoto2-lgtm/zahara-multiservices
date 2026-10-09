@@ -10,6 +10,8 @@ et simule le cloud. Ils protègent les règles ajoutées à la caisse :
 | `garde-fous.test.js` | pas de bon sans session, numéro unique, alerte de bon identique, interdiction de valider sa propre demande |
 | `reprise.test.js` | reprise d'historique (session technique, solde du tiroir inchangé, bannière de rattachement) |
 | `regularisation.test.js` | net par caisse, motif obligatoire, confirmation de la régularisation en masse |
+| `cloture-encadree.test.js` | clôture par un tiers ou tardive (motif obligatoire, marque administrative), clôture existante jamais écrasée (cloud et synchro) |
+| `apres-cloture.test.js` | bons validés ou rattachés après la clôture : marque, badge, bannière, alerte, recalcul |
 | `reappro.test.js` | virement lié à la demande, doublon de demande, validation par un autre, statut monotone à la synchro |
 
 Lancer : `npm run test:caisse` (ou `node --test tests-caisse/*.test.js`).

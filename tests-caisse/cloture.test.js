@@ -3,10 +3,10 @@ const assert = require('node:assert/strict');
 const { ouvrirApp, fermerNavigateur } = require('./harness');
 after(fermerNavigateur);
 
-/* Une session ouverte avec une entrée validée (+5000) et une sortie en attente (−2000). */
+/* Une session ouverte il y a 2 h avec une entrée validée (+5000) et une sortie en attente (−2000). */
 function donnees() {
   DATA.caisse_sessions = [{ id: 's1', caisse_id: 'c1', date: '2026-10-09', statut: 'ouverte', fond_ouverture: 1000,
-    ouverte_par: 'T', ouverte_par_id: 'u1', ouverte_le: new Date(Date.now() - 50 * 3600000).toISOString() }];
+    ouverte_par: 'T', ouverte_par_id: 'u1', ouverte_le: new Date(Date.now() - 2 * 3600000).toISOString() }];
   DATA.caisse_mouvements = [
     { id: 'm1', session_id: 's1', caisse_id: 'c1', type: 'entree', montant: 5000, requiert_validation: false, valide: true, numero: 'E1', motif: 'x' },
     { id: 'm2', session_id: 's1', caisse_id: 'c1', type: 'sortie', montant: 2000, requiert_validation: true, valide: false, numero: 'S1', motif: 'virement interne' }];
@@ -82,6 +82,7 @@ test('session ancienne : alerte au-delà de 24 h et dans la fenêtre de clôture
   try {
     const r = await app.page.evaluate(async function (d) {
       eval('(' + d + ')')();
+      DATA.caisse_sessions[0].ouverte_le = new Date(Date.now() - 50 * 3600000).toISOString();   /* session ouverte depuis 50 h */
       caisseClôturerModal('c1');
       return { anciennes: caisseSessionsAnciennes(24).length, banniere: caisseBanniereAnciennes().indexOf('plus de 24 h') !== -1,
         modal: document.getElementById('ccl-recap').textContent.indexOf('ouverte depuis') !== -1 };
