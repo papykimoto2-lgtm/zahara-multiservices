@@ -170,3 +170,12 @@ Limites connues : le suivi horodaté n'existe que pour les changements de statut
 - **Sécurité** : aucun droit direct des déposants sur le stockage ni les tables. L'Edge Function (clé de service) n'autorise rien : `fc_depot_preparer` décide AVANT l'envoi (dossier du souscripteur, étape publiée avec dépôt ouvert, 10 pièces au plus ; mission de l'intervenant en cours ou à corriger, livrable existant, aucune version en attente), `fc_depot_valider` REvérifie après l'envoi et enregistre (le fichier envoyé est retiré en cas d'échec). Type déterminé par la **signature des octets** (PDF, JPEG, PNG, WebP), 5 Mo, empreinte SHA-256, 20 dépôts / 10 min par jeton, chemin `{dossier}/{pièce}` jamais écrasé. Dossier d'un autre souscripteur ou sans titulaire : refus (correctif d'une comparaison NULL détectée au test : `fc__dossier_du_client`).
 - **Limites** : pas d'analyse antivirus ; pas de dépôt multiple en un geste ; l'appel réel de l'Edge Function avec un jeton du portail n'a pas pu être testé depuis l'environnement de développement (réseau sortant bloqué) — testé : SQL (droits, refus, isolation), logique du portail (contrôles, envoi multipart, erreurs) et lien ERP. À faire à la première utilisation : demander une pièce à un souscripteur de test et la déposer depuis son portail.
 - Tests : `portail-depot-fichiers.test.js` (4), `foncier-pieces-stockage.test.js` (6).
+
+## RF1 — Refacturation des frais du titre au souscripteur
+
+- ERP : Foncier › dossier individuel › Frais du titre › « Refacturation au souscripteur ». Les frais *avancés pour le souscripteur* et comptabilisés se regroupent en une **note de débours** `NDF-AAAA-NNNN` (prix coûtant, sans marge, document figé à l'émission).
+- Statuts : `emise` → `encaissee` ; `annulee` (uniquement avant encaissement ; libère les frais). Publication au portail : notification e-mail externe dédupliquée (`debours:<id>`).
+- Encaissement (droit Comptabilité) : écriture en **brouillard** D trésorerie (`_compteTresoVersement`) / C `titre_avances_souscripteur` (4111 suggéré). Clôt la créance née de la comptabilisation du frais (D 4111 / C 401).
+- TVA non ventilée sur la note (débours) : traitement à confirmer par l'expert-comptable.
+- SQL : `foncier_notes_debours_portail.sql` → `fc_vue_souscripteur_debours()` (JWT `kind=souscripteur`, notes publiées émises/encaissées du client titulaire uniquement).
+- Tests : `foncier-refacturation.test.js` (5), `portail-debours.test.js` (2). Test SQL rollback validé sur les deux projets.

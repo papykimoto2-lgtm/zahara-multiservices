@@ -61678,11 +61678,13 @@ function fcPeutComptabiliserFrais() { try { return userPeutSurStore('ecritures',
 function fcNombre(v) { var n = parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : NaN; }
 function fcTotalFrais(f) { return Math.round((f.montant_ht + f.tva) * 100) / 100; }
 function fcSyntheseFraisTitre(d) {
-  var o = { promoteur: 0, souscripteur: 0, regle: 0, a_regler: 0 };
+  var o = { promoteur: 0, souscripteur: 0, regle: 0, a_regler: 0, a_refacturer: 0, refacture: 0, encaisse: 0 };
   fcFraisTitre(d).filter(function(f){ return f.statut !== 'annule'; }).forEach(function(f){
     var t = fcTotalFrais(f); o[f.charge === 'souscripteur' ? 'souscripteur' : 'promoteur'] += t;
     if (f.statut === 'paye') o.regle += t; else o.a_regler += t;
   });
+  o.a_refacturer = fcFraisARefacturer(d).reduce(function(s, f){ return s + fcTotalFrais(f); }, 0);
+  fcNotesDebours(d).forEach(function(n){ if (n.statut === 'emise') o.refacture += n.montant; else if (n.statut === 'encaissee') o.encaisse += n.montant; });
   return o;
 }
 async function fcAjouterFraisTitre(dossierId, o) {
@@ -61769,6 +61771,114 @@ async function fcAnnulerFraisTitre(dossierId, fraisId, motif) {
 }
 fcProtegerMutations(['fcAjouterFraisTitre', 'fcAnnulerFraisTitre']);
 
+/* ═══ Refacturation au souscripteur (frais avancés) ═══
+   Les frais imputés au souscripteur (« avancés ») sont refacturés AU PRIX COÛTANT (débours, sans marge) par une NOTE DE DÉBOURS
+   numérotée (NDF-AAAA-NNNN), figée à l'émission, adressée à un souscripteur titulaire du dossier, avec échéance de règlement.
+   Cycle : émise → (publiée au portail + e-mail) → encaissée (D trésorerie / C frais avancés : le compte de tiers du souscripteur est soldé)
+   ou annulée (motif ; seulement tant qu'elle n'est pas encaissée ; les frais redeviennent refacturables).
+   Les comptes sont ceux de Paramètres › Comptes par défaut › Titre foncier. TVA : débours à l'identique de la pièce d'origine (non ventilée) —
+   traitement à confirmer par l'expert-comptable. */
+function fcNotesDebours(d) { return (d && d.notes_debours) || []; }
+function fcNoteDebours(d, id) { return fcNotesDebours(d).find(function(n){ return n.id === id; }) || null; }
+function fcFraisARefacturer(d) { return fcFraisTitre(d).filter(function(f){ return f.charge === 'souscripteur' && ['comptabilise', 'paye'].indexOf(f.statut) !== -1 && !f.note_id; }); }
+function fcNumeroNoteDebours() {
+  var an = new Date().getFullYear(), max = 0, re = new RegExp('^NDF-' + an + '-(\\d+)$');
+  (DATA.dossiers_fonciers || []).forEach(function(d){ fcNotesDebours(d).forEach(function(n){ var m = re.exec(n.numero || ''); if (m) max = Math.max(max, parseInt(m[1], 10)); }); });
+  return 'NDF-' + an + '-' + ('0000' + (max + 1)).slice(-4);
+}
+function fcNoteEnRetard(n, aujourdhui) { return !!(n && n.statut === 'emise' && n.echeance && n.echeance < (aujourdhui || fcAuj())); }
+function fcHtmlNoteDebours(d, n, lignes, c) {
+  var p = (typeof attSoldeEntreprise === 'function') ? attSoldeEntreprise(c) : (DATA.params || {}), E = function(x){ return escHtml(x == null ? '' : String(x)); };
+  var N = function(x){ return new Intl.NumberFormat('fr-FR').format(Math.round(x)); };
+  var lots = (d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ');
+  var lettres = (typeof _montantEnLettres === 'function') ? _montantEnLettres(n.montant) : '';
+  var lg = lignes.map(function(f){ var t = f.tiers_id ? fcIntervenant(f.tiers_id) : null;
+    return '<tr><td>' + E(dateShort(f.date)) + '</td><td>' + E(FC_FRAIS_TITRE[f.nature].lib) + '</td><td>' + E(t ? t.nom_organisation : '—') + '</td><td>' + E(f.piece) + '</td><td style="text-align:right;">' + N(fcTotalFrais(f)) + '</td></tr>'; }).join('');
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Note de débours ' + E(n.numero) + '</title><style>body{font-family:Georgia,serif;color:#1a1a1a;padding:38px 46px;max-width:760px;margin:0 auto;font-size:13px;line-height:1.55;position:relative;}'
+    + 'h1{text-align:center;font-size:20px;letter-spacing:1px;margin:16px 0 2px;color:#1D3F7A;}.sub{text-align:center;font-size:12px;color:#555;margin-bottom:14px;}'
+    + '.ref{display:flex;justify-content:space-between;font-size:12px;color:#444;border-bottom:2px solid #1D3F7A;padding-bottom:8px;}table{width:100%;border-collapse:collapse;margin:8px 0 12px;}td,th{border:1px solid #ccc;padding:5px 9px;font-size:12px;text-align:left;}th{background:#eef2f9;}'
+    + '.mont{border:2px solid #1D3F7A;text-align:center;padding:10px;margin:10px 0;font-size:15px;font-weight:bold;color:#1D3F7A;}.art{margin:6px 0;text-align:justify;}' + (typeof ATT_PIED_CSS === 'string' ? ATT_PIED_CSS : '') + '</style></head><body>'
+    + '<div class="ref"><div><strong style="font-size:15px;">' + E(p.societe || '') + '</strong></div><div style="text-align:right;">N° <strong>' + E(n.numero) + '</strong><br>Date : ' + E(dateShort(n.date)) + '<br>Échéance : <strong>' + E(dateShort(n.echeance)) + '</strong></div></div>'
+    + '<h1>NOTE DE DÉBOURS</h1><div class="sub">Remboursement des frais avancés pour l\'établissement de votre titre foncier</div>'
+    + '<p class="art"><strong>Souscripteur :</strong> ' + E(((c.prenoms || '') + ' ' + (c.nom || '')).trim() || c.id) + ' — dossier ' + E(c.dossier || c.id) + '<br><strong>Bien :</strong> ' + E(lots || '—') + '<br><strong>Dossier foncier :</strong> ' + E(d.reference) + '</p>'
+    + '<table><thead><tr><th>Date</th><th>Nature</th><th>Prestataire</th><th>Pièce</th><th style="text-align:right;">Montant (FCFA)</th></tr></thead><tbody>' + lg + '</tbody></table>'
+    + '<div class="mont">Total à rembourser : ' + N(n.montant) + ' FCFA' + (lettres ? '<div style="font-size:12px;font-weight:normal;">(' + E(lettres) + ')</div>' : '') + '</div>'
+    + '<p class="art">Ces frais ont été réglés par ' + E(p.societe || 'le promoteur') + ' pour votre compte à l\'occasion de l\'établissement de votre titre foncier individuel. Ils vous sont refacturés <strong>au prix coûtant (débours), sans marge</strong>, sur la base des pièces justificatives ci-dessus.</p>'
+    + '<p class="art">Règlement attendu <strong>avant le ' + E(dateShort(n.echeance)) + '</strong>, auprès de nos services (espèces, mobile money ou virement), en rappelant la référence <strong>' + E(n.numero) + '</strong>.</p>'
+    + (typeof docPiedDePageEntreprise === 'function' ? docPiedDePageEntreprise(p) : '') + '</body></html>';
+}
+async function fcEmettreNoteDebours(dossierId, fraisIds, o) {
+  o = o || {};
+  var d = fcDossier(dossierId); if (!d || !fcEstIndividuel(d)) return { ok: false, erreur: 'Dossier de titre individuel introuvable.' };
+  if (d.statut === 'annule') return { ok: false, erreur: 'Dossier annulé.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) émet une note de débours.' };
+  var ids = (fraisIds || []).filter(function(x, i, a){ return a.indexOf(x) === i; }); if (!ids.length) return { ok: false, erreur: 'Choisissez au moins un frais à refacturer.' };
+  var lignes = ids.map(function(id){ return fcFrais(d, id); });
+  if (lignes.some(function(f){ return !f; })) return { ok: false, erreur: 'Frais introuvable dans ce dossier.' };
+  var bad = lignes.find(function(f){ return f.charge !== 'souscripteur'; }); if (bad) return { ok: false, erreur: 'Seuls les frais avancés pour le souscripteur se refacturent.' };
+  bad = lignes.find(function(f){ return ['comptabilise', 'paye'].indexOf(f.statut) === -1; }); if (bad) return { ok: false, erreur: 'Comptabilisez d\'abord les frais avant de les refacturer.' };
+  bad = lignes.find(function(f){ return f.note_id; }); if (bad) return { ok: false, erreur: 'Un des frais figure déjà sur une note de débours.' };
+  var cid = o.client_id || (d.client_ids || [d.client_id])[0], c = fcClient(cid);
+  if (!c || (d.client_ids || [d.client_id]).indexOf(cid) === -1) return { ok: false, erreur: 'Souscripteur destinataire invalide.' };
+  var ech = o.echeance || (function(){ var x = new Date(); x.setDate(x.getDate() + 30); return x.toISOString().slice(0, 10); })();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ech) || ech < fcAuj()) return { ok: false, erreur: 'Échéance invalide (date future, AAAA-MM-JJ).' };
+  var total = Math.round(lignes.reduce(function(s, f){ return s + fcTotalFrais(f); }, 0) * 100) / 100;
+  var n = { id: uid(), numero: fcNumeroNoteDebours(), date: fcAuj(), echeance: ech, montant: total, client_id: cid, frais_ids: ids, statut: 'emise', publie_portail: false, emis_par: fcActeur().nom, emis_le: new Date().toISOString() };
+  n.html = fcHtmlNoteDebours(d, n, lignes, c);
+  lignes.forEach(function(f){ f.note_id = n.id; });
+  d.notes_debours = fcNotesDebours(d).concat([n]); await fcSauver(d);
+  await fcEvenement(d, '', 'note_debours', 'Note de débours ' + n.numero + ' émise : ' + total + ' FCFA à rembourser par ' + (c.nom || cid) + ' avant le ' + ech, { source: 'promoteur', source_ref: n.id });
+  return { ok: true, note: n };
+}
+async function fcAnnulerNoteDebours(dossierId, noteId, motif) {
+  var d = fcDossier(dossierId), n = d && fcNoteDebours(d, noteId); if (!n) return { ok: false, erreur: 'Note introuvable.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) annule une note.' };
+  if (n.statut !== 'emise') return { ok: false, erreur: n.statut === 'encaissee' ? 'Note encaissée : elle ne s\'annule pas (contre-passer l\'encaissement en comptabilité).' : 'Note déjà annulée.' };
+  if (!String(motif || '').trim()) return { ok: false, erreur: "Le motif d'annulation est obligatoire." };
+  n.statut = 'annulee'; n.publie_portail = false; n.annule_motif = String(motif).trim(); n.annule_par = fcActeur().nom; n.annule_le = new Date().toISOString();
+  n.frais_ids.forEach(function(id){ var f = fcFrais(d, id); if (f && f.note_id === n.id) delete f.note_id; });
+  await fcSauver(d);
+  await fcEvenement(d, '', 'note_debours', 'Note de débours ' + n.numero + ' annulée', { source: 'promoteur', source_ref: n.id, motif: n.annule_motif });
+  return { ok: true };
+}
+async function fcPublierNoteDebours(dossierId, noteId, on) {
+  var d = fcDossier(dossierId), n = d && fcNoteDebours(d, noteId); if (!n) return { ok: false, erreur: 'Note introuvable.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) publie une note.' };
+  if (n.statut === 'annulee') return { ok: false, erreur: 'Note annulée.' };
+  n.publie_portail = !!on; if (on) n.publie_le = new Date().toISOString();
+  await fcSauver(d);
+  var c = fcClient(n.client_id), prevenu = false;
+  if (on && c) {
+    var lien = (DATA.params && DATA.params.portail_url) || (location.origin + '/portail-unique.html');
+    var r = await fcCreerNotification({ dedup: 'debours:' + n.id, titre: 'Frais de titre foncier à rembourser', template_code: 'note_debours', dossier_id: d.id, urgent: false,
+      message: 'Une note de débours (' + n.numero + ') de ' + fmtF(n.montant) + ' FCFA est disponible pour votre dossier foncier, à régler avant le ' + dateShort(n.echeance) + '.\n\nConsultez-la dans votre espace : ' + lien,
+      destinataire: { type: 'externe', id: c.id, nom: c.nom || '', email: c.email || '', telephone: c.tel || '' } });
+    prevenu = r.creees.length > 0;
+  }
+  await fcEvenement(d, '', 'note_debours', 'Note de débours ' + n.numero + (on ? ' publiée au portail du souscripteur' : ' retirée du portail'), { source: 'promoteur', source_ref: n.id });
+  return { ok: true, prevenu: prevenu };
+}
+async function fcEncaisserNoteDebours(dossierId, noteId, o) {
+  o = o || {};
+  var d = fcDossier(dossierId), n = d && fcNoteDebours(d, noteId); if (!n) return { ok: false, erreur: 'Note introuvable.' };
+  if (!fcPeutComptabiliserFrais()) return { ok: false, erreur: "Vous n'avez pas le droit de comptabiliser (module Comptabilité)." };
+  if (n.statut !== 'emise') return { ok: false, erreur: n.statut === 'encaissee' ? 'Déjà encaissée.' : 'Note annulée.' };
+  if (['especes', 'mobile_money', 'virement', 'cheque', 'banque'].indexOf(o.mode) === -1) return { ok: false, erreur: 'Mode de règlement inconnu.' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(o.date || '') || o.date < n.date) return { ok: false, erreur: "Date d'encaissement invalide (pas avant la date de la note)." };
+  var c = fcClient(n.client_id) || {}, ecr;
+  try { ecr = { id: 'ecr_titre_enc_' + n.id, ref: 'ENC-' + n.numero, date: o.date, piece: n.numero, libelle: 'Remboursement frais de titre — ' + n.numero + ' — ' + (c.nom || ''), montant: n.montant, type: 'actif', mode: o.mode,
+      division: (typeof _resolveDivisionEcriture === 'function' ? _resolveDivisionEcriture('client', c.id) : ''), created_at: today(), origine: 'foncier_note_debours', note_id: n.id,
+      notes: 'Dossier ' + d.reference + ' · note de débours ' + n.numero + ' · généré en brouillard, à valider en comptabilité.',
+      lignes: [{ compte: _compteTresoVersement(o.mode), sens: 'D', montant: n.montant, libelle: 'Encaissement ' + n.numero }, { compte: requireCompteDefaut('titre_avances_souscripteur'), sens: 'C', montant: n.montant, libelle: 'Frais avancés remboursés par ' + (c.nom || 'le souscripteur') }] };
+  } catch (e) { return { ok: false, erreur: /COMPTE_DEFAUT_MANQUANT/.test(String(e && e.message)) ? 'Compte non paramétré (Paramètres › Comptes par défaut › Titre foncier).' : String(e && e.message || e) }; }
+  await fcPoserEcriture(ecr);
+  n.statut = 'encaissee'; n.encaisse_le = o.date; n.mode_encaissement = o.mode; n.ecriture_encaissement = ecr.id; await fcSauver(d);
+  await fcEvenement(d, '', 'note_debours', 'Note de débours ' + n.numero + ' encaissée : ' + n.montant + ' FCFA (' + o.mode + ') — écriture ' + ecr.ref + ' (brouillard)', { source: 'promoteur', source_ref: n.id });
+  return { ok: true, ecriture: ecr };
+}
+fcProtegerMutations(['fcEmettreNoteDebours', 'fcAnnulerNoteDebours', 'fcPublierNoteDebours']);
+
+
 /* ═══ Vente → titre : à l'entier règlement du prix initial, le dossier de titre individuel s'ouvre (ou le service Foncier est prévenu) ═══
    Réglable : Foncier › Notifications › « Ouverture automatique » (DATA.params.fc_ouverture_auto_solde, actif par défaut). Une seule fois par souscripteur. */
 async function fcApresSolde(clientId) {
@@ -61802,14 +61912,29 @@ function fcPanneauFrais(d) {
   var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">💶 Frais du titre — honoraires et droits</div>'
     + '<div style="font-size:11px;color:var(--dim);margin-bottom:6px;">Chaque frais exige sa pièce justificative. Comptabilisation SYSCOHADA en brouillard (comptes : Paramètres › Comptes par défaut › Titre foncier).</div>';
   h += l.length ? '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Nature</th><th>Imputation</th><th>Pièce</th><th>HT</th><th>TVA</th><th>Total</th><th>Statut</th><th></th></tr></thead><tbody>' + l.map(function(f){
-    var fq = '\'' + f.id + '\'', t = f.tiers_id ? fcIntervenant(f.tiers_id) : null;
+    var fq = '\'' + f.id + '\'', t = f.tiers_id ? fcIntervenant(f.tiers_id) : null, rf = fcFraisARefacturer(d).indexOf(f) !== -1;
     var act = f.statut === 'saisi' ? (compta ? '<button class="btn btn-secondary btn-sm" onclick="fcComptabiliserFraisUI(' + q + ',' + fq + ')">Comptabiliser</button> ' : '') + (gerer ? '<button class="btn btn-secondary btn-sm" onclick="fcAnnulerFraisUI(' + q + ',' + fq + ')">Annuler</button>' : '')
             : f.statut === 'comptabilise' ? (compta ? '<button class="btn btn-secondary btn-sm" onclick="fcReglerFraisUI(' + q + ',' + fq + ')">Régler</button>' : '') : '';
-    return '<tr style="' + (f.statut === 'annule' ? 'opacity:.5;text-decoration:line-through;' : '') + '"><td>' + escHtml(f.date) + '</td><td>' + escHtml(FC_FRAIS_TITRE[f.nature].lib) + (t ? '<br><span style="font-size:11px;color:var(--dim);">' + escHtml(t.nom_organisation) + '</span>' : '') + '</td>'
+    return '<tr style="' + (f.statut === 'annule' ? 'opacity:.5;text-decoration:line-through;' : '') + '"><td>' + (rf && gerer ? '<input type="checkbox" class="ff-rf" value="' + f.id + '" title="À inclure dans une note de débours"> ' : '') + escHtml(f.date) + '</td><td>' + escHtml(FC_FRAIS_TITRE[f.nature].lib) + (t ? '<br><span style="font-size:11px;color:var(--dim);">' + escHtml(t.nom_organisation) + '</span>' : '') + '</td>'
       + '<td>' + (f.charge === 'souscripteur' ? 'Souscripteur (avancé, à refacturer)' : 'Promoteur (charge)') + '</td><td>' + escHtml(f.piece) + '</td><td style="text-align:right;">' + fmtF(f.montant_ht) + '</td><td style="text-align:right;">' + fmtF(f.tva) + '</td><td style="text-align:right;"><b>' + fmtF(fcTotalFrais(f)) + '</b></td>'
-      + '<td>' + escHtml(FC_STATUTS_FRAIS[f.statut]) + '</td><td>' + act + '</td></tr>'; }).join('') + '</tbody></table></div>'
+      + '<td>' + escHtml(FC_STATUTS_FRAIS[f.statut]) + (f.note_id && fcNoteDebours(d, f.note_id) ? '<div style="font-size:10px;color:var(--dim);">' + escHtml(fcNoteDebours(d, f.note_id).numero) + '</div>' : '') + '</td><td>' + act + '</td></tr>'; }).join('') + '</tbody></table></div>'
     + '<div style="font-size:12px;margin-top:6px;">À la charge du promoteur : <b>' + fmtF(syn.promoteur) + ' F</b> · avancés pour le souscripteur (à refacturer) : <b>' + fmtF(syn.souscripteur) + ' F</b> · réglé : ' + fmtF(syn.regle) + ' F · reste à régler : <b>' + fmtF(syn.a_regler) + ' F</b></div>'
     : '<div style="color:var(--dim);padding:6px;">Aucun frais saisi.</div>';
+
+  var notes = fcNotesDebours(d);
+  if (syn.souscripteur > 0 || notes.length) {
+    h += '<div style="margin-top:10px;border-top:1px dashed var(--bord,#ccc);padding-top:8px;"><b>🧾 Refacturation au souscripteur</b> <span style="font-size:11px;color:var(--dim);">(au prix coûtant, sans marge)</span>'
+      + '<div style="font-size:12px;margin:4px 0;">À refacturer : <b>' + fmtF(syn.a_refacturer) + ' F</b> · émis, en attente de règlement : <b>' + fmtF(syn.refacture) + ' F</b> · encaissé : <b>' + fmtF(syn.encaisse) + ' F</b></div>';
+    if (gerer && syn.a_refacturer > 0) h += '<button class="btn btn-primary btn-sm" onclick="fcEmettreNoteUI(' + q + ')">Émettre une note de débours (frais cochés)</button>';
+    if (notes.length) h += '<div class="table-wrap"><table><thead><tr><th>Note</th><th>Date</th><th>Échéance</th><th>Montant</th><th>Statut</th><th></th></tr></thead><tbody>' + notes.map(function(n){
+      var nq = '\'' + n.id + '\'', retard = fcNoteEnRetard(n);
+      return '<tr style="' + (n.statut === 'annulee' ? 'opacity:.5;' : '') + '"><td><b>' + escHtml(n.numero) + '</b><br><span style="font-size:11px;color:var(--dim);">' + escHtml((fcClient(n.client_id) || {}).nom || '') + '</span></td><td>' + escHtml(n.date) + '</td><td>' + escHtml(n.echeance) + (retard ? ' <span style="color:#c0392b;">⏰ en retard</span>' : '') + '</td>'
+        + '<td style="text-align:right;"><b>' + fmtF(n.montant) + '</b></td><td>' + ({ emise: 'Émise', encaissee: 'Encaissée le ' + escHtml(n.encaisse_le || ''), annulee: 'Annulée' }[n.statut]) + (n.publie_portail ? ' · 🌐' : '') + '</td>'
+        + '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="fcVoirNoteUI(' + q + ',' + nq + ')">👁 Imprimer</button> '
+        + (gerer && n.statut !== 'annulee' ? '<button class="btn ' + (n.publie_portail ? 'btn-primary' : 'btn-secondary') + ' btn-sm" title="Publier au portail du souscripteur (avec e-mail)" onclick="fcPublierNoteUI(' + q + ',' + nq + ',' + (n.publie_portail ? 'false' : 'true') + ')">🌐</button> ' : '')
+        + (n.statut === 'emise' ? (compta ? '<button class="btn btn-secondary btn-sm" onclick="fcEncaisserNoteUI(' + q + ',' + nq + ')">Encaisser</button> ' : '') + (gerer ? '<button class="btn btn-secondary btn-sm" onclick="fcAnnulerNoteUI(' + q + ',' + nq + ')">Annuler</button>' : '') : '') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    h += '</div>';
+  }
   if (gerer && d.statut !== 'annule') {
     var ivs = (DATA.intervenants_fonciers || []).filter(function(i){ return i.statut_relation === 'actif' && (i.type === 'notaire' || i.type === 'geometre'); });
     h += '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;margin-top:8px;">'
@@ -61824,6 +61949,30 @@ function fcPanneauFrais(d) {
   }
   return h + '</div>';
 }
+
+async function fcEmettreNoteUI(id) {
+  var ids = Array.prototype.map.call(document.querySelectorAll('.ff-rf:checked'), function(e){ return e.value; });
+  if (!ids.length) { toast('Cochez les frais à inclure dans la note.', 'error'); return; }
+  var x = new Date(); x.setDate(x.getDate() + 30); var ech = prompt('Échéance de règlement (AAAA-MM-JJ) :', x.toISOString().slice(0, 10)); if (!ech) return;
+  var r = await fcEmettreNoteDebours(id, ids, { echeance: ech.trim() }); fcMsg(r, 'Note de débours émise.'); fcRenderDetail(id);
+  if (r.ok) fcVoirNoteUI(id, r.note.id);
+}
+function fcVoirNoteUI(id, nid) {
+  var d = fcDossier(id), n = d && fcNoteDebours(d, nid); if (!n || !n.html) return;
+  var w = window.open('', '_blank', 'width=860,height=900'); if (!w) { toast('Fenêtre bloquée par le navigateur.', 'error'); return; }
+  w.document.write(n.html); w.document.close(); setTimeout(function(){ try { w.print(); } catch (e) {} }, 400);
+}
+async function fcPublierNoteUI(id, nid, on) {
+  var r = await fcPublierNoteDebours(id, nid, on); if (!r.ok) { toast(r.erreur, 'error'); }
+  else toast(on ? ('🌐 Note publiée au portail du souscripteur' + (r.prevenu ? ' (e-mail en file).' : ' (aucun e-mail : adresse ou canal indisponible).')) : 'Note retirée du portail.', 'info', 6000);
+  fcRenderDetail(id);
+}
+async function fcEncaisserNoteUI(id, nid) {
+  var mode = prompt('Mode de règlement : especes, mobile_money, virement, cheque ou banque', 'especes'); if (!mode) return;
+  var date = prompt("Date d'encaissement (AAAA-MM-JJ) :", fcAuj()); if (!date) return;
+  fcMsg(await fcEncaisserNoteDebours(id, nid, { mode: mode.trim(), date: date.trim() }), 'Encaissement comptabilisé (écriture en brouillard).'); fcRenderDetail(id);
+}
+async function fcAnnulerNoteUI(id, nid) { var m = prompt("Motif de l'annulation (obligatoire) :"); if (m === null) return; fcMsg(await fcAnnulerNoteDebours(id, nid, m), 'Note annulée.'); fcRenderDetail(id); }
 async function fcAjouterFraisUI(id) {
   var g = function(i){ var e = document.getElementById(i); return e ? e.value : ''; };
   fcMsg(await fcAjouterFraisTitre(id, { nature: g('ff-nature'), tiers_id: g('ff-tiers'), montant_ht: g('ff-ht'), tva: g('ff-tva'), date: g('ff-date'), piece: g('ff-piece'), charge: g('ff-charge') }), 'Frais saisi.'); fcRenderDetail(id);
