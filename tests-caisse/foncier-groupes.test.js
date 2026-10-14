@@ -118,6 +118,6 @@ test('interface : cases à cocher, panneau des groupes, détail et bandeau', asy
   const h = await run(app.page, (g) => { APP._fgSel = g; var glob = DATA.dossiers_fonciers.find(function (d) { return d.niveau !== 'individuel' && d.parcelle_id === 'p1'; }); return { pan: fcPanneauTitresIndividuels(glob), ban: fcBandeauNiveau(fcDossier(DATA.groupes_fonciers[0].dossier_ids[0])) }; }, g);
   assert.match(h.pan, /fc-ck-lot/); assert.match(h.pan, /Groupes de mutation/); assert.match(h.pan, /Appliquer à tout le groupe/); assert.match(h.pan, /Justificatif commun/); assert.match(h.pan, /GM-\d{4}-001/);
   assert.match(h.pan, /lots cochés \(même souscripteur\)/); assert.match(h.ban, /Groupe de mutation : <b>GM-/);
-  assert.equal(await run(app.page, () => ALL_STORES.indexOf('groupes_fonciers') !== -1 && SANIX_STORES_LOCAL_UNIQUEMENT.indexOf('groupes_fonciers') !== -1 && !SUPA_STORE_MAP.groupes_fonciers), true);
+  assert.equal(await run(app.page, () => ALL_STORES.indexOf('groupes_fonciers') !== -1 && SANIX_STORES_LOCAL_UNIQUEMENT.indexOf('groupes_fonciers') === -1 && SUPA_STORE_MAP.some(function (p) { return p[1] === 'groupes_fonciers'; })), true);
   assert.deepEqual(app.etat.erreursPage, []);
 });

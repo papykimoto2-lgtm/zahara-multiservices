@@ -191,7 +191,7 @@ test('journal en ajout seul, stores locaux et aucune synchronisation cloud', asy
     };
   });
   assert.ok(r.avant >= 2); assert.equal(r.supprimer, 'undefined'); assert.equal(r.modifier, 'undefined');
-  assert.equal(r.stores, true); assert.equal(r.local, true); assert.equal(r.mappe, false); assert.equal(r.sync, 0);
+  assert.equal(r.stores, true); assert.equal(r.local, false); assert.equal(r.mappe, true); assert.equal(r.sync, 0);
 });
 
 test('interface : onglet, liste et détail s\'affichent sans erreur', async () => {

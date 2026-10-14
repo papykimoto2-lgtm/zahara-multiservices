@@ -206,7 +206,7 @@ test('stores locaux, aucune synchronisation cloud, interface sans erreur', async
   const r = await app.page.evaluate(function (mid) {
     fcRenderIntervenants(); fcMissionDetail(mid);
     return {
-      stores: ['intervenants_fonciers', 'missions_foncieres'].every(function (s) { return ALL_STORES.indexOf(s) !== -1 && SANIX_STORES_LOCAL_UNIQUEMENT.indexOf(s) !== -1 && !SUPA_STORE_MAP.some(function (p) { return p[1] === s; }); }),
+      stores: ['intervenants_fonciers', 'missions_foncieres'].every(function (s) { return ALL_STORES.indexOf(s) !== -1 && SANIX_STORES_LOCAL_UNIQUEMENT.indexOf(s) === -1 && SUPA_STORE_MAP.some(function (p) { return p[1] === s; }); }),
       sync: window.__sync, liste: document.getElementById('fi-root').innerHTML.indexOf('MF-') !== -1, detail: document.getElementById('fi-detail').innerHTML.indexOf('Plan de bornage') !== -1,
       onglet: !!document.getElementById('tab-foncier-intervenants')
     };

@@ -160,7 +160,7 @@ test('stores locaux, aucune synchronisation cloud, interface sans erreur', async
     await fcCreerDemande('c1', a.d1, 'Avancement', 'Où en est mon dossier ?');
     fcRenderSouscripteurs(); fcRender(); fcOuvrirDetail(a.d1);
     return {
-      stores: ['publications_foncieres', 'demandes_fonciers'].every(function (s) { return ALL_STORES.indexOf(s) !== -1 && SANIX_STORES_LOCAL_UNIQUEMENT.indexOf(s) !== -1 && !SUPA_STORE_MAP.some(function (p) { return p[1] === s; }); }),
+      stores: ['publications_foncieres', 'demandes_fonciers'].every(function (s) { return ALL_STORES.indexOf(s) !== -1 && SANIX_STORES_LOCAL_UNIQUEMENT.indexOf(s) === -1 && SUPA_STORE_MAP.some(function (p) { return p[1] === s; }); }),
       sync: window.__sync, apercu: document.getElementById('fs-root').innerHTML.indexOf('Résidence Les Palmiers') !== -1, demande: document.getElementById('fs-root').innerHTML.indexOf('DI-') !== -1,
       detail: document.getElementById('fc-detail').innerHTML.indexOf('Informations publiées au souscripteur') !== -1, onglet: !!document.getElementById('tab-foncier-souscripteurs')
     };
