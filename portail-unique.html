@@ -1763,7 +1763,7 @@
     if(!STAFF.length) STAFF.push({ id:'admin', nom:'Administration '+_brandNom(), poste:'Support', type:'admin' });
   }
 
-  var S = { client:null, versements:[], programmes:[], lots:[], rapports:[], conventions:[], messages:[], interlocuteur:null, suivi:null, pieces:null, ptOccupe:false, ptMsg:null };
+  var S = { client:null, versements:[], programmes:[], lots:[], rapports:[], conventions:[], messages:[], interlocuteur:null, suivi:null, pieces:null, debours:null, ptOccupe:false, ptMsg:null };
 
   async function loginSouscripteur(){
     var ident=(document.getElementById('sousLogin').value||'').trim();
@@ -1819,6 +1819,7 @@
     }catch(e){ S.versements=S.versements||[]; }
     S.suivi=await chargerSuiviTitre();
     S.pieces=await chargerPiecesTitre();
+    S.debours=await chargerDeboursTitre();
     rendreSouscripteur();
     /* Badge messages non lus */
     setTimeout(function(){ mettreAJourBadge('s', compterNonLus(S.messages)); }, 100);
@@ -1906,7 +1907,33 @@
     }catch(e){ echec('Ouverture impossible pour le moment. Réessayez.'); }
   }
   function rafraichirPiecesTitre(){
-    var host=document.getElementById('s-tit'); if(host&&S.suivi) host.innerHTML=blocSuiviTitre()+blocPiecesTitre();
+    var host=document.getElementById('s-tit'); if(host&&S.suivi) host.innerHTML=blocSuiviTitre()+blocPiecesTitre()+blocDeboursTitre();
+  }
+  /* Frais de titre à rembourser : notes de débours publiées par le promoteur (fc_vue_souscripteur_debours). Le document est celui figé à l'émission. */
+  var DB_STATUT={ emise:['À régler','p-or'], encaissee:['Réglée','p-vert'] };
+  async function chargerDeboursTitre(){
+    try{
+      var r=await fetch(SB_URL+'/rest/v1/rpc/fc_vue_souscripteur_debours',{ method:'POST', headers:_authHdr(true), body:'{}' });
+      if(!r.ok) return null;
+      var v=await r.json();
+      return (v&&Array.isArray(v.notes))?v.notes:null;
+    }catch(e){ return null; }
+  }
+  function blocDeboursTitre(){
+    var l=S.debours; if(!l||!l.length) return '';
+    var h='<div class="card"><strong>💶 Frais de titre à rembourser</strong><p style="font-size:.78rem;color:#4b6a8b;margin:6px 0 0;">Frais avancés par le promoteur pour votre titre foncier, refacturés au prix coûtant.</p>';
+    l.forEach(function(n,i){
+      var st=DB_STATUT[n.statut]||['',''], retard=n.statut==='emise'&&n.echeance&&String(n.echeance).slice(0,10)<new Date().toISOString().slice(0,10);
+      h+='<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid #e2e8f0;padding:8px 0;font-size:.85rem;"><div><strong>'+esc(n.numero||'')+'</strong> <span class="pill '+st[1]+'">'+esc(st[0])+'</span>'+(retard?' <span class="pill p-rouge">En retard</span>':'')
+        +'<div style="font-size:.76rem;color:#6b7f95;">Dossier '+esc(n.dossier||'')+' · émise le '+esc(dshort(n.date))+(n.statut==='emise'?' · à régler avant le '+esc(dshort(n.echeance)):(n.encaisse_le?' · réglée le '+esc(dshort(n.encaisse_le)):''))+'</div></div>'
+        +'<div style="text-align:right;"><strong>'+fmt(n.montant)+' FCFA</strong><div style="margin-top:4px;"><button class="highlight-btn" style="padding:6px 14px;background:#16a34a;" onclick="dbOuvrir('+i+')">Consulter / imprimer</button></div></div></div>';
+    });
+    return h+'</div>';
+  }
+  function dbOuvrir(i){
+    var n=S.debours&&S.debours[parseInt(i,10)]; if(!n||!n.html) return;
+    var w=window.open('','_blank','width=860,height=900'); if(!w) return;
+    w.document.write(n.html); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
   }
   function blocSuiviTitre(){
     var v=S.suivi; if(!v) return '';
@@ -1978,7 +2005,7 @@
     html+='<div class="sub" id="s-ver"><div class="card"><strong>💳 Historique des versements</strong><div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Mode</th></tr></thead><tbody>'+tableVers(vs)+'</tbody></table></div></div></div>';
     html+='<div class="sub" id="s-tra">'+blocTravaux()+'</div>';
     html+='<div class="sub" id="s-rec">'+blocReception()+'</div>';
-    if(S.suivi) html+='<div class="sub" id="s-tit">'+blocSuiviTitre()+blocPiecesTitre()+'</div>';
+    if(S.suivi) html+='<div class="sub" id="s-tit">'+blocSuiviTitre()+blocPiecesTitre()+blocDeboursTitre()+'</div>';
     html+='<div class="sub" id="s-doc">'+sPrixModifs()+'<div class="card"><strong>📁 Mes documents</strong><div style="display:flex; flex-direction:column; gap:12px; margin-top:12px; max-width:340px;"><button class="highlight-btn" style="background:#0077b6;" onclick="docEcheancier()">📅 Échéancier personnalisé</button><button class="highlight-btn" style="background:#0077b6;" onclick="docAttestation()">📑 Attestation de versements</button>'+sAttSoldeBtn()+'</div></div></div>';
     html+='<div class="sub" id="s-msg"><div class="card">'
       +'<strong style="font-size:1rem;">💬 Messagerie</strong>'
