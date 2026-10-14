@@ -1357,7 +1357,7 @@
      Aucune table lue directement : tout passe par des fonctions serveur qui identifient l'intervenant par son JETON
      (fc_vue_intervenant, fc_intervenant_accepter, fc_intervenant_demarrer). Il ne voit que ses missions envoyées :
      jamais d'observations internes, de responsable, de montants ni de souscripteurs. */
-  var INT = { id:null, nom:'', missions:[], attestations:[], ouverte:null, occupe:null, msg:null, erreur:'' };
+  var INT = { id:null, nom:'', missions:[], dossiers:[], ouverte:null, occupe:null, msg:null, erreur:'' };
   var INT_STATUTS = { envoyee:'À accepter', acceptee:'Acceptée', en_cours:'En cours', attente_informations:"En attente d'informations", livrable_soumis:'Livrable soumis', en_verification:'En vérification', a_corriger:'À corriger', validee:'Validée', cloturee:'Clôturée' };
   var INT_COULEUR = { envoyee:'p-or', acceptee:'p-bleu', en_cours:'p-bleu', attente_informations:'p-or', livrable_soumis:'p-bleu', en_verification:'p-bleu', a_corriger:'p-rouge', validee:'p-vert', cloturee:'p-gris' };
   var INT_ACTIVES = ['envoyee','acceptee','en_cours','attente_informations','livrable_soumis','en_verification','a_corriger'];
@@ -1408,27 +1408,70 @@
     try{
       var v=await _intRpc('fc_vue_intervenant');
       INT.missions=(v&&Array.isArray(v.missions))?v.missions:[]; INT.erreur='';
-      /* Notaire : attestations de solde transmises par le promoteur (la fonction renvoie [] pour tout autre intervenant). */
-      try{ var na=await _intRpc('fc_vue_notaire_attestations'); INT.attestations=(na&&Array.isArray(na.attestations))?na.attestations:[]; }catch(e2){ if(e2&&e2.message==='session') throw e2; INT.attestations=[]; }
+      /* Notaire : dossier de transmission (la fonction renvoie [] pour tout autre intervenant). */
+      try{ var nd=await _intRpc('fc_vue_notaire_dossiers'); INT.dossiers=(nd&&Array.isArray(nd.dossiers))?nd.dossiers:[]; }catch(e2){ if(e2&&e2.message==='session') throw e2; INT.dossiers=[]; }
     }catch(e){
       if(e&&e.message==='session'){ logoutIntervenant(); setErr('intError','Session expirée : reconnectez-vous.'); return; }
       INT.erreur='Chargement impossible pour le moment. Réessayez.';
     }
     rendreIntervenant();
   }
-  /* Espace notaire : attestations de solde transmises (lecture et impression du texte figé validé par la direction). */
-  function _intAttestationsHtml(){
-    var l=INT.attestations||[]; if(!l.length) return '';
-    return '<div class="card"><strong>📜 Attestations de solde transmises</strong><p style="font-size:.78rem;color:#4b6a8b;margin:6px 0;">Documents validés par la Direction, transmis pour les dossiers dont vous avez la charge.</p>'
-      +l.map(function(a,i){ return '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid #e2e8f0;padding:8px 0;"><div><strong>'+esc(a.souscripteur||'—')+'</strong> · dossier '+esc(a.dossier||'—')+'<div style="font-size:.78rem;color:#6b7f95;">'+(a.kind==='finale'?'Valeur finale':'Prix initial')+' · N° '+esc(a.numero||'')+(a.date?' · validée le '+esc(dshort(a.date)):'')+'</div></div>'
-        +'<button class="highlight-btn" style="padding:8px 16px;background:#16a34a;" data-i="'+i+'" onclick="intOuvrirAttestation(this.dataset.i)">Consulter / imprimer</button></div>'; }).join('')+'</div>';
+  /* Espace notaire : dossier de transmission. Le promoteur ne transmet que ce qu'il coche (identité, bien, avancement, attestations,
+     pièces une à une). Les fichiers s'ouvrent par une URL de 60 s (Edge Function fc-notaire-piece) ; chaque ouverture est journalisée côté serveur. */
+  var INT_STATUT_ETAPE={ a_preparer:'À préparer', a_venir:'À venir', en_cours:'En cours', attente_intervenant:"En attente d'un intervenant", attente_document:"En attente d'un document", attente_administration:"En attente d'une administration", attente_decision:"En attente d'une décision", bloque:'Bloquée', rejete:'Rejetée', termine:'Terminée', annule:'Annulée' };
+  function _intTaille(n){ n=parseInt(n,10)||0; return n>1048576?(n/1048576).toFixed(1)+' Mo':Math.max(1,Math.round(n/1024))+' Ko'; }
+  function _intDossiersNotaireHtml(){
+    var l=INT.dossiers||[]; if(!l.length) return '';
+    var h='<div class="card"><strong>📂 Dossiers qui vous sont transmis</strong><p style="font-size:.78rem;color:#4b6a8b;margin:6px 0 0;">Informations et documents transmis par le promoteur pour les dossiers dont vous avez la charge. Chaque ouverture de document est enregistrée.</p></div>';
+    l.forEach(function(d,ci){
+      h+='<div class="card"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><strong>'+esc(d.souscripteur||'—')+'</strong><span style="font-size:.8rem;color:#6b7f95;">Dossier '+esc(d.dossier||'—')+'</span></div>';
+      var id=d.identite;
+      if(id) h+='<div style="margin-top:10px;"><div style="font-weight:600;font-size:.85rem;">Identité</div><div style="font-size:.84rem;line-height:1.6;">'+esc(((id.prenoms||'')+' '+(id.nom||'')).trim())+(id.naissance?'<br>Né(e) le '+esc(dshort(id.naissance)):'')+(id.nationalite?' — '+esc(id.nationalite):'')+(id.piece_type||id.piece_num?'<br>'+esc((id.piece_type||'Pièce')+' '+(id.piece_num||'')):'')+'</div></div>';
+      var b=d.bien;
+      if(b){
+        h+='<div style="margin-top:10px;"><div style="font-weight:600;font-size:.85rem;">Bien</div>';
+        (b.lots||[]).forEach(function(x){ h+='<div style="font-size:.84rem;line-height:1.6;">Lot '+esc(x.lot||'—')+(x.ilot?', îlot '+esc(x.ilot):'')+(x.surface?' — '+esc(x.surface)+' m²':'')+(x.type?' ('+esc(x.type)+')':'')+'<br><span style="color:#4b6a8b;">Parcelle '+esc(x.parcelle||'—')+(x.localisation?' · '+esc(x.localisation):'')+(x.numero_tf?' · TF '+esc(x.numero_tf):'')+(x.numero_acd?' · ACD '+esc(x.numero_acd):'')+'</span></div>'; });
+        (b.references||[]).forEach(function(r){ h+='<div style="font-size:.8rem;color:#4b6a8b;">Dossier '+esc(r.dossier||'')+(r.idufci?' · IDUFCI '+esc(r.idufci):'')+(r.numero_dossier_guf?' · GUF '+esc(r.numero_dossier_guf):'')+'</div>'; });
+        h+='</div>';
+      }
+      if(d.avancement){
+        h+='<div style="margin-top:10px;"><div style="font-weight:600;font-size:.85rem;">Avancement du dossier foncier</div>';
+        d.avancement.forEach(function(a){ h+='<div style="font-size:.8rem;color:#4b6a8b;margin-top:4px;">'+esc(a.reference||'')+' ('+(a.niveau==='individuel'?'titre individuel':'titre mère')+')</div><ul style="font-size:.84rem;margin:2px 0 0 18px;">'+(a.etapes||[]).map(function(e){ return '<li>'+esc(e.libelle||'')+' : <strong>'+esc(INT_STATUT_ETAPE[e.statut]||e.statut||'')+'</strong>'+(e.date_cible&&e.statut!=='termine'?' <span style="color:#6b7f95;">(échéance '+esc(dshort(e.date_cible))+')</span>':'')+'</li>'; }).join('')+'</ul>'; });
+        h+='</div>';
+      }
+      if((d.attestations||[]).length){
+        h+='<div style="margin-top:10px;"><div style="font-weight:600;font-size:.85rem;">Attestations de solde</div>';
+        d.attestations.forEach(function(a,ai){ h+='<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;padding:6px 0;font-size:.84rem;"><span>'+(a.kind==='finale'?'Valeur finale':'Prix initial')+' · N° '+esc(a.numero||'')+(a.date?' · validée le '+esc(dshort(a.date)):'')+'</span><button class="highlight-btn" style="padding:6px 14px;background:#16a34a;" data-c="'+ci+'" data-i="'+ai+'" onclick="intOuvrirAttestation(this.dataset.c,this.dataset.i)">Consulter / imprimer</button></div>'; });
+        h+='</div>';
+      }
+      if((d.pieces||[]).length){
+        h+='<div style="margin-top:10px;"><div style="font-weight:600;font-size:.85rem;">Pièces</div>';
+        d.pieces.forEach(function(p,pi){ h+='<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;padding:6px 0;font-size:.84rem;"><span>'+esc(p.nom||'document')+' <span style="color:#6b7f95;">('+esc(_intTaille(p.taille))+(p.date?' · '+esc(dshort(p.date)):'')+(p.version>1?' · v'+esc(p.version):'')+')</span></span><button class="highlight-btn" style="padding:6px 14px;background:#0077b6;" data-c="'+ci+'" data-i="'+pi+'" onclick="intOuvrirPiece(this.dataset.c,this.dataset.i)">Ouvrir</button></div>'; });
+        h+='</div>';
+      }
+      h+='</div>';
+    });
+    return h;
   }
-  function intOuvrirAttestation(i){
-    var a=(INT.attestations||[])[parseInt(i,10)]; if(!a||!a.html) return;
+  function intOuvrirAttestation(ci,i){
+    var d=(INT.dossiers||[])[parseInt(ci,10)], a=d&&(d.attestations||[])[parseInt(i,10)]; if(!a||!a.html) return;
     var w=window.open('','_blank','width=860,height=900'); if(!w) return;
     w.document.write(a.html); w.document.close();
-    try{ logConnexion('[NOTAIRE] '+(INT.nom||INT.id), true, 'Consultation attestation '+(a.numero||'')+' — '+(a.souscripteur||'')); }catch(e){}
+    try{ logConnexion('[NOTAIRE] '+(INT.nom||INT.id), true, 'Consultation attestation '+(a.numero||'')+' — '+(d.souscripteur||'')); }catch(e){}
     setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
+  }
+  async function intOuvrirPiece(ci,i){
+    var d=(INT.dossiers||[])[parseInt(ci,10)], p=d&&(d.pieces||[])[parseInt(i,10)]; if(!p||INT.occupe) return;
+    var w=window.open('','_blank');   /* ouvert tout de suite (anti-bloqueur de fenêtres), adresse renseignée ensuite */
+    var echec=function(m){ try{ if(w) w.close(); }catch(e){} INT.msg={ t:'err', m:m||'Document indisponible.' }; rendreIntervenant(); };
+    try{
+      var r=await fetch(SB_URL+'/functions/v1/fc-notaire-piece',{ method:'POST', headers:_authHdr(true), body:JSON.stringify({ piece_id:p.id }) });
+      var j={}; try{ j=await r.json(); }catch(e){}
+      if(r.status===401){ try{ if(w) w.close(); }catch(e){} logoutIntervenant(); setErr('intError','Session expirée : reconnectez-vous.'); return; }
+      if(!r.ok||!j.url) return echec(j.message);
+      if(w) w.location=j.url; else INT.msg={ t:'err', m:'Votre navigateur a bloqué l\'ouverture : autorisez les fenêtres pour ce site.' };
+      try{ logConnexion('[NOTAIRE] '+(INT.nom||INT.id), true, 'Ouverture document '+(p.nom||'')+' — '+(d.souscripteur||'')); }catch(e){}
+    }catch(e){ echec('Ouverture impossible pour le moment. Réessayez.'); }
   }
   function _intMission(id){ return INT.missions.filter(function(m){ return String(m.id)===String(id); })[0]; }
   async function intAction(action, missionId){
@@ -1498,7 +1541,7 @@
     return h+'</div>';
   }
   function logoutIntervenant(){
-    INT.id=null; INT.nom=''; INT.missions=[]; INT.attestations=[]; INT.ouverte=null; INT.occupe=null; INT.msg=null; INT.erreur='';
+    INT.id=null; INT.nom=''; INT.missions=[]; INT.dossiers=[]; INT.ouverte=null; INT.occupe=null; INT.msg=null; INT.erreur='';
     _clearToken(); try{ sessionStorage.removeItem('pp_int_nom'); }catch(e){}
     document.getElementById('int-dash').style.display='none'; document.getElementById('int-dash').innerHTML='';
     document.getElementById('int-login').style.display='block'; document.getElementById('intCode').value='';
@@ -1555,7 +1598,7 @@
     if(INT.msg) h+='<div role="'+(INT.msg.t==='ok'?'status':'alert')+'" style="'+(INT.msg.t==='ok'?'background:#dcfce7;color:#166534;':'background:#fee2e2;color:#991b1b;')+'padding:10px 14px;border-radius:14px;margin:12px 0;font-size:.88rem;">'+esc(INT.msg.m)+'</div>';
     h+='<div class="kpi-row">'+kpiBox('À accepter',n(function(m){return m.statut==='envoyee';}),'')+kpiBox('En cours',n(function(m){return ['acceptee','en_cours','attente_informations'].indexOf(m.statut)!==-1;}),'')
       +kpiBox('À corriger',n(function(m){return m.statut==='a_corriger';}),'color:#991b1b;')+kpiBox('En retard',n(_intEnRetard),'color:#991b1b;')+'</div>';
-    h+=_intAttestationsHtml();
+    h+=_intDossiersNotaireHtml();
     if(INT.erreur) h+='<div class="badge-danger" style="display:block;">'+esc(INT.erreur)+'</div>';
     if(!ms.length&&!INT.erreur) h+='<div class="card"><p style="color:#4b6a8b;">Aucune mission pour le moment. Si vous en attendez une, contactez votre interlocuteur.</p></div>';
     h+=ms.map(function(m){
