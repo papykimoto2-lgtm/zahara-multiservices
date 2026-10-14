@@ -247,7 +247,7 @@ test('cycle, interface, store local et aucune synchronisation cloud', async () =
     fcRenderNotifications(); fcMajBadgeNotif();
     return {
       cycle: !!(cycle && cycle.alertes && cycle.file), html: document.getElementById('fn-root').innerHTML, badge: document.getElementById('fn-badge') ? document.getElementById('fn-badge').textContent : null,
-      store: ALL_STORES.indexOf('notifications_foncieres') !== -1 && SANIX_STORES_LOCAL_UNIQUEMENT.indexOf('notifications_foncieres') !== -1 && !SUPA_STORE_MAP.some(function (p) { return p[1] === 'notifications_foncieres'; }),
+      store: ALL_STORES.indexOf('notifications_foncieres') !== -1 && SANIX_STORES_LOCAL_UNIQUEMENT.indexOf('notifications_foncieres') === -1 && SUPA_STORE_MAP.some(function (p) { return p[1] === 'notifications_foncieres'; }),
       sync: window.__sync, onglet: !!document.getElementById('tab-foncier-notifications')
     };
   }, ids.d);

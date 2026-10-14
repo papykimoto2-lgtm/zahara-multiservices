@@ -25350,7 +25350,7 @@ async function loadAllData() {
    bandeau discret pour un profil Admin uniquement — jamais pour les
    autres rôles, pour ne pas faire porter une dette technique à un
    utilisateur qui ne peut rien y faire. */
-var SANIX_STORES_LOCAL_UNIQUEMENT = ['conflits_sync','dossiers_fonciers','evenements_fonciers','intervenants_fonciers','missions_foncieres','publications_foncieres','demandes_fonciers','notifications_foncieres','pieces_foncieres','groupes_fonciers']; // écarts connus et voulus — jamais synchronisés au cloud par conception
+var SANIX_STORES_LOCAL_UNIQUEMENT = ['conflits_sync','pieces_foncieres']; // écarts connus et voulus — jamais synchronisés au cloud par conception
 function sanixAutoDiagnostic(){
   try{
     var mappes = {}; SUPA_STORE_MAP.forEach(function(p){ mappes[p[1]]=true; });
@@ -27078,6 +27078,15 @@ var SUPA_STORE_MAP = [
   ['pi_caisse_sessions',  'caisse_sessions'],
   ['pi_caisse_mouvements','caisse_mouvements'],
   ['pi_demandes_reappro', 'demandes_reappro'],
+  /* Foncier Connect — tables créées par supabase/foncier_connect.sql (pièces jointes : local uniquement) */
+  ['pi_dossiers_fonciers', 'dossiers_fonciers'],
+  ['pi_evenements_fonciers', 'evenements_fonciers'],
+  ['pi_intervenants_fonciers', 'intervenants_fonciers'],
+  ['pi_missions_foncieres', 'missions_foncieres'],
+  ['pi_publications_foncieres', 'publications_foncieres'],
+  ['pi_demandes_fonciers', 'demandes_fonciers'],
+  ['pi_notifications_foncieres', 'notifications_foncieres'],
+  ['pi_groupes_fonciers', 'groupes_fonciers'],
   ['pi_bordereaux_caisse', 'bordereaux_caisse'],
   ['pi_users',           'users'],
   ['pi_portail_medias',  'portail_medias'],
