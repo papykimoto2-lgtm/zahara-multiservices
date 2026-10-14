@@ -59766,7 +59766,7 @@ function fcRenderIntervenants() {
       var d = fcDossier(m.dossier_id), retard = fcMissionEnRetard(m);
       return '<tr><td><strong>' + escHtml(m.reference) + '</strong><br>' + escHtml(m.titre) + '</td><td>' + escHtml(d ? d.reference : '—') + '</td><td>' + escHtml(fcNomIntervenant(m.intervenant_id)) + '</td><td>' + escHtml(FC_STATUTS_MISSION[m.statut]) + '</td>'
         + '<td>' + escHtml(m.echeance) + (retard ? '<br><span style="color:#c0392b;font-size:11px;">En retard</span>' : '') + '</td><td>' + escHtml(m.contrat_reference || '—') + '</td>'
-        + '<td><button class="btn btn-secondary btn-sm" onclick="fcMissionDetail(\'' + m.id + '\')">Ouvrir</button></td></tr>';
+        + '<td><button class="btn btn-secondary btn-sm" onclick="fcMissionDetail(\'' + m.id + '\')">Ouvrir' + (fcMessagesNonLus(m) ? ' 💬' + fcMessagesNonLus(m) : '') + '</button></td></tr>';
     }).join('') + '</tbody></table></div>' : '<div style="color:var(--dim);padding:8px;">Aucune mission.</div>';
   h += '</div><div id="fi-detail"></div>';
   host.innerHTML = h;
@@ -59887,7 +59887,7 @@ async function fcMissionUI() {
   var r = await fcCreerMission({ dossier_id: g('fi-m-dossier'), intervenant_id: g('fi-m-interv'), titre: g('fi-m-titre'), livrables: g('fi-m-livr').split(';'), echeance: g('fi-m-ech'), etape_code: g('fi-m-etape'), contrat_reference: g('fi-m-contrat') });
   if (fcMsg(r, 'Mission créée (brouillon).')) { APP._fiSel = r.mission.id; fcRenderIntervenants(); }
 }
-function fcMissionDetail(id) { APP._fiSel = id; fcRenderMissionDetail(id); var el = document.getElementById('fi-detail'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth' }); }
+function fcMissionDetail(id) { APP._fiSel = id; fcRenderMissionDetail(id); fcMarquerMessagesLus(id).then(function(r){ if (r && r.marques) fcRenderMissionDetail(id); }).catch(function(){}); var el = document.getElementById('fi-detail'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth' }); }
 function fcRenderMissionDetail(id) {
   var m = fcMission(id), host = document.getElementById('fi-detail'); if (!m || !host) return;
   var suiv = (FC_TRANSITIONS_MISSION[m.statut] || []).map(function(s){ return '<button class="btn btn-secondary btn-sm" onclick="fcStatutMissionUI(\'' + m.id + '\',\'' + s + '\')">→ ' + escHtml(FC_STATUTS_MISSION[s]) + '</button>'; }).join(' ');
@@ -59903,6 +59903,7 @@ function fcRenderMissionDetail(id) {
         + (der && der.statut === 'soumis' && m.statut === 'en_verification' ? ' <button class="btn btn-primary btn-sm" onclick="fcValiderUI(\'' + m.id + '\',\'' + l.id + '\')">Valider</button> <button class="btn btn-secondary btn-sm" onclick="fcRefuserUI(\'' + m.id + '\',\'' + l.id + '\')">Refuser</button>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   var evs = (DATA.evenements_fonciers || []).filter(function(x){ return x.mission_id === m.id; }).sort(function(a, b){ return b.date.localeCompare(a.date); });
+  h += fcHtmlMessagerie(m);
   h += '<div class="card-title" style="margin-top:12px;">🕑 Historique de la mission</div><div style="max-height:200px;overflow:auto;font-size:12px;">' + evs.map(function(x){ return '<div style="padding:3px 0;border-bottom:1px solid var(--bord,#eee);"><b>' + escHtml(x.date.slice(0, 16).replace('T', ' ')) + '</b> · ' + escHtml(x.acteur || '—') + ' · ' + escHtml(x.description) + (x.motif ? ' <i>(' + escHtml(x.motif) + ')</i>' : '') + '</div>'; }).join('') + '</div></div>';
   host.innerHTML = h;
 }
@@ -59922,6 +59923,52 @@ async function fcRefuserUI(mid, lid) {
   var el = prompt('Éléments à corriger (obligatoire) :'); if (!el) return;
   var de = prompt('Délai de correction (AAAA-MM-JJ, facultatif) :') || '';
   fcMsg(await fcRefuserLivrable(mid, lid, { motif: mo, elements: el, delai: de }), 'Livrable refusé.'); fcRenderIntervenants();
+}
+
+/* Messagerie de mission (P4) : un fil en texte seul entre le promoteur et l'intervenant, stocké dans la mission.
+   Le portail écrit côté SQL (fc_intervenant_envoyer_message) ; mêmes limites que lui. */
+var FC_MESSAGE_MAX = 2000, FC_MESSAGES_MAX = 500;
+function fcMessagesMission(m) { return Array.isArray(m && m.messages) ? m.messages : []; }
+function fcMessagesNonLus(m) { return fcMessagesMission(m).filter(function(x){ return x.de === 'intervenant' && !x.lu_le; }).length; }
+async function fcEnvoyerMessageMission(missionId, texte) {
+  var m = fcMission(missionId);
+  if (!m) return { ok: false, erreur: 'Mission introuvable.' };
+  if (m.statut === 'cloturee') return { ok: false, erreur: 'Mission clôturée : la messagerie est en lecture seule.' };
+  if (m.statut === 'brouillon' || m.statut === 'annulee') return { ok: false, erreur: "La mission n'est pas partagée avec l'intervenant." };
+  var t = String(texte || '').trim();
+  if (!t) return { ok: false, erreur: 'Écrivez un message.' };
+  if (t.length > FC_MESSAGE_MAX) return { ok: false, erreur: 'Message trop long (' + FC_MESSAGE_MAX + ' caractères au plus).' };
+  if (fcMessagesMission(m).length >= FC_MESSAGES_MAX) return { ok: false, erreur: 'Limite de messages atteinte pour cette mission.' };
+  var msg = { id: uid(), date: new Date().toISOString(), de: 'promoteur', auteur: fcActeur().nom, texte: t };
+  m.messages = fcMessagesMission(m).concat([msg]);
+  await fcSauverMission(m);
+  await fcEvenementMission(m, 'message_promoteur', m.reference + ' : message à ' + fcNomIntervenant(m.intervenant_id), { source: 'promoteur', source_ref: msg.id });
+  return { ok: true, message: msg };
+}
+/* Lecture par le personnel : marque lus les messages de l'intervenant. */
+async function fcMarquerMessagesLus(missionId) {
+  var m = fcMission(missionId);
+  if (!m) return { ok: false, erreur: 'Mission introuvable.' };
+  var maintenant = new Date().toISOString(), n = 0;
+  fcMessagesMission(m).forEach(function(x){ if (x.de === 'intervenant' && !x.lu_le) { x.lu_le = maintenant; n++; } });
+  if (n) await fcSauverMission(m);
+  return { ok: true, marques: n };
+}
+function fcHtmlMessagerie(m) {
+  var ms = fcMessagesMission(m), nl = fcMessagesNonLus(m), ouvert = ['brouillon', 'annulee', 'cloturee'].indexOf(m.statut) === -1;
+  return '<div class="card-title" style="margin-top:12px;">💬 Messagerie' + (nl ? ' <span style="background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;">' + nl + ' nouveau(x)</span>' : '') + '</div>'
+    + '<div style="max-height:220px;overflow:auto;font-size:12px;margin-bottom:6px;">' + (ms.length ? ms.map(function(x){
+      var moi = x.de === 'promoteur';
+      return '<div style="padding:4px 8px;margin:3px 0;border-radius:8px;background:' + (moi ? 'rgba(184,115,51,.12)' : 'rgba(0,0,0,.05)') + ';"><b>' + escHtml(moi ? (x.auteur || 'Promoteur') : (x.auteur || fcNomIntervenant(m.intervenant_id))) + '</b> · <span style="color:var(--dim);">' + escHtml(String(x.date || '').replace('T', ' ').slice(0, 16)) + '</span>'
+        + (moi && x.lu_le ? ' <span style="color:var(--dim);">· lu</span>' : '') + '<div style="white-space:pre-wrap;">' + escHtml(x.texte) + '</div></div>';
+    }).join('') : '<i>Aucun message.</i>') + '</div>'
+    + (ouvert ? '<textarea class="form-control" id="fi-msg-txt" maxlength="' + FC_MESSAGE_MAX + '" rows="2" placeholder="Écrire à l\'intervenant"></textarea>'
+      + '<button class="btn btn-primary btn-sm" style="margin-top:4px;" onclick="fcMessageUI(\'' + m.id + '\')">Envoyer</button>'
+      : '<i style="color:var(--dim);">Lecture seule.</i>');
+}
+async function fcMessageUI(id) {
+  var el = document.getElementById('fi-msg-txt'), r = await fcEnvoyerMessageMission(id, el ? el.value : '');
+  if (fcMsg(r, 'Message envoyé.')) fcRenderMissionDetail(id);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -60150,7 +60197,7 @@ async function fcRetirerUI(pubId) {
   fcMsg(await fcRetirerPublication(pubId, m), 'Publication retirée.'); fcRender();
 }
 fcProtegerMutations(['fcOuvrirDossier', 'fcChangerStatutEtape', 'fcAjouterJustificatif', 'fcDefinirIssue', 'fcCorrigerEtape', 'fcEnregistrerIntervenant', 'fcCreerMission',
-  'fcChangerStatutMission', 'fcSoumettreLivrable', 'fcValiderLivrable', 'fcRefuserLivrable', 'fcPublierInformation', 'fcRetirerPublication', 'fcCreerDemande', 'fcRepondreDemande', 'fcChangerStatutDemande', 'fcGenererAccesIntervenant', 'fcRevoquerAccesIntervenant']);
+  'fcChangerStatutMission', 'fcSoumettreLivrable', 'fcValiderLivrable', 'fcRefuserLivrable', 'fcPublierInformation', 'fcRetirerPublication', 'fcCreerDemande', 'fcRepondreDemande', 'fcChangerStatutDemande', 'fcGenererAccesIntervenant', 'fcRevoquerAccesIntervenant', 'fcEnvoyerMessageMission', 'fcMarquerMessagesLus']);
 
 /* ══════════════════════════════════════════════════════════════════════════
    FONCIER CONNECT — phase 4 : notifications, échéances, relances
@@ -60277,6 +60324,12 @@ function fcAdminsEscalade() {
   if (id) { var r = fcUserRecipient(id); return r ? [r] : []; }
   return (DATA.users || []).filter(function(u){ return u.role === 'admin' && u.statut !== 'inactif'; }).map(function(u){ return fcUserRecipient(u.id); });
 }
+/* « Tout le service Foncier » : le service foncier et les administrateurs, plus les personnes désignées. */
+function fcUsersFoncier(extra) {
+  var ids = (extra || []).slice();
+  (DATA.users || []).forEach(function(u){ if (u && (u.role === 'service_foncier' || u.role === 'admin')) ids.push(u.id); });
+  return ids.filter(function(x, i){ return x && ids.indexOf(x) === i; });
+}
 async function fcNotifierUsers(ids, base, evenement) {
   var vus = {}, total = 0, acteur = evenement && evenement.acteur_id;
   for (var i = 0; i < ids.length; i++) {
@@ -60331,6 +60384,10 @@ async function fcNotifierEvenement(d, e) {
       else if (e.nouveau === 'attente_informations' && e.source === 'prestataire') total += await fcNotifierUsers([m.responsable_validation_id], base('Informations demandées par un intervenant', m.reference + '\n' + e.description + (e.motif ? '\nDemande : ' + e.motif : '')), e);
       else if (['validee', 'cloturee', 'annulee'].indexOf(e.nouveau) !== -1) total += (await externe('Mission ' + (FC_STATUTS_MISSION[e.nouveau] || '').toLowerCase(), 'Mission ' + m.reference + ' : ' + (FC_STATUTS_MISSION[e.nouveau] || ''))).creees.length;
       break;
+    case 'message_intervenant':
+      if (m) total += await fcNotifierUsers(fcUsersFoncier([m.responsable_validation_id, d.responsable_id]), base('Nouveau message d\'un intervenant', m.reference + ' — ' + (interv ? interv.nom_organisation : 'intervenant') + '\n' + (e.motif || '')), e);
+      break;
+    case 'message_promoteur': if (m) total += (await externe('Nouveau message du promoteur', 'Mission ' + m.reference + ' : un nouveau message vous attend dans votre espace intervenant.')).creees.length; break;
     case 'livrable_depose': if (m) total += await fcNotifierUsers([m.responsable_validation_id], base('Livrable déposé à vérifier', ref + '\n' + e.description), e); break;
     case 'livrable_refuse': if (m) total += (await externe('Livrable à corriger', 'Mission ' + m.reference + '\n' + e.description + '\nMotif : ' + (e.motif || '—'))).creees.length; break;
     case 'livrable_valide': if (m) total += (await externe('Livrable validé', 'Mission ' + m.reference + '\n' + e.description)).creees.length; break;
