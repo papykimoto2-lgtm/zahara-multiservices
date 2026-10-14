@@ -5978,7 +5978,12 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
         </div>
 
-        <div class="card"><div class="table-wrap"><table>
+        <div class="card">
+          <div class="filters-bar" style="margin-bottom:8px;align-items:center;">
+            <input type="search" id="val-search" class="form-control" style="max-width:380px;" placeholder="🔍 Rechercher : type, objet, demandeur, date, montant, statut…" autocomplete="off" aria-label="Rechercher dans le circuit de validation" oninput="valSearchChange(this.value)">
+            <span id="val-search-count" style="font-size:12px;color:var(--blanc-dim);"></span>
+          </div>
+          <div class="table-wrap"><table>
           <thead><tr><th>Type</th><th>Objet</th><th style="text-align:right;">Montant</th><th>Demandeur</th><th>Date</th><th>Statut</th><th></th></tr></thead>
           <tbody id="tbody-validations"></tbody>
         </table></div></div>
@@ -112603,6 +112608,23 @@ async function submitBC(id){
 var valFilter='en_attente';
 function valSetFilter(fl){ valFilter=fl; document.querySelectorAll('#val-filter-tabs .tab-btn').forEach(function(b){ b.classList.toggle('active', (b.getAttribute('onclick')||'').indexOf("'"+fl+"'")!==-1); }); renderValidations(); }
 function valReject(id){ var m=prompt('Motif du rejet ?',''); if(m===null)return; valDecide(id,'rejete',m||''); }
+/* Recherche multicritère : tous les mots saisis doivent apparaître (type, objet, demandeur, valideur, motif, date, montant, statut),
+   sans tenir compte des accents ni de la casse ; le montant se cherche avec ou sans espaces. */
+var valSearch='', _valSearchTimer=null;
+function valNorm(t){ return String(t==null?'':t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
+function valCorrespond(v, termes){
+  if(!termes.length) return true;
+  var st={en_attente:'en attente',valide:'valide validee',rejete:'rejete rejetee',annule:'annule validation annulee'}[v.statut]||v.statut;
+  var m=Math.round(v.montant||0), meta=v.meta||{};
+  var foin=valNorm([valTypeLabel(v.type), v.libelle, v.demandeur, v.valideur, v.motif, v.date_demande, v.date_decision, st, m, fmtF(m), String(m).replace(/\B(?=(\d{3})+(?!\d))/g,' '), meta.chantier||'' ].join(' '));
+  var foinSansEspace=foin.replace(/[\s\u00a0\u202f]/g,'');
+  return termes.every(function(t){ return foin.indexOf(t)!==-1 || foinSansEspace.indexOf(t.replace(/[\s\u00a0\u202f]/g,''))!==-1; });
+}
+function valSearchChange(txt){
+  valSearch=String(txt||'');
+  clearTimeout(_valSearchTimer);
+  _valSearchTimer=setTimeout(function(){ if(typeof renderValidations==='function') renderValidations(); }, 150);
+}
 function renderValidations(){
   var all=(DATA.validations||[]);
   var enAtt=all.filter(function(v){return v.statut==='en_attente';});
@@ -112614,10 +112636,14 @@ function renderValidations(){
     {l:'Montant en attente',v:fmtF(Math.round(enAtt.reduce(function(s,v){return s+(v.montant||0);},0)))+' F',i:'💰',c:'kpi-blue'},
   ].map(function(k){return '<div class="kpi-card '+(k.c||'')+'"><div class="kpi-icon">'+k.i+'</div><div class="kpi-value">'+k.v+'</div><div class="kpi-label">'+k.l+'</div></div>';}).join(''); }
   var list = valFilter==='en_attente'?enAtt:all.filter(function(v){return v.statut!=='en_attente';});
+  var termes = valNorm(valSearch).split(/\s+/).filter(Boolean), totalListe = list.length;
+  if(termes.length) list = list.filter(function(v){ return valCorrespond(v, termes); });
+  var cpt = document.getElementById('val-search-count');
+  if(cpt) cpt.textContent = termes.length ? (list.length+' / '+totalListe+' résultat(s)') : '';
   var canDecide=(typeof hasRole!=='function')||hasRole('admin')||hasRole('manager');
   var tb=document.getElementById('tbody-validations');
   if(tb){
-    if(!list.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:20px;">Aucun élément.</td></tr>'; }
+    if(!list.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:20px;">'+(termes.length?'Aucun résultat pour cette recherche.':'Aucun élément.')+'</td></tr>'; }
     else tb.innerHTML=list.slice().sort(function(a,b){return (b.date_demande||'').localeCompare(a.date_demande||'');}).map(function(v){
       var acts='';
       if(v.statut==='en_attente'){
