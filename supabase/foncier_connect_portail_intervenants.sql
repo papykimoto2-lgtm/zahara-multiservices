@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- Foncier Connect — portail intervenants (P1-P3) : fc_vue_intervenant(),
--- accepter, démarrer, déposer un livrable, soumettre, demander des informations, reprendre
+-- Foncier Connect — portail intervenants (P1-P4) : fc_vue_intervenant(),
+-- accepter, démarrer, déposer un livrable, soumettre, demander des informations, reprendre, messagerie
 -- À exécuter sur le projet Supabase de Zahara ET sur celui de Menco, après
 -- foncier_connect.sql. Idempotent.
 --
@@ -142,7 +142,15 @@ begin
                                              else 'null'::jsonb end) order by ver.ord), '[]'::jsonb)
                      from jsonb_array_elements(coalesce(l.val -> 'versions', '[]'::jsonb)) with ordinality as ver(val, ord))
                  ) order by l.ord), '[]'::jsonb)
-          from jsonb_array_elements(coalesce(m.data -> 'livrables', '[]'::jsonb)) with ordinality as l(val, ord))
+          from jsonb_array_elements(coalesce(m.data -> 'livrables', '[]'::jsonb)) with ordinality as l(val, ord)),
+        -- Messagerie de la mission : texte seul ; le personnel est toujours présenté comme « Promoteur ».
+        'messages', (
+          select coalesce(jsonb_agg(jsonb_build_object(
+                   'id', x.val ->> 'id', 'date', x.val ->> 'date', 'de', x.val ->> 'de',
+                   'auteur', case when x.val ->> 'de' = 'intervenant' then coalesce(x.val ->> 'auteur', '') else 'Promoteur' end,
+                   'texte', x.val ->> 'texte', 'lu', (x.val ->> 'lu_le') is not null)
+                 order by x.val ->> 'date', x.val ->> 'id'), '[]'::jsonb)
+          from jsonb_array_elements(case when jsonb_typeof(m.data -> 'messages') = 'array' then m.data -> 'messages' else '[]'::jsonb end) as x(val))
       ) order by m.data ->> 'echeance', m.data ->> 'reference'), '[]'::jsonb)
     from public.pi_missions_foncieres m
     join public.pi_dossiers_fonciers d on d.id = m.data ->> 'dossier_id'
@@ -375,6 +383,136 @@ begin
 end
 $fn$;
 
+-- ── Messagerie : un fil par mission, texte seul ────────────────────────────
+-- Écriture par ajout à un chemin précis, avec comparaison du nombre de messages : un double clic ne
+-- crée pas deux messages. Mission clôturée : lecture seule. 500 messages au plus par mission,
+-- 10 messages par minute au plus par intervenant.
+create or replace function public.fc_intervenant_envoyer_message(p_mission text, p_texte text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $fn$
+declare
+  v_c     jsonb := public.fc__intervenant_courant();
+  v_m     jsonb;
+  v_txt   text := btrim(coalesce(p_texte, ''));
+  v_msgs  jsonb;
+  v_nb    int;
+  v_n     int;
+  v_now   timestamptz := now();
+  v_iso   text := to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+  v_mid   text := replace(gen_random_uuid()::text, '-', '');
+  v_eid   text := replace(gen_random_uuid()::text, '-', '');
+  v_recent int;
+begin
+  if v_c is null then
+    return jsonb_build_object('ok', false, 'erreur', 'Accès au portail non valide : reconnectez-vous.');
+  end if;
+  if p_mission is null or length(p_mission) > 64 then
+    return jsonb_build_object('ok', false, 'erreur', 'Mission introuvable.');
+  end if;
+
+  v_m := (select data from public.pi_missions_foncieres
+          where id = p_mission and data ->> 'intervenant_id' = v_c ->> 'id');
+  if v_m is null
+     or coalesce(v_m ->> 'statut', '') in ('brouillon', 'annulee')
+     or not exists (select 1 from public.pi_dossiers_fonciers d where d.id = v_m ->> 'dossier_id')
+  then
+    return jsonb_build_object('ok', false, 'erreur', 'Mission introuvable.');
+  end if;
+  if (v_m ->> 'statut') = 'cloturee' then
+    return jsonb_build_object('ok', false, 'erreur', 'Mission clôturée : la messagerie est en lecture seule.');
+  end if;
+  if v_txt = '' then
+    return jsonb_build_object('ok', false, 'erreur', 'Écrivez un message.');
+  end if;
+  if length(v_txt) > 2000 then
+    return jsonb_build_object('ok', false, 'erreur', 'Message trop long (2000 caractères au plus).');
+  end if;
+
+  v_msgs := case when jsonb_typeof(v_m -> 'messages') = 'array' then v_m -> 'messages' else '[]'::jsonb end;
+  v_nb := jsonb_array_length(v_msgs);
+  if v_nb >= 500 then
+    return jsonb_build_object('ok', false, 'erreur', 'Limite de messages atteinte pour cette mission.');
+  end if;
+
+  -- Antispam : 10 messages par minute et par intervenant, toutes missions confondues.
+  v_recent := (select count(*) from public.pi_missions_foncieres mm,
+                      jsonb_array_elements(case when jsonb_typeof(mm.data -> 'messages') = 'array' then mm.data -> 'messages' else '[]'::jsonb end) x
+               where mm.data ->> 'intervenant_id' = v_c ->> 'id'
+                 and x ->> 'de' = 'intervenant'
+                 and (x ->> 'date') > to_char((v_now - interval '1 minute') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
+  if v_recent >= 10 then
+    return jsonb_build_object('ok', false, 'erreur', 'Trop de messages : patientez une minute.');
+  end if;
+
+  update public.pi_missions_foncieres
+     set data = jsonb_set(
+                  jsonb_set(data, '{messages}',
+                            case when jsonb_typeof(data -> 'messages') = 'array' then data -> 'messages' else '[]'::jsonb end
+                            || jsonb_build_array(jsonb_build_object('id', v_mid, 'date', v_iso, 'de', 'intervenant',
+                                                                    'auteur', v_c ->> 'nom', 'texte', v_txt))),
+                  '{_modifie}', to_jsonb(v_iso)),
+         updated_at = v_now
+   where id = p_mission
+     and data ->> 'intervenant_id' = v_c ->> 'id'
+     and data ->> 'statut' = v_m ->> 'statut'
+     and jsonb_array_length(case when jsonb_typeof(data -> 'messages') = 'array' then data -> 'messages' else '[]'::jsonb end) = v_nb;
+  get diagnostics v_n = row_count;
+  if v_n = 0 then
+    return jsonb_build_object('ok', false, 'erreur', 'La mission vient d''être modifiée : réessayez.');
+  end if;
+
+  insert into public.pi_evenements_fonciers(id, data, updated_at)
+  values (
+    v_eid,
+    jsonb_build_object(
+      'id', v_eid, 'dossier_id', v_m ->> 'dossier_id', 'etape_code', coalesce(v_m ->> 'etape_code', ''),
+      'type', 'message_intervenant',
+      'description', (v_m ->> 'reference') || ' : message de ' || (v_c ->> 'nom'),
+      'ancien', '', 'nouveau', '', 'source', 'prestataire', 'source_ref', v_mid,
+      'motif', left(v_txt, 200), 'acteur', v_c ->> 'nom', 'acteur_id', v_c ->> 'id', 'acteur_role', 'intervenant',
+      'date', v_iso, 'mission_id', p_mission),
+    v_now);
+  return jsonb_build_object('ok', true, 'id', v_mid);
+end
+$fn$;
+
+-- L'intervenant marque lus les messages du promoteur (sans toucher à _modifie : pas de faux conflit côté ERP).
+create or replace function public.fc_intervenant_marquer_lu(p_mission text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $fn$
+declare
+  v_c   jsonb := public.fc__intervenant_courant();
+  v_iso text := to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+  v_n   int;
+begin
+  if v_c is null then
+    return jsonb_build_object('ok', false, 'erreur', 'Accès au portail non valide : reconnectez-vous.');
+  end if;
+  if p_mission is null or length(p_mission) > 64 then
+    return jsonb_build_object('ok', false, 'erreur', 'Mission introuvable.');
+  end if;
+  update public.pi_missions_foncieres
+     set data = jsonb_set(data, '{messages}', (
+           select jsonb_agg(case when x.val ->> 'de' = 'promoteur' and x.val ->> 'lu_le' is null
+                                 then x.val || jsonb_build_object('lu_le', v_iso) else x.val end order by x.ord)
+           from jsonb_array_elements(data -> 'messages') with ordinality as x(val, ord)))
+   where id = p_mission
+     and data ->> 'intervenant_id' = v_c ->> 'id'
+     and coalesce(data ->> 'statut', '') not in ('brouillon', 'annulee')
+     and jsonb_typeof(data -> 'messages') = 'array'
+     and exists (select 1 from jsonb_array_elements(data -> 'messages') y
+                 where y ->> 'de' = 'promoteur' and y ->> 'lu_le' is null);
+  get diagnostics v_n = row_count;
+  return jsonb_build_object('ok', true, 'marques', v_n);
+end
+$fn$;
+
 -- ── Garde-fou : une écriture de l'ERP ne peut pas faire disparaître une version ──
 -- Une mission est une seule ligne, réécrite en entier par l'ERP à chaque modification. Un poste resté
 -- hors ligne peut donc renvoyer une copie qui ignore un dépôt fait entre-temps depuis le portail.
@@ -413,6 +551,20 @@ begin
   exception when others then
     null;   -- jamais bloquant
   end;
+  -- Messagerie : même principe, par identifiant de message (la ligne nouvelle prévaut en cas de doublon).
+  begin
+    if jsonb_typeof(old.data -> 'messages') = 'array' and jsonb_array_length(old.data -> 'messages') > 0 then
+      new.data := jsonb_set(new.data, '{messages}', (
+        select coalesce(jsonb_agg(x.v order by x.v ->> 'date', x.v ->> 'id'), '[]'::jsonb)
+        from (select distinct on (u.v ->> 'id') u.v
+              from (select e.v, 1 as pr from jsonb_array_elements(case when jsonb_typeof(new.data -> 'messages') = 'array' then new.data -> 'messages' else '[]'::jsonb end) as e(v)
+                    union all
+                    select e.v, 2 as pr from jsonb_array_elements(old.data -> 'messages') as e(v)) u
+              order by u.v ->> 'id', u.pr) x));
+    end if;
+  exception when others then
+    null;
+  end;
   return new;
 end
 $fn$;
@@ -430,7 +582,8 @@ declare f text;
 begin
   foreach f in array array['fc_intervenant_accepter(text)', 'fc_intervenant_demarrer(text)', 'fc_intervenant_soumettre(text)',
                            'fc_intervenant_demander_info(text, text)', 'fc_intervenant_reprendre(text)',
-                           'fc_intervenant_deposer(text, text, text, text)'] loop
+                           'fc_intervenant_deposer(text, text, text, text)',
+                           'fc_intervenant_envoyer_message(text, text)', 'fc_intervenant_marquer_lu(text)'] loop
     execute 'revoke all on function public.' || f || ' from public, anon';
     execute 'grant execute on function public.' || f || ' to authenticated';
   end loop;

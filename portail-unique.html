@@ -1451,7 +1451,36 @@
     INT.occupe=null; INT.ouverte=missionId;
     await chargerIntervenant();
   }
-  function intOuvrir(id){ INT.ouverte=(INT.ouverte===id)?null:id; INT.msg=null; rendreIntervenant(); }
+  function intOuvrir(id){
+    INT.ouverte=(INT.ouverte===id)?null:id; INT.msg=null; rendreIntervenant();
+    var m=INT.ouverte&&_intMission(INT.ouverte);
+    if(m&&_intNonLus(m)){   /* l'ouverture vaut lecture ; l'écran garde la mise en évidence jusqu'au prochain affichage */
+      var mid=m.id;
+      _intRpc('fc_intervenant_marquer_lu',{ p_mission:String(mid) }).then(function(){ (m.messages||[]).forEach(function(x){ if(x.de==='promoteur') x.lu=true; }); }).catch(function(){});
+    }
+  }
+  function _intNonLus(m){ return (m.messages||[]).filter(function(x){ return x.de==='promoteur'&&!x.lu; }).length; }
+  async function intMessage(missionId){
+    if(INT.occupe) return;
+    var el=_intChamp(missionId,'msg'), t=el?el.value.trim():'';
+    if(!t){ INT.msg={ t:'err', m:'Écrivez un message.' }; rendreIntervenant(); return; }
+    if(t.length>2000){ INT.msg={ t:'err', m:'Message trop long (2000 caractères au plus).' }; rendreIntervenant(); return; }
+    await _intExec(missionId, 'fc_intervenant_envoyer_message', { p_mission:String(missionId), p_texte:t }, 'Message envoyé.');
+  }
+  function _intMessagerie(m){
+    var ms=m.messages||[], ferme=(m.statut==='cloturee');
+    var h='<div style="margin-top:14px;"><strong style="font-size:.85rem;">💬 Messagerie</strong>';
+    h+='<div style="max-height:260px;overflow:auto;margin-top:6px;">'+(ms.length?ms.map(function(x){
+      var moi=x.de==='intervenant', nouveau=!moi&&!x.lu;
+      return '<div style="margin:4px 0;padding:6px 10px;border-radius:12px;font-size:.84rem;'+(moi?'background:#e0f2fe;margin-left:24px;':'background:#f1f5f9;margin-right:24px;')+(nouveau?'border:1px solid #f59e0b;':'')+'">'
+        +'<div style="font-size:.74rem;color:#6b7f95;"><strong>'+esc(moi?'Vous':(x.auteur||'Promoteur'))+'</strong> · '+esc(String(x.date||'').replace('T',' ').slice(0,16))+(nouveau?' <span class="pill p-or">nouveau</span>':'')+'</div>'
+        +'<div style="white-space:pre-wrap;">'+esc(x.texte)+'</div></div>';
+    }).join(''):'<div style="font-size:.8rem;color:#6b7f95;">Aucun message.</div>')+'</div>';
+    h+=ferme?'<div style="font-size:.78rem;color:#6b7f95;margin-top:6px;">Mission clôturée : lecture seule.</div>'
+      :'<textarea data-champ="msg" data-id="'+esc(m.id)+'" maxlength="2000" rows="2" style="width:100%;margin-top:6px;" placeholder="Écrire au promoteur"></textarea>'
+       +'<button class="highlight-btn" style="margin-top:6px;" '+(INT.occupe?'disabled':'')+' data-id="'+esc(m.id)+'" onclick="intMessage(this.dataset.id)">Envoyer</button>';
+    return h+'</div>';
+  }
   function logoutIntervenant(){
     INT.id=null; INT.nom=''; INT.missions=[]; INT.ouverte=null; INT.occupe=null; INT.msg=null; INT.erreur='';
     _clearToken(); try{ sessionStorage.removeItem('pp_int_nom'); }catch(e){}
@@ -1496,7 +1525,8 @@
         +(peutDeposer?'<div style="margin-top:8px;"><input type="text" data-champ="ref'+li+'" data-id="'+esc(m.id)+'" maxlength="300" style="width:100%;" placeholder="Référence (nom du fichier, lien, n° de dépôt)">'
           +'<textarea data-champ="note'+li+'" data-id="'+esc(m.id)+'" maxlength="2000" rows="2" style="width:100%;margin-top:4px;" placeholder="Note (facultatif)"></textarea>'
           +'<button class="highlight-btn" style="margin-top:6px;" '+(INT.occupe?'disabled':'')+' data-id="'+esc(m.id)+'" onclick="intDeposer(this.dataset.id,'+li+')">Déposer cette version</button></div>':'')+'</div>';
-    }).join('')+'</div></div>';
+    }).join('')+'</div>';
+    h+=_intMessagerie(m)+'</div>';
     return h;
   }
   function rendreIntervenant(){
@@ -1515,7 +1545,7 @@
       var ouvert=INT.ouverte===m.id, retard=_intEnRetard(m), d=m.dossier||{};
       return '<div class="card"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start;">'
         +'<div><strong>'+esc(m.reference)+'</strong> — '+esc(m.titre)+'<div style="font-size:.78rem;color:#6b7f95;margin-top:2px;">Dossier '+esc(d.reference||'—')+(d.parcelle?' · '+esc(d.parcelle):'')+'</div></div>'
-        +'<span class="pill '+(INT_COULEUR[m.statut]||'p-gris')+'">'+esc(INT_STATUTS[m.statut]||m.statut)+'</span></div>'
+        +'<span class="pill '+(INT_COULEUR[m.statut]||'p-gris')+'">'+esc(INT_STATUTS[m.statut]||m.statut)+'</span>'+(!ouvert&&_intNonLus(m)?' <span class="pill p-rouge">💬 '+_intNonLus(m)+' nouveau(x)</span>':'')+'</div>'
         +'<div style="font-size:.82rem;margin-top:8px;">Échéance : <strong>'+esc(dshort(m.echeance))+'</strong>'+(retard?' <span class="pill p-rouge">En retard</span>':'')+'</div>'
         +'<button class="highlight-btn" style="margin-top:8px;padding:8px 16px;background:#4b6a8b;" data-id="'+esc(m.id)+'" onclick="intOuvrir(this.dataset.id)">'+(ouvert?'Fermer':'Ouvrir')+'</button>'
         +(ouvert?_intDetail(m):'')+'</div>';
