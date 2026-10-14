@@ -24748,6 +24748,7 @@ var DATA = {
   demandes_fonciers: [],
   notifications_foncieres: [],
   pieces_foncieres: [],
+  groupes_fonciers: [],
   /* v147 — Circuit budgétaire complet : budget prévisionnel annuel par
      division/compte, validé par le DG, décrémenté par les Demandes d'Achat
      validées, avec transferts de ligne à ligne */
@@ -24759,7 +24760,8 @@ var DATA = {
    INDEXEDDB
 ────────────────────────────────────────────────────── */
 var DB_NAME = 'ImmoSuiteDB';
-var DB_VERSION = 159; /* v159: store 'pieces_foncieres' — Foncier Connect, pièces jointes par étape (promoteur et souscripteur). Local uniquement : pièces d'identité et titres, jamais synchronisées. Migration additive.
+var DB_VERSION = 160; /* v160: store 'groupes_fonciers' — groupes de mutation (plusieurs dossiers individuels traités ensemble). Local uniquement. Migration additive.
+                          v159: v159: store 'pieces_foncieres' — Foncier Connect, pièces jointes par étape (promoteur et souscripteur). Local uniquement : pièces d'identité et titres, jamais synchronisées. Migration additive.
                           v158: v158: store 'notifications_foncieres' — Foncier Connect phase 4, notifications et relances (local, sans table Supabase). Migration additive.
                           v157: stores 'publications_foncieres' et 'demandes_fonciers' — Foncier Connect phase 3, information du souscripteur (locaux, sans table Supabase). Migration additive.
                           v156: stores 'intervenants_fonciers' et 'missions_foncieres' — Foncier Connect phase 2 (locaux, sans table Supabase). Migration additive.
@@ -24921,7 +24923,7 @@ var ALL_STORES = [
   'demandes_reappro',
   /* v154 — Bordereaux de transmission des pièces de caisse au Gérant (visa final) */
   'bordereaux_caisse',
-  'dossiers_fonciers','evenements_fonciers','intervenants_fonciers','missions_foncieres','publications_foncieres','demandes_fonciers','notifications_foncieres','pieces_foncieres',
+  'dossiers_fonciers','evenements_fonciers','intervenants_fonciers','missions_foncieres','publications_foncieres','demandes_fonciers','notifications_foncieres','pieces_foncieres','groupes_fonciers',
   /* v147 — Circuit budgétaire : DA + transferts */
   'fiches_engagement_depense', 'transferts_budgetaires',
   /* [FIX] Demandes de versement du portail souscripteur — n'était même pas
@@ -25348,7 +25350,7 @@ async function loadAllData() {
    bandeau discret pour un profil Admin uniquement — jamais pour les
    autres rôles, pour ne pas faire porter une dette technique à un
    utilisateur qui ne peut rien y faire. */
-var SANIX_STORES_LOCAL_UNIQUEMENT = ['conflits_sync','dossiers_fonciers','evenements_fonciers','intervenants_fonciers','missions_foncieres','publications_foncieres','demandes_fonciers','notifications_foncieres','pieces_foncieres']; // écarts connus et voulus — jamais synchronisés au cloud par conception
+var SANIX_STORES_LOCAL_UNIQUEMENT = ['conflits_sync','dossiers_fonciers','evenements_fonciers','intervenants_fonciers','missions_foncieres','publications_foncieres','demandes_fonciers','notifications_foncieres','pieces_foncieres','groupes_fonciers']; // écarts connus et voulus — jamais synchronisés au cloud par conception
 function sanixAutoDiagnostic(){
   try{
     var mappes = {}; SUPA_STORE_MAP.forEach(function(p){ mappes[p[1]]=true; });
@@ -50531,7 +50533,7 @@ var STORE_MODULE = {
   af_operations:'Acquisition & Amenagement Foncier',
   af_agents:'Acquisition & Amenagement Foncier',
   af_relances:'Acquisition & Amenagement Foncier',
-  parcelles:'Foncier', terrains:'Foncier', dossiers_fonciers:'Foncier', evenements_fonciers:'Foncier', intervenants_fonciers:'Foncier', missions_foncieres:'Foncier', publications_foncieres:'Foncier', demandes_fonciers:'Foncier', notifications_foncieres:'Foncier', pieces_foncieres:'Foncier',
+  parcelles:'Foncier', terrains:'Foncier', dossiers_fonciers:'Foncier', evenements_fonciers:'Foncier', intervenants_fonciers:'Foncier', missions_foncieres:'Foncier', publications_foncieres:'Foncier', demandes_fonciers:'Foncier', notifications_foncieres:'Foncier', pieces_foncieres:'Foncier', groupes_fonciers:'Foncier',
   /* [FIX] 'Conges' ne correspond à AUCUNE entrée de ALL_MODULES (le module
      réel s'appelle 'Conges RH') — userPeut() traite donc toute écriture sur
      conges_rh comme "non restreinte" quel que soit le droit configuré :
@@ -61375,7 +61377,8 @@ function fcBandeauNiveau(d) {
   return '<div style="background:var(--card2,#f5f1ea);border-left:4px solid var(--or);padding:8px 10px;margin-bottom:8px;font-size:12px;border-radius:6px;"><b>Titre individuel</b> — lot(s) ' + escHtml(lots.join(', ')) + ' · souscripteur ' + escHtml(cl)
     + (g ? ' · <a href="#" onclick="fcAllerDossier(\'' + g.id + '\');return false;">dossier global ' + escHtml(g.reference) + '</a>' : '')
     + '<br>Titre de l\'opération (titre mère) : ' + (tm.disponible ? '<b style="color:#2e7d4f;">disponible</b> — ' : '<b style="color:#c0392b;">non disponible</b> — ') + escHtml(tm.raison)
-    + (d.titre_mere_derogation ? '<br><b style="color:#c0392b;">Dossier ouvert par dérogation</b> : ' + escHtml(d.titre_mere_derogation.motif) : '') + '</div>';
+    + (d.titre_mere_derogation ? '<br><b style="color:#c0392b;">Dossier ouvert par dérogation</b> : ' + escHtml(d.titre_mere_derogation.motif) : '')
+    + (d.groupe_id && fcGroupe(d.groupe_id) && fcGroupe(d.groupe_id).statut !== 'dissous' ? '<br>Groupe de mutation : <b>' + escHtml(fcGroupe(d.groupe_id).reference) + '</b> — ' + escHtml(fcGroupe(d.groupe_id).libelle) + ' (' + fcGroupe(d.groupe_id).dossier_ids.length + ' dossiers)' : '') + '</div>';
 }
 function fcPanneauTitresIndividuels(d) {
   if (fcEstIndividuel(d)) return '';
@@ -61387,14 +61390,15 @@ function fcPanneauTitresIndividuels(d) {
     + '<div style="font-size:12px;margin-bottom:6px;">Titre mère : ' + (s.titre_mere.disponible ? '<b style="color:#2e7d4f;">disponible</b>' : '<b style="color:#c0392b;">non disponible</b>') + ' — ' + escHtml(s.titre_mere.raison) + '</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:8px;">' + fcKpi('Lots suivis', s.lots_suivis) + fcKpi('Titres remis', s.remis, '#2e7d4f') + fcKpi('En cours', s.en_cours, '#1565c0') + fcKpi('Bloqués', s.bloques, '#c0392b')
     + fcKpi('Sans dossier', s.sans_dossier, '#B87333') + fcKpi('Attendent le titre mère', s.attente_titre_mere, '#6a5acd') + '</div>';
-  h += '<div class="table-wrap"><table><thead><tr><th>Lot</th><th>Souscripteur</th><th>Dossier individuel</th><th>Étape courante</th><th></th></tr></thead><tbody>' + lots.map(function(x){
+  h += '<div class="table-wrap"><table><thead><tr><th></th><th>Lot</th><th>Souscripteur</th><th>Dossier individuel</th><th>Étape courante</th><th></th></tr></thead><tbody>' + lots.map(function(x){
     var e = x.dossier ? fcProchaineEtape(x.dossier) : null;
-    return '<tr><td>' + escHtml(fcLibelleLot(x.lot)) + '</td><td>' + escHtml(x.clients.map(function(c){ return c.nom || c.id; }).join(', ')) + '</td>'
+    var ck = x.dossier ? (x.dossier.groupe_id && fcGroupe(x.dossier.groupe_id) && fcGroupe(x.dossier.groupe_id).statut !== 'dissous' ? '<span title="Groupe ' + escHtml(fcGroupe(x.dossier.groupe_id).reference) + '" style="font-size:10px;color:#6a5acd;">' + escHtml(fcGroupe(x.dossier.groupe_id).reference) + '</span>' : (fcDossierOuvert(x.dossier) ? '<input type="checkbox" class="fc-ck-dos" value="' + x.dossier.id + '" title="Grouper ce dossier">' : '')) : '<input type="checkbox" class="fc-ck-lot" value="' + x.lot.id + '" title="Ouvrir un dossier groupé avec d\'autres lots du même souscripteur">';
+    return '<tr><td>' + ck + '</td><td>' + escHtml(fcLibelleLot(x.lot)) + '</td><td>' + escHtml(x.clients.map(function(c){ return c.nom || c.id; }).join(', ')) + '</td>'
       + '<td>' + (x.dossier ? '<b>' + escHtml(x.dossier.reference) + '</b> ' + (fcRemisTitre(x.dossier) ? '<span style="color:#2e7d4f;">titre remis</span>' : fcBadgeStatut(x.dossier.statut === 'ouvert' ? 'en_cours' : x.dossier.statut)) : '<span style="color:var(--dim);">—</span>') + '</td>'
       + '<td>' + (e ? escHtml(e.libelle) : '—') + '</td><td>' + (x.dossier ? '<button class="btn btn-secondary btn-sm" onclick="fcAllerDossier(\'' + x.dossier.id + '\')">Ouvrir</button>' : '<button class="btn btn-secondary btn-sm" onclick="fcOuvrirIndividuelUI(\'' + x.lot.id + '\')">Ouvrir le dossier</button>') + '</td></tr>'; }).join('')
-    + '</tbody></table></div>' + (s.sans_dossier ? '<div style="margin-top:8px;"><button class="btn btn-primary btn-sm" onclick="fcOuvrirEnLotUI(\'' + d.parcelle_id + '\')">Ouvrir tous les dossiers manquants (' + s.sans_dossier + ')</button></div>' : '')
+    + '</tbody></table></div>' + (s.sans_dossier ? '<div style="margin-top:8px;"><button class="btn btn-primary btn-sm" onclick="fcOuvrirEnLotUI(\'' + d.parcelle_id + '\')">Ouvrir tous les dossiers manquants (' + s.sans_dossier + ')</button> <button class="btn btn-secondary btn-sm" onclick="fcOuvrirGroupeSouscripteurUI(\'' + d.parcelle_id + '\')">Ouvrir un dossier groupé pour les lots cochés (même souscripteur)</button></div>' : '')
     + (sansSuivi ? '<div style="font-size:11px;color:var(--dim);margin-top:6px;">' + sansSuivi + ' lot(s) sans souscripteur ne sont pas suivis.</div>' : '') + '</div>';
-  return h;
+  return h + fcPanneauGroupes(d);
 }
 async function fcOuvrirIndividuelUI(lotId) {
   var r = await fcOuvrirDossierIndividuel({ lot_id: lotId });
@@ -61515,6 +61519,170 @@ async function fcEnregistrerModifUI(id) {
   var g = function(i){ return (document.getElementById(i) || {}).value; };
   var r = await fcModifierDossier(id, { responsable_id: g('fc-m-resp'), priorite: g('fc-m-prio'), date_cible: g('fc-m-cible'), observations: g('fc-m-obs') });
   if (fcMsg(r, r.inchange ? 'Aucun changement.' : 'Dossier modifié.')) { APP._fcEdit = null; fcRender(); }
+}
+
+
+/* ═══ Groupes de mutation ═══
+   Un notaire ou un géomètre-expert traite souvent plusieurs titres individuels en une fois. Le groupe relie des dossiers individuels d'une même
+   parcelle pour les piloter ensemble (action groupée sur une étape, justificatif commun, avancement), SANS les fusionner : chaque dossier garde
+   son souscripteur, ses pièces, son journal et ses justificatifs. Le groupe est interne : un souscripteur ne voit jamais le groupe ni les autres dossiers. */
+function fcGroupe(id) { return (DATA.groupes_fonciers || []).find(function(g){ return g.id === id; }) || null; }
+function fcDossiersDuGroupe(g) { return (g.dossier_ids || []).map(fcDossier).filter(Boolean); }
+function fcReferenceGroupe() {
+  var an = new Date().getFullYear(), max = 0, re = new RegExp('^GM-' + an + '-(\\d+)$');
+  (DATA.groupes_fonciers || []).forEach(function(g){ var m = String(g.reference || '').match(re); if (m) max = Math.max(max, parseInt(m[1], 10)); });
+  return 'GM-' + an + '-' + String(max + 1).padStart(3, '0');
+}
+function fcPeutGererGroupe(g) { return fcDossiersDuGroupe(g).every(fcPeutGererDossier) || fcEstAdmin(); }
+async function fcCreerGroupe(o) {
+  o = o || {};
+  var ids = (o.dossier_ids || []).filter(function(x, i, a){ return a.indexOf(x) === i; });
+  if (ids.length < 2) return { ok: false, erreur: 'Un groupe réunit au moins deux dossiers individuels.' };
+  var ds = ids.map(fcDossier);
+  if (ds.some(function(d){ return !d || !fcEstIndividuel(d); })) return { ok: false, erreur: 'Seuls des dossiers individuels peuvent être groupés.' };
+  if (ds.some(function(d){ return d.parcelle_id !== ds[0].parcelle_id; })) return { ok: false, erreur: "Tous les dossiers d'un groupe doivent appartenir à la même parcelle (opération)." };
+  var clos = ds.find(function(d){ return !fcDossierOuvert(d); }); if (clos) return { ok: false, erreur: 'Le dossier ' + clos.reference + ' est ' + clos.statut + '.' };
+  var deja = ds.find(function(d){ return d.groupe_id && fcGroupe(d.groupe_id) && fcGroupe(d.groupe_id).statut !== 'dissous'; }); if (deja) return { ok: false, erreur: 'Le dossier ' + deja.reference + ' appartient déjà à un groupe (' + fcGroupe(deja.groupe_id).reference + ').' };
+  if (!ds.every(fcPeutGererDossier) && !fcEstAdmin()) return { ok: false, erreur: 'Vous devez être responsable de tous les dossiers du groupe (ou administrateur).' };
+  if (!String(o.libelle || '').trim()) return { ok: false, erreur: 'Donnez un libellé au groupe (ex. « Mutation — lot de 12 titres, notaire X »).' };
+  var iv = o.intervenant_id ? fcIntervenant(o.intervenant_id) : null;
+  if (o.intervenant_id && (!iv || iv.statut_relation !== 'actif')) return { ok: false, erreur: 'Intervenant inconnu ou inactif.' };
+  var g = { id: uid(), reference: fcReferenceGroupe(), parcelle_id: ds[0].parcelle_id, libelle: String(o.libelle).trim(), intervenant_id: iv ? iv.id : '', date_cible: o.date_cible || '', dossier_ids: ids, statut: 'ouvert', created_at: fcAuj(), created_by: fcActeur().nom };
+  if (!DATA.groupes_fonciers) DATA.groupes_fonciers = [];
+  DATA.groupes_fonciers.push(g);
+  await fcDb('groupes_fonciers', g, { forceRole: true });
+  for (var i = 0; i < ds.length; i++) { ds[i].groupe_id = g.id; await fcSauver(ds[i]); await fcEvenement(ds[i], '', 'groupe_rattache', 'Rattaché au groupe de mutation ' + g.reference + ' — ' + g.libelle, { source: 'promoteur', source_ref: g.id }); }
+  return { ok: true, groupe: g };
+}
+async function fcAjouterAuGroupe(groupeId, dossierId) {
+  var g = fcGroupe(groupeId), d = fcDossier(dossierId);
+  if (!g || !d) return { ok: false, erreur: 'Groupe ou dossier introuvable.' };
+  if (g.statut === 'dissous') return { ok: false, erreur: 'Groupe dissous.' };
+  if (!fcEstIndividuel(d) || d.parcelle_id !== g.parcelle_id) return { ok: false, erreur: "Le dossier doit être un dossier individuel de la même parcelle." };
+  if (!fcDossierOuvert(d)) return { ok: false, erreur: 'Dossier ' + d.statut + '.' };
+  if (d.groupe_id && fcGroupe(d.groupe_id) && fcGroupe(d.groupe_id).statut !== 'dissous') return { ok: false, erreur: 'Ce dossier appartient déjà à un groupe (' + fcGroupe(d.groupe_id).reference + ').' };
+  if (!fcPeutGererDossier(d) && !fcEstAdmin()) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) peut le rattacher.' };
+  g.dossier_ids.push(d.id); d.groupe_id = g.id;
+  await fcDb('groupes_fonciers', g, { forceRole: true }); await fcSauver(d);
+  await fcEvenement(d, '', 'groupe_rattache', 'Rattaché au groupe de mutation ' + g.reference + ' — ' + g.libelle, { source: 'promoteur', source_ref: g.id });
+  return { ok: true };
+}
+async function fcRetirerDuGroupe(groupeId, dossierId, motif) {
+  var g = fcGroupe(groupeId), d = fcDossier(dossierId);
+  if (!g || !d || g.dossier_ids.indexOf(d.id) === -1) return { ok: false, erreur: 'Dossier absent de ce groupe.' };
+  if (!fcPeutGererDossier(d) && !fcEstAdmin()) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) peut le retirer.' };
+  if (!String(motif || '').trim()) return { ok: false, erreur: 'Le motif est obligatoire.' };
+  g.dossier_ids = g.dossier_ids.filter(function(x){ return x !== d.id; }); d.groupe_id = '';
+  if (g.dossier_ids.length < 2) g.statut = 'dissous';
+  await fcDb('groupes_fonciers', g, { forceRole: true }); await fcSauver(d);
+  await fcEvenement(d, '', 'groupe_retire', 'Retiré du groupe de mutation ' + g.reference + (g.statut === 'dissous' ? ' (groupe dissous : moins de deux dossiers)' : ''), { motif: String(motif).trim(), source_ref: g.id });
+  return { ok: true, dissous: g.statut === 'dissous' };
+}
+/* Action groupée : chaque dossier applique SA règle (justificatif exigé, titre mère, etc.). Les échecs sont rapportés par dossier, sans annuler les réussites. */
+async function fcAppliquerAuGroupe(groupeId, code, statut, o) {
+  o = o || {};
+  var g = fcGroupe(groupeId);
+  if (!g || g.statut === 'dissous') return { ok: false, erreur: 'Groupe introuvable ou dissous.' };
+  if (!fcPeutGererGroupe(g)) return { ok: false, erreur: 'Vous devez être responsable de tous les dossiers du groupe (ou administrateur).' };
+  var ds = fcDossiersDuGroupe(g).filter(fcDossierOuvert);
+  if (!ds.length) return { ok: false, erreur: 'Aucun dossier ouvert dans ce groupe.' };
+  if (!ds.some(function(d){ return fcEtape(d, code); })) return { ok: false, erreur: "Cette étape n'existe pas dans les dossiers du groupe." };
+  var appliques = 0, echecs = [];
+  for (var i = 0; i < ds.length; i++) {
+    var d = ds[i], e = fcEtape(d, code);
+    if (!e) { echecs.push({ reference: d.reference, erreur: "Étape absente de ce dossier." }); continue; }
+    if (e.statut === statut) { appliques++; continue; }
+    var r = await fcChangerStatutEtape(d.id, code, statut, { motif: o.motif });
+    if (r.ok) { appliques++; await fcEvenement(d, code, 'action_groupee', 'Action groupée ' + g.reference + ' : étape « ' + e.libelle + ' » → ' + FC_STATUTS[statut], { source_ref: g.id }); }
+    else echecs.push({ reference: d.reference, erreur: r.erreur });
+  }
+  return { ok: true, appliques: appliques, echecs: echecs, total: ds.length };
+}
+async function fcJustificatifGroupe(groupeId, code, j) {
+  var g = fcGroupe(groupeId);
+  if (!g || g.statut === 'dissous') return { ok: false, erreur: 'Groupe introuvable ou dissous.' };
+  if (!fcPeutGererGroupe(g)) return { ok: false, erreur: 'Vous devez être responsable de tous les dossiers du groupe (ou administrateur).' };
+  j = j || {};
+  if (!FC_SOURCES[j.source]) return { ok: false, erreur: 'La source du justificatif est obligatoire.' };
+  if (!String(j.reference || '').trim() && !String(j.note || '').trim()) return { ok: false, erreur: 'Indiquez une référence ou une description.' };
+  var ajoutes = 0, echecs = [];
+  var ds = fcDossiersDuGroupe(g).filter(fcDossierOuvert);
+  for (var i = 0; i < ds.length; i++) {
+    if (!fcEtape(ds[i], code)) { echecs.push({ reference: ds[i].reference, erreur: 'Étape absente de ce dossier.' }); continue; }
+    var r = await fcAjouterJustificatif(ds[i].id, code, { source: j.source, reference: (String(j.reference || '').trim() || 'Justificatif du groupe') + ' [' + g.reference + ']', note: j.note });
+    if (r.ok) ajoutes++; else echecs.push({ reference: ds[i].reference, erreur: r.erreur });
+  }
+  return { ok: true, ajoutes: ajoutes, echecs: echecs };
+}
+function fcSyntheseGroupe(g) {
+  var ds = fcDossiersDuGroupe(g), etapes = {};
+  ds.forEach(function(d){ var e = fcProchaineEtape(d); var k = e ? e.libelle : 'Terminé'; etapes[k] = (etapes[k] || 0) + 1; });
+  return { dossiers: ds.length, remis: ds.filter(fcRemisTitre).length, par_etape: etapes };
+}
+fcProtegerMutations(['fcCreerGroupe', 'fcAjouterAuGroupe', 'fcRetirerDuGroupe', 'fcAppliquerAuGroupe', 'fcJustificatifGroupe']);
+
+/* ── Interface ── */
+function fcCochees(classe) { return [].slice.call(document.querySelectorAll('.' + classe + ':checked')).map(function(x){ return x.value; }); }
+function fcPanneauGroupes(d) {
+  var gs = (DATA.groupes_fonciers || []).filter(function(g){ return g.parcelle_id === d.parcelle_id && g.statut !== 'dissous'; });
+  var ivs = (DATA.intervenants_fonciers || []).filter(function(i){ return i.statut_relation === 'actif'; });
+  var h = '<div class="card"><div class="card-title">🧩 Groupes de mutation</div><div style="font-size:11px;color:var(--dim);margin-bottom:6px;">Réunissez plusieurs dossiers individuels traités ensemble par un notaire ou un géomètre-expert : cochez-les dans le tableau ci-dessus. Chaque dossier garde son souscripteur, ses pièces et son journal ; le groupe sert à les piloter ensemble. Il reste interne.</div>';
+  h += gs.length ? '<div class="table-wrap"><table><thead><tr><th>Groupe</th><th>Intervenant</th><th>Dossiers</th><th>Titres remis</th><th></th></tr></thead><tbody>' + gs.map(function(g){ var s = fcSyntheseGroupe(g), iv = g.intervenant_id && fcIntervenant(g.intervenant_id);
+    return '<tr><td><b>' + escHtml(g.reference) + '</b><div style="font-size:11px;color:var(--dim);">' + escHtml(g.libelle) + '</div></td><td>' + escHtml(iv ? iv.nom_organisation : '—') + '</td><td>' + s.dossiers + '</td><td>' + s.remis + ' / ' + s.dossiers + '</td><td><button class="btn btn-secondary btn-sm" onclick="APP._fgSel=\'' + g.id + '\';fcRender()">Ouvrir</button></td></tr>'; }).join('') + '</tbody></table></div>' : '<div style="color:var(--dim);font-size:12px;">Aucun groupe.</div>';
+  h += '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;margin-top:8px;"><div class="form-group"><label>Libellé du groupe</label><input class="form-control" id="fg-lib" placeholder="Mutation — lot de titres, notaire…"></div>'
+    + '<div class="form-group"><label>Intervenant</label><select class="filter-select" id="fg-iv"><option value="">— aucun —</option>' + ivs.map(function(i){ return '<option value="' + i.id + '">' + escHtml(i.nom_organisation) + '</option>'; }).join('') + '</select></div>'
+    + '<div class="form-group"><label>Échéance</label><input type="date" class="form-control" id="fg-cible"></div>'
+    + '<button class="btn btn-primary btn-sm" onclick="fcCreerGroupeUI()">Créer un groupe avec les dossiers cochés</button></div>';
+  if (APP._fgSel && fcGroupe(APP._fgSel) && fcGroupe(APP._fgSel).parcelle_id === d.parcelle_id) h += fcDetailGroupe(fcGroupe(APP._fgSel));
+  return h + '</div>';
+}
+function fcDetailGroupe(g) {
+  var ds = fcDossiersDuGroupe(g), codes = {};
+  ds.forEach(function(d){ d.etapes.forEach(function(e){ if (/^ind_/.test(e.code) || ['depot', 'recepisse', 'suivi_instruction', 'verification_documents', 'cloture'].indexOf(e.code) !== -1) codes[e.code] = e.libelle; }); });
+  var h = '<div style="border:1px solid var(--or);border-radius:8px;padding:10px;margin-top:10px;"><div style="font-weight:700;">' + escHtml(g.reference) + ' — ' + escHtml(g.libelle) + (g.date_cible ? ' · échéance ' + escHtml(g.date_cible) : '') + '</div>'
+    + '<div class="table-wrap"><table><thead><tr><th>Dossier</th><th>Lot(s)</th><th>Souscripteur</th><th>Étape courante</th><th></th></tr></thead><tbody>' + ds.map(function(d){ var e = fcProchaineEtape(d);
+      return '<tr><td>' + escHtml(d.reference) + '</td><td>' + escHtml((d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ')) + '</td><td>' + escHtml((d.client_ids || [d.client_id]).map(function(id){ return (fcClient(id) || {}).nom || id; }).join(', ')) + '</td><td>' + escHtml(e ? e.libelle : 'Terminé') + '</td>'
+        + '<td><button class="btn btn-secondary btn-sm" onclick="fcAllerDossier(\'' + d.id + '\')">Ouvrir</button> <button class="btn btn-secondary btn-sm" onclick="fcRetirerDuGroupeUI(\'' + g.id + '\',\'' + d.id + '\')">Retirer</button></td></tr>'; }).join('') + '</tbody></table></div>'
+    + '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;"><div class="form-group"><label>Étape</label><select class="filter-select" id="fg-code">' + Object.keys(codes).map(function(c){ return '<option value="' + c + '">' + escHtml(codes[c]) + '</option>'; }).join('') + '</select></div>'
+    + '<div class="form-group"><label>Nouveau statut</label><select class="filter-select" id="fg-statut">' + fcOptions(FC_STATUTS, 'en_cours') + '</select></div>'
+    + '<div class="form-group"><label>Motif (si bloqué, rejeté, annulé)</label><input class="form-control" id="fg-motif"></div><button class="btn btn-primary btn-sm" onclick="fcAppliquerGroupeUI(\'' + g.id + '\')">Appliquer à tout le groupe</button></div>'
+    + '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;"><div class="form-group"><label>Justificatif commun — source</label><select class="filter-select" id="fg-jsrc">' + fcOptions(FC_SOURCES, 'promoteur') + '</select></div>'
+    + '<div class="form-group"><label>Référence</label><input class="form-control" id="fg-jref" placeholder="ex. quittance collective n° …"></div><button class="btn btn-secondary btn-sm" onclick="fcJustifGroupeUI(\'' + g.id + '\')">Ajouter à chaque dossier</button></div>'
+    + '<div style="font-size:11px;color:var(--dim);">Chaque dossier applique sa propre règle : l\'action groupée peut réussir pour certains et être refusée pour d\'autres (justificatif manquant, titre mère indisponible…) ; le détail est affiché.</div></div>';
+  return h;
+}
+async function fcCreerGroupeUI() {
+  var g = function(i){ return (document.getElementById(i) || {}).value || ''; };
+  var r = await fcCreerGroupe({ dossier_ids: fcCochees('fc-ck-dos'), libelle: g('fg-lib'), intervenant_id: g('fg-iv'), date_cible: g('fg-cible') });
+  if (fcMsg(r, 'Groupe créé.')) { APP._fgSel = r.groupe.id; fcRender(); }
+}
+async function fcAppliquerGroupeUI(id) {
+  var g = function(i){ return (document.getElementById(i) || {}).value || ''; };
+  var r = await fcAppliquerAuGroupe(id, g('fg-code'), g('fg-statut'), { motif: g('fg-motif') });
+  if (!r.ok) { fcMsg(r); return; }
+  if (typeof toast === 'function') toast(r.appliques + ' / ' + r.total + ' dossier(s) mis à jour' + (r.echecs.length ? ' — ' + r.echecs.length + ' refusé(s) : ' + r.echecs.map(function(x){ return x.reference + ' (' + x.erreur + ')'; }).slice(0, 3).join(' ; ') : ''), r.echecs.length ? 'error' : 'success');
+  fcRender();
+}
+async function fcJustifGroupeUI(id) {
+  var g = function(i){ return (document.getElementById(i) || {}).value || ''; };
+  var r = await fcJustificatifGroupe(id, g('fg-code'), { source: g('fg-jsrc'), reference: g('fg-jref') });
+  if (!r.ok) { fcMsg(r); return; }
+  if (typeof toast === 'function') toast(r.ajoutes + ' justificatif(s) ajouté(s)' + (r.echecs.length ? ', ' + r.echecs.length + ' refusé(s)' : ''), r.echecs.length ? 'error' : 'success');
+  fcRender();
+}
+async function fcRetirerDuGroupeUI(gid, did) {
+  var m = prompt('Motif du retrait du groupe :'); if (!m) return;
+  var r = await fcRetirerDuGroupe(gid, did, m); if (fcMsg(r, 'Dossier retiré du groupe.')) { if (r.dissous) APP._fgSel = null; fcRender(); }
+}
+async function fcOuvrirGroupeSouscripteurUI(parcelleId) {
+  var ids = fcCochees('fc-ck-lot');
+  if (ids.length < 2) { fcMsg({ ok: false, erreur: 'Cochez au moins deux lots du même souscripteur.' }); return; }
+  var r = await fcOuvrirDossierIndividuel({ lot_ids: ids });
+  if (!r.ok && r.titre_mere_manquant && confirm(r.erreur + '\n\nOuvrir quand même par dérogation (motif obligatoire, journalisée) ?')) {
+    var m = prompt('Motif de la dérogation :'); if (!m) return;
+    r = await fcOuvrirDossierIndividuel({ lot_ids: ids, forcer: true, motif_derogation: m });
+  }
+  fcMsg(r, 'Dossier groupé ouvert pour ce souscripteur.'); fcRender();
 }
 
 /* Cycle automatique : au démarrage puis toutes les 30 minutes tant que l'application est ouverte. */
