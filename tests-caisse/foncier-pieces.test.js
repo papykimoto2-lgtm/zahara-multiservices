@@ -110,9 +110,9 @@ test('un dossier clôturé n\'accepte plus de pièce ; un justificatif sourcé e
   assert.match((await run(app.page, (d) => fcAjouterPiece(d, 'depot', PDF, {}), d)).erreur, /aucune nouvelle pièce/);
 });
 
-test('store local déclaré ; interface : panneau promoteur et aperçu souscripteur', async () => {
+test('store synchronisé (métadonnées) ; interface : panneau promoteur et aperçu souscripteur', async () => {
   const app = await ouvrirApp(); const { d } = await preparer(app.page);
-  assert.equal(await run(app.page, () => ALL_STORES.indexOf('pieces_foncieres') !== -1 && SANIX_STORES_LOCAL_UNIQUEMENT.indexOf('pieces_foncieres') !== -1 && !SUPA_STORE_MAP.pieces_foncieres), true);
+  assert.equal(await run(app.page, () => ALL_STORES.indexOf('pieces_foncieres') !== -1 && SANIX_STORES_LOCAL_UNIQUEMENT.indexOf('pieces_foncieres') === -1 && SUPA_STORE_MAP.some(function (x) { return x[0] === 'pi_pieces_foncieres' && x[1] === 'pieces_foncieres'; })), true);
   await run(app.page, (d) => fcDemanderPiece(d, 'depot', 'CNI'), d);
   const html = await run(app.page, (d) => { document.body.insertAdjacentHTML('beforeend', '<div id="fc-detail"></div><div id="fs-root"></div>'); APP._fcPiecesSel = { d: d, c: 'depot' }; return fcPanneauPieces(fcDossier(d)); }, d);
   assert.match(html, /Pièces jointes/); assert.match(html, /Dépôt ouvert au souscripteur/);

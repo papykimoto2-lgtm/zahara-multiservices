@@ -25359,7 +25359,7 @@ async function loadAllData() {
    bandeau discret pour un profil Admin uniquement — jamais pour les
    autres rôles, pour ne pas faire porter une dette technique à un
    utilisateur qui ne peut rien y faire. */
-var SANIX_STORES_LOCAL_UNIQUEMENT = ['conflits_sync','pieces_foncieres']; // écarts connus et voulus — jamais synchronisés au cloud par conception
+var SANIX_STORES_LOCAL_UNIQUEMENT = ['conflits_sync']; // écarts connus et voulus — jamais synchronisés au cloud par conception
 function sanixAutoDiagnostic(){
   try{
     var mappes = {}; SUPA_STORE_MAP.forEach(function(p){ mappes[p[1]]=true; });
@@ -27096,6 +27096,7 @@ var SUPA_STORE_MAP = [
   ['pi_demandes_fonciers', 'demandes_fonciers'],
   ['pi_notifications_foncieres', 'notifications_foncieres'],
   ['pi_groupes_fonciers', 'groupes_fonciers'],
+  ['pi_pieces_foncieres', 'pieces_foncieres'],   /* métadonnées seulement : les fichiers sont dans le bucket privé « pieces-foncieres » (supabase/foncier_pieces_stockage.sql) */
   ['pi_bordereaux_caisse', 'bordereaux_caisse'],
   ['pi_users',           'users'],
   ['pi_portail_medias',  'portail_medias'],
@@ -60809,6 +60810,77 @@ function fcPiecesEtape(dossierId, code, inclureRetirees) {
 function fcDossierOuvert(d) { return d && ['cloture', 'annule'].indexOf(d.statut) === -1; }
 function fcMetaPiece(f) { return { nom: String(f.nom).slice(0, 160), type: f.type, taille: Math.max(Number(f.taille) || 0, Math.floor(String(f.contenu).length * 3 / 4)), contenu: f.contenu }; }
 
+/* ── Stockage privé des fichiers (bucket « pieces-foncieres », jamais public) ──
+   · Le fichier est envoyé UNE fois, sous un chemin unique {dossier}/{pièce} : jamais écrasé ni supprimé (aucune règle UPDATE/DELETE).
+   · Le cloud ne reçoit que les métadonnées + le chemin (pas de base64) ; le poste d'origine garde le contenu pour l'hors-ligne.
+   · Les autres postes obtiennent le fichier par URL signée courte (fcContenuPiece), après contrôle d'accès et journalisation.
+   · Échec d'envoi : la ligne n'est PAS publiée (pas de pièce fantôme) ; fcSynchroniserPieces() réessaie. */
+var FC_PIECES_BUCKET = 'pieces-foncieres';
+var _fcContenusCache = {};
+function fcCheminPiece(p) { return String(p.dossier_id || 'divers') + '/' + p.id; }
+function fcBytesDeDataUrl(dataUrl) {
+  var bin = atob(String(dataUrl || '').split(',').pop()), u = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u;
+}
+async function fcEnvoyerPieceStorage(p) {
+  if (!p) return false;
+  if (p.chemin) return true;
+  if (!p.contenu || typeof SB === 'undefined' || !SB.url || !SB.key) return false;
+  var chemin = fcCheminPiece(p);
+  try {
+    var resp = await fetch(SB.url + '/storage/v1/object/' + FC_PIECES_BUCKET + '/' + encodeURI(chemin), {
+      method: 'POST',
+      headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + sbAuth(), 'Content-Type': p.type || 'application/octet-stream' },
+      body: fcBytesDeDataUrl(p.contenu)
+    });
+    var deja = false;
+    if (!resp.ok) { var t = ''; try { t = await resp.text(); } catch (e) {} deja = resp.status === 409 || /already exists|Duplicate/i.test(t); }
+    if (!resp.ok && !deja) return false;
+    p.chemin = chemin; p.bucket = FC_PIECES_BUCKET;
+    try { await dbPut('pieces_foncieres', p, { forceRole: true }); } catch (e) {}
+    return true;
+  } catch (e) { return false; }
+}
+/* Copie à publier au cloud : sans contenu ; null si le fichier n'a pas pu être envoyé. */
+async function fcPieceVersCloud(p) {
+  if (!p || (!p.contenu && !p.chemin)) return p || null;
+  if (!p.chemin && !(await fcEnvoyerPieceStorage(p))) return null;
+  var c = JSON.parse(JSON.stringify(p)); delete c.contenu; return c;
+}
+async function fcUrlSigneePiece(p) {
+  if (!p || !p.chemin || typeof SB === 'undefined' || !SB.url || !SB.key) return '';
+  try {
+    var r = await fetch(SB.url + '/storage/v1/object/sign/' + (p.bucket || FC_PIECES_BUCKET) + '/' + encodeURI(p.chemin), {
+      method: 'POST', headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + sbAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 120 }) });
+    if (!r.ok) return '';
+    var j = await r.json(); return SB.url + '/storage/v1' + (j.signedURL || j.signedUrl || '');
+  } catch (e) { return ''; }
+}
+/* Contenu (data URL) d'une pièce : local si présent, sinon téléchargé via URL signée. '' si indisponible. */
+async function fcContenuPiece(p) {
+  if (!p) return '';
+  if (p.contenu) return p.contenu;
+  if (_fcContenusCache[p.id]) return _fcContenusCache[p.id];
+  var u = await fcUrlSigneePiece(p); if (!u) return '';
+  try {
+    var r = await fetch(u); if (!r.ok) return '';
+    var b = await r.blob();
+    var d = await new Promise(function(res, rej){ var fr = new FileReader(); fr.onload = function(){ res(fr.result); }; fr.onerror = rej; fr.readAsDataURL(b); });
+    d = String(d).replace(/^data:[^,]*,/, 'data:' + (p.type || b.type) + ';base64,');
+    _fcContenusCache[p.id] = d; return d;
+  } catch (e) { return ''; }
+}
+/* Réessaie l'envoi des pièces restées locales (échec réseau, pièces antérieures à cette version). */
+async function fcSynchroniserPieces() {
+  if (typeof SB === 'undefined' || !SB.url || !SB.key || !navigator.onLine) return { envoyees: 0, restantes: 0 };
+  var attente = (DATA.pieces_foncieres || []).filter(function(p){ return p.contenu && !p.chemin; }), n = 0;
+  for (var i = 0; i < attente.length; i++) {
+    if (await fcEnvoyerPieceStorage(attente[i])) { n++; try { await syncToSupabase('pi_pieces_foncieres', attente[i]); } catch (e) {} }
+  }
+  return { envoyees: n, restantes: attente.length - n };
+}
+
 /* Promoteur : joindre une pièce à une étape. */
 async function fcAjouterPiece(dossierId, code, f, o) {
   o = o || {};
@@ -61076,7 +61148,9 @@ async function fcVerifierIntegrite(pieceId) {
   var p = fcPiece(pieceId), d = p && fcDossier(p.dossier_id);
   if (!p || !d) return { ok: false, erreur: 'Document introuvable.' };
   if (!p.empreinte) return { ok: true, conforme: null, message: "Aucune empreinte n'a été calculée pour ce document." };
-  var h = await fcEmpreinte(p.contenu), conforme = h === p.empreinte;
+  var contenu = await fcContenuPiece(p);
+  if (!contenu) return { ok: false, erreur: "Le fichier n'est pas disponible (hors ligne ou stockage inaccessible)." };
+  var h = await fcEmpreinte(contenu), conforme = h === p.empreinte;
   p.integrite = conforme ? 'conforme' : 'alteree'; p.integrite_verifiee_le = new Date().toISOString();
   await fcDb('pieces_foncieres', p, { forceRole: true });
   if (!conforme) await fcEvenement(d, p.etape_code, 'piece_integrite', 'ALERTE : le contenu de « ' + fcNomJournal(p) + ' » ne correspond plus à son empreinte d\'origine', { source_ref: p.id });
@@ -61197,11 +61271,13 @@ async function fcDeposerDocumentUI() {
 }
 async function fcTelechargerPieceUI(id) {
   var r = await fcAccederPiece(id, 'telechargement'); if (!fcMsg(r, 'Téléchargement journalisé.')) return;
-  var a = document.createElement('a'); a.href = r.piece.contenu; a.download = r.piece.nom; document.body.appendChild(a); a.click(); a.remove();
+  var contenu = await fcContenuPiece(r.piece); if (!contenu) { fcMsg({ ok: false, erreur: "Le fichier n'est pas disponible (hors ligne ou stockage inaccessible)." }); return; }
+  var a = document.createElement('a'); a.href = contenu; a.download = r.piece.nom; document.body.appendChild(a); a.click(); a.remove();
 }
 async function fcPrevisualiserUI(id) {
   var r = await fcAccederPiece(id, 'consultation'); if (!r.ok) { fcMsg(r); return; }
-  var b = await (await fetch(r.piece.contenu)).blob(), url = URL.createObjectURL(b);
+  var contenu = await fcContenuPiece(r.piece); if (!contenu) { fcMsg({ ok: false, erreur: "Le fichier n'est pas disponible (hors ligne ou stockage inaccessible)." }); return; }
+  var b = await (await fetch(contenu)).blob(), url = URL.createObjectURL(b);
   var ov = document.createElement('div'); ov.id = 'fd-apercu'; ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;display:flex;flex-direction:column;padding:16px;';
   ov.innerHTML = '<div style="color:#fff;margin-bottom:8px;display:flex;justify-content:space-between;"><b>' + escHtml(r.piece.nom) + '</b><button class="btn btn-secondary btn-sm" id="fd-apercu-x">Fermer</button></div>'
     + (r.piece.type === 'application/pdf' ? '<iframe src="' + url + '" style="flex:1;background:#fff;border:0;"></iframe>' : '<div style="flex:1;overflow:auto;text-align:center;"><img alt="Aperçu du document" src="' + url + '" style="max-width:100%;"></div>');
@@ -61879,7 +61955,8 @@ async function fcOuvrirGroupeSouscripteurUI(parcelleId) {
 
 /* Cycle automatique : au démarrage puis toutes les 30 minutes tant que l'application est ouverte. */
 setTimeout(function(){ if (typeof fcCycleNotifications === 'function' && APP.currentUser) fcCycleNotifications(); }, 25000);
-setInterval(function(){ if (typeof fcCycleNotifications === 'function' && APP.currentUser) fcCycleNotifications(); }, 30 * 60000);
+setTimeout(function(){ if (typeof fcSynchroniserPieces === 'function' && APP.currentUser) fcSynchroniserPieces(); }, 40000);
+setInterval(function(){ if (typeof fcCycleNotifications === 'function' && APP.currentUser) { fcCycleNotifications(); if (typeof fcSynchroniserPieces === 'function') fcSynchroniserPieces(); } }, 30 * 60000);
 
 /* ══════ ENCAISSEMENT MOBILE MONEY — relevé → souscripteur → versement ══════ */
 var MOMO_LINES = [];
@@ -101547,6 +101624,20 @@ async function msgSignedUrl(bucket, path) {
       } catch (e) { /* échec upload → repli base64 intégral */ }
     }
     return await _origSyncPJ.apply(this, arguments);
+  };
+})();
+
+/* Pièces foncières : le fichier part dans le bucket privé, la ligne publiée ne porte que métadonnées et chemin. */
+(function () {
+  if (typeof syncToSupabase !== 'function') return;
+  var _origSyncPieces = syncToSupabase;
+  syncToSupabase = async function (table, obj, opts) {
+    if (table === 'pi_pieces_foncieres' && obj && obj.contenu && SB.url && SB.key) {
+      var cloud = await fcPieceVersCloud(obj);
+      if (!cloud) { console.warn('[Pièces foncières] fichier non envoyé : ligne non publiée, nouvel essai plus tard', obj.id); return false; }
+      return await _origSyncPieces.call(this, table, cloud, opts);
+    }
+    return await _origSyncPieces.apply(this, arguments);
   };
 })();
 
