@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Foncier Connect — COMPLÉMENT (14/10/2026)
--- À exécuter sur Zahara (ilvusckdanwrckxqvhmr) ET Menco (pxwgefdxgrskusjbzrxz)
+-- À exécuter sur le projet Supabase de Zahara ET sur celui de Menco
 -- après foncier_connect.sql. Idempotent.
 --
 -- Constat : sur les deux projets, l'exécution s'est arrêtée avant la création
