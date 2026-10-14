@@ -1957,14 +1957,16 @@
   }
   /* Attestation de solde : n'apparaît que si la Direction l'a validée ET publiée pour ce souscripteur.
      Le document validé est figé dans la fiche (attestation_solde.html) : on l'affiche tel quel. */
+  function _attPubliee(champ){ var a=S.client&&S.client[champ]; return (a&&a.statut==='valide'&&a.publie_portail&&a.html) ? a : null; }
   function sAttSoldeBtn(){
-    var a=S.client&&S.client.attestation_solde;
-    if(!a||a.statut!=='valide'||!a.publie_portail||!a.html) return '';
-    return '<button class="highlight-btn" style="background:#16a34a;" onclick="docAttSolde()">📜 Attestation de solde N° '+esc(a.numero||'')+'</button>';
+    var a=_attPubliee('attestation_solde'), f=_attPubliee('attestation_solde_finale'), h='';
+    if(a) h+='<button class="highlight-btn" style="background:#16a34a;" onclick="docAttSolde()">📜 Attestation de solde N° '+esc(a.numero||'')+(f?' (prix initial)':'')+'</button>';
+    if(f) h+=' <button class="highlight-btn" style="background:#16a34a;" onclick="docAttSolde(\'finale\')">📜 Attestation de solde — valeur finale N° '+esc(f.numero||'')+'</button>';
+    return h;
   }
-  function docAttSolde(){
-    var a=S.client&&S.client.attestation_solde;
-    if(!a||a.statut!=='valide'||!a.publie_portail||!a.html) return;
+  function docAttSolde(kind){
+    var a=_attPubliee(kind==='finale'?'attestation_solde_finale':'attestation_solde');
+    if(!a) return;
     var w=window.open('','_blank','width=860,height=900'); if(!w) return;
     w.document.write(a.html); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
   }
