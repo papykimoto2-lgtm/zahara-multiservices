@@ -8429,6 +8429,19 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
               <div class="form-group"><label>Terrain — Contrepartie acquisition<br><span style="font-size:10px;color:var(--blanc-dim);">401 fournisseur (à crédit) ou 521 banque (comptant)</span></label><input class="form-control" id="cd-terrain-contrepartie" list="dl-plan-comptable" placeholder="401"></div>
               <div class="form-group"></div>
             </div>
+            <div class="form-section-title" style="margin-top:16px;">🏛️ Titre foncier — honoraires et droits (SYSCOHADA révisé)</div>
+            <div style="font-size:12px;color:var(--blanc-dim);margin:6px 0 12px;line-height:1.6;">
+              Comptes utilisés pour comptabiliser les frais d'un dossier de titre individuel. <strong>Aucun n'est présélectionné</strong> : à confirmer avec l'expert-comptable. Repères du plan OHADA : <strong>6324 Honoraires</strong>, <strong>6325 Frais d'actes et de contentieux</strong>, <strong>646 Droits d'enregistrement</strong>, <strong>401 Fournisseurs</strong> ; frais avancés pour le compte du souscripteur : compte de tiers (ex. 4111 sous-compte du client).
+              Écritures : constatation <strong>D charge (+ D 4452 TVA déductible) / C 401</strong>, puis règlement <strong>D 401 / C 5x</strong>. Générées en brouillard, à valider en comptabilité.
+            </div>
+            <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+              <div class="form-group"><label>Honoraires notaire</label><input class="form-control" id="cd-titre-honoraires-notaire" list="dl-plan-comptable" placeholder="6324"></div>
+              <div class="form-group"><label>Honoraires géomètre-expert</label><input class="form-control" id="cd-titre-honoraires-geometre" list="dl-plan-comptable" placeholder="6324"></div>
+              <div class="form-group"><label>Droits d'enregistrement / mutation</label><input class="form-control" id="cd-titre-droits-enregistrement" list="dl-plan-comptable" placeholder="646"></div>
+              <div class="form-group"><label>Frais d'actes et formalités</label><input class="form-control" id="cd-titre-frais-actes" list="dl-plan-comptable" placeholder="6325"></div>
+              <div class="form-group"><label>Fournisseurs du titre (notaire, géomètre, Trésor)</label><input class="form-control" id="cd-titre-fournisseurs" list="dl-plan-comptable" placeholder="401"></div>
+              <div class="form-group"><label>Frais avancés pour le souscripteur</label><input class="form-control" id="cd-titre-avances-souscripteur" list="dl-plan-comptable" placeholder="4111"></div>
+            </div>
             <div style="margin-top:14px;"><button class="btn btn-primary" onclick="saveComptesDefaut()">💾 Enregistrer les comptes par défaut</button></div>
           </div>
         </div>
@@ -40633,7 +40646,7 @@ var LIBELLES_COMPTES_DEFAUT = {
   paie_retenues:'Paie — Retenues diverses', tva_collectee:'TVA collectée', tva_deductible:'TVA déductible',
   tva_deductible_travaux:'TVA déductible — Travaux', retenue_garantie:'Retenue de garantie', avance_fournisseur:'Avance fournisseur',
   cession_produit:'Cession foncière — Produit', amort_dotation:'Amortissements — Dotation', amort_cumul:'Amortissements — Cumul',
-  terrain_produit:'Terrain — Produit (vente)', terrain_tva_collectee:'Terrain — TVA collectée', terrain_stock:'Terrain — Stock',
+  titre_honoraires_notaire:'Titre foncier — Honoraires notaire (charge)', titre_honoraires_geometre:'Titre foncier — Honoraires géomètre-expert (charge)', titre_droits_enregistrement:"Titre foncier — Droits d'enregistrement / mutation (charge)", titre_frais_actes:"Titre foncier — Frais d'actes et formalités (charge)", titre_fournisseurs:'Titre foncier — Fournisseurs (notaire, géomètre, Trésor)', titre_avances_souscripteur:'Titre foncier — Frais avancés pour le souscripteur (à refacturer)', terrain_produit:'Terrain — Produit (vente)', terrain_tva_collectee:'Terrain — TVA collectée', terrain_stock:'Terrain — Stock',
   terrain_variation:'Terrain — Variation de stock', terrain_achat:'Terrain — Achat / charge', terrain_contrepartie:'Terrain — Contrepartie acquisition',
   frais_bancaires:'Frais bancaires — Charge', vente_lot_produit:'Vente lots/appartements — Produit', compte_courant_associe:'Compte courant associé / partenaire',
   stock_lots_variation:'Stock lots (part entreprise) — Variation', stock_lots_compte:'Stock lots (part entreprise) — Compte de stock',
@@ -40813,6 +40826,7 @@ function loadComptesDefaut() {
   var _emanq=document.getElementById('cd-ecart-caisse-manquant'); if(_emanq)_emanq.value=cd.ecart_caisse_manquant||'';
   document.getElementById('cd-cession-produit').value = cd.cession_produit || '';
   var _tp=document.getElementById('cd-terrain-produit'); if(_tp)_tp.value=cd.terrain_produit|| '';
+  ['honoraires_notaire','honoraires_geometre','droits_enregistrement','frais_actes','fournisseurs','avances_souscripteur'].forEach(function(k){ var el=document.getElementById('cd-titre-'+k.replace(/_/g,'-')); if(el) el.value=cd['titre_'+k]||''; });
   var _tt=document.getElementById('cd-terrain-tva'); if(_tt)_tt.value=cd.terrain_tva_collectee|| '';
   var _ttx=document.getElementById('cd-terrain-taux-tva'); if(_ttx)_ttx.value=(cd.terrain_taux_tva!=null?cd.terrain_taux_tva:tvaDefaut());
   var _ts=document.getElementById('cd-terrain-stock'); if(_ts)_ts.value=cd.terrain_stock|| '';
@@ -40985,6 +40999,12 @@ async function saveComptesDefaut() {
     ecart_caisse_manquant:   (document.getElementById('cd-ecart-caisse-manquant')||{}).value ? document.getElementById('cd-ecart-caisse-manquant').value.trim() : '',
     cession_produit:     document.getElementById('cd-cession-produit').value.trim() || '',
     terrain_produit:     (document.getElementById('cd-terrain-produit')||{}).value ? document.getElementById('cd-terrain-produit').value.trim() : '',
+    titre_honoraires_notaire:    ((document.getElementById('cd-titre-honoraires-notaire')||{}).value||'').trim(),
+    titre_honoraires_geometre:   ((document.getElementById('cd-titre-honoraires-geometre')||{}).value||'').trim(),
+    titre_droits_enregistrement: ((document.getElementById('cd-titre-droits-enregistrement')||{}).value||'').trim(),
+    titre_frais_actes:           ((document.getElementById('cd-titre-frais-actes')||{}).value||'').trim(),
+    titre_fournisseurs:          ((document.getElementById('cd-titre-fournisseurs')||{}).value||'').trim(),
+    titre_avances_souscripteur:  ((document.getElementById('cd-titre-avances-souscripteur')||{}).value||'').trim(),
     terrain_tva_collectee: (document.getElementById('cd-terrain-tva')||{}).value ? document.getElementById('cd-terrain-tva').value.trim() : '',
     terrain_taux_tva:    parseFloat((document.getElementById('cd-terrain-taux-tva')||{}).value) || tvaDefaut(),
     terrain_stock:       (document.getElementById('cd-terrain-stock')||{}).value ? document.getElementById('cd-terrain-stock').value.trim() : '',
@@ -56316,7 +56336,7 @@ function lancerAuditIntegrite(){
       paie_retenues:'Paie — Retenues diverses', tva_collectee:'TVA collectée', tva_deductible:'TVA déductible',
       tva_deductible_travaux:'TVA déductible — Travaux', retenue_garantie:'Retenue de garantie', avance_fournisseur:'Avance fournisseur',
       cession_produit:'Cession foncière — Produit', amort_dotation:'Amortissements — Dotation', amort_cumul:'Amortissements — Cumul',
-      terrain_produit:'Terrain — Produit (vente)', terrain_tva_collectee:'Terrain — TVA collectée', terrain_stock:'Terrain — Stock',
+      titre_honoraires_notaire:'Titre foncier — Honoraires notaire (charge)', titre_honoraires_geometre:'Titre foncier — Honoraires géomètre-expert (charge)', titre_droits_enregistrement:"Titre foncier — Droits d'enregistrement / mutation (charge)", titre_frais_actes:"Titre foncier — Frais d'actes et formalités (charge)", titre_fournisseurs:'Titre foncier — Fournisseurs (notaire, géomètre, Trésor)', titre_avances_souscripteur:'Titre foncier — Frais avancés pour le souscripteur (à refacturer)', terrain_produit:'Terrain — Produit (vente)', terrain_tva_collectee:'Terrain — TVA collectée', terrain_stock:'Terrain — Stock',
       terrain_variation:'Terrain — Variation de stock', terrain_achat:'Terrain — Achat / charge', terrain_contrepartie:'Terrain — Contrepartie acquisition'
     };
     Object.keys(libelles).forEach(function(key){
@@ -59495,6 +59515,7 @@ function fcRenderDetail(id) {
   h += '</tbody></table></div>';
   h += fcPanneauPieces(d);
   h += fcPanneauTitresIndividuels(d);
+  h += fcPanneauFrais(d);
   var pubs = (DATA.publications_foncieres || []).filter(function(x){ return x.dossier_id === d.id; }).sort(function(a, b){ return b.publie_le.localeCompare(a.publie_le); });
   h += '<div class="card-title" style="margin-top:14px;">📣 Informations publiées au souscripteur</div>' + (pubs.length ? pubs.map(function(x){
     return '<div style="padding:5px 0;border-bottom:1px solid var(--bord,#eee);font-size:12px;' + (x.retire ? 'opacity:.55;' : '') + '"><b>' + escHtml(x.publie_le.slice(0, 10)) + '</b> · ' + escHtml(x.libelle_public) + ' <i>(' + escHtml(FC_LIBELLES_SOURCE[x.source]) + ')</i>'
@@ -60536,6 +60557,7 @@ function fcRenderNotifications() {
   if (alertes.length) h += '<div class="card"><div class="card-title">⏰ Échéances à signaler</div><div style="font-size:12px;">' + alertes.map(function(a){ var t = fcTexteAlerte(a); return '<div style="padding:4px 0;border-bottom:1px solid var(--bord,#eee);"><b>' + escHtml(t.titre) + '</b> — ' + escHtml(t.msg) + '</div>'; }).join('') + '</div></div>';
   h += '<div class="card"><div class="card-title">⚙️ Règles de relance</div><div style="font-size:11px;color:var(--dim);margin-bottom:6px;">Nombre de jours (séparés par des virgules). Les délais administratifs ont leurs propres règles, sans escalade.</div>'
     + ['interne', 'administratif', 'mission'].map(function(k){ var c = cfg[k]; return '<div style="padding:6px 0;"><b>' + ({ interne: 'Échéance interne', administratif: 'Délai administratif', mission: 'Mission' }[k]) + '</b> · avant : <input id="fn-' + k + '-avant" value="' + (c.avant || []).join(',') + '" style="width:70px;"> · le jour : <input type="checkbox" id="fn-' + k + '-jour"' + (c.jour ? ' checked' : '') + '> · après : <input id="fn-' + k + '-apres" value="' + (c.apres || []).join(',') + '" style="width:70px;"> · escalade après : <input id="fn-' + k + '-esc" value="' + (c.escalade_apres || 0) + '" style="width:50px;"' + (k === 'administratif' ? ' disabled' : '') + '> jours</div>'; }).join('')
+    + '<div style="padding:6px 0;font-size:12px;"><label><input type="checkbox" id="fn-auto-solde" ' + (((DATA.params || {}).fc_ouverture_auto_solde === false) ? '' : 'checked ') + (admin ? '' : 'disabled ') + '> Ouvrir automatiquement le dossier de titre individuel quand un souscripteur a soldé le prix initial de son bien (sinon : le service Foncier est seulement prévenu)</label></div>'
     + (admin ? '<button class="btn btn-secondary btn-sm" onclick="fcSauverRelancesUI()">Enregistrer les règles</button>' : '<div style="font-size:11px;color:var(--dim);">Modification réservée aux administrateurs.</div>') + '</div>';
   host.innerHTML = h; fcMajBadgeNotif();
 }
@@ -60548,7 +60570,7 @@ async function fcSauverRelancesUI() {
   var g = function(i){ var el = document.getElementById(i); return el ? el.value : ''; }, ch = function(i){ var el = document.getElementById(i); return !!(el && el.checked); };
   var cfg = {};
   ['interne', 'administratif', 'mission'].forEach(function(k){ cfg[k] = { avant: nums(g('fn-' + k + '-avant')), jour: ch('fn-' + k + '-jour'), apres: nums(g('fn-' + k + '-apres')), escalade_apres: k === 'administratif' ? 0 : (parseInt(g('fn-' + k + '-esc'), 10) || 0) }; });
-  DATA.params = DATA.params || {}; DATA.params.fc_relances = cfg; DATA.params._modifie = new Date().toISOString();
+  DATA.params = DATA.params || {}; DATA.params.fc_relances = cfg; DATA.params.fc_ouverture_auto_solde = ch('fn-auto-solde'); DATA.params._modifie = new Date().toISOString();
   await dbPut('params', DATA.params); if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
   toast('Règles de relance enregistrées.', 'success'); fcRenderNotifications();
 }
@@ -61636,6 +61658,183 @@ async function fcOuvrirIndividuelsEnLot(parcelleId, responsableId) {
   return { ok: true, ouverts: ouverts, echecs: echecs };
 }
 fcProtegerMutations(['fcOuvrirDossierIndividuel', 'fcOuvrirIndividuelsEnLot']);
+
+/* ═══ Frais du titre foncier → comptabilité SYSCOHADA ═══
+   Les frais d'un dossier INDIVIDUEL (honoraires notaire / géomètre-expert, droits d'enregistrement, frais d'actes) sont saisis avec
+   leur pièce justificative, imputés au promoteur (charge) ou au souscripteur (frais avancés à refacturer), puis comptabilisés :
+     constatation  : D charge HT (+ D 4452 TVA déductible) / C fournisseurs            (ou D frais avancés / C fournisseurs)
+     règlement     : D fournisseurs / C trésorerie (caisse, mobile money, banque)
+   Les comptes viennent de Paramètres › Comptes par défaut (rien n'est présélectionné). Les écritures sont créées NON validées
+   (brouillard) : la validation reste à la comptabilité. Une fois comptabilisé, un frais ne s'annule plus ici : contre-passation en comptabilité. */
+var FC_FRAIS_TITRE = {
+  honoraires_notaire:    { lib: 'Honoraires du notaire',                    cle: 'titre_honoraires_notaire' },
+  honoraires_geometre:   { lib: 'Honoraires du géomètre-expert',            cle: 'titre_honoraires_geometre' },
+  droits_enregistrement: { lib: "Droits d'enregistrement et de mutation",   cle: 'titre_droits_enregistrement', sans_tva: true },
+  frais_actes:           { lib: "Frais d'actes et formalités",              cle: 'titre_frais_actes' }
+};
+var FC_STATUTS_FRAIS = { saisi: 'Saisi', comptabilise: 'Comptabilisé', paye: 'Réglé', annule: 'Annulé' };
+function fcFraisTitre(d) { return (d && d.frais_titre) || []; }
+function fcPeutComptabiliserFrais() { try { return userPeutSurStore('ecritures', 'c'); } catch (e) { return false; } }
+function fcNombre(v) { var n = parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : NaN; }
+function fcTotalFrais(f) { return Math.round((f.montant_ht + f.tva) * 100) / 100; }
+function fcSyntheseFraisTitre(d) {
+  var o = { promoteur: 0, souscripteur: 0, regle: 0, a_regler: 0 };
+  fcFraisTitre(d).filter(function(f){ return f.statut !== 'annule'; }).forEach(function(f){
+    var t = fcTotalFrais(f); o[f.charge === 'souscripteur' ? 'souscripteur' : 'promoteur'] += t;
+    if (f.statut === 'paye') o.regle += t; else o.a_regler += t;
+  });
+  return o;
+}
+async function fcAjouterFraisTitre(dossierId, o) {
+  o = o || {};
+  var d = fcDossier(dossierId); if (!d) return { ok: false, erreur: 'Dossier introuvable.' };
+  if (!fcEstIndividuel(d)) return { ok: false, erreur: 'Les frais se saisissent sur un dossier de titre individuel.' };
+  if (d.statut === 'annule') return { ok: false, erreur: 'Dossier annulé.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) saisit les frais.' };
+  if (!FC_FRAIS_TITRE[o.nature]) return { ok: false, erreur: 'Nature de frais inconnue.' };
+  var ht = fcNombre(o.montant_ht), tva = o.tva === undefined || o.tva === '' ? 0 : fcNombre(o.tva);
+  if (!(ht > 0)) return { ok: false, erreur: 'Le montant hors taxes doit être supérieur à 0.' };
+  if (!isFinite(tva) || tva < 0) return { ok: false, erreur: 'TVA invalide.' };
+  if (tva > 0 && FC_FRAIS_TITRE[o.nature].sans_tva) return { ok: false, erreur: "Les droits d'enregistrement ne portent pas de TVA." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(o.date || '')) return { ok: false, erreur: 'Date de la pièce invalide (AAAA-MM-JJ).' };
+  var piece = String(o.piece || '').trim(); if (!piece) return { ok: false, erreur: 'La référence de la pièce justificative (facture, quittance, reçu) est obligatoire.' };
+  var charge = o.charge === 'souscripteur' ? 'souscripteur' : 'promoteur';
+  var tiers = o.tiers_id ? fcIntervenant(o.tiers_id) : null; if (o.tiers_id && !tiers) return { ok: false, erreur: 'Intervenant introuvable.' };
+  var a = fcActeur();
+  var f = { id: uid(), nature: o.nature, montant_ht: Math.round(ht * 100) / 100, tva: Math.round(tva * 100) / 100, date: o.date, piece: piece, charge: charge, tiers_id: tiers ? tiers.id : '',
+            libelle: String(o.libelle || '').trim().slice(0, 200), statut: 'saisi', saisi_par: a.nom, saisi_le: new Date().toISOString() };
+  d.frais_titre = fcFraisTitre(d).concat([f]); await fcSauver(d);
+  await fcEvenement(d, '', 'frais_titre', FC_FRAIS_TITRE[f.nature].lib + ' saisis : ' + fcTotalFrais(f) + ' FCFA (' + (charge === 'souscripteur' ? 'avancés pour le souscripteur' : 'à la charge du promoteur') + ') — pièce ' + piece, { source: 'promoteur', source_ref: f.id });
+  return { ok: true, frais: f };
+}
+function fcFrais(d, id) { return fcFraisTitre(d).find(function(f){ return f.id === id; }) || null; }
+function fcEcritureFrais(d, f, phase, o) {
+  o = o || {};
+  var cl = fcClient((d.client_ids || [d.client_id])[0]) || {}, t = f.tiers_id ? fcIntervenant(f.tiers_id) : null, total = fcTotalFrais(f);
+  var four = requireCompteDefaut('titre_fournisseurs'), lib = FC_FRAIS_TITRE[f.nature].lib + ' — ' + d.reference + (t ? ' — ' + t.nom_organisation : '');
+  var base = { piece: f.piece, tiers_id: f.tiers_id || '', montant: total, mode: o.mode || '', division: (typeof _resolveDivisionEcriture === 'function' ? _resolveDivisionEcriture('client', cl.id) : ''), created_at: today(),
+               notes: 'Dossier ' + d.reference + ' · pièce ' + f.piece + ' · généré en brouillard, à valider en comptabilité.', origine: 'foncier_frais_titre', frais_id: f.id };
+  if (phase === 'constat') {
+    var lignes;
+    if (f.charge === 'souscripteur') lignes = [{ compte: requireCompteDefaut('titre_avances_souscripteur'), sens: 'D', montant: total, libelle: 'Frais avancés pour ' + (cl.nom || 'le souscripteur') }, { compte: four, sens: 'C', montant: total, libelle: lib }];
+    else {
+      lignes = [{ compte: requireCompteDefaut(FC_FRAIS_TITRE[f.nature].cle), sens: 'D', montant: f.montant_ht, libelle: lib }];
+      if (f.tva > 0) lignes.push({ compte: requireCompteDefaut('tva_deductible'), sens: 'D', montant: f.tva, libelle: 'TVA déductible — ' + lib });
+      lignes.push({ compte: four, sens: 'C', montant: total, libelle: lib });
+    }
+    return Object.assign({ id: 'ecr_titre_' + f.id + '_cst', ref: 'TIT-' + d.reference + '-' + f.id.slice(-4), date: f.date, libelle: lib, type: f.charge === 'souscripteur' ? 'actif' : 'charge', lignes: lignes }, base);
+  }
+  var treso = _compteTresoVersement(o.mode);
+  return Object.assign({ id: 'ecr_titre_' + f.id + '_reg', ref: 'REG-' + d.reference + '-' + f.id.slice(-4), date: o.date, libelle: 'Règlement — ' + lib, type: 'actif',
+                         lignes: [{ compte: four, sens: 'D', montant: total, libelle: lib }, { compte: treso, sens: 'C', montant: total, libelle: 'Règlement ' + (o.mode || '') }] }, base);
+}
+async function fcPoserEcriture(ecr) {
+  var i = DATA.ecritures.findIndex(function(e){ return e.id === ecr.id; });
+  if (i >= 0) DATA.ecritures[i] = ecr; else DATA.ecritures.push(ecr);
+  await dbPut('ecritures', ecr);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', ecr);
+  try { if (typeof buildBalance === 'function') buildBalance(); if (typeof buildGrandLivre === 'function') buildGrandLivre(); } catch (e) {}
+}
+async function fcComptabiliserFraisTitre(dossierId, fraisId) {
+  var d = fcDossier(dossierId), f = d && fcFrais(d, fraisId); if (!f) return { ok: false, erreur: 'Frais introuvable.' };
+  if (!fcPeutComptabiliserFrais()) return { ok: false, erreur: "Vous n'avez pas le droit de comptabiliser (module Comptabilité)." };
+  if (f.statut !== 'saisi') return { ok: false, erreur: f.statut === 'annule' ? 'Frais annulé.' : 'Déjà comptabilisé.' };
+  var ecr; try { ecr = fcEcritureFrais(d, f, 'constat'); } catch (e) { return { ok: false, erreur: /COMPTE_DEFAUT_MANQUANT/.test(String(e && e.message)) ? 'Compte non paramétré (Paramètres › Comptes par défaut › Titre foncier).' : String(e && e.message || e) }; }
+  await fcPoserEcriture(ecr);
+  f.statut = 'comptabilise'; f.ecriture_constat = ecr.id; f.comptabilise_par = fcActeur().nom; f.comptabilise_le = new Date().toISOString(); await fcSauver(d);
+  await fcEvenement(d, '', 'frais_titre', 'Frais comptabilisés : ' + FC_FRAIS_TITRE[f.nature].lib + ' ' + fcTotalFrais(f) + ' FCFA — écriture ' + ecr.ref + ' (brouillard)', { source: 'promoteur', source_ref: f.id });
+  return { ok: true, ecriture: ecr };
+}
+async function fcReglerFraisTitre(dossierId, fraisId, o) {
+  o = o || {};
+  var d = fcDossier(dossierId), f = d && fcFrais(d, fraisId); if (!f) return { ok: false, erreur: 'Frais introuvable.' };
+  if (!fcPeutComptabiliserFrais()) return { ok: false, erreur: "Vous n'avez pas le droit de comptabiliser (module Comptabilité)." };
+  if (f.statut !== 'comptabilise') return { ok: false, erreur: f.statut === 'paye' ? 'Déjà réglé.' : "Comptabilisez d'abord ce frais." };
+  if (['especes', 'mobile_money', 'virement', 'cheque', 'banque'].indexOf(o.mode) === -1) return { ok: false, erreur: 'Mode de règlement inconnu.' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(o.date || '') || o.date < f.date) return { ok: false, erreur: 'Date de règlement invalide (pas avant la date de la pièce).' };
+  var ecr; try { ecr = fcEcritureFrais(d, f, 'reglement', { mode: o.mode, date: o.date }); } catch (e) { return { ok: false, erreur: /COMPTE_DEFAUT_MANQUANT/.test(String(e && e.message)) ? 'Compte non paramétré (Paramètres › Comptes par défaut).' : String(e && e.message || e) }; }
+  await fcPoserEcriture(ecr);
+  f.statut = 'paye'; f.ecriture_reglement = ecr.id; f.regle_le = o.date; f.mode_reglement = o.mode; await fcSauver(d);
+  await fcEvenement(d, '', 'frais_titre', 'Frais réglés : ' + FC_FRAIS_TITRE[f.nature].lib + ' ' + fcTotalFrais(f) + ' FCFA — écriture ' + ecr.ref + ' (brouillard)', { source: 'promoteur', source_ref: f.id });
+  return { ok: true, ecriture: ecr };
+}
+async function fcAnnulerFraisTitre(dossierId, fraisId, motif) {
+  var d = fcDossier(dossierId), f = d && fcFrais(d, fraisId); if (!f) return { ok: false, erreur: 'Frais introuvable.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) annule un frais.' };
+  if (f.statut !== 'saisi') return { ok: false, erreur: f.statut === 'annule' ? 'Déjà annulé.' : 'Frais comptabilisé : demandez la contre-passation de l\'écriture en comptabilité.' };
+  if (!String(motif || '').trim()) return { ok: false, erreur: "Le motif d'annulation est obligatoire." };
+  f.statut = 'annule'; f.annule_motif = String(motif).trim(); f.annule_par = fcActeur().nom; f.annule_le = new Date().toISOString(); await fcSauver(d);
+  await fcEvenement(d, '', 'frais_titre', 'Frais annulés : ' + FC_FRAIS_TITRE[f.nature].lib + ' ' + fcTotalFrais(f) + ' FCFA', { source: 'promoteur', source_ref: f.id, motif: f.annule_motif });
+  return { ok: true };
+}
+fcProtegerMutations(['fcAjouterFraisTitre', 'fcAnnulerFraisTitre']);
+
+/* ═══ Vente → titre : à l'entier règlement du prix initial, le dossier de titre individuel s'ouvre (ou le service Foncier est prévenu) ═══
+   Réglable : Foncier › Notifications › « Ouverture automatique » (DATA.params.fc_ouverture_auto_solde, actif par défaut). Une seule fois par souscripteur. */
+async function fcApresSolde(clientId) {
+  try {
+    if ((DATA.params || {}).fc_ouverture_auto_solde === false) return { ok: false, raison: 'désactivé' };
+    var c = fcClient(clientId); if (!c || c.statut === 'resilie') return { ok: false, raison: 'souscripteur' };
+    if (typeof attSoldeSolde !== 'function' || !attSoldeSolde(c, 'initial').solde) return { ok: false, raison: 'non soldé' };
+    var lotIds = fcLotsIdsClient(c).filter(function(id){ var l = (DATA.lots || []).find(function(x){ return x.id === id; }); return l && l.parcelle_id; });
+    if (!lotIds.length) return { ok: false, raison: 'aucun lot rattaché à une parcelle' };
+    var deja = (DATA.dossiers_fonciers || []).some(function(d){ return fcEstIndividuel(d) && d.statut !== 'annule' && (d.client_ids || [d.client_id]).indexOf(c.id) !== -1; });
+    if (deja) return { ok: false, raison: 'dossier existant' };
+    var lot0 = (DATA.lots || []).find(function(x){ return x.id === lotIds[0]; }), tm = fcTitreMere(lot0.parcelle_id), r = null;
+    if (tm.disponible && fcDroitEcriture()) r = await fcOuvrirDossierIndividuel({ lot_ids: lotIds, client_id: c.id });
+    if (r && r.ok) {
+      await fcEvenement(r.dossier, '', 'ouverture_auto', 'Dossier ouvert automatiquement : ' + (c.nom || c.id) + ' a soldé le prix initial de son bien.', { source: 'promoteur' });
+      if (typeof toast === 'function') toast('🏛️ Souscripteur soldé : dossier de titre individuel ' + r.dossier.reference + ' ouvert automatiquement.', 'success', 6000);
+      return { ok: true, dossier: r.dossier };
+    }
+    var raison = r ? r.erreur : (!tm.disponible ? "le titre de l'opération n'est pas disponible (" + tm.raison + ')' : "droits insuffisants pour ouvrir le dossier depuis ce poste");
+    var res = await fcNotifierUsers(fcUsersFoncier([]), { dedup: 'solde:' + c.id, titre: 'Souscripteur soldé : dossier de titre individuel à ouvrir',
+      message: (c.nom || c.id) + ' a soldé le prix initial de son bien. Dossier non ouvert automatiquement : ' + raison + '.', template_code: 'solde_titre', dossier_id: '', urgent: false }, null);
+    return { ok: false, raison: raison, notifies: res };
+  } catch (e) { console.warn('[Foncier Connect] ouverture automatique au solde', e); return { ok: false, raison: String(e && e.message || e) }; }
+}
+
+
+
+function fcPanneauFrais(d) {
+  if (!fcEstIndividuel(d)) return '';
+  var l = fcFraisTitre(d), syn = fcSyntheseFraisTitre(d), q = '\'' + d.id + '\'', compta = fcPeutComptabiliserFrais(), gerer = fcPeutGererDossier(d);
+  var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">💶 Frais du titre — honoraires et droits</div>'
+    + '<div style="font-size:11px;color:var(--dim);margin-bottom:6px;">Chaque frais exige sa pièce justificative. Comptabilisation SYSCOHADA en brouillard (comptes : Paramètres › Comptes par défaut › Titre foncier).</div>';
+  h += l.length ? '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Nature</th><th>Imputation</th><th>Pièce</th><th>HT</th><th>TVA</th><th>Total</th><th>Statut</th><th></th></tr></thead><tbody>' + l.map(function(f){
+    var fq = '\'' + f.id + '\'', t = f.tiers_id ? fcIntervenant(f.tiers_id) : null;
+    var act = f.statut === 'saisi' ? (compta ? '<button class="btn btn-secondary btn-sm" onclick="fcComptabiliserFraisUI(' + q + ',' + fq + ')">Comptabiliser</button> ' : '') + (gerer ? '<button class="btn btn-secondary btn-sm" onclick="fcAnnulerFraisUI(' + q + ',' + fq + ')">Annuler</button>' : '')
+            : f.statut === 'comptabilise' ? (compta ? '<button class="btn btn-secondary btn-sm" onclick="fcReglerFraisUI(' + q + ',' + fq + ')">Régler</button>' : '') : '';
+    return '<tr style="' + (f.statut === 'annule' ? 'opacity:.5;text-decoration:line-through;' : '') + '"><td>' + escHtml(f.date) + '</td><td>' + escHtml(FC_FRAIS_TITRE[f.nature].lib) + (t ? '<br><span style="font-size:11px;color:var(--dim);">' + escHtml(t.nom_organisation) + '</span>' : '') + '</td>'
+      + '<td>' + (f.charge === 'souscripteur' ? 'Souscripteur (avancé, à refacturer)' : 'Promoteur (charge)') + '</td><td>' + escHtml(f.piece) + '</td><td style="text-align:right;">' + fmtF(f.montant_ht) + '</td><td style="text-align:right;">' + fmtF(f.tva) + '</td><td style="text-align:right;"><b>' + fmtF(fcTotalFrais(f)) + '</b></td>'
+      + '<td>' + escHtml(FC_STATUTS_FRAIS[f.statut]) + '</td><td>' + act + '</td></tr>'; }).join('') + '</tbody></table></div>'
+    + '<div style="font-size:12px;margin-top:6px;">À la charge du promoteur : <b>' + fmtF(syn.promoteur) + ' F</b> · avancés pour le souscripteur (à refacturer) : <b>' + fmtF(syn.souscripteur) + ' F</b> · réglé : ' + fmtF(syn.regle) + ' F · reste à régler : <b>' + fmtF(syn.a_regler) + ' F</b></div>'
+    : '<div style="color:var(--dim);padding:6px;">Aucun frais saisi.</div>';
+  if (gerer && d.statut !== 'annule') {
+    var ivs = (DATA.intervenants_fonciers || []).filter(function(i){ return i.statut_relation === 'actif' && (i.type === 'notaire' || i.type === 'geometre'); });
+    h += '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;margin-top:8px;">'
+      + '<div class="form-group"><label>Nature</label><select class="filter-select" id="ff-nature">' + Object.keys(FC_FRAIS_TITRE).map(function(k){ return '<option value="' + k + '">' + escHtml(FC_FRAIS_TITRE[k].lib) + '</option>'; }).join('') + '</select></div>'
+      + '<div class="form-group"><label>Intervenant</label><select class="filter-select" id="ff-tiers"><option value="">—</option>' + ivs.map(function(i){ return '<option value="' + i.id + '">' + escHtml(i.nom_organisation) + '</option>'; }).join('') + '</select></div>'
+      + '<div class="form-group"><label>Montant HT (F)</label><input class="form-control" id="ff-ht" inputmode="decimal" style="width:110px;"></div>'
+      + '<div class="form-group"><label>TVA (F)</label><input class="form-control" id="ff-tva" inputmode="decimal" style="width:90px;" value="0"></div>'
+      + '<div class="form-group"><label>Date de la pièce</label><input type="date" class="form-control" id="ff-date" value="' + fcAuj() + '"></div>'
+      + '<div class="form-group"><label>N° facture / quittance *</label><input class="form-control" id="ff-piece" style="width:130px;"></div>'
+      + '<div class="form-group"><label>Imputation</label><select class="filter-select" id="ff-charge"><option value="promoteur">Charge du promoteur</option><option value="souscripteur">Avancé pour le souscripteur</option></select></div>'
+      + '<button class="btn btn-primary btn-sm" onclick="fcAjouterFraisUI(' + q + ')">Saisir</button></div>';
+  }
+  return h + '</div>';
+}
+async function fcAjouterFraisUI(id) {
+  var g = function(i){ var e = document.getElementById(i); return e ? e.value : ''; };
+  fcMsg(await fcAjouterFraisTitre(id, { nature: g('ff-nature'), tiers_id: g('ff-tiers'), montant_ht: g('ff-ht'), tva: g('ff-tva'), date: g('ff-date'), piece: g('ff-piece'), charge: g('ff-charge') }), 'Frais saisi.'); fcRenderDetail(id);
+}
+async function fcComptabiliserFraisUI(id, fid) { fcMsg(await fcComptabiliserFraisTitre(id, fid), 'Frais comptabilisé (écriture en brouillard).'); fcRenderDetail(id); }
+async function fcReglerFraisUI(id, fid) {
+  var mode = prompt('Mode de règlement : especes, mobile_money, virement, cheque ou banque', 'virement'); if (!mode) return;
+  var date = prompt('Date du règlement (AAAA-MM-JJ) :', fcAuj()); if (!date) return;
+  fcMsg(await fcReglerFraisTitre(id, fid, { mode: mode.trim(), date: date.trim() }), 'Règlement comptabilisé (écriture en brouillard).'); fcRenderDetail(id);
+}
+async function fcAnnulerFraisUI(id, fid) { var m = prompt("Motif de l'annulation (obligatoire) :"); if (m === null) return; fcMsg(await fcAnnulerFraisTitre(id, fid, m), 'Frais annulé.'); fcRenderDetail(id); }
 
 /* ── Interface ── */
 function fcBandeauNiveau(d) {
@@ -113092,6 +113291,7 @@ function attSoldeAuto(clientId){
     }
   });
   attSoldeRafraichirUI(clientId);
+  if (typeof fcApresSolde === 'function') { try { var _p = fcApresSolde(clientId); if (_p && _p.catch) _p.catch(function(){}); } catch (e) {} }
 }
 /* Rafraîchit la liste « À livrer » et la zone Documents de la fiche souscripteur si elle est ouverte. */
 function attSoldeRafraichirUI(clientId){
