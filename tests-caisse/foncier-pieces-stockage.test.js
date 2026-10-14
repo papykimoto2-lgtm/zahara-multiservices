@@ -103,3 +103,18 @@ test('synchro réelle : le fichier part dans le bucket, la ligne publiée ne con
   assert.equal(o.echec.res, false); assert.equal(o.echec.rest, 0); assert.equal(o.echec.chemin, ''); assert.equal(o.echec.localGarde, true);
   assert.deepEqual(app.etat.erreursPage, []);
 });
+
+test('livrable déposé depuis le portail : la version porte le lien vers le fichier (ouvrable par le responsable)', async () => {
+  const app = await ouvrirApp(); const ids = await preparer(app.page);
+  const html = await app.page.evaluate(function (ids) {
+    DATA.intervenants_fonciers = [{ id: 'g1', type: 'geometre', nom_organisation: 'Cabinet Géo', statut_relation: 'actif' }]; DATA.users = [{ id: 'u1', nom: 'Resp', login: 'rf' }];
+    DATA.pieces_foncieres.push({ id: 'pfp', dossier_id: ids.d, etape_code: 'depot', nom: 'plan.pdf', type: 'application/pdf', chemin: ids.d + '/pfp', retire: false });
+    DATA.missions_foncieres = [{ id: 'm1', reference: 'MF-1', titre: 'Bornage', dossier_id: ids.d, intervenant_id: 'g1', statut: 'livrable_soumis', responsable_validation_id: 'u1', echeance: '2099-12-31', messages: [],
+      livrables: [{ id: 'l1', libelle: 'Plan', versions: [{ numero: 1, reference: 'Fichier : plan.pdf', note: '', date: '2026-10-14', depose_par: 'Cabinet Géo', statut: 'soumis', refus: null, piece_id: 'pfp' }, { numero: 2, reference: 'Fichier : x.pdf', statut: 'soumis', piece_id: 'inconnue' }] }] }];
+    document.body.insertAdjacentHTML('beforeend', '<div id="fi-detail"></div>');
+    fcRenderMissionDetail('m1'); return document.getElementById('fi-detail').innerHTML;
+  }, ids);
+  assert.match(html, /Fichier : plan\.pdf[\s\S]*fcTelechargerPieceUI\('pfp'\)[\s\S]*ouvrir le fichier/);
+  assert.equal((html.match(/ouvrir le fichier/g) || []).length, 1, 'pas de lien si la pièce est inconnue de ce poste');
+  assert.deepEqual(app.etat.erreursPage, []);
+});
