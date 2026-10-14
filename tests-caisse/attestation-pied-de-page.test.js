@@ -104,3 +104,22 @@ test('sans division : la raison sociale des Paramètres est utilisée', async ()
   });
   assert.equal(nous, 'Zahara Multi Services');
 });
+
+test('attestation validée avec « ImmoSuite ERP » : l\'identification du promoteur est corrigée à l\'affichage, le reste du texte validé et le document enregistré sont inchangés', async () => {
+  const app = await ouvrirApp();
+  const r = await app.page.evaluate(function () {
+    window.attSoldeSolde = function () { return { solde: true, prix: 5000000, verse: 5000000, dateSolde: '2026-01-01', vs: [], frais: 0 }; };
+    DATA.params = { societe: 'ImmoSuite ERP' };
+    DATA.divisions = [{ id: 'dz', nom: 'Zahara', raisonSociale: 'ZMS Sarl', rccm: 'CI-ABJ-03-2020-M-11200', ncc: '1729048 Q', siegeSocial: 'Abidjan Cocody Angré 2 Plateau 7ème Tranche\n01 BP 6264 ABIDJAN 01', tel: '27 22 52 32 11', email: 'z@x.ci' }];
+    DATA.programmes = [{ id: 'pz', division_id: 'dz' }];
+    var c = { id: 'c1', nom: 'BENDE', programme_id: 'pz' };
+    var figee = attSoldeHtml(c, { numero: 'ATS-1', date: '2026-10-14', signataire: 'DG' });   // reconstitue un document figé avec le nom par défaut
+    DATA.divisions = []; var ancien = attSoldeHtml(c, { numero: 'ATS-1', date: '2026-10-14', signataire: 'DG' }).replace('le promoteur', 'ImmoSuite ERP').replace('<strong style="font-size:15px;"></strong>', '<strong style="font-size:15px;">ImmoSuite ERP</strong>').replace('<div class="art">La société, promoteur immobilier.</div>', '<div class="art">ImmoSuite ERP, promoteur immobilier.</div>');
+    DATA.divisions = [{ id: 'dz', nom: 'Zahara', raisonSociale: 'ZMS Sarl', rccm: 'CI-ABJ-03-2020-M-11200', ncc: '1729048 Q', siegeSocial: 'Abidjan Cocody Angré 2 Plateau 7ème Tranche\n01 BP 6264 ABIDJAN 01', tel: '27 22 52 32 11', email: 'z@x.ci' }];
+    var a = { statut: 'valide', html: ancien }, avant = a.html, h = attSoldeHtmlFinal(a, c), d = new DOMParser().parseFromString(h, 'text/html');
+    return { immo: /ImmoSuite/.test(h), entete: d.querySelector('.ref strong').textContent, promoteur: d.querySelector('h3 + .art').textContent, montant: /Solde restant dû : 0 FCFA/.test(h), stocke: a.html === avant, pied: !!d.querySelector('.pied'), avantImmo: /ImmoSuite ERP/.test(avant) };
+  });
+  assert.equal(r.avantImmo, true, 'le document figé contient bien le nom par défaut'); assert.equal(r.immo, false); assert.equal(r.entete, 'ZMS Sarl');
+  assert.match(r.promoteur, /^ZMS Sarl, RCCM CI-ABJ-03-2020-M-11200, N° CC 1729048 Q, promoteur immobilier, siège : Abidjan Cocody Angré 2 Plateau 7ème Tranche, 01 BP 6264 ABIDJAN 01\.$/);
+  assert.equal(r.montant, true); assert.equal(r.stocke, true); assert.equal(r.pied, true);
+});
