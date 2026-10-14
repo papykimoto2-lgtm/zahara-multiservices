@@ -62,3 +62,16 @@ test('Paramètres : le champ Mobile (CEL) est enregistré et rechargé', async (
   });
   assert.equal(r.champ, true); assert.equal(r.saved, '01 50 06 06 02'); assert.equal(r.recharge, '01 50 06 06 02');
 });
+
+test('attestation déjà validée (document figé sans pied) : le pied est ajouté à l\'affichage, sans toucher au texte validé ni au document enregistré', async () => {
+  const app = await ouvrirApp();
+  const r = await app.page.evaluate(function (params) {
+    DATA.params = params;
+    var figee = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{}</style></head><body><h1>ATTESTATION DE SOLDE</h1><p>Texte validé</p></body></html>';
+    var a = { statut: 'valide', html: figee }, avant = a.html, h = attSoldeHtmlFinal(a), d = new DOMParser().parseFromString(h, 'text/html');
+    var deja = attSoldeHtmlFinal({ html: h });
+    DATA.params = {}; var sansParam = attSoldeHtmlFinal({ html: figee });
+    return { pied: d.querySelectorAll('.pied').length, texte: d.body.textContent.indexOf('Texte validé') !== -1, stocke: a.html === avant, idempotent: deja === h, sansParam: sansParam === figee, css: /\.pied\{position:absolute/.test(h), lignes: d.querySelector('.pied').children.length };
+  }, PARAMS);
+  assert.equal(r.pied, 1); assert.equal(r.texte, true); assert.equal(r.stocke, true); assert.equal(r.idempotent, true); assert.equal(r.sansParam, true); assert.equal(r.css, true); assert.equal(r.lignes, 3);
+});
