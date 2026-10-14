@@ -113018,9 +113018,48 @@ function attSoldeBloc(c, kind){
     + (!a ? 'Souscripteur soldé — aucune attestation préparée.' : a.statut==='brouillon' ? 'Brouillon généré automatiquement au constat du solde. À soumettre au DG / gérant.' : a.statut==='en_attente' ? 'En attente de validation du DG / gérant.' : a.statut==='valide' ? 'Validée par '+escHtml(a.valide_par||'')+' le '+escHtml(dateShort(a.valide_le))+'.' : 'Rejetée'+(a.motif?(' : '+escHtml(a.motif)):'')+'.')
     + '</div>' + attSoldeCellule(c.id, kind) + '</div>';
 }
+/* ── Notaire : transmission des attestations validées via son espace Intervenant (portail unique) ──
+   Le notaire est désigné sur la fiche du souscripteur (notaire_intervenant_id, intervenant de type « notaire »).
+   Chaque attestation validée est transmise explicitement (transmis_notaire) ; changer de notaire ou retirer la
+   transmission coupe l'accès côté serveur. Le texte transmis est celui figé à la validation, corrigé à l'affichage. */
+function attNotairesActifs(){ return (DATA.intervenants_fonciers||[]).filter(function(i){ return i.type==='notaire' && i.statut_relation==='actif'; }); }
+function attNotaireDe(c){ return c && c.notaire_intervenant_id ? (DATA.intervenants_fonciers||[]).find(function(i){ return i.id===c.notaire_intervenant_id; }) || null : null; }
+function attNotaireChoisir(clientId, id){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
+  var avant = attNotaireDe(c), apres = id ? (attNotairesActifs().find(function(i){return i.id===id;})||null) : null;
+  if(id && !apres){ toast('Notaire introuvable ou inactif.','error'); return; }
+  c.notaire_intervenant_id = apres ? apres.id : '';
+  if(avant && (!apres || apres.id!==avant.id)){   /* l'ancien notaire perd l'accès : on retire aussi les transmissions */
+    ['attestation_solde','attestation_solde_finale'].forEach(function(ch){ var a = c[ch]; if(a){ a.transmis_notaire = false; delete a.transmis_notaire_le; delete a.html_notaire; } });
+  }
+  attSoldeSauver(c); attSoldeRafraichirUI(clientId);
+  toast(apres ? 'Notaire désigné : '+apres.nom_organisation+'. Transmettez ensuite chaque attestation (⚖️).' : 'Notaire retiré : plus aucun accès.','info');
+}
+function attSoldeNotaire(clientId, on, kind){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c[attChamp(kind)];
+  if(!a || a.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
+  var n = attNotaireDe(c);
+  if(on && (!n || n.statut_relation!=='actif')){ toast('Désignez d\'abord un notaire actif pour ce souscripteur.','error'); return; }
+  a.transmis_notaire = !!on;
+  if(on){ a.transmis_notaire_le = today(); a.html_notaire = attSoldeHtmlFinal(a, c); } else { delete a.transmis_notaire_le; delete a.html_notaire; }
+  attLierJuridique(c, attLibKind(kind)+' N° '+a.numero+(on ? ' transmise au notaire '+n.nom_organisation+' (espace Intervenant).' : ' retirée de l\'espace du notaire.'), kind);
+  attSoldeSauver(c); attSoldeRafraichirUI(c.id);
+  toast(on ? '⚖️ Attestation disponible dans l\'espace du notaire (il doit avoir un accès portail actif).' : 'Transmission au notaire retirée.', 'info', 6000);
+}
+function attSoldeNotaireZone(c){
+  var valide = ['attestation_solde','attestation_solde_finale'].some(function(ch){ return c[ch] && c[ch].statut==='valide'; });
+  var n = attNotaireDe(c), liste = attNotairesActifs();
+  if(!valide && !n) return '';
+  var opts = '<option value="">— aucun —</option>' + liste.map(function(i){ return '<option value="'+escHtml(i.id)+'"'+(n&&n.id===i.id?' selected':'')+'>'+escHtml(i.nom_organisation)+'</option>'; }).join('');
+  var e = n ? (typeof fcEtatAccesIntervenant==='function' ? fcEtatAccesIntervenant(n).etat : '') : '';
+  return '<div style="border:1px solid var(--gris-med);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;">⚖️ <strong>Notaire chargé du dossier</strong> '
+    + '<select class="filter-select" style="margin-left:6px;" onchange="attNotaireChoisir(\''+c.id+'\',this.value)">'+opts+'</select>'
+    + (liste.length ? '' : '<div style="color:var(--blanc-dim);margin-top:4px;">Aucun notaire enregistré : ajoutez-le dans Foncier › Intervenants (type Notaire), puis générez son accès portail.</div>')
+    + (n && e!=='actif' ? '<div style="color:#c0392b;margin-top:4px;">⚠️ Ce notaire n\'a pas d\'accès portail actif (Foncier › Intervenants › Générer l\'accès).</div>' : '') + '</div>';
+}
 function attSoldeZoneClient(clientId){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return '';
-  return attSoldeBloc(c, 'initial') + attSoldeBloc(c, 'finale');
+  return attSoldeNotaireZone(c) + attSoldeBloc(c, 'initial') + attSoldeBloc(c, 'finale');
 }
 /* ── Impression « avec modifications » (à titre indicatif) ───────────────────
    Deux versions imprimables d'une attestation validée :
@@ -113113,7 +113152,7 @@ async function attSoldeAnnulerValidation(clientId, kind){
   var qui = (APP.currentUser&&APP.currentUser.nom)||'—';
   a.annulations = (a.annulations||[]).concat([{ le:today(), par:qui, motif:motif, valide_par:a.valide_par||'', valide_le:a.valide_le||'', publie_portail:!!a.publie_portail, wa_envoye_le:a.wa_envoye_le||'' }]);
   a.statut = 'brouillon'; a.publie_portail = false;
-  ['html','valide_par','valide_le','date_emission','publie_le','wa_envoye_le','variante','date_demande','demandeur','motif'].forEach(function(k){ delete a[k]; });
+  ['html','html_notaire','transmis_notaire','transmis_notaire_le','valide_par','valide_le','date_emission','publie_le','wa_envoye_le','variante','date_demande','demandeur','motif'].forEach(function(k){ delete a[k]; });
   a.date_brouillon = today();
   (DATA.validations||[]).filter(function(v){ return v.type===champ && v.ref_id===clientId && v.statut==='valide'; }).forEach(function(v){
     v.statut = 'annule'; v.motif = "Validation annulée par "+qui+" le "+today()+" : "+motif;
@@ -113188,6 +113227,7 @@ function attSoldeCellule(clientId, kind){
     + (kind==='finale' ? '' : '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer avec les modifications demandées par le souscripteur : version à titre indicatif" onclick="attSoldeVarianteOuvrir('+q+')">✏️ Avec modif.</button> ')
     + '<button class="btn '+(a.publie_portail?'btn-primary':'btn-secondary')+' btn-sm" '+b+' title="'+(a.publie_portail?'Publiée au portail — cliquer pour retirer':'Publier au portail du souscripteur')+'" onclick="attSoldePublier('+q+','+(a.publie_portail?'false':'true')+k+')">🌐</button> '
     + '<button class="btn btn-secondary btn-sm" '+b+' title="Envoyer par WhatsApp" onclick="attSoldeWhatsApp('+q+k+')">📲</button> '
+    + (attNotaireDe(c) ? '<button class="btn '+(a.transmis_notaire?'btn-primary':'btn-secondary')+' btn-sm" '+b+' title="'+(a.transmis_notaire?'Transmise au notaire — cliquer pour retirer':'Transmettre au notaire (espace Intervenant)')+'" onclick="attSoldeNotaire('+q+','+(a.transmis_notaire?'false':'true')+k+')">⚖️</button> ' : '')
     + '<button class="btn btn-secondary btn-sm" '+b+' title="Annuler la validation (validée par erreur) : retour en brouillon, puis nouvelle soumission au DG" onclick="attSoldeAnnulerValidation('+q+k+')">↩ Annuler la validation</button>'
     + (a.wa_envoye_le?'<div style="font-size:9px;color:var(--blanc-dim);">WhatsApp : '+escHtml(dateShort(a.wa_envoye_le))+'</div>':'');
 }

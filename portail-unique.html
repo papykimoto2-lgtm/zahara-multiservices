@@ -1357,7 +1357,7 @@
      Aucune table lue directement : tout passe par des fonctions serveur qui identifient l'intervenant par son JETON
      (fc_vue_intervenant, fc_intervenant_accepter, fc_intervenant_demarrer). Il ne voit que ses missions envoyées :
      jamais d'observations internes, de responsable, de montants ni de souscripteurs. */
-  var INT = { id:null, nom:'', missions:[], ouverte:null, occupe:null, msg:null, erreur:'' };
+  var INT = { id:null, nom:'', missions:[], attestations:[], ouverte:null, occupe:null, msg:null, erreur:'' };
   var INT_STATUTS = { envoyee:'À accepter', acceptee:'Acceptée', en_cours:'En cours', attente_informations:"En attente d'informations", livrable_soumis:'Livrable soumis', en_verification:'En vérification', a_corriger:'À corriger', validee:'Validée', cloturee:'Clôturée' };
   var INT_COULEUR = { envoyee:'p-or', acceptee:'p-bleu', en_cours:'p-bleu', attente_informations:'p-or', livrable_soumis:'p-bleu', en_verification:'p-bleu', a_corriger:'p-rouge', validee:'p-vert', cloturee:'p-gris' };
   var INT_ACTIVES = ['envoyee','acceptee','en_cours','attente_informations','livrable_soumis','en_verification','a_corriger'];
@@ -1408,11 +1408,27 @@
     try{
       var v=await _intRpc('fc_vue_intervenant');
       INT.missions=(v&&Array.isArray(v.missions))?v.missions:[]; INT.erreur='';
+      /* Notaire : attestations de solde transmises par le promoteur (la fonction renvoie [] pour tout autre intervenant). */
+      try{ var na=await _intRpc('fc_vue_notaire_attestations'); INT.attestations=(na&&Array.isArray(na.attestations))?na.attestations:[]; }catch(e2){ if(e2&&e2.message==='session') throw e2; INT.attestations=[]; }
     }catch(e){
       if(e&&e.message==='session'){ logoutIntervenant(); setErr('intError','Session expirée : reconnectez-vous.'); return; }
       INT.erreur='Chargement impossible pour le moment. Réessayez.';
     }
     rendreIntervenant();
+  }
+  /* Espace notaire : attestations de solde transmises (lecture et impression du texte figé validé par la direction). */
+  function _intAttestationsHtml(){
+    var l=INT.attestations||[]; if(!l.length) return '';
+    return '<div class="card"><strong>📜 Attestations de solde transmises</strong><p style="font-size:.78rem;color:#4b6a8b;margin:6px 0;">Documents validés par la Direction, transmis pour les dossiers dont vous avez la charge.</p>'
+      +l.map(function(a,i){ return '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid #e2e8f0;padding:8px 0;"><div><strong>'+esc(a.souscripteur||'—')+'</strong> · dossier '+esc(a.dossier||'—')+'<div style="font-size:.78rem;color:#6b7f95;">'+(a.kind==='finale'?'Valeur finale':'Prix initial')+' · N° '+esc(a.numero||'')+(a.date?' · validée le '+esc(dshort(a.date)):'')+'</div></div>'
+        +'<button class="highlight-btn" style="padding:8px 16px;background:#16a34a;" data-i="'+i+'" onclick="intOuvrirAttestation(this.dataset.i)">Consulter / imprimer</button></div>'; }).join('')+'</div>';
+  }
+  function intOuvrirAttestation(i){
+    var a=(INT.attestations||[])[parseInt(i,10)]; if(!a||!a.html) return;
+    var w=window.open('','_blank','width=860,height=900'); if(!w) return;
+    w.document.write(a.html); w.document.close();
+    try{ logConnexion('[NOTAIRE] '+(INT.nom||INT.id), true, 'Consultation attestation '+(a.numero||'')+' — '+(a.souscripteur||'')); }catch(e){}
+    setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
   }
   function _intMission(id){ return INT.missions.filter(function(m){ return String(m.id)===String(id); })[0]; }
   async function intAction(action, missionId){
@@ -1482,7 +1498,7 @@
     return h+'</div>';
   }
   function logoutIntervenant(){
-    INT.id=null; INT.nom=''; INT.missions=[]; INT.ouverte=null; INT.occupe=null; INT.msg=null; INT.erreur='';
+    INT.id=null; INT.nom=''; INT.missions=[]; INT.attestations=[]; INT.ouverte=null; INT.occupe=null; INT.msg=null; INT.erreur='';
     _clearToken(); try{ sessionStorage.removeItem('pp_int_nom'); }catch(e){}
     document.getElementById('int-dash').style.display='none'; document.getElementById('int-dash').innerHTML='';
     document.getElementById('int-login').style.display='block'; document.getElementById('intCode').value='';
@@ -1539,6 +1555,7 @@
     if(INT.msg) h+='<div role="'+(INT.msg.t==='ok'?'status':'alert')+'" style="'+(INT.msg.t==='ok'?'background:#dcfce7;color:#166534;':'background:#fee2e2;color:#991b1b;')+'padding:10px 14px;border-radius:14px;margin:12px 0;font-size:.88rem;">'+esc(INT.msg.m)+'</div>';
     h+='<div class="kpi-row">'+kpiBox('À accepter',n(function(m){return m.statut==='envoyee';}),'')+kpiBox('En cours',n(function(m){return ['acceptee','en_cours','attente_informations'].indexOf(m.statut)!==-1;}),'')
       +kpiBox('À corriger',n(function(m){return m.statut==='a_corriger';}),'color:#991b1b;')+kpiBox('En retard',n(_intEnRetard),'color:#991b1b;')+'</div>';
+    h+=_intAttestationsHtml();
     if(INT.erreur) h+='<div class="badge-danger" style="display:block;">'+esc(INT.erreur)+'</div>';
     if(!ms.length&&!INT.erreur) h+='<div class="card"><p style="color:#4b6a8b;">Aucune mission pour le moment. Si vous en attendez une, contactez votre interlocuteur.</p></div>';
     h+=ms.map(function(m){
@@ -1826,7 +1843,7 @@
     html+='<div class="sub" id="s-tra">'+blocTravaux()+'</div>';
     html+='<div class="sub" id="s-rec">'+blocReception()+'</div>';
     if(S.suivi) html+='<div class="sub" id="s-tit">'+blocSuiviTitre()+'</div>';
-    html+='<div class="sub" id="s-doc"><div class="card"><strong>📁 Mes documents</strong><div style="display:flex; flex-direction:column; gap:12px; margin-top:12px; max-width:340px;"><button class="highlight-btn" style="background:#0077b6;" onclick="docEcheancier()">📅 Échéancier personnalisé</button><button class="highlight-btn" style="background:#0077b6;" onclick="docAttestation()">📑 Attestation de versements</button>'+sAttSoldeBtn()+'</div></div></div>';
+    html+='<div class="sub" id="s-doc">'+sPrixModifs()+'<div class="card"><strong>📁 Mes documents</strong><div style="display:flex; flex-direction:column; gap:12px; margin-top:12px; max-width:340px;"><button class="highlight-btn" style="background:#0077b6;" onclick="docEcheancier()">📅 Échéancier personnalisé</button><button class="highlight-btn" style="background:#0077b6;" onclick="docAttestation()">📑 Attestation de versements</button>'+sAttSoldeBtn()+'</div></div></div>';
     html+='<div class="sub" id="s-msg"><div class="card">'
       +'<strong style="font-size:1rem;">💬 Messagerie</strong>'
       +'<div style="margin:14px 0 12px;">'
@@ -1958,6 +1975,29 @@
   /* Attestation de solde : n'apparaît que si la Direction l'a validée ET publiée pour ce souscripteur.
      Le document validé est figé dans la fiche (attestation_solde.html) : on l'affiche tel quel. */
   function _attPubliee(champ){ var a=S.client&&S.client[champ]; return (a&&a.statut==='valide'&&a.publie_portail&&a.html) ? a : null; }
+  /* Prix & modifications (lecture seule) : mêmes règles que les attestations de solde.
+     Prix initial = montant du contrat − modifications facturées − régularisations de surface. */
+  function sModifs(c){
+    var m=[];
+    (c.demandes_modification||[]).forEach(function(d){ var mt=d&&d.facture?(parseFloat(d.montant_facture)||0):0; if(mt) m.push({date:String(d.date||'').slice(0,10),nature:'Travaux modificatifs',libelle:String(d.description||'Modification de construction'),montant:mt}); });
+    (c.regularisations_surface||[]).forEach(function(r){ var mt=r?(parseFloat(r.montant)||0):0; if(mt) m.push({date:String(r.date||'').slice(0,10),nature:'Régularisation de surface',libelle:'Écart de surface de '+(r.ecart_m2!=null?r.ecart_m2:'?')+' m²'+(r.prix_m2?(' × '+fmt(r.prix_m2)+' FCFA/m²'):''),montant:mt}); });
+    return m.sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); });
+  }
+  function sPrixModifs(){
+    var c=S.client; if(!c) return '';
+    var total=parseFloat(c.montant_total)||0; if(total<=0) return '';
+    var m=sModifs(c), somme=m.reduce(function(s,x){ return s+x.montant; },0), initial=total-somme;
+    if(initial<=0.5){ m=[]; somme=0; initial=total; }
+    var verse=(S.versements||[]).filter(function(v){ return v&&v.statut!=='annule'&&v.type!=='frais_souscription'; }).reduce(function(s,v){ return s+(parseFloat(v.montant)||0); },0);
+    var reste=Math.max(0,total-verse), lg=function(a,b,st){ return '<tr><td style="'+(st||'')+'">'+a+'</td><td style="text-align:right;white-space:nowrap;'+(st||'')+'">'+b+'</td></tr>'; };
+    var h='<div class="card"><strong>🏠 Prix du bien et modifications</strong><div style="overflow-x:auto;"><table style="margin-top:8px;"><tbody>'+lg('Prix initial du bien',fmt(initial)+' FCFA','font-weight:700;');
+    m.forEach(function(x){ h+=lg('<span style="font-size:.75rem;color:#4b6a8b;">'+esc(dshort(x.date))+' · '+esc(x.nature)+'</span><br>'+esc(x.libelle),'+ '+fmt(x.montant)+' FCFA'); });
+    if(m.length) h+=lg('Valeur finale du bien',fmt(total)+' FCFA','font-weight:700;border-top:2px solid #cbd5e1;');
+    h+=lg('Total versé',fmt(verse)+' FCFA')+lg(reste>0.5?'Reste à payer':'Solde','<strong>'+(reste>0.5?fmt(reste)+' FCFA':'soldé ✓')+'</strong>')+'</tbody></table></div>'
+      +(m.length?'':'<div style="font-size:.78rem;color:#4b6a8b;margin-top:6px;">Aucune modification facturée à ce jour.</div>')
+      +'<div style="font-size:.72rem;color:#6b7f95;margin-top:8px;">Frais de souscription exclus. Information indicative ; seules les attestations de solde validées font foi.</div></div>';
+    return h;
+  }
   function sAttSoldeBtn(){
     var a=_attPubliee('attestation_solde'), f=_attPubliee('attestation_solde_finale'), h='';
     if(a) h+='<button class="highlight-btn" style="background:#16a34a;" onclick="docAttSolde()">📜 Attestation de solde N° '+esc(a.numero||'')+(f?' (prix initial)':'')+'</button>';
