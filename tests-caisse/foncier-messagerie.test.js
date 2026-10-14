@@ -97,3 +97,40 @@ test('affichage : texte HTML inerte, mission clôturée en lecture seule, chaîn
   assert.equal(r.xss, 0); assert.equal(r.texte, true); assert.equal(r.zone, true); assert.equal(r.chaine, true); assert.equal(r.lectureSeule, true);
   assert.deepEqual(app.etat.erreursPage, []);
 });
+
+test('e-mail à l\'intervenant : notification e-mail créée, lien vers son espace, contenu du message non copié, envoi via EmailJS', async () => {
+  const app = await ouvrirApp(); const ids = await preparer(app.page);
+  const r = await app.page.evaluate(async function (m) {
+    DATA.params = Object.assign(DATA.params || {}, { emailjs_service: 's', emailjs_template: 't', emailjs_key: 'k', societe: 'Zahara', portail_url: 'https://portail.exemple.ci/portail-unique.html' });
+    var envois = []; window.emailjs = { init: function () {}, send: function (s, t, p) { envois.push(p); return Promise.resolve(); } };
+    await fcEnvoyerMessageMission(m, 'Merci de joindre le PV de bornage.');
+    var n = DATA.notifications_foncieres.filter(function (x) { return x.template_code === 'message_promoteur'; });
+    var file = await fcTraiterFile();
+    return { n: n.map(function (x) { return [x.canal, x.adresse, x.message]; }), envoyees: file.envoyees, envois: envois.map(function (p) { return [p.to_email, p.subject, p.message]; }) };
+  }, ids.m);
+  assert.equal(r.n.length, 1); assert.equal(r.n[0][0], 'email'); assert.equal(r.n[0][1], 'geo@x.ci');
+  assert.match(r.n[0][2], /https:\/\/portail\.exemple\.ci\/portail-unique\.html/); assert.doesNotMatch(r.n[0][2], /PV de bornage/);
+  const msg = r.envois.filter(function (e) { return e[1] === 'Nouveau message du promoteur'; });
+  assert.equal(msg.length, 1); assert.equal(msg[0][0], 'geo@x.ci'); assert.match(msg[0][2], /portail\.exemple\.ci/);
+});
+
+test('les autres e-mails à l\'intervenant (mission envoyée) portent aussi le lien de son espace', async () => {
+  const app = await ouvrirApp(); await preparer(app.page);
+  const r = await app.page.evaluate(function () { return DATA.notifications_foncieres.filter(function (x) { return x.canal === 'email'; }).map(function (x) { return x.message; }); });
+  assert.ok(r.length >= 1); r.forEach(function (msg) { assert.match(msg, /Votre espace intervenant : \S+portail-unique\.html/); });
+});
+
+test('avertissement à l\'écran si l\'intervenant ne sera pas prévenu (pas d\'adresse, canal coupé, EmailJS absent) ; confirmation sinon', async () => {
+  const app = await ouvrirApp(); const ids = await preparer(app.page);
+  const r = await app.page.evaluate(function (m) {
+    var mi = fcMission(m), i = fcIntervenant(mi.intervenant_id), out = {};
+    DATA.params = Object.assign(DATA.params || {}, { emailjs_service: 's', emailjs_template: 't', emailjs_key: 'k' });
+    out.ok = fcHtmlMessagerie(mi);
+    DATA.params.emailjs_key = ''; out.sansEmailjs = fcHtmlMessagerie(mi); DATA.params.emailjs_key = 'k';
+    DATA.params.fc_canaux = { email: false }; out.coupe = fcHtmlMessagerie(mi); delete DATA.params.fc_canaux;
+    var e = i.email; i.email = ''; out.sansAdresse = fcHtmlMessagerie(mi); i.email = e;
+    return out;
+  }, ids.m);
+  assert.match(r.ok, /prévient l'intervenant par e-mail \(geo@x\.ci\)/); assert.match(r.sansEmailjs, /EmailJS n'est pas configuré/);
+  assert.match(r.coupe, /canal e-mail est désactivé/); assert.match(r.sansAdresse, /Aucune adresse e-mail/);
+});

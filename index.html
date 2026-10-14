@@ -6691,6 +6691,10 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
                   <input type="text" id="param-tel" class="form-control">
                 </div>
                 <div class="form-group">
+                  <label>Mobile (CEL)</label>
+                  <input type="text" id="param-cel" class="form-control" placeholder="01 50 06 06 02">
+                </div>
+                <div class="form-group">
                   <label>Site web</label>
                   <input type="text" id="param-site" class="form-control">
                 </div>
@@ -49122,6 +49126,7 @@ async function saveParams() {
     adresse:     gv('param-adresse'),
     email:       gv('param-email'),
     tel:         gv('param-tel'),
+    cel:         gv('param-cel'),
     site:        gv('param-site'),
     whatsapp:    gv('param-whatsapp'),
     whatsapp_pdg: gv('param-whatsapp-pdg'),
@@ -49487,7 +49492,7 @@ function loadParamFields() {
   sv('param-fne-point-vente',p.fne_point_vente); sv('param-fne-etablissement',p.fne_etablissement||p.societe||'');
   sv('param-teledeclarant-dgi',p.teledeclarant_dgi); sv('param-teledeclarant-cnps',p.teledeclarant_cnps); sv('param-teledeclarant-fne',p.teledeclarant_fne);
   sv('param-agrement',p.agrement); sv('param-adresse',p.adresse);
-  sv('param-email',p.email); sv('param-tel',p.tel); sv('param-site',p.site);
+  sv('param-email',p.email); sv('param-tel',p.tel); sv('param-cel',p.cel); sv('param-site',p.site);
   sv('param-whatsapp',p.whatsapp); sv('param-whatsapp-pdg',p.whatsapp_pdg); sv('param-tva',p.tva||18);
   sv('param-retenue',p.retenue_pct||10); sv('param-avance',p.avance_pct||20);
   sv('param-commission',p.commission_pct||3);
@@ -59959,6 +59964,14 @@ async function fcMarquerMessagesLus(missionId) {
   if (n) await fcSauverMission(m);
   return { ok: true, marques: n };
 }
+/* L'intervenant est prévenu par e-mail de chaque message : on dit à l'écran si ce ne sera pas possible. */
+function fcAvisEmailIntervenant(m) {
+  var i = fcIntervenant(m.intervenant_id), p = DATA.params || {};
+  if (!i || !String(i.email || '').trim()) return '<div style="font-size:11px;color:#B87333;margin-bottom:4px;">⚠ Aucune adresse e-mail pour cet intervenant : il ne sera pas prévenu (renseignez-la dans sa fiche).</div>';
+  if (fcCanauxActifs().email === false) return '<div style="font-size:11px;color:#B87333;margin-bottom:4px;">⚠ Le canal e-mail est désactivé : l\'intervenant ne sera pas prévenu.</div>';
+  if (!p.emailjs_service || !p.emailjs_template || !p.emailjs_key) return '<div style="font-size:11px;color:#B87333;margin-bottom:4px;">⚠ EmailJS n\'est pas configuré (Paramètres › Communications) : l\'e-mail ne partira pas.</div>';
+  return '<div style="font-size:11px;color:var(--dim);margin-bottom:4px;">✉ Chaque message prévient l\'intervenant par e-mail (' + escHtml(i.email) + ').</div>';
+}
 function fcHtmlMessagerie(m) {
   var ms = fcMessagesMission(m), nl = fcMessagesNonLus(m), ouvert = ['brouillon', 'annulee', 'cloturee'].indexOf(m.statut) === -1;
   return '<div class="card-title" style="margin-top:12px;">💬 Messagerie' + (nl ? ' <span style="background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;">' + nl + ' nouveau(x)</span>' : '') + '</div>'
@@ -59967,7 +59980,7 @@ function fcHtmlMessagerie(m) {
       return '<div style="padding:4px 8px;margin:3px 0;border-radius:8px;background:' + (moi ? 'rgba(184,115,51,.12)' : 'rgba(0,0,0,.05)') + ';"><b>' + escHtml(moi ? (x.auteur || 'Promoteur') : (x.auteur || fcNomIntervenant(m.intervenant_id))) + '</b> · <span style="color:var(--dim);">' + escHtml(String(x.date || '').replace('T', ' ').slice(0, 16)) + '</span>'
         + (moi && x.lu_le ? ' <span style="color:var(--dim);">· lu</span>' : '') + '<div style="white-space:pre-wrap;">' + escHtml(x.texte) + '</div></div>';
     }).join('') : '<i>Aucun message.</i>') + '</div>'
-    + (ouvert ? '<textarea class="form-control" id="fi-msg-txt" maxlength="' + FC_MESSAGE_MAX + '" rows="2" placeholder="Écrire à l\'intervenant"></textarea>'
+    + (ouvert ? fcAvisEmailIntervenant(m) + '<textarea class="form-control" id="fi-msg-txt" maxlength="' + FC_MESSAGE_MAX + '" rows="2" placeholder="Écrire à l\'intervenant"></textarea>'
       + '<button class="btn btn-primary btn-sm" style="margin-top:4px;" onclick="fcMessageUI(\'' + m.id + '\')">Envoyer</button>'
       : '<i style="color:var(--dim);">Lecture seule.</i>');
 }
@@ -60351,7 +60364,7 @@ async function fcNotifierEvenement(d, e) {
   var base = function(titre, msg, extra) { return Object.assign({ dedup: cle, titre: titre, message: msg, template_code: e.type, dossier_id: d.id, event_id: e.id, mission_id: e.mission_id || '' }, extra || {}); };
   var ref = d.reference + ' — ' + fcLibelleParcelle(d.parcelle_id);
   var m = e.mission_id ? fcMission(e.mission_id) : null, interv = m ? fcIntervenant(m.intervenant_id) : null;
-  var externe = function(titre, msg) { return interv ? fcCreerNotification(base(titre, msg, { destinataire: { type: 'externe', id: interv.id, nom: interv.nom_organisation, email: interv.email, telephone: interv.telephone }, dedup: cle })) : Promise.resolve({ creees: [] }); };
+  var externe = function(titre, msg) { msg += '\n\nVotre espace intervenant : ' + fcUrlPortailIntervenant(); return interv ? fcCreerNotification(base(titre, msg, { destinataire: { type: 'externe', id: interv.id, nom: interv.nom_organisation, email: interv.email, telephone: interv.telephone }, dedup: cle })) : Promise.resolve({ creees: [] }); };
   switch (e.type) {
     case 'ouverture': total += await fcNotifierUsers([resp], base('Dossier ouvert', ref + '\n' + e.description), e); break;
     case 'changement_statut':
@@ -112801,6 +112814,20 @@ function attSoldeNumero(){
   return 'ATS-' + an + '-' + ('0000' + (max+1)).slice(-4);
 }
 /* Corps du document. opts : {numero, date, signataire, fonction, projet}. Pas d'image embarquée (reste léger dans la fiche). */
+/* Pied de page d'entreprise des documents officiels, construit depuis Paramètres › Entreprise :
+   société + siège (1re ligne de l'adresse) / RCCM et CC / suite de l'adresse (BP…), TEL, CEL, E-MAIL.
+   Les éléments non renseignés sont omis ; rien n'est inventé. Retourne '' si les paramètres sont vides. */
+function docPiedDePageEntreprise(p){
+  p = p || DATA.params || {};
+  var E = function(x){ return escHtml(x==null?'':String(x)); };
+  var adr = String(p.adresse||'').split(/\r?\n/).map(function(x){ return x.trim(); }).filter(Boolean);
+  var l1 = ((p.societe ? E(p.societe)+' ' : '') + (adr[0] ? 'Siège Social : '+E(adr[0]) : '')).trim();
+  var ids = []; if (p.rccm) ids.push('N° RCCM : '+E(p.rccm)); if (p.dgi) ids.push('CC : '+E(p.dgi));
+  var contacts = []; if (p.tel) contacts.push('TEL : '+E(p.tel)); if (p.cel) contacts.push('CEL : '+E(p.cel)); if (p.email) contacts.push('E-MAIL : '+E(p.email));
+  var l3 = [adr.length>1 ? adr.slice(1).map(E).join(' – ') : '', contacts.join('   ')].filter(Boolean).join(' – ');
+  var lignes = [l1, ids.join(' – '), l3].filter(Boolean);
+  return lignes.length ? '<div class="pied">'+lignes.map(function(l){ return '<div>'+l+'</div>'; }).join('')+'</div>' : '';
+}
 function attSoldeHtml(c, opts){
   opts = opts || {};
   var ov = opts.overrides || {};
@@ -112825,7 +112852,8 @@ function attSoldeHtml(c, opts){
     + '.mont{border:2px solid #1D3F7A;text-align:center;padding:10px;margin:10px 0;font-size:15px;font-weight:bold;color:#1D3F7A;}'
     + '.sig{display:flex;justify-content:space-between;margin-top:34px;}.sig div{width:46%;text-align:center;font-size:12px;}'
     + '.projet{position:fixed;top:40%;left:8%;font-size:64px;color:rgba(200,0,0,.13);transform:rotate(-24deg);font-weight:bold;pointer-events:none;}'
-    + '@media print{body{padding:18mm 16mm;}}</style></head><body>'
+    + '.pied{margin-top:30px;border-top:1px solid #000;padding-top:6px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#222;line-height:1.5;}'
+    + '@page{size:A4;margin:12mm 16mm;}@media print{body{padding:0 0 22mm;max-width:none;font-size:11.5px;line-height:1.38;min-height:270mm;box-sizing:border-box;position:relative;}h1{font-size:18px;margin:8px 0 2px;}h3{margin:8px 0 3px;break-after:avoid;}.art{margin:3px 0;}table{margin:4px 0 6px;}td,th{padding:3px 8px;}.mont{margin:6px 0;padding:6px;font-size:14px;}.sig{page-break-inside:avoid;margin-top:16px;}.pied{position:absolute;left:0;right:0;bottom:0;margin:0;}}</style></head><body>'
     + (opts.projet ? '<div class="projet">PROJET — NON VALIDÉ</div>' : '')
     + (opts.indicatif ? '<div class="projet">À TITRE INDICATIF</div>' : '')
     + '<div class="ref"><div><strong style="font-size:15px;">'+E(p.societe||'')+'</strong></div><div style="text-align:right;">N° <strong>'+E(opts.numero||'—')+'</strong><br>Dossier : '+E(c.dossier||c.id)+'</div></div>'
@@ -112857,6 +112885,7 @@ function attSoldeHtml(c, opts){
     + (ov.observations ? '<div class="art">6. '+E(ov.observations)+'</div>' : '')
     + '<div class="sig"><div>Le souscripteur<br><br><br>(lu et pris connaissance)</div>'
     + '<div>Fait à '+E(p.ville||'____________')+', le '+E(dateShort(opts.date||today()))+'<br><strong>'+E(opts.fonction||'Le Directeur Général / Le Gérant')+'</strong><br>'+E(opts.signataire||'')+'<br><br><br>Signature et cachet</div></div>'
+    + docPiedDePageEntreprise(p)
     + '</body></html>';
   return h;
 }
