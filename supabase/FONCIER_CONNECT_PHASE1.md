@@ -179,3 +179,11 @@ Limites connues : le suivi horodaté n'existe que pour les changements de statut
 - TVA non ventilée sur la note (débours) : traitement à confirmer par l'expert-comptable.
 - SQL : `foncier_notes_debours_portail.sql` → `fc_vue_souscripteur_debours()` (JWT `kind=souscripteur`, notes publiées émises/encaissées du client titulaire uniquement).
 - Tests : `foncier-refacturation.test.js` (5), `portail-debours.test.js` (2). Test SQL rollback validé sur les deux projets.
+
+## PF1 — Pilotage foncier : filtres, coûts, rapport périodique
+
+- **Filtres** (Foncier › Pilotage foncier) : programme, parcelle, procédure, responsable, niveau (global/individuel), période d'ouverture. S'appliquent à tous les tableaux et exports (`fcAvecFiltre` : DATA temporairement restreint puis restauré, y compris en cas d'erreur).
+- **💶 Coûts du titre** (direction) : frais engagés TTC, part promoteur / avancés pour les souscripteurs, à régler, à refacturer, refacturé, encaissé, notes de débours en retard, répartition par nature et par opération, coût moyen d'un titre remis (indicatif sous le seuil de mesure).
+- **📑 Rapport périodique** (direction) : hebdomadaire, mensuel, trimestriel ; période en cours ou close ; comparaison avec la période précédente ; situation au jour. Export PDF / CSV. Envoi à la direction par notification interne, une seule fois par période (déduplication).
+- **Envoi automatique** : Foncier › Notifications › « Rapport de pilotage envoyé à la direction » (jamais / chaque semaine / chaque mois), exécuté par le cycle de notifications (dernière période close).
+- Aucune migration SQL. Tests : `foncier-pilotage-rapport.test.js` (6).
