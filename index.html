@@ -26778,7 +26778,7 @@ async function syncToSupabase(table, obj, opts) {
      on n'écrase pas silencieusement : on journalise le conflit et on alerte.
      Ne s'active que si obj._baseModifie est fourni (édition d'un enregistrement existant) —
      une création ne peut pas être en conflit. */
-  var _STORES_CONFLIT = ['pi_ecritures','pi_factures_client','pi_financements_programme','pi_cessions_foncieres','pi_versements','pi_lots','pi_programmes','pi_clients','pi_employes','pi_caisse_mouvements','pi_caisse_sessions'];
+  var _STORES_CONFLIT = ['pi_ecritures','pi_factures_client','pi_financements_programme','pi_cessions_foncieres','pi_versements','pi_lots','pi_programmes','pi_clients','pi_employes','pi_caisse_mouvements','pi_caisse_sessions','pi_missions_foncieres'];
   if (!(opts && opts.skipConflict) && _STORES_CONFLIT.indexOf(table) !== -1 && obj && obj.id && obj._baseModifie && !_pulling && !obj._forceCloture) {
     try {
       var remote = await sbFetch(table + '?id=eq.' + obj.id + '&select=id,m:data->>_modifie', 'GET');
@@ -59579,7 +59579,7 @@ function fcReferenceMission() {
   (DATA.missions_foncieres || []).forEach(function(m){ var x = String(m.reference || '').match(re); if (x) max = Math.max(max, parseInt(x[1], 10)); });
   return 'MF-' + an + '-' + String(max + 1).padStart(3, '0');
 }
-async function fcSauverMission(m) { m._modifie = new Date().toISOString(); await fcDb('missions_foncieres', m); }
+async function fcSauverMission(m) { m._baseModifie = m._modifie || m._baseModifie || null; m._modifie = new Date().toISOString(); await fcDb('missions_foncieres', m); }
 async function fcEvenementMission(m, type, description, extra) {
   var d = fcDossier(m.dossier_id);
   if (!d) return null;
@@ -59725,7 +59725,7 @@ function fcVueIntervenant(intervenantId) {
     out.missions.push({
       id: m.id, reference: m.reference, titre: m.titre, description: m.description, statut: m.statut, echeance: m.echeance,
       dossier: { reference: d.reference, parcelle: fcLibelleParcelle(d.parcelle_id) }, etapes: etapes,
-      livrables: m.livrables.map(function(l){ return { id: l.id, libelle: l.libelle, versions: l.versions.map(function(v){ return { numero: v.numero, statut: v.statut, date: v.date, refus: v.refus ? { motif: v.refus.motif, elements: v.refus.elements, delai: v.refus.delai } : null }; }) }; })
+      livrables: m.livrables.map(function(l){ return { id: l.id, libelle: l.libelle, versions: l.versions.map(function(v){ return { numero: v.numero, statut: v.statut, date: v.date, reference: v.reference, note: v.note, refus: v.refus ? { motif: v.refus.motif, elements: v.refus.elements, delai: v.refus.delai } : null }; }) }; })
     });
   });
   return out;
@@ -60327,6 +60327,8 @@ async function fcNotifierEvenement(d, e) {
       if (!m) break;
       if (e.nouveau === 'envoyee') { total += (await externe('Nouvelle mission : ' + m.titre, 'Mission ' + m.reference + ' — ' + m.titre + '\nÉchéance : ' + m.echeance + '\nLivrables attendus : ' + m.livrables.map(function(l){ return l.libelle; }).join(', '))).creees.length; total += await fcNotifierUsers([m.responsable_validation_id], base('Mission envoyée', m.reference + ' — ' + m.titre), e); }
       else if (e.nouveau === 'acceptee') total += await fcNotifierUsers([m.responsable_validation_id], base('Mission acceptée', m.reference + ' acceptée par ' + (interv ? interv.nom_organisation : '—')), e);
+      else if (e.nouveau === 'livrable_soumis' && e.source === 'prestataire') total += await fcNotifierUsers([m.responsable_validation_id], base('Livrables soumis pour vérification', m.reference + ' : ' + (interv ? interv.nom_organisation : "l'intervenant") + ' a soumis ses livrables.\nÀ vérifier dans la mission.'), e);
+      else if (e.nouveau === 'attente_informations' && e.source === 'prestataire') total += await fcNotifierUsers([m.responsable_validation_id], base('Informations demandées par un intervenant', m.reference + '\n' + e.description + (e.motif ? '\nDemande : ' + e.motif : '')), e);
       else if (['validee', 'cloturee', 'annulee'].indexOf(e.nouveau) !== -1) total += (await externe('Mission ' + (FC_STATUTS_MISSION[e.nouveau] || '').toLowerCase(), 'Mission ' + m.reference + ' : ' + (FC_STATUTS_MISSION[e.nouveau] || ''))).creees.length;
       break;
     case 'livrable_depose': if (m) total += await fcNotifierUsers([m.responsable_validation_id], base('Livrable déposé à vérifier', ref + '\n' + e.description), e); break;

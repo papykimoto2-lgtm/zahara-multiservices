@@ -1365,7 +1365,9 @@
   var INT_ETAPES = { a_preparer:'À préparer', a_venir:'À venir', en_cours:'En cours', attente_intervenant:"En attente d'un intervenant", attente_document:"En attente d'un document", attente_administration:"En attente d'une administration", attente_decision:"En attente d'une décision", bloque:'Bloqué', rejete:'Rejeté', termine:'Terminé', annule:'Annulé' };
   var INT_VERSIONS = { soumis:['En attente de vérification','p-bleu'], valide:['Validée','p-vert'], refuse:['Refusée','p-rouge'] };
   var INT_ACTIONS = { accepter:{ fn:'fc_intervenant_accepter', ok:'Mission acceptée. Vous pouvez la démarrer quand vous êtes prêt.', confirmer:"Accepter cette mission ? Cette acceptation ne remplace pas un contrat lorsqu'il est nécessaire." },
-                      demarrer:{ fn:'fc_intervenant_demarrer', ok:'Mission démarrée.', confirmer:'' } };
+                      demarrer:{ fn:'fc_intervenant_demarrer', ok:'Mission démarrée.', confirmer:'' },
+                      soumettre:{ fn:'fc_intervenant_soumettre', ok:'Livrables soumis pour vérification.', confirmer:'' },
+                      reprendre:{ fn:'fc_intervenant_reprendre', ok:'Mission reprise.', confirmer:'' } };
 
   async function loginIntervenant(){
     var ident=(document.getElementById('intLogin').value||'').trim();
@@ -1412,13 +1414,36 @@
     }
     rendreIntervenant();
   }
+  function _intMission(id){ return INT.missions.filter(function(m){ return String(m.id)===String(id); })[0]; }
   async function intAction(action, missionId){
     var a=INT_ACTIONS[action]; if(!a||INT.occupe) return;
-    if(a.confirmer && !confirm(a.confirmer)) return;
+    var conf=a.confirmer;
+    if(action==='soumettre'){
+      var mm=_intMission(missionId), sans=((mm&&mm.livrables)||[]).filter(function(l){ return !(l.versions&&l.versions.length); }).length;
+      if(sans) conf=sans+' livrable(s) n\'ont aucune version déposée. Soumettre quand même pour vérification ?';
+    }
+    if(conf && !confirm(conf)) return;
+    await _intExec(missionId, a.fn, { p_mission: String(missionId) }, a.ok);
+  }
+  function _intChamp(missionId, pref){ var el=document.querySelector('[data-champ="'+pref+'"][data-id="'+String(missionId).replace(/["\\]/g,'')+'"]'); return el; }
+  async function intDeposer(missionId, idx){
+    var m=_intMission(missionId), l=m&&(m.livrables||[])[idx]; if(!l||INT.occupe) return;
+    var ref=_intChamp(missionId,'ref'+idx), note=_intChamp(missionId,'note'+idx);
+    var r=ref?ref.value.trim():'', n=note?note.value.trim():'';
+    if(!r){ INT.msg={ t:'err', m:'Indiquez une référence (nom du fichier, lien ou n° de dépôt).' }; rendreIntervenant(); return; }
+    await _intExec(missionId, 'fc_intervenant_deposer', { p_mission:String(missionId), p_livrable:String(l.id), p_reference:r.slice(0,300), p_note:n.slice(0,2000) }, 'Livrable déposé. Pensez à soumettre pour vérification quand tout est prêt.');
+  }
+  async function intDemanderInfo(missionId){
+    if(INT.occupe) return;
+    var el=_intChamp(missionId,'info'), n=el?el.value.trim():'';
+    if(!n){ INT.msg={ t:'err', m:'Précisez les informations dont vous avez besoin.' }; rendreIntervenant(); return; }
+    await _intExec(missionId, 'fc_intervenant_demander_info', { p_mission:String(missionId), p_note:n.slice(0,1000) }, 'Demande envoyée au promoteur.');
+  }
+  async function _intExec(missionId, fn, body, okMsg){
     INT.occupe=missionId; INT.msg=null; rendreIntervenant();
     try{
-      var res=await _intRpc(a.fn, { p_mission: String(missionId) });
-      INT.msg = res && res.ok ? { t:'ok', m:a.ok } : { t:'err', m:(res&&res.erreur)||'Action impossible.' };
+      var res=await _intRpc(fn, body);
+      INT.msg = res && res.ok ? { t:'ok', m:okMsg } : { t:'err', m:(res&&res.erreur)||'Action impossible.' };
     }catch(e){
       if(e&&e.message==='session'){ INT.occupe=null; logoutIntervenant(); setErr('intError','Session expirée : reconnectez-vous.'); return; }
       INT.msg={ t:'err', m:'Action impossible pour le moment. Réessayez.' };
@@ -1441,8 +1466,14 @@
     if(m.statut==='envoyee') h=info('Cette mission vous est confiée. Acceptez-la pour commencer.')+btn('accepter','✅ Accepter la mission','#16a34a')
         +'<p style="font-size:.72rem;color:#6b7f95;margin-top:6px;">L\'acceptation ne remplace pas un contrat lorsqu\'il est nécessaire.</p>';
     else if(m.statut==='acceptee') h=info('Mission acceptée. Indiquez le démarrage du travail.')+btn('demarrer','▶ Démarrer la mission');
-    else if(m.statut==='en_cours'||m.statut==='attente_informations') h=info('Mission en cours. Le dépôt en ligne des livrables arrive prochainement : en attendant, transmettez-les à votre interlocuteur habituel.');
-    else if(m.statut==='a_corriger') h=info('<strong style="color:#991b1b;">Un livrable a été refusé.</strong> Corrigez les éléments indiqués ci-dessous puis transmettez la nouvelle version à votre interlocuteur.');
+    else if(m.statut==='en_cours'||m.statut==='a_corriger'){
+      h=info(m.statut==='a_corriger'?'<strong style="color:#991b1b;">Un livrable a été refusé.</strong> Déposez une nouvelle version ci-dessous puis soumettez à nouveau.':'Déposez la référence de chaque livrable ci-dessous, puis soumettez pour vérification.')
+        +btn('soumettre','📤 Soumettre pour vérification','#16a34a')
+        +'<div style="margin-top:10px;"><label style="font-size:.8rem;font-weight:600;">Besoin d\'une information ?</label>'
+        +'<textarea data-champ="info" data-id="'+id+'" maxlength="1000" rows="2" style="width:100%;margin-top:4px;" placeholder="Précisez ce qu\'il vous manque"></textarea>'
+        +'<button class="highlight-btn" style="margin-top:6px;background:#4b6a8b;" '+(INT.occupe?'disabled':'')+' data-id="'+id+'" onclick="intDemanderInfo(this.dataset.id)">Demander des informations</button></div>';
+    }
+    else if(m.statut==='attente_informations') h=info('Vous avez demandé des informations au promoteur. Reprenez la mission dès que vous pouvez continuer.')+btn('reprendre','▶ Reprendre la mission');
     else if(m.statut==='livrable_soumis'||m.statut==='en_verification') h=info('Votre livrable est en cours de vérification par le promoteur.');
     else if(m.statut==='validee'||m.statut==='cloturee') h=info('Mission validée. Merci pour votre travail.');
     return h;
@@ -1453,13 +1484,18 @@
     h+=_intActions(m);
     var et=m.etapes||[];
     if(et.length) h+='<div style="margin-top:14px;"><strong style="font-size:.85rem;">Étapes concernées</strong>'+et.map(function(e){ return '<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #eef2f8;font-size:.84rem;"><span>'+esc(e.libelle||e.code)+(e.date_cible?' <span style="color:#6b7f95;">(cible '+esc(dshort(e.date_cible))+')</span>':'')+'</span><span class="pill p-gris">'+esc(INT_ETAPES[e.statut]||e.statut||'')+'</span></div>'; }).join('')+'</div>';
-    h+='<div style="margin-top:14px;"><strong style="font-size:.85rem;">Livrables attendus</strong>'+(m.livrables||[]).map(function(l){
-      var vs=l.versions||[];
+    var depot=(m.statut==='en_cours'||m.statut==='a_corriger');
+    h+='<div style="margin-top:14px;"><strong style="font-size:.85rem;">Livrables attendus</strong>'+(m.livrables||[]).map(function(l,li){
+      var vs=l.versions||[], der=vs.length?vs[vs.length-1]:null, peutDeposer=depot&&(!der||der.statut==='refuse');
       return '<div style="padding:8px 0;border-bottom:1px solid #eef2f8;"><div style="font-size:.88rem;font-weight:600;">'+esc(l.libelle)+'</div>'
         +(vs.length?vs.map(function(v){ var st=INT_VERSIONS[v.statut]||[v.statut||'','p-gris'];
             return '<div style="font-size:.8rem;margin-top:4px;">Version '+esc(v.numero)+' · '+esc(dshort(v.date))+' <span class="pill '+st[1]+'">'+esc(st[0])+'</span>'
+              +(v.reference?'<div style="font-size:.78rem;color:#334155;">Réf. : '+esc(v.reference)+(v.note?' — '+esc(v.note):'')+'</div>':'')
               +(v.refus?'<div style="background:#fee2e2;color:#7f1d1d;border-radius:10px;padding:8px 10px;margin-top:4px;"><strong>À corriger :</strong> '+esc(v.refus.elements||'')+'<br><span style="font-size:.74rem;">Motif : '+esc(v.refus.motif||'—')+(v.refus.delai?' · avant le '+esc(dshort(v.refus.delai)):'')+'</span></div>':'')+'</div>'; }).join('')
-          :'<div style="font-size:.78rem;color:#6b7f95;margin-top:2px;">Aucune version déposée.</div>')+'</div>';
+          :'<div style="font-size:.78rem;color:#6b7f95;margin-top:2px;">Aucune version déposée.</div>')
+        +(peutDeposer?'<div style="margin-top:8px;"><input type="text" data-champ="ref'+li+'" data-id="'+esc(m.id)+'" maxlength="300" style="width:100%;" placeholder="Référence (nom du fichier, lien, n° de dépôt)">'
+          +'<textarea data-champ="note'+li+'" data-id="'+esc(m.id)+'" maxlength="2000" rows="2" style="width:100%;margin-top:4px;" placeholder="Note (facultatif)"></textarea>'
+          +'<button class="highlight-btn" style="margin-top:6px;" '+(INT.occupe?'disabled':'')+' data-id="'+esc(m.id)+'" onclick="intDeposer(this.dataset.id,'+li+')">Déposer cette version</button></div>':'')+'</div>';
     }).join('')+'</div></div>';
     return h;
   }
