@@ -1,0 +1,112 @@
+# Foncier Connect — phase 1 (dossiers fonciers) — état au 13/10/2026
+
+Cahier des charges : « ImmoSuite Foncier Connect » v1.0 du 13/10/2026. Cette phase réalise le noyau côté application ; la base de données vient après.
+
+## Ce qui est livré (branche de travail, non publié sur `main`)
+- Onglet **Foncier › Sécurisation du titre › Dossiers fonciers** : indicateurs, ouverture d'un dossier à partir d'une parcelle, liste, détail par étape, historique.
+- Stores locaux `dossiers_fonciers` et `evenements_fonciers` (DB locale v155, migration additive). Déclarés dans `SANIX_STORES_LOCAL_UNIQUEMENT` : **aucune synchronisation cloud, aucune table Supabase** à ce stade (aucun appel à `syncToSupabase`, vérifié par test).
+- Rattachement aux droits existants : `STORE_MODULE` = « Foncier », comme `parcelles`.
+- Workflow de référence en 28 étapes (phases A à E), filtré selon la procédure (ACD, régularisation, dossier avec ACD, titre foncier, mutation, morcellement, fusion, autre) : 28 étapes pour un ACD, 24 pour un morcellement.
+
+## Règles métier appliquées (cahier §20)
+| Règle | Implémentation |
+|---|---|
+| RM-01 | Référence `DF-AAAA-NNN` unique ; second dossier ouvert de même procédure sur la même parcelle : refus, sauf confirmation |
+| RM-02 | Chaque changement de statut produit un événement (ancien, nouveau, motif, acteur, date) |
+| RM-03 | Une étape à justificatif ne se termine pas sans justificatif ; dérogation possible avec motif, journalisée à part |
+| RM-04 | Un dossier exige un responsable ; un statut actif exige un responsable d'étape ou de dossier |
+| RM-07 | « Terminé » n'est jamais une décision : l'issue (favorable/défavorable) est distincte et exige un document officiel reçu et contrôlé |
+| RM-08 | Chaque justificatif porte une source obligatoire (promoteur, prestataire, administration déclarée, document officiel contrôlé) |
+| RM-09 | Une étape terminée n'est plus modifiable directement ; correction par fonction dédiée, motif obligatoire, ancienne valeur conservée |
+| RM-11 | Dépassement d'échéance : « retard interne » et « délai administratif dépassé » sont distingués ; ni l'un ni l'autre n'est un rejet |
+| RM-13 | La clôture est refusée tant que des étapes restent ouvertes ; dérogation motivée possible |
+| §14 | Journal en ajout seul : aucune fonction de modification ou de suppression d'événement |
+
+## Non réalisé à ce stade
+Portail souscripteur, portail des intervenants, notifications, gestion documentaire (fichiers), cartographie liée, tableaux de bord avancés, intégrations. Le champ `visibilite` de chaque étape est déjà enregistré en vue du portail souscripteur.
+
+## Phase base de données (après la fermeture de l'accès anonyme)
+Conserver la convention du dépôt : tables `pi_dossiers_fonciers` et `pi_evenements_fonciers` au format `id / data jsonb / updated_at / scope_id`, **sans `organization_id`** (une base par client), **créées sans aucun accès `anon`** et avec les règles personnel / souscripteur / intervenant écrites avec la table. Journal : politique d'insertion seule, ni UPDATE ni DELETE. Puis ajouter les deux stores à `SUPA_STORE_MAP` et les retirer de `SANIX_STORES_LOCAL_UNIQUEMENT`.
+
+Tests : `tests-caisse/foncier-connect.test.js` (14 tests).
+
+## Phase 2 — intervenants et missions (13/10/2026, branche de travail)
+- Onglet **Foncier › Sécurisation du titre › Intervenants & missions**. Stores locaux `intervenants_fonciers` et `missions_foncieres` (DB locale v156), toujours sans table Supabase ni synchronisation.
+- **Répertoire** (§7.2) : nom, type, contact, moyen de contact obligatoire, référence professionnelle ; doublon refusé.
+- **Missions** (§7.4, §8.3) : dossier, intervenant actif, livrables attendus, échéance, responsable de validation (par défaut le responsable du dossier). Cycle de vie : brouillon, envoyée, acceptée, en cours, en attente d'informations, livrable soumis, en vérification, à corriger, validée, clôturée (+ annulée, avec motif, ajoutée au-delà du cahier). Seuls les passages prévus sont possibles.
+- **Acceptation** : la manière dont elle a été reçue est obligatoire ; sans contrat référencé, un avertissement rappelle qu'elle ne remplace pas un contrat (§7.4).
+- **Livrables** (§8.4) : chaque dépôt crée une version ; l'ancienne n'est jamais effacée. Refus : motif et éléments à corriger obligatoires, auteur, date, délai facultatif.
+- **Validation réservée au responsable désigné** (ou à un administrateur) ; « validée » exige que tous les livrables attendus soient validés.
+- Un livrable validé devient un **justificatif sourcé** (« document reçu du prestataire ») de l'étape liée, **sans terminer l'étape** (RM-07, RM-08).
+- **Vue intervenant** (§8.5) : `fcVueIntervenant()` ne renvoie que les missions envoyées de cet intervenant, avec le dossier (référence, parcelle), les étapes de son périmètre et ses livrables — ni observations internes, ni responsable, ni montants. Le futur portail externe devra s'y conformer ; la règle d'accès à écrire en base reprendra cette limite.
+- Journal : tous les événements de mission s'ajoutent au journal des dossiers (`mission_id`).
+- Tests : `tests-caisse/foncier-missions.test.js` (13 tests).
+
+Non réalisé : portail externe avec connexion, notifications, documents joints aux missions, tableaux de bord intervenants au-delà des indicateurs de l'onglet.
+
+## Phase 3 — information du souscripteur (13/10/2026, branche de travail)
+- Onglet **Foncier › Sécurisation du titre › Souscripteurs** et bouton « Publier » sur les étapes publiables du détail d'un dossier. Stores locaux `publications_foncieres` et `demandes_fonciers` (DB locale v157), toujours sans table Supabase.
+- **Rien n'est publié automatiquement** ; le texte public est rédigé à part (jamais repris des observations, motifs ou justificatifs) et une étape « interne » n'est pas publiable (RM-05). Publier est réservé au responsable du dossier ou à un administrateur.
+- **Source obligatoire** de chaque information, affichée au souscripteur ; « décision officielle » seulement avec un document officiel contrôlé sur l'étape (RM-08).
+- **Aucune approbation affirmée sans preuve** (RM-07) : un texte évoquant approbation, accord, obtention, délivrance ou issue favorable est refusé tant que l'étape n'a pas une issue favorable établie par un document officiel (garde-fou lexical : à compléter par la relecture du responsable).
+- **Retrait** d'une publication : motif obligatoire, journalisé ; l'historique est conservé.
+- `fcVueSouscripteur(clientId)` : définition exacte de ce que le portail pourra lire — uniquement les dossiers des parcelles de ses lots, historique publié, progression, prochaine étape, demandes. Aucune donnée interne (testé avec des valeurs sentinelles).
+- **Progression** (§9.3) : étapes publiables seulement, pondérées par phase (`DATA.params.fc_poids_phases`, défaut C=2, D=2, E=1), expliquée en clair ; jamais présentée comme une probabilité d'obtention ni une garantie juridique.
+- **Demandes d'information** (§9.6) : référence `DI-AAAA-NNN`, uniquement sur son propre dossier ; statuts nouvelle, en cours, en attente du souscripteur, répondue, clôturée ; réponse par le responsable.
+- Tests : `tests-caisse/foncier-souscripteur.test.js` (11 tests).
+
+## Correctif transversal : droits et échecs d'écriture (phases 1 à 3)
+`dbPut()` refuse en silence (renvoie `false`) un profil sans droit sur le module. Les fonctions de Foncier Connect annonçaient alors « enregistré » alors que rien n'était écrit. Corrigé : contrôle du droit avant toute modification (`fcDroitEcriture`), échec d'écriture signalé (`fcDb`), toutes les fonctions de mutation protégées (`fcProtegerMutations`). Tests : `tests-caisse/foncier-droits.test.js` (4 tests).
+
+## Phase 4 — notifications, échéances, relances (13/10/2026, branche de travail)
+- Onglet **Foncier › Notifications** (badge de non lues). Store local `notifications_foncieres` (DB locale v158), sans table Supabase.
+- **Dérivées du journal** : l'événement métier est enregistré d'abord, les notifications ensuite (`fcNotifierSansRisque`). Un échec de notification ne peut ni annuler ni perdre l'opération (RM-10) ; `fcRattraperNotifications()` recrée, sans doublon, celles des événements récents qui n'en ont pas.
+- **Canaux** : *interne* (immédiat) ; *e-mail* via la configuration EmailJS existante (Paramètres) ; *SMS* et *WhatsApp* : **aucun fournisseur intégré**, la notification est marquée « canal non disponible », jamais « envoyée ». Un fournisseur se branche en renseignant `FC_FOURNISSEURS.sms` / `.whatsapp`. EmailJS non configuré : « canal non disponible », sans consommer de tentative.
+- **Destinataires** : le personnel reçoit dans ImmoSuite (e-mail aussi pour les cas urgents) ; l'intervenant et le souscripteur reçoivent par e-mail un texte limité aux données publiques (mission, échéance, titre public) — aucune donnée interne du dossier (testé).
+- **File** (§10.5) : identifiant, clé anti-doublon par destinataire et canal, 3 tentatives espacées (5 min, 30 min, 2 h), abandon avec message d'erreur, relance manuelle (« Relancer les envois en échec »), reprise des envois restés « en cours » plus de 10 minutes après un incident.
+- **Échéances et relances** (§10.4) : règles configurables par type (échéance interne, délai administratif, mission) : jours avant, le jour même, jours après, escalade. Une seule alerte par seuil franchi et par date d'échéance, la plus urgente seulement (pas de rafale après une absence) ; changer l'échéance remet le compteur à zéro.
+- **RM-11** : un délai administratif dépassé a ses propres règles, **jamais d'escalade**, et un libellé neutre (« ni un rejet ni une faute attribuée ») ; l'échéance interne dépassée est escaladée vers l'administrateur désigné (`fc_escalade_user_id`) ou les administrateurs.
+- Cycle automatique : au démarrage (25 s) puis toutes les 30 minutes tant que l'application est ouverte. Un cycle côté serveur (tâche planifiée) viendra avec la base de données : tant que personne n'ouvre l'application, aucune échéance n'est analysée.
+- Tests : `tests-caisse/foncier-notifications.test.js` (18 tests).
+
+## Référentiel de procédure (immatriculation d'une parcelle)
+
+Intégré dans `menko-immo.html` (constantes `FC_PROCEDURE_REF`, `FC_ACTEURS_REF`, `FC_BLOCS`, `FC_SITUATIONS`, `FC_CONTROLES_REF`, `FC_SOURCES_OFFICIELLES`, `FC_IDUFCI_NOTE`) :
+
+- ACD : 9 étapes officielles (30 étapes internes avec la création du titre avant signature) ; immatriculation au Livre foncier : 6 opérations.
+- 7 situations initiales, 9 contrôles essentiels (`fcEvaluerControle`, source obligatoire), références IDUFCI / n° dossier GUF (`fcDefinirReferences`), 6 blocs de suivi.
+- Tests : `tests-caisse/foncier-procedure.test.js` (15).
+
+**À valider avant usage commercial** : le contenu n'est pas vérifié par un juriste ou un géomètre-expert ; les liens de sources ne sont pas vérifiés ; l'intitulé de l'ACD est incohérent dans Menko (« Arrêté de Concession Définitive » vs « Attestation de Cession Définitive ») ; l'acronyme du ministère (MCLU) reste à confirmer. Les dossiers existants ne sont pas modifiés.
+
+## Pièces jointes par étape
+
+Store local `pieces_foncieres` (DB v159), **jamais synchronisé** (pièces d'identité, titres) : à créer fermé, sans accès anonyme, avec stockage privé (bucket non public, URL signées) lors de la phase base de données.
+
+- **Promoteur** : joint un PDF/JPG/PNG/WebP (5 Mo max, 20 pièces par étape) à n'importe quelle étape ; interne par défaut, visible du souscripteur seulement si l'étape lui est publiée ; une source facultative crée aussi un justificatif sourcé.
+- **Souscripteur** : dépose une pièce uniquement là où le responsable a ouvert un dépôt (« Demander une pièce »), sur ses propres dossiers. La pièce est « à vérifier » ; le responsable l'accepte ou la refuse (motif obligatoire, communiqué).
+- Une pièce retirée est masquée et conservée avec son motif. Tout est journalisé ; notifications au responsable (dépôt) et au souscripteur (demande, décision).
+- `fcDeposerPieceSouscripteur(clientId, …)` est l'API que l'espace souscripteur réel appellera. Aujourd'hui, le dépôt se simule depuis l'onglet « Information souscripteurs » (aperçu) : un vrai dépôt par le client exige le portail authentifié et le stockage privé.
+
+## Onglets « Sécurisation du titre »
+
+Ordre de marche en avant : 2.1 Situation des titres → 2.2 Dossiers fonciers → 2.3 Intervenants & missions → 2.4 Jalons du titre (ex-Workflow titre) → 2.5 Information souscripteurs. « Notifications » (transversal) passe en Vue d'ensemble. Passerelles dossier ↔ jalons ; intitulé unique « Arrêté de Concession Définitive ».
+
+## Gestion documentaire (cahier §11) et pilotage (cahier §12)
+
+DB v159 inchangée : la gestion documentaire étend `pieces_foncieres` (local, jamais synchronisé).
+
+**Documents** (onglet « Documents », Vue d'ensemble) : catégorie, version (l'ancienne reste conservée), date d'expiration (alerte à 30 jours), confidentialité (normale / restreinte : responsable et administrateur seulement, jamais visible du souscripteur), archivage logique avec motif et restauration, empreinte SHA-256 et contrôle d'intégrité, recherche (nom, dossier, parcelle, étape, catégorie, organisation), export CSV. Consultations et téléchargements sont journalisés ; un accès refusé n'est pas journalisé comme un accès. Contrôles à l'envoi : taille (5 Mo), format et signature du fichier. **Pas d'analyse antivirus** (non disponible côté navigateur). L'empreinte détecte une altération, elle ne prouve pas l'authenticité.
+
+**Pilotage** (onglet « Pilotage foncier ») : tableau promoteur (13 indicateurs), responsable (listes cliquables : jour, retard, 7 jours, compléments, à valider, documents reçus, sans mise à jour, anomalies), intervenants, direction (réservée admin/dg/direction/manager : procédures, durée d'étape interne, blocages par cause déclarée, respect des échéances, volume par intervenant, évolution sur 12 mois, délai ouverture → clôture avec attentes distinguées). Les durées sont **mesurées au journal horodaté** ; moins de 3 observations = « indicatif » ; aucun retard n'est imputé à une administration ou à un prestataire. Exports CSV (Excel) et PDF/impression : tableaux, rapport des retards, historique d'un dossier ; refusés si le profil ne peut pas consulter le module.
+
+Limites connues : le suivi horodaté n'existe que pour les changements de statut faits à partir de cette version (les dossiers antérieurs, sans journal, apparaissent « non mesurés ») ; les rapports périodiques automatiques (envoi planifié) ne sont pas faits ; les exports ne couvrent pas encore un filtre par projet ou par période.
+
+## Titre global et titres individuels
+
+- **Dossier global** : rattaché à la parcelle (titre mère). **Dossier individuel** (`type_procedure = titre_individuel`, `niveau = 'individuel'`) : un par lot, ou un par souscripteur pour plusieurs de ses lots (`lots_ids`), lié au global (`dossier_global_id`). Champs additifs, aucune migration : les dossiers existants restent « globaux ».
+- Circuit propre : vérification du titre mère → identification du lot (morcellement) → pièces du souscripteur → acte de mutation → droits et frais → inscription du titre individuel → remise avec décharge (justificatif obligatoire) → clôture.
+- **Titre mère disponible** = parcelle déclarée « TF définitif », ou dossier global dont l'étape « Enregistrement des références » est terminée avec un document officiel contrôlé (un « terminé » seul ne suffit pas). Sinon, l'ouverture exige une dérogation motivée (journalisée, signalée au dossier) ; l'acte de mutation, les droits, l'inscription et la remise ne peuvent pas être terminés si le titre mère n'est plus disponible.
+- **Étanchéité** : `fcDossiersDuSouscripteur` n'expose un dossier individuel qu'à ses titulaires (corrige une exposition possible entre souscripteurs d'une même parcelle) ; demandes et dépôts de pièces suivent la même règle.
+- Panneau « Titres individuels de l'opération » dans le dossier global (lots, souscripteurs, avancement, ouverture individuelle ou en lot) ; bandeau dans le dossier individuel ; vue souscripteur en deux niveaux ; pilotage de direction par opération (titres remis / lots suivis).
+- Hors périmètre pour l'instant : le notaire n'est pas encore un intervenant « type » (acteur de référence seulement) ; le regroupement de lots d'un même souscripteur se fait par l'API (`lot_ids`), pas encore depuis l'interface ; la synchronisation des lots avec le plan de morcellement n'est pas automatique.
