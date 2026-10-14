@@ -83,6 +83,8 @@ begin
     execute format(
       'create policy %I on public.%I for all to authenticated using (%s) with check (%s)',
       t || '_staff', t, staff, staff);
+    -- Supabase accorde par défaut TRUNCATE (contourne la RLS) : tout retirer, puis ne rendre que le CRUD.
+    execute format('revoke all on table public.%I from authenticated', t);
     execute format('grant select, insert, update, delete on table public.%I to authenticated', t);
   end loop;
 end$$;
@@ -99,7 +101,7 @@ grant select, insert on table public.pi_evenements_fonciers to authenticated;
 
 -- Trigger : bloque UPDATE/DELETE même pour service_role (qui contourne la RLS).
 create or replace function public.pi_evenements_fonciers_ajout_seul()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = '' as $$
 begin
   raise exception 'Journal foncier en ajout seul : % interdit', tg_op
     using errcode = '42501';
@@ -138,7 +140,7 @@ create policy pi_demandes_fonciers_souscripteur_update on public.pi_demandes_fon
 
 -- ── 4. updated_at automatique ──────────────────────────────────────────────
 create or replace function public.pi_foncier_touch()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = '' as $$
 begin new.updated_at := now(); return new; end$$;
 
 do $$
