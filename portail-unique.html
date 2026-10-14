@@ -1492,6 +1492,24 @@
     if(!r){ INT.msg={ t:'err', m:'Indiquez une référence (nom du fichier, lien ou n° de dépôt).' }; rendreIntervenant(); return; }
     await _intExec(missionId, 'fc_intervenant_deposer', { p_mission:String(missionId), p_livrable:String(l.id), p_reference:r.slice(0,300), p_note:n.slice(0,2000) }, 'Livrable déposé. Pensez à soumettre pour vérification quand tout est prêt.');
   }
+  /* Dépôt d'un fichier (livrable) : Edge Function fc-portail-fichier ; la note est reprise du champ « Note » de la version. */
+  async function intDeposerFichier(missionId, idx){
+    var m=_intMission(missionId), l=m&&(m.livrables||[])[idx]; if(!l||INT.occupe) return;
+    var inp=_intChamp(missionId,'fich'+idx), f=inp&&inp.files&&inp.files[0], note=_intChamp(missionId,'note'+idx);
+    var err=function(t){ INT.msg={ t:'err', m:t }; rendreIntervenant(); };
+    if(!f) return err('Choisissez un fichier.');
+    if(f.size>5*1024*1024) return err('Fichier trop volumineux (5 Mo au plus).');
+    if(['application/pdf','image/jpeg','image/png','image/webp'].indexOf(f.type)===-1) return err('Format non accepté (PDF, JPG, PNG ou WebP uniquement).');
+    var fd=new FormData(); fd.append('cible',JSON.stringify({ kind:'livrable', mission_id:String(missionId), livrable_id:String(l.id) })); fd.append('note',note?note.value.trim().slice(0,500):''); fd.append('fichier',f,f.name);
+    INT.occupe=missionId; INT.msg=null; rendreIntervenant();
+    try{
+      var r=await fetch(SB_URL+'/functions/v1/fc-portail-fichier',{ method:'POST', headers:_authHdr(false), body:fd }), j={}; try{ j=await r.json(); }catch(e){}
+      if(r.status===401){ INT.occupe=null; logoutIntervenant(); setErr('intError','Session expirée : reconnectez-vous.'); return; }
+      INT.msg=(r.ok&&j.ok)?{ t:'ok', m:'Fichier déposé. Pensez à soumettre la mission pour vérification quand tous les livrables sont déposés.' }:{ t:'err', m:j.erreur||'Dépôt impossible pour le moment. Réessayez.' };
+    }catch(e){ INT.msg={ t:'err', m:'Dépôt impossible pour le moment. Réessayez.' }; }
+    INT.occupe=null; INT.ouverte=missionId;
+    await chargerIntervenant();
+  }
   async function intDemanderInfo(missionId){
     if(INT.occupe) return;
     var el=_intChamp(missionId,'info'), n=el?el.value.trim():'';
@@ -1583,7 +1601,10 @@
           :'<div style="font-size:.78rem;color:#6b7f95;margin-top:2px;">Aucune version déposée.</div>')
         +(peutDeposer?'<div style="margin-top:8px;"><input type="text" data-champ="ref'+li+'" data-id="'+esc(m.id)+'" maxlength="300" style="width:100%;" placeholder="Référence (nom du fichier, lien, n° de dépôt)">'
           +'<textarea data-champ="note'+li+'" data-id="'+esc(m.id)+'" maxlength="2000" rows="2" style="width:100%;margin-top:4px;" placeholder="Note (facultatif)"></textarea>'
-          +'<button class="highlight-btn" style="margin-top:6px;" '+(INT.occupe?'disabled':'')+' data-id="'+esc(m.id)+'" onclick="intDeposer(this.dataset.id,'+li+')">Déposer cette version</button></div>':'')+'</div>';
+          +'<button class="highlight-btn" style="margin-top:6px;" '+(INT.occupe?'disabled':'')+' data-id="'+esc(m.id)+'" onclick="intDeposer(this.dataset.id,'+li+')">Déposer cette version</button>'
+          +'<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #cbd5e1;"><div style="font-size:.78rem;color:#4b6a8b;">Ou déposez le fichier lui-même (PDF, JPG, PNG ou WebP — 5 Mo au plus) :</div>'
+          +'<input type="file" data-champ="fich'+li+'" data-id="'+esc(m.id)+'" accept="application/pdf,image/jpeg,image/png,image/webp" style="margin-top:4px;max-width:100%;">'
+          +'<button class="highlight-btn" style="margin-top:6px;background:#0077b6;" '+(INT.occupe?'disabled':'')+' data-id="'+esc(m.id)+'" onclick="intDeposerFichier(this.dataset.id,'+li+')">Déposer le fichier</button></div></div>':'')+'</div>';
     }).join('')+'</div>';
     h+=_intMessagerie(m)+'</div>';
     return h;
@@ -1742,7 +1763,7 @@
     if(!STAFF.length) STAFF.push({ id:'admin', nom:'Administration '+_brandNom(), poste:'Support', type:'admin' });
   }
 
-  var S = { client:null, versements:[], programmes:[], lots:[], rapports:[], conventions:[], messages:[], interlocuteur:null, suivi:null };
+  var S = { client:null, versements:[], programmes:[], lots:[], rapports:[], conventions:[], messages:[], interlocuteur:null, suivi:null, pieces:null, ptOccupe:false, ptMsg:null };
 
   async function loginSouscripteur(){
     var ident=(document.getElementById('sousLogin').value||'').trim();
@@ -1797,6 +1818,7 @@
       S.messages=await pmsgFetch('souscripteur', S.client.id);
     }catch(e){ S.versements=S.versements||[]; }
     S.suivi=await chargerSuiviTitre();
+    S.pieces=await chargerPiecesTitre();
     rendreSouscripteur();
     /* Badge messages non lus */
     setTimeout(function(){ mettreAJourBadge('s', compterNonLus(S.messages)); }, 100);
@@ -1814,6 +1836,77 @@
       var v=await r.json();
       return (v && Array.isArray(v.dossiers) && (v.dossiers.length || (v.demandes||[]).length)) ? v : null;
     }catch(e){ return null; }
+  }
+  /* ── Pièces du dossier foncier (souscripteur) : dépôt et ouverture de fichiers ──
+     Fonctions serveur fc_vue_souscripteur_pieces (lecture) et Edge Function fc-portail-fichier (dépôt, ouverture). Le portail ne décide rien :
+     droits, format réel du fichier et limite de 5 Mo sont contrôlés côté serveur ; les contrôles d'ici ne servent qu'à éviter un envoi inutile. */
+  var PT_MAX=5*1024*1024, PT_TYPES=['application/pdf','image/jpeg','image/png','image/webp'];
+  var PT_STATUT={ a_verifier:['À vérifier','p-or'], acceptee:['Acceptée','p-vert'], refusee:['Refusée','p-rouge'], jointe:['Jointe','p-bleu'] };
+  var PT_FN_URL=SB_URL+'/functions/v1/fc-portail-fichier';
+  async function chargerPiecesTitre(){
+    try{
+      var r=await fetch(SB_URL+'/rest/v1/rpc/fc_vue_souscripteur_pieces',{ method:'POST', headers:_authHdr(true), body:'{}' });
+      if(!r.ok) return null;
+      var v=await r.json();
+      return (v&&(Array.isArray(v.demandes)||Array.isArray(v.pieces)))?{ demandes:v.demandes||[], pieces:v.pieces||[] }:null;
+    }catch(e){ return null; }
+  }
+  function blocPiecesTitre(){
+    var P=S.pieces; if(!P||(!P.demandes.length&&!P.pieces.length)) return '';
+    var h='<div class="card"><strong>📎 Pièces de votre dossier</strong>';
+    if(S.ptMsg) h+='<div role="'+(S.ptMsg.t==='ok'?'status':'alert')+'" style="'+(S.ptMsg.t==='ok'?'background:#dcfce7;color:#166534;':'background:#fee2e2;color:#991b1b;')+'padding:8px 12px;border-radius:12px;margin:8px 0;font-size:.85rem;">'+esc(S.ptMsg.m)+'</div>';
+    if(P.demandes.length){
+      h+='<p style="font-size:.8rem;color:#4b6a8b;margin:8px 0 4px;">Le promoteur vous demande :</p>';
+      P.demandes.forEach(function(d,i){
+        h+='<div style="border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-top:8px;"><div style="font-size:.88rem;"><strong>'+esc(d.demande||'Pièce demandée')+'</strong><div style="font-size:.76rem;color:#6b7f95;">Dossier '+esc(d.dossier||'')+' · '+esc(d.etape||'')+'</div></div>'
+          +'<input type="file" id="pt-f-'+i+'" accept="application/pdf,image/jpeg,image/png,image/webp" style="margin-top:6px;max-width:100%;">'
+          +'<input type="text" id="pt-n-'+i+'" maxlength="500" placeholder="Commentaire (facultatif)" style="width:100%;margin-top:4px;">'
+          +'<button class="highlight-btn" style="margin-top:6px;padding:8px 16px;" '+(S.ptOccupe?'disabled':'')+' onclick="ptEnvoyer('+i+')">'+(S.ptOccupe?'<span class="spinner"></span> Envoi…':'Envoyer le fichier')+'</button>'
+          +'<div style="font-size:.7rem;color:#6b7f95;margin-top:4px;">PDF, JPG, PNG ou WebP — 5 Mo au plus.</div></div>';
+      });
+    }
+    if(P.pieces.length){
+      h+='<p style="font-size:.8rem;color:#4b6a8b;margin:12px 0 4px;">Documents de votre dossier :</p>';
+      P.pieces.forEach(function(p,i){
+        var st=p.de==='vous'&&PT_STATUT[p.statut]?'<span class="pill '+PT_STATUT[p.statut][1]+'">'+PT_STATUT[p.statut][0]+'</span>':'';
+        h+='<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid #e2e8f0;padding:8px 0;font-size:.84rem;"><div>'+esc(p.nom||'document')+' '+st
+          +'<div style="font-size:.74rem;color:#6b7f95;">'+(p.de==='vous'?'Envoyé par vous':'Transmis par le promoteur')+' · '+esc(dshort(p.date))+' · '+esc(p.etape||'')+'</div>'
+          +(p.motif_refus?'<div style="font-size:.78rem;color:#991b1b;">Motif du refus : '+esc(p.motif_refus)+'</div>':'')+'</div>'
+          +(p.disponible?'<button class="highlight-btn" style="padding:6px 14px;background:#0077b6;" onclick="ptOuvrir('+i+')">Ouvrir</button>':'')+'</div>';
+      });
+    }
+    return h+'</div>';
+  }
+  async function ptEnvoyer(i){
+    var d=S.pieces&&S.pieces.demandes[i]; if(!d||S.ptOccupe) return;
+    var inp=document.getElementById('pt-f-'+i), f=inp&&inp.files&&inp.files[0], note=document.getElementById('pt-n-'+i);
+    var err=function(m){ S.ptMsg={ t:'err', m:m }; rafraichirPiecesTitre(); };
+    if(!f) return err('Choisissez un fichier.');
+    if(f.size>PT_MAX) return err('Fichier trop volumineux (5 Mo au plus).');
+    if(PT_TYPES.indexOf(f.type)===-1) return err('Format non accepté (PDF, JPG, PNG ou WebP uniquement).');
+    var fd=new FormData(); fd.append('cible',JSON.stringify({ kind:'souscripteur', dossier_id:d.dossier_id, etape_code:d.etape_code })); fd.append('note',note?note.value.trim():''); fd.append('fichier',f,f.name);
+    S.ptOccupe=true; S.ptMsg=null; rafraichirPiecesTitre();
+    try{
+      var r=await fetch(PT_FN_URL,{ method:'POST', headers:_authHdr(false), body:fd }), j={}; try{ j=await r.json(); }catch(e){}
+      if(r.status===401){ S.ptOccupe=false; logoutSouscripteur(); setErr('sousError','Session expirée : reconnectez-vous.'); return; }
+      if(!r.ok||!j.ok) S.ptMsg={ t:'err', m:j.erreur||'Envoi impossible pour le moment. Réessayez.' };
+      else { S.ptMsg={ t:'ok', m:'Fichier envoyé. Le responsable du dossier va le vérifier.' }; S.pieces=(await chargerPiecesTitre())||S.pieces; }
+    }catch(e){ S.ptMsg={ t:'err', m:'Envoi impossible pour le moment. Réessayez.' }; }
+    S.ptOccupe=false; rafraichirPiecesTitre();
+  }
+  async function ptOuvrir(i){
+    var p=S.pieces&&S.pieces.pieces[i]; if(!p) return;
+    var w=window.open('','_blank');
+    var echec=function(m){ try{ if(w) w.close(); }catch(e){} S.ptMsg={ t:'err', m:m||'Document indisponible.' }; rafraichirPiecesTitre(); };
+    try{
+      var r=await fetch(PT_FN_URL,{ method:'POST', headers:_authHdr(true), body:JSON.stringify({ action:'ouvrir', piece_id:p.id }) }), j={}; try{ j=await r.json(); }catch(e){}
+      if(r.status===401){ try{ if(w) w.close(); }catch(e){} logoutSouscripteur(); setErr('sousError','Session expirée : reconnectez-vous.'); return; }
+      if(!r.ok||!j.url) return echec(j.erreur);
+      if(w) w.location=j.url; else echec('Votre navigateur a bloqué l\'ouverture : autorisez les fenêtres pour ce site.');
+    }catch(e){ echec('Ouverture impossible pour le moment. Réessayez.'); }
+  }
+  function rafraichirPiecesTitre(){
+    var host=document.getElementById('s-tit'); if(host&&S.suivi) host.innerHTML=blocSuiviTitre()+blocPiecesTitre();
   }
   function blocSuiviTitre(){
     var v=S.suivi; if(!v) return '';
@@ -1885,7 +1978,7 @@
     html+='<div class="sub" id="s-ver"><div class="card"><strong>💳 Historique des versements</strong><div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Mode</th></tr></thead><tbody>'+tableVers(vs)+'</tbody></table></div></div></div>';
     html+='<div class="sub" id="s-tra">'+blocTravaux()+'</div>';
     html+='<div class="sub" id="s-rec">'+blocReception()+'</div>';
-    if(S.suivi) html+='<div class="sub" id="s-tit">'+blocSuiviTitre()+'</div>';
+    if(S.suivi) html+='<div class="sub" id="s-tit">'+blocSuiviTitre()+blocPiecesTitre()+'</div>';
     html+='<div class="sub" id="s-doc">'+sPrixModifs()+'<div class="card"><strong>📁 Mes documents</strong><div style="display:flex; flex-direction:column; gap:12px; margin-top:12px; max-width:340px;"><button class="highlight-btn" style="background:#0077b6;" onclick="docEcheancier()">📅 Échéancier personnalisé</button><button class="highlight-btn" style="background:#0077b6;" onclick="docAttestation()">📑 Attestation de versements</button>'+sAttSoldeBtn()+'</div></div></div>';
     html+='<div class="sub" id="s-msg"><div class="card">'
       +'<strong style="font-size:1rem;">💬 Messagerie</strong>'
