@@ -48,13 +48,41 @@ test('échappement HTML des libellés', async () => {
   assert.doesNotMatch(h, /<img/); assert.match(h, /&lt;img/);
 });
 
-test('espace notaire : liste des attestations transmises, échappée ; rien si aucune', async () => {
+test('espace notaire : seul ce qui est transmis s\'affiche, texte échappé ; rien si aucun dossier', async () => {
   const { page, erreurs } = await ouvrir();
   const r = await page.evaluate(() => {
-    INT.attestations = []; var vide = _intAttestationsHtml();
-    INT.attestations = [{ souscripteur: '<b>BENDE</b>', dossier: 'D-1', kind: 'finale', numero: 'ATF-1', date: '2026-10-14', html: '<p>x</p>' }, { souscripteur: 'KONE', dossier: 'D-2', kind: 'initial', numero: 'ATS-2', html: '<p>y</p>' }];
-    return { vide: vide, h: _intAttestationsHtml() };
+    INT.dossiers = []; var vide = _intDossiersNotaireHtml();
+    INT.dossiers = [
+      { souscripteur: '<b>BENDE</b>', dossier: 'D-1', identite: { nom: 'BENDE', prenoms: 'Jean', naissance: '1980-01-01', nationalite: 'Ivoirienne', piece_type: 'CNI', piece_num: 'C0012' },
+        bien: { lots: [{ lot: '12', ilot: 'B', surface: '300', type: 'villa', parcelle: 'PARC-1', localisation: 'Bingerville', numero_tf: 'TF 123' }], references: [{ dossier: 'DF-G', idufci: 'CI-1', numero_dossier_guf: 'GUF-9' }] },
+        avancement: [{ reference: 'DF-I', niveau: 'individuel', statut: 'en_cours', etapes: [{ libelle: 'Acte de mutation', statut: 'en_cours', date_cible: '2026-12-01' }, { libelle: 'Dépôt', statut: 'termine' }] }],
+        attestations: [{ kind: 'finale', numero: 'ATF-1', date: '2026-10-14', html: '<p>x</p>' }],
+        pieces: [{ id: 'p1', nom: 'titre_mere.pdf', taille: 2500000, date: '2026-10-10', version: 2 }] },
+      { souscripteur: 'KONE', dossier: 'D-2', identite: null, bien: null, avancement: null, attestations: [{ kind: 'initial', numero: 'ATS-2', html: '<p>y</p>' }], pieces: [] }];
+    return { vide: vide, h: _intDossiersNotaireHtml() };
   });
-  assert.equal(r.vide, ''); assert.doesNotMatch(r.h, /<b>BENDE/); assert.match(r.h, /&lt;b&gt;BENDE/); assert.match(r.h, /Valeur finale · N° ATF-1 · validée le 14\/10\/2026/); assert.match(r.h, /Prix initial · N° ATS-2/);
-  assert.equal((r.h.match(/intOuvrirAttestation/g) || []).length, 2); assert.deepEqual(erreurs, []);
+  assert.equal(r.vide, ''); assert.doesNotMatch(r.h, /<b>BENDE/); assert.match(r.h, /&lt;b&gt;BENDE/);
+  assert.match(r.h, /Jean BENDE/); assert.match(r.h, /CNI C0012/); assert.match(r.h, /Lot 12, îlot B — 300 m²/); assert.match(r.h, /TF TF 123/); assert.match(r.h, /IDUFCI CI-1/); assert.match(r.h, /GUF GUF-9/);
+  assert.match(r.h, /Acte de mutation : <strong>En cours<\/strong> <span[^>]*>\(échéance 01\/12\/2026\)/); assert.match(r.h, /Dépôt : <strong>Terminée<\/strong>/);
+  assert.match(r.h, /Valeur finale · N° ATF-1 · validée le 14\/10\/2026/); assert.match(r.h, /Prix initial · N° ATS-2/);
+  assert.match(r.h, /titre_mere\.pdf[\s\S]*2\.4 Mo · 10\/10\/2026 · v2/);
+  const kone = r.h.slice(r.h.indexOf('KONE')); assert.doesNotMatch(kone, /Identité|Avancement du dossier|Pièces/, 'KONE : seules les attestations sont transmises');
+  assert.equal((r.h.match(/intOuvrirPiece/g) || []).length, 1); assert.equal((r.h.match(/intOuvrirAttestation/g) || []).length, 2); assert.deepEqual(erreurs, []);
+});
+
+test('ouverture d\'une pièce : appel de fc-notaire-piece avec le jeton, puis URL signée ; refus et session expirée gérés', async () => {
+  const { page, erreurs } = await ouvrir();
+  const r = await page.evaluate(async () => {
+    var appels = [], ouverts = [], rep = { status: 200, body: { url: 'https://x.supabase.co/storage/v1/object/sign/pieces-foncieres/a?token=t' } };
+    window.fetch = async function (u, o) { appels.push({ u: String(u), body: o && o.body, h: o && o.headers }); return new Response(JSON.stringify(rep.body), { status: rep.status }); };
+    window.open = function () { var w = { closed: false, location: '', close: function () { this.closed = true; } }; ouverts.push(w); return w; };
+    INT.id = 'n1'; INT.nom = 'Etude'; INT.dossiers = [{ souscripteur: 'BENDE', pieces: [{ id: 'pz1', nom: 'a.pdf' }], attestations: [] }];
+    var out = {};
+    await intOuvrirPiece('0', '0'); out.ok = { loc: ouverts[0].location, appel: appels[0].u, corps: appels[0].body };
+    rep = { status: 403, body: { message: 'Document indisponible.' } }; await intOuvrirPiece('0', '0'); out.refus = { ferme: ouverts[1].closed, msg: INT.msg && INT.msg.m };
+    rep = { status: 401, body: {} }; window.logoutIntervenant = function () { out.deconnecte = true; }; await intOuvrirPiece('0', '0');
+    return out;
+  });
+  assert.match(r.ok.appel, /\/functions\/v1\/fc-notaire-piece$/); assert.equal(r.ok.corps, '{"piece_id":"pz1"}'); assert.match(r.ok.loc, /object\/sign\/pieces-foncieres\/a\?token=t/);
+  assert.equal(r.refus.ferme, true); assert.equal(r.refus.msg, 'Document indisponible.'); assert.equal(r.deconnecte, true); assert.deepEqual(erreurs, []);
 });

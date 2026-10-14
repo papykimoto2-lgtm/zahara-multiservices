@@ -113123,6 +113123,7 @@ function attNotaireChoisir(clientId, id){
   if(avant && (!apres || apres.id!==avant.id)){   /* l'ancien notaire perd l'accès : on retire aussi les transmissions */
     ['attestation_solde','attestation_solde_finale'].forEach(function(ch){ var a = c[ch]; if(a){ a.transmis_notaire = false; delete a.transmis_notaire_le; delete a.html_notaire; } });
   }
+  if(avant && (!apres || apres.id!==avant.id)) dnRetirerTout(c);
   attSoldeSauver(c); attSoldeRafraichirUI(clientId);
   toast(apres ? 'Notaire désigné : '+apres.nom_organisation+'. Transmettez ensuite chaque attestation (⚖️).' : 'Notaire retiré : plus aucun accès.','info');
 }
@@ -113148,9 +113149,83 @@ function attSoldeNotaireZone(c){
     + (liste.length ? '' : '<div style="color:var(--blanc-dim);margin-top:4px;">Aucun notaire enregistré : ajoutez-le dans Foncier › Intervenants (type Notaire), puis générez son accès portail.</div>')
     + (n && e!=='actif' ? '<div style="color:#c0392b;margin-top:4px;">⚠️ Ce notaire n\'a pas d\'accès portail actif (Foncier › Intervenants › Générer l\'accès).</div>' : '') + '</div>';
 }
+/* ── Dossier de transmission au notaire ──
+   Le notaire désigné (notaire_intervenant_id) ne voit dans son espace Intervenant QUE ce qui est coché ici :
+   sections de la fiche (identité, bien et références, avancement des étapes publiables) et pièces une à une.
+   Les documents « restreints » et les pièces d'un autre souscripteur ne sont jamais transmissibles. Changer ou retirer le notaire
+   retire tout. Les fichiers sont servis par l'Edge Function fc-notaire-piece (URL de 60 s, consultation journalisée). */
+var DN_SECTIONS = { identite: 'Identité du souscripteur (nom, naissance, nationalité, pièce d\'identité)', bien: 'Bien : lots, parcelle, références TF / ACD / IDUFCI / GUF', avancement: 'Avancement du dossier foncier (étapes publiables seulement)' };
+function dnTransmission(c) { return Object.assign({ identite: false, bien: false, avancement: false }, (c && c.transmission_notaire) || {}); }
+function dnPeutTransmettre(c) {
+  try { if (hasRole('admin') || hasRole('manager')) return true; } catch (e) {}
+  return fcDossiersDuSouscripteur(c).some(function(d){ return fcPeutGererDossier(d); });
+}
+function dnPieceTransmissible(c, p) {
+  if (!c || !p || p.retire || p.remplacee_par) return false;
+  if (p.confidentialite === 'restreinte') return false;
+  if (p.client_id && p.client_id !== c.id) return false;
+  return fcDossiersDuSouscripteur(c).some(function(d){ return d.id === p.dossier_id; });
+}
+function dnPiecesDuClient(c) { return (DATA.pieces_foncieres || []).filter(function(p){ return dnPieceTransmissible(c, p) && fcPieceLisible(p); }); }
+function dnJournal(c, texte) {
+  try { var d = fcDossiersDuSouscripteur(c)[0]; if (d) fcEvenement(d, '', 'transmission_notaire', texte, { source: 'promoteur' }); } catch (e) {}
+}
+function dnSection(clientId, section, on) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === clientId; });
+  if (!c || !DN_SECTIONS[section]) return { ok: false, erreur: 'Section inconnue.' };
+  var n = attNotaireDe(c);
+  if (on && (!n || n.statut_relation !== 'actif')) return { ok: false, erreur: "Désignez d'abord un notaire actif pour ce souscripteur." };
+  if (!dnPeutTransmettre(c)) return { ok: false, erreur: 'Réservé aux responsables du dossier et aux administrateurs.' };
+  var t = dnTransmission(c); t[section] = !!on; t.modifie_le = new Date().toISOString(); t.modifie_par = (APP.currentUser && APP.currentUser.nom) || '';
+  c.transmission_notaire = t; attSoldeSauver(c);
+  dnJournal(c, (on ? 'Transmis' : 'Retiré') + ' au notaire ' + (n ? n.nom_organisation : '') + ' : ' + DN_SECTIONS[section].split(' (')[0].split(' :')[0] + '.');
+  return { ok: true };
+}
+async function dnPiece(clientId, pieceId, on) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === clientId; }), p = fcPiece(pieceId);
+  if (!c || !p) return { ok: false, erreur: 'Pièce ou souscripteur introuvable.' };
+  var n = attNotaireDe(c), d = fcDossier(p.dossier_id);
+  if (on && (!n || n.statut_relation !== 'actif')) return { ok: false, erreur: "Désignez d'abord un notaire actif pour ce souscripteur." };
+  if (!dnPeutTransmettre(c) && !(d && fcPeutGererDossier(d))) return { ok: false, erreur: 'Réservé aux responsables du dossier et aux administrateurs.' };
+  if (on) {
+    if (p.confidentialite === 'restreinte') return { ok: false, erreur: 'Un document restreint ne peut pas être transmis.' };
+    if (!dnPieceTransmissible(c, p)) return { ok: false, erreur: "Cette pièce n'appartient pas aux dossiers de ce souscripteur." };
+    if (!fcPieceLisible(p)) return { ok: false, erreur: "Vous n'avez pas accès à ce document." };
+    if (!p.chemin) return { ok: false, erreur: "Le fichier n'est pas encore dans le stockage privé (envoi en cours ou hors ligne) : réessayez dans un instant." };
+  }
+  var l = (p.transmis_notaire_clients || []).filter(function(x){ return x !== clientId; });
+  if (on) l.push(clientId);
+  p.transmis_notaire_clients = l; p.transmis_notaire_le = on ? new Date().toISOString() : (p.transmis_notaire_le || '');
+  await fcDb('pieces_foncieres', p, { forceRole: true });
+  if (d) await fcEvenement(d, p.etape_code, 'transmission_notaire', (on ? 'Pièce transmise' : 'Transmission retirée') + ' au notaire ' + (n ? n.nom_organisation : '') + ' : ' + fcNomJournal(p), { source: 'promoteur', source_ref: p.id });
+  return { ok: true };
+}
+async function dnRetirerTout(c) {
+  c.transmission_notaire = { identite: false, bien: false, avancement: false, modifie_le: new Date().toISOString() };
+  var pcs = (DATA.pieces_foncieres || []).filter(function(p){ return (p.transmis_notaire_clients || []).indexOf(c.id) !== -1; });
+  for (var i = 0; i < pcs.length; i++) { pcs[i].transmis_notaire_clients = pcs[i].transmis_notaire_clients.filter(function(x){ return x !== c.id; }); try { await fcDb('pieces_foncieres', pcs[i], { forceRole: true }); } catch (e) {} }
+}
+function dnPanneau(c) {
+  var n = attNotaireDe(c); if (!n) return '';
+  var t = dnTransmission(c), q = '\'' + c.id + '\'', peut = dnPeutTransmettre(c);
+  var h = '<div style="border:1px solid var(--gris-med);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;">📂 <strong>Dossier de transmission au notaire</strong> <span style="color:var(--blanc-dim);">— ce que ' + escHtml(n.nom_organisation) + ' voit dans son espace. Rien n\'est transmis sans votre coche.</span>';
+  Object.keys(DN_SECTIONS).forEach(function(k){
+    h += '<div><label><input type="checkbox" ' + (t[k] ? 'checked ' : '') + (peut ? '' : 'disabled ') + 'onchange="dnSectionUI(' + q + ',\'' + k + '\',this.checked)"> ' + escHtml(DN_SECTIONS[k]) + '</label></div>';
+  });
+  var pcs = dnPiecesDuClient(c);
+  h += '<div style="margin-top:6px;font-weight:600;">Pièces</div>';
+  h += pcs.length ? pcs.map(function(p){
+    var coche = (p.transmis_notaire_clients || []).indexOf(c.id) !== -1;
+    return '<div><label><input type="checkbox" ' + (coche ? 'checked ' : '') + ((!p.chemin && !coche) ? 'disabled ' : '') + 'onchange="dnPieceUI(' + q + ',\'' + p.id + '\',this.checked)"> ' + escHtml(p.nom) + ' <span style="color:var(--blanc-dim);">(' + escHtml(FC_CATEGORIES_DOC[p.categorie] || 'autre') + ', v' + (p.version || 1) + ')</span>'
+      + (!p.chemin ? ' <span style="color:#c0392b;">⚠ fichier pas encore envoyé au stockage</span>' : '') + '</label></div>';
+  }).join('') : '<div style="color:var(--blanc-dim);">Aucune pièce transmissible (les documents restreints et ceux d\'un autre souscripteur sont exclus).</div>';
+  return h + '</div>';
+}
+function dnSectionUI(clientId, section, on) { var r = dnSection(clientId, section, on); if (!r.ok) toast(r.erreur, 'error'); attSoldeRafraichirUI(clientId); }
+async function dnPieceUI(clientId, pieceId, on) { var r = await dnPiece(clientId, pieceId, on); if (!r.ok) toast(r.erreur, 'error'); attSoldeRafraichirUI(clientId); }
 function attSoldeZoneClient(clientId){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return '';
-  return attSoldeNotaireZone(c) + attSoldeBloc(c, 'initial') + attSoldeBloc(c, 'finale');
+  return attSoldeNotaireZone(c) + dnPanneau(c) + attSoldeBloc(c, 'initial') + attSoldeBloc(c, 'finale');
 }
 /* ── Impression « avec modifications » (à titre indicatif) ───────────────────
    Deux versions imprimables d'une attestation validée :
