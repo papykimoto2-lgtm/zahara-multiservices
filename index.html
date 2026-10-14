@@ -112542,7 +112542,7 @@ function printFacture(id){
    VALIDATIONS HIÉRARCHIQUES — workflow générique
    ══════════════════════════════════════════════════════ */
 function valTypeLabel(t){ var m={bon_commande:'Bon de commande',situation:'Situation de travaux',convention:'Convention',facture_fournisseur:'Facture fournisseur',liberation_garantie:'Libération retenue garantie',reception_travaux:'Réception de travaux',livraison:'Livraison souscripteur',attestation_solde:'Attestation de solde',cession:'Cession foncière',autre:'Autre'}; return m[t]||t; }
-function valStatutBadge(st){ var m={en_attente:'badge-or',valide:'badge-vert',rejete:'badge-rouge'}; var l={en_attente:'⏳ En attente',valide:'✅ Validé',rejete:'⛔ Rejeté'}; return '<span class="badge '+(m[st]||'badge-or')+'">'+(l[st]||st)+'</span>'; }
+function valStatutBadge(st){ var m={en_attente:'badge-or',valide:'badge-vert',rejete:'badge-rouge',annule:'badge-rouge'}; var l={en_attente:'⏳ En attente',valide:'✅ Validé',rejete:'⛔ Rejeté',annule:'↩ Validation annulée'}; return '<span class="badge '+(m[st]||'badge-or')+'">'+(l[st]||st)+'</span>'; }
 function valPending(type,refId){ return (DATA.validations||[]).find(function(v){return v.type===type&&v.ref_id===refId&&v.statut==='en_attente';}); }
 async function valCreate(type,refId,libelle,montant,meta){
   if(valPending(type,refId)){ toast('Déjà en attente de validation.','info'); return null; }
@@ -112943,6 +112943,32 @@ function attSoldeSauver(c){
   dbPut('clients', c);
   if(typeof syncToSupabase==='function') syncToSupabase('pi_clients', c);
 }
+/* Annulation d'une validation faite par erreur : l'attestation repasse en brouillon (même numéro, aucun numéro perdu),
+   elle est retirée du portail, la validation du journal est marquée « annulée » (jamais effacée) et le motif est conservé.
+   Ensuite « Soumettre au DG » la renvoie en validation. Réservé à la hiérarchie, comme la validation. */
+async function attSoldeAnnulerValidation(clientId){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c.attestation_solde;
+  if(!a || a.statut!=='valide'){ toast('Aucune attestation validée à annuler.','error'); return; }
+  if(typeof hasRole==='function' && !hasRole('admin') && !hasRole('manager')){ toast('Annulation réservée à la hiérarchie.','error'); return; }
+  var motif = prompt("Motif de l'annulation de la validation (obligatoire) :\nL'attestation N° "+a.numero+" repassera en brouillon et sera retirée du portail.", '');
+  if(motif===null) return;
+  motif = String(motif).trim();
+  if(!motif){ toast("Le motif de l'annulation est obligatoire.",'error'); return; }
+  var qui = (APP.currentUser&&APP.currentUser.nom)||'—';
+  a.annulations = (a.annulations||[]).concat([{ le:today(), par:qui, motif:motif, valide_par:a.valide_par||'', valide_le:a.valide_le||'', publie_portail:!!a.publie_portail, wa_envoye_le:a.wa_envoye_le||'' }]);
+  a.statut = 'brouillon'; a.publie_portail = false;
+  ['html','valide_par','valide_le','date_emission','publie_le','wa_envoye_le','variante','date_demande','demandeur','motif'].forEach(function(k){ delete a[k]; });
+  a.date_brouillon = today();
+  (DATA.validations||[]).filter(function(v){ return v.type==='attestation_solde' && v.ref_id===clientId && v.statut==='valide'; }).forEach(function(v){
+    v.statut = 'annule'; v.motif = "Validation annulée par "+qui+" le "+today()+" : "+motif;
+    dbPut('validations', v); if(typeof syncToSupabase==='function') syncToSupabase('pi_validations', v);
+  });
+  await attLierJuridique(c, 'Validation de l\'attestation de solde N° '+a.numero+' annulée par '+qui+' ('+motif+'). Retour en brouillon.');
+  attSoldeSauver(c);
+  etudesLiveRefresh('validations'); if(typeof renderValidations==='function') renderValidations();
+  attSoldeRafraichirUI(clientId);
+  toast("↩ Validation annulée : l'attestation est en brouillon. Cliquez « Soumettre au DG » pour la renvoyer.",'success',7000);
+}
 async function attSoldeDemander(clientId){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
   var S = attSoldeSolde(c);
@@ -112952,7 +112978,7 @@ async function attSoldeDemander(clientId){
   if(a && a.statut==='valide' && !confirm('Une attestation a déjà été validée ('+a.numero+'). En demander une nouvelle ?')) return;
   var nom = ((c.nom||'')+' '+(c.prenoms||'')).trim();
   c.attestation_solde = { numero:(a && a.statut!=='valide') ? a.numero : attSoldeNumero(), statut:'en_attente', date_demande:today(),
-    demandeur:(APP.currentUser&&APP.currentUser.nom)||'—', prix:S.prix, verse:S.verse, date_solde:S.dateSolde, publie_portail:false };
+    demandeur:(APP.currentUser&&APP.currentUser.nom)||'—', prix:S.prix, verse:S.verse, date_solde:S.dateSolde, publie_portail:false, annulations:(a && a.annulations) || undefined };
   attSoldeSauver(c);
   var v = await valCreate('attestation_solde', c.id, 'Attestation de solde '+c.attestation_solde.numero+' — '+nom+(c.dossier?(' ('+c.dossier+')'):''), S.prix, {client_id:c.id});
   attSoldeRafraichirUI(c.id);
@@ -113005,7 +113031,8 @@ function attSoldeCellule(clientId){
     + '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer l\'attestation SANS modification : version officielle, à remettre au notaire" onclick="attSoldeImprimer('+q+')">🖨 Sans modif.</button> '
     + '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer avec les modifications demandées par le souscripteur : version à titre indicatif" onclick="attSoldeVarianteOuvrir('+q+')">✏️ Avec modif.</button> '
     + '<button class="btn '+(a.publie_portail?'btn-primary':'btn-secondary')+' btn-sm" '+b+' title="'+(a.publie_portail?'Publiée au portail — cliquer pour retirer':'Publier au portail du souscripteur')+'" onclick="attSoldePublier('+q+','+(a.publie_portail?'false':'true')+')">🌐</button> '
-    + '<button class="btn btn-secondary btn-sm" '+b+' title="Envoyer par WhatsApp" onclick="attSoldeWhatsApp('+q+')">📲</button>'
+    + '<button class="btn btn-secondary btn-sm" '+b+' title="Envoyer par WhatsApp" onclick="attSoldeWhatsApp('+q+')">📲</button> '
+    + '<button class="btn btn-secondary btn-sm" '+b+' title="Annuler la validation (validée par erreur) : retour en brouillon, puis nouvelle soumission au DG" onclick="attSoldeAnnulerValidation('+q+')">↩ Annuler la validation</button>'
     + (a.wa_envoye_le?'<div style="font-size:9px;color:var(--blanc-dim);">WhatsApp : '+escHtml(dateShort(a.wa_envoye_le))+'</div>':'');
 }
 
