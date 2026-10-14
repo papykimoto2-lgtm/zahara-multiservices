@@ -59723,9 +59723,9 @@ function fcVueIntervenant(intervenantId) {
     var etapes = (d.etapes || []).filter(function(e){ return (m.perimetre.etapes || []).indexOf(e.code) !== -1; })
       .map(function(e){ return { code: e.code, libelle: e.libelle, statut: e.statut, date_cible: e.date_cible }; });
     out.missions.push({
-      reference: m.reference, titre: m.titre, description: m.description, statut: m.statut, echeance: m.echeance,
+      id: m.id, reference: m.reference, titre: m.titre, description: m.description, statut: m.statut, echeance: m.echeance,
       dossier: { reference: d.reference, parcelle: fcLibelleParcelle(d.parcelle_id) }, etapes: etapes,
-      livrables: m.livrables.map(function(l){ return { libelle: l.libelle, versions: l.versions.map(function(v){ return { numero: v.numero, statut: v.statut, date: v.date, refus: v.refus ? { motif: v.refus.motif, elements: v.refus.elements, delai: v.refus.delai } : null }; }) }; })
+      livrables: m.livrables.map(function(l){ return { id: l.id, libelle: l.libelle, versions: l.versions.map(function(v){ return { numero: v.numero, statut: v.statut, date: v.date, refus: v.refus ? { motif: v.refus.motif, elements: v.refus.elements, delai: v.refus.delai } : null }; }) }; })
     });
   });
   return out;
@@ -59740,6 +59740,7 @@ function fcRenderIntervenants() {
     + '<div style="font-size:11px;color:var(--dim);margin-bottom:10px;">L\'acceptation d\'une mission dans ImmoSuite ne remplace pas la signature d\'un contrat lorsqu\'elle est nécessaire. La validation finale d\'un livrable revient au responsable désigné.</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">'
     + kpi('Missions', s.total) + kpi('Envoyées', s.attribuees) + kpi('En cours', s.en_cours, '#1565c0') + kpi('Livrables attendus', s.livrables_attendus) + kpi('À corriger', s.a_corriger, '#c0392b') + kpi('Terminées', s.terminees, '#2e7d4f') + kpi('En retard', s.en_retard, '#c0392b') + '</div></div>';
+  h += fcCarteAccesGenere();
   h += '<div class="card"><div class="card-title">👤 Nouvel intervenant</div><div class="filters-bar" style="align-items:end;flex-wrap:wrap;">'
     + '<div class="form-group"><label>Organisation</label><input class="form-control" id="fi-n-nom"></div>'
     + '<div class="form-group"><label>Type</label><select class="filter-select" id="fi-n-type">' + fcOptions(FC_TYPES_INTERVENANT, 'geometre') + '</select></div>'
@@ -59748,8 +59749,8 @@ function fcRenderIntervenants() {
     + '<div class="form-group"><label>E-mail</label><input class="form-control" id="fi-n-email"></div>'
     + '<div class="form-group"><label>Référence professionnelle</label><input class="form-control" id="fi-n-ref"></div>'
     + '<button class="btn btn-primary btn-sm" onclick="fcIntervenantUI()">Enregistrer</button></div>';
-  h += is.length ? '<div class="table-wrap"><table><thead><tr><th>Organisation</th><th>Type</th><th>Contact</th><th>Référence</th><th>Relation</th></tr></thead><tbody>'
-    + is.map(function(i){ return '<tr><td><strong>' + escHtml(i.nom_organisation) + '</strong></td><td>' + escHtml(FC_TYPES_INTERVENANT[i.type] || i.type) + '</td><td>' + escHtml(i.contact_nom) + '<br><span style="font-size:11px;color:var(--dim);">' + escHtml(i.telephone) + ' ' + escHtml(i.email) + '</span></td><td>' + escHtml(i.reference_professionnelle || '—') + '</td><td>' + escHtml(i.statut_relation) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div style="color:var(--dim);padding:8px;">Aucun intervenant enregistré.</div>';
+  h += is.length ? '<div class="table-wrap"><table><thead><tr><th>Organisation</th><th>Type</th><th>Contact</th><th>Référence</th><th>Relation</th><th>Accès portail</th></tr></thead><tbody>'
+    + is.map(function(i){ return '<tr><td><strong>' + escHtml(i.nom_organisation) + '</strong></td><td>' + escHtml(FC_TYPES_INTERVENANT[i.type] || i.type) + '</td><td>' + escHtml(i.contact_nom) + '<br><span style="font-size:11px;color:var(--dim);">' + escHtml(i.telephone) + ' ' + escHtml(i.email) + '</span></td><td>' + escHtml(i.reference_professionnelle || '—') + '</td><td>' + escHtml(i.statut_relation) + '</td><td>' + fcCelluleAccesIntervenant(i) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div style="color:var(--dim);padding:8px;">Aucun intervenant enregistré.</div>';
   h += '</div><div class="card"><div class="card-title">📌 Nouvelle mission</div><div class="filters-bar" style="align-items:end;flex-wrap:wrap;">'
     + '<div class="form-group"><label>Dossier</label><select class="filter-select" id="fi-m-dossier">' + ds.map(function(d){ return '<option value="' + d.id + '">' + escHtml(d.reference + ' — ' + fcLibelleParcelle(d.parcelle_id)) + '</option>'; }).join('') + '</select></div>'
     + '<div class="form-group"><label>Intervenant</label><select class="filter-select" id="fi-m-interv">' + is.filter(function(i){ return i.statut_relation === 'actif'; }).map(function(i){ return '<option value="' + i.id + '">' + escHtml(i.nom_organisation) + '</option>'; }).join('') + '</select></div>'
@@ -59776,6 +59777,111 @@ async function fcIntervenantUI() {
   var r = await fcEnregistrerIntervenant({ nom_organisation: g('fi-n-nom'), type: g('fi-n-type'), contact_nom: g('fi-n-contact'), telephone: g('fi-n-tel'), email: g('fi-n-email'), reference_professionnelle: g('fi-n-ref') });
   if (fcMsg(r, 'Intervenant enregistré.')) fcRenderIntervenants();
 }
+/* ═══ Accès des intervenants au portail (Foncier Connect — portail intervenants, P1) ═══
+   Identifiant de connexion = e-mail ou téléphone de la fiche. Code de 8 caractères, affiché UNE seule fois puis conservé
+   haché (SHA-256 + sel, comme les souscripteurs : portal-login le vérifie sans jamais le renvoyer). Expire au bout de
+   FC_ACCES_INTERVENANT_JOURS jours ; l'accès cesse aussi dès que la relation n'est plus « actif ». Rien de secret dans
+   acces_historique (qui, quand, quoi). Réservé aux administrateurs et managers : c'est un identifiant externe. */
+var FC_ACCES_INTERVENANT_JOURS = 90;
+var FC_ALPHABET_CODE = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   /* sans I, L, O, 0, 1 : pas de confusion à la saisie */
+function fcCodeAcces() {
+  var n = FC_ALPHABET_CODE.length, max = Math.floor(256 / n) * n, out = '';   /* rejet des octets hors plage : aucun biais */
+  while (out.length < 8) {
+    var b = new Uint8Array(16); crypto.getRandomValues(b);
+    for (var k = 0; k < b.length && out.length < 8; k++) if (b[k] < max) out += FC_ALPHABET_CODE.charAt(b[k] % n);
+  }
+  return out;
+}
+function fcPeutGererAccesIntervenant() { try { return hasRole('admin') || hasRole('manager'); } catch (e) { return false; } }
+function fcEtatAccesIntervenant(i, maintenant) {
+  if (!i || i.statut_relation !== 'actif') return { etat: 'inactif', expiration: '' };
+  if (!i.code_acces_hash) return { etat: 'aucun', expiration: '' };
+  var exp = i.code_expiration || '';
+  return { etat: (exp && new Date(exp) < (maintenant || new Date())) ? 'expire' : 'actif', expiration: exp };
+}
+function fcIdentifiantAcces(i) { return String(i.email || '').trim() || String(i.telephone || '').trim(); }
+async function fcGenererAccesIntervenant(id) {
+  if (!fcPeutGererAccesIntervenant()) return { ok: false, erreur: 'Seul un administrateur ou un manager peut remettre un accès au portail.' };
+  var i = fcIntervenant(id);
+  if (!i) return { ok: false, erreur: 'Intervenant introuvable.' };
+  if (i.statut_relation !== 'actif') return { ok: false, erreur: "Cet intervenant n'est pas actif." };
+  if (!fcIdentifiantAcces(i)) return { ok: false, erreur: "Renseignez un e-mail ou un téléphone : c'est l'identifiant de connexion." };
+  var code = fcCodeAcces(), salt = generateSalt(), a = fcActeur(), maintenant = new Date();
+  var fin = new Date(maintenant.getTime() + FC_ACCES_INTERVENANT_JOURS * 86400000).toISOString().slice(0, 10) + 'T23:59:59Z';
+  var regenere = !!i.code_acces_hash;
+  i.code_acces_hash = await hashPassword(code, salt); i.code_acces_salt = salt;
+  i.code_acces_date = maintenant.toISOString(); i.code_expiration = fin;
+  delete i.code_acces; delete i.mot_de_passe;
+  if (!i.acces_historique) i.acces_historique = [];
+  i.acces_historique.push({ date: maintenant.toISOString(), action: regenere ? 'regenere' : 'genere', par: a.nom, expiration: fin });
+  i._modifie = maintenant.toISOString();
+  await fcDb('intervenants_fonciers', i);
+  return { ok: true, code: code, expiration: fin, identifiant: fcIdentifiantAcces(i), intervenant: i };
+}
+async function fcRevoquerAccesIntervenant(id) {
+  if (!fcPeutGererAccesIntervenant()) return { ok: false, erreur: 'Seul un administrateur ou un manager peut retirer un accès au portail.' };
+  var i = fcIntervenant(id);
+  if (!i) return { ok: false, erreur: 'Intervenant introuvable.' };
+  if (!i.code_acces_hash) return { ok: false, erreur: "Cet intervenant n'a pas d'accès au portail." };
+  var a = fcActeur(), maintenant = new Date();
+  delete i.code_acces_hash; delete i.code_acces_salt; delete i.code_acces_date; delete i.code_expiration; delete i.code_acces; delete i.mot_de_passe;
+  if (!i.acces_historique) i.acces_historique = [];
+  i.acces_historique.push({ date: maintenant.toISOString(), action: 'revoque', par: a.nom });
+  i._modifie = maintenant.toISOString();
+  await fcDb('intervenants_fonciers', i);
+  return { ok: true, intervenant: i };
+}
+function fcUrlPortailIntervenant() { var p = DATA.params || {}; return p.portail_url || (location.origin + '/portail-unique.html'); }
+function fcMessageAccesIntervenant(i, code, expiration) {
+  var soc = (DATA.params || {}).societe || 'notre société', nom = String(i.contact_nom || i.nom_organisation || '').trim();
+  return 'Bonjour ' + nom + ',\n\nVous avez accès à l\'espace Intervenants de ' + soc + ' pour suivre vos missions foncières et déposer vos livrables.\n\n'
+    + '🔗 Lien : ' + fcUrlPortailIntervenant() + '\n👤 Identifiant : ' + fcIdentifiantAcces(i) + '\n🔑 Code d\'accès : ' + code
+    + '\n⏳ Valable jusqu\'au ' + (expiration ? String(expiration).slice(0, 10).split('-').reverse().join('/') : '—') + '\n\n'
+    + 'Ouvrez le lien, choisissez « Intervenant », puis saisissez votre identifiant et ce code.\n\nCordialement,\n' + soc;
+}
+function fcCelluleAccesIntervenant(i) {
+  var e = fcEtatAccesIntervenant(i), peut = fcPeutGererAccesIntervenant(), q = '\'' + i.id + '\'';
+  var dfin = e.expiration ? String(e.expiration).slice(0, 10).split('-').reverse().join('/') : '';
+  var b = { actif: '<span class="badge badge-vert">🔐 Actif jusqu\'au ' + escHtml(dfin) + '</span>', expire: '<span class="badge badge-rouge">⏰ Expiré le ' + escHtml(dfin) + '</span>',
+            aucun: '<span class="badge badge-gris">⚪ Aucun</span>', inactif: '<span class="badge badge-gris">⛔ Relation inactive</span>' }[e.etat];
+  if (!peut || e.etat === 'inactif') return b;
+  return b + '<div style="margin-top:4px;"><button class="btn btn-secondary btn-sm" onclick="fcAccesIntervenantUI(' + q + ')">' + (e.etat === 'aucun' ? 'Générer l\'accès' : 'Régénérer') + '</button>'
+    + (e.etat === 'aucun' ? '' : ' <button class="btn btn-secondary btn-sm" onclick="fcRevoquerAccesUI(' + q + ')">Retirer</button>') + '</div>';
+}
+function fcCarteAccesGenere() {
+  var x = APP._fiAcces; if (!x) return '';
+  var i = fcIntervenant(x.id); if (!i) return '';
+  var msg = fcMessageAccesIntervenant(i, x.code, x.expiration), tel = String(i.telephone || '').trim(), mail = String(i.email || '').trim();
+  return '<div class="card" style="border:2px solid #2e7d4f;"><div class="card-title">🔑 Accès portail de ' + escHtml(i.nom_organisation) + ' — à transmettre maintenant</div>'
+    + '<div style="font-size:12px;color:#c0392b;margin-bottom:8px;">Ce code ne sera plus jamais affiché : seul son empreinte est conservée. Pour en donner un nouveau, utilisez « Régénérer ».</div>'
+    + '<div style="font-size:13px;">Identifiant : <b>' + escHtml(x.identifiant) + '</b> &nbsp;·&nbsp; Code : <b style="font-family:monospace;font-size:20px;letter-spacing:2px;">' + escHtml(x.code) + '</b></div>'
+    + '<textarea class="form-control" id="fi-acces-msg" rows="9" readonly style="margin-top:8px;">' + escHtml(msg) + '</textarea>'
+    + '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="fcCopierAcces()">Copier le message</button>'
+    + (tel ? '<a class="btn btn-secondary btn-sm" target="_blank" rel="noopener" href="https://wa.me/' + escHtml(telWhatsApp(tel)) + '?text=' + encodeURIComponent(msg) + '">WhatsApp</a>' : '')
+    + (mail ? '<a class="btn btn-secondary btn-sm" href="mailto:' + escHtml(mail) + '?subject=' + encodeURIComponent('Votre accès à l\'espace Intervenants') + '&body=' + encodeURIComponent(msg) + '">E-mail</a>' : '')
+    + '<button class="btn btn-secondary btn-sm" onclick="fcFermerAcces()">J\'ai transmis le code</button></div></div>';
+}
+async function fcAccesIntervenantUI(id) {
+  var i = fcIntervenant(id); if (!i) return;
+  if (i.code_acces_hash && !confirm('Un accès existe déjà pour ' + i.nom_organisation + '. Le code actuel cessera de fonctionner immédiatement. Continuer ?')) return;
+  var r = await fcGenererAccesIntervenant(id);
+  if (!fcMsg(r, 'Accès généré : transmettez le code maintenant.')) return;
+  APP._fiAcces = { id: id, code: r.code, expiration: r.expiration, identifiant: r.identifiant };
+  fcRenderIntervenants();
+}
+async function fcRevoquerAccesUI(id) {
+  var i = fcIntervenant(id); if (!i) return;
+  if (!confirm('Retirer l\'accès au portail de ' + i.nom_organisation + ' ? Son code cessera de fonctionner immédiatement.')) return;
+  var r = await fcRevoquerAccesIntervenant(id);
+  if (fcMsg(r, 'Accès retiré.')) { if (APP._fiAcces && APP._fiAcces.id === id) APP._fiAcces = null; fcRenderIntervenants(); }
+}
+function fcFermerAcces() { APP._fiAcces = null; fcRenderIntervenants(); }
+function fcCopierAcces() {
+  var t = document.getElementById('fi-acces-msg'); if (!t) return;
+  try { navigator.clipboard.writeText(t.value).then(function(){ toast('Message copié.', 'success'); }, function(){ t.select(); document.execCommand('copy'); }); }
+  catch (e) { t.select(); try { document.execCommand('copy'); toast('Message copié.', 'success'); } catch (e2) {} }
+}
+
 async function fcMissionUI() {
   var g = function(i){ return (document.getElementById(i) || {}).value || ''; };
   var r = await fcCreerMission({ dossier_id: g('fi-m-dossier'), intervenant_id: g('fi-m-interv'), titre: g('fi-m-titre'), livrables: g('fi-m-livr').split(';'), echeance: g('fi-m-ech'), etape_code: g('fi-m-etape'), contrat_reference: g('fi-m-contrat') });
@@ -60044,7 +60150,7 @@ async function fcRetirerUI(pubId) {
   fcMsg(await fcRetirerPublication(pubId, m), 'Publication retirée.'); fcRender();
 }
 fcProtegerMutations(['fcOuvrirDossier', 'fcChangerStatutEtape', 'fcAjouterJustificatif', 'fcDefinirIssue', 'fcCorrigerEtape', 'fcEnregistrerIntervenant', 'fcCreerMission',
-  'fcChangerStatutMission', 'fcSoumettreLivrable', 'fcValiderLivrable', 'fcRefuserLivrable', 'fcPublierInformation', 'fcRetirerPublication', 'fcCreerDemande', 'fcRepondreDemande', 'fcChangerStatutDemande']);
+  'fcChangerStatutMission', 'fcSoumettreLivrable', 'fcValiderLivrable', 'fcRefuserLivrable', 'fcPublierInformation', 'fcRetirerPublication', 'fcCreerDemande', 'fcRepondreDemande', 'fcChangerStatutDemande', 'fcGenererAccesIntervenant', 'fcRevoquerAccesIntervenant']);
 
 /* ══════════════════════════════════════════════════════════════════════════
    FONCIER CONNECT — phase 4 : notifications, échéances, relances

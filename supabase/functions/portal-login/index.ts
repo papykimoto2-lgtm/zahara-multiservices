@@ -212,6 +212,10 @@ const KINDS: Record<string, {
   identFields: string[];
   nested?: string;
   idClaim: string;
+  // Profil dont la fiche porte un statut de relation (ex. intervenant foncier) :
+  // seule une fiche dont `champ` vaut `valeur` peut se connecter. Un
+  // intervenant archivé perd l'accès sans qu'il faille effacer son code.
+  actif?: { champ: string; valeur: string };
 }> = {
   souscripteur:    { table: "pi_clients",                  identFields: ["dossier", "tel", "email"],                  idClaim: "client_id" },
   apporteur:       { table: "pi_apporteurs",               identFields: ["email", "tel"],                             idClaim: "apporteur_id" },
@@ -231,6 +235,11 @@ const KINDS: Record<string, {
   // Les propriétaires terriens ne sont pas des lignes de table : ils vivent
   // dans un tableau JSON à l'intérieur de l'opération foncière.
   proprio_foncier: { table: "pi_af_operations",            identFields: ["contact", "tel", "email", "nom"], nested: "proprietaires", idClaim: "prop_id" },
+  // Foncier Connect — géomètres, notaires, prestataires : ils ne voient que
+  // leurs missions, par les fonctions fc_*intervenant* (jamais par les tables).
+  // La fiche porte email / telephone (cf. fcEnregistrerIntervenant) et n'est
+  // utilisable que si statut_relation = « actif ».
+  intervenant:     { table: "pi_intervenants_fonciers",    identFields: ["email", "telephone"], idClaim: "intervenant_id", actif: { champ: "statut_relation", valeur: "actif" } },
 };
 
 // ── Lecture paginée d'une table ────────────────────────────────────────────
@@ -339,6 +348,7 @@ async function resolvePortalLogin(kind: string, ident: string, code: string): Pr
       // Profil imbriqué (propriétaire terrien) : l'élément du tableau porte sa
       // propre suppression, indépendamment de l'opération qui le contient.
       if (estSupprimeLogique(rec)) continue;
+      if (cfg.actif && String(rec[cfg.actif.champ] ?? "") !== cfg.actif.valeur) continue;
       // On accepte n'importe lequel des identifiants présents sur la fiche :
       // l'acteur ne sait pas lequel on attend de lui.
       const matches = cfg.identFields.some((f) => {
@@ -358,7 +368,7 @@ async function resolvePortalLogin(kind: string, ident: string, code: string): Pr
         id: String(cfg.nested ? (rec.id ?? parentId) : parentId),
         parent_id: String(parentId),
         idClaim: cfg.idClaim,
-        nom: rec.nom ?? rec.raison_sociale ?? rec.proprietaire_nom ?? rec.acquereur ?? "",
+        nom: rec.nom ?? rec.raison_sociale ?? rec.nom_organisation ?? rec.proprietaire_nom ?? rec.acquereur ?? "",
         nested: !!cfg.nested,
         expiration: rec.code_expiration ?? rec.date_expiration ?? null,
       };
