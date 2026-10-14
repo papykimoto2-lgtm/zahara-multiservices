@@ -10086,6 +10086,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div class="etape-btns">
               <button class="tab-btn active" onclick="switchTab('foncier','dashboard');renderFoncierDashboard()" title="Récapitulatif du portefeuille — répartition, valeur, alertes"><i>📊</i>Tableau de bord</button>
               <button class="tab-btn" onclick="switchTab('foncier','notifications')" title="Alertes, échéances et notifications"><i>🔔</i>Notifications <span id="fn-badge" style="display:none;background:#dc3545;color:#fff;border-radius:10px;padding:0 6px;font-size:10px;"></span></button>
+              <button class="tab-btn" onclick="switchTab('foncier','journee')" title="Ce qui demande une action aujourd'hui, avec l'action en un clic"><i>☀️</i>Ma journée <span id="fj-badge" style="display:none;background:#dc3545;color:#fff;border-radius:10px;padding:0 6px;font-size:10px;margin-left:4px;">0</span></button>
               <button class="tab-btn" onclick="switchTab('foncier','pilotage')" title="Tableaux de bord : promoteur, responsable, intervenants, direction"><i>🎯</i>Pilotage foncier</button>
               <button class="tab-btn" onclick="switchTab('foncier','documents')" title="Gestion documentaire : classement, versions, expiration, recherche"><i>🗂️</i>Documents</button>
             </div>
@@ -10101,6 +10102,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div class="etape-btns">
               <button class="tab-btn" onclick="switchTab('foncier','titres')" title="Point de départ : quel titre détient chaque parcelle aujourd'hui"><i>📜</i>2.1 Situation des titres</button>
               <button class="tab-btn" onclick="switchTab('foncier','dossiers')" title="Dossiers fonciers : étapes, responsables, justificatifs, historique"><i>📁</i>2.2 Dossiers fonciers</button>
+              <button class="tab-btn" onclick="switchTab('foncier','modeles')" title="Modèles de dossier : délais et responsables par défaut, ordre des étapes"><i>📐</i>Modèles de dossier</button>
               <button class="tab-btn" onclick="switchTab('foncier','intervenants')" title="Répertoire des intervenants et missions confiées"><i>🤝</i>2.3 Intervenants &amp; missions</button>
               <button class="tab-btn" onclick="switchTab('foncier','workflow')" title="Vue synthétique par parcelle : attribution → ACP → ACD → TF → mutation"><i>🧭</i>2.4 Jalons du titre</button>
               <button class="tab-btn" onclick="switchTab('foncier','souscripteurs')" title="Information des souscripteurs : publications, aperçu, demandes"><i>👥</i>2.5 Information souscripteurs</button>
@@ -10638,6 +10640,8 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
         <div class="tab-pane" id="tab-foncier-souscripteurs"><div id="fs-root"></div></div>
         <div class="tab-pane" id="tab-foncier-notifications"><div id="fn-root"></div></div>
         <div class="tab-pane" id="tab-foncier-pilotage"><div id="fp-root"></div></div>
+        <div class="tab-pane" id="tab-foncier-journee"><div id="fj-root"></div></div>
+        <div class="tab-pane" id="tab-foncier-modeles"><div id="fm-root"></div></div>
         <div class="tab-pane" id="tab-foncier-documents"><div id="fd-root"></div></div>
 
         <div class="tab-pane" id="tab-foncier-fisc">
@@ -30543,6 +30547,8 @@ function switchTab(context, tab) {
   if (context==='foncier' && tab==='souscripteurs' && typeof fcRenderSouscripteurs==='function') fcRenderSouscripteurs();
   if (context==='foncier' && tab==='notifications' && typeof fcRenderNotifications==='function') fcRenderNotifications();
   if (context==='foncier' && tab==='pilotage' && typeof fcRenderPilotage==='function') fcRenderPilotage();
+  if (context==='foncier' && tab==='journee' && typeof fcRenderJournee==='function') fcRenderJournee();
+  if (context==='foncier' && tab==='modeles' && typeof fcRenderModeles==='function') fcRenderModeles();
   if (context==='foncier' && tab==='documents' && typeof fcRenderDocuments==='function') fcRenderDocuments();
   if (context==='recliv' && tab==='garsav' && typeof garInit==='function') { garInit(); }
   if (context==='conventions' && tab==='cautions' && typeof cauInit==='function') { cauInit(); }
@@ -59299,11 +59305,14 @@ async function fcOuvrirDossier(o) {
     controles: fcControlesInitiaux(), procedure_ref_version: FC_PROCEDURE_REF.version
   };
   d.etapes.forEach(function(e){ e.responsable_id = d.responsable_id; });
+  var modele = o.sans_modele ? null : fcModeleActif(o.type), appl = modele ? fcAppliquerModele(d, modele) : null;
+  if (appl && !d.date_cible && appl.echeance) d.date_cible = appl.echeance;
   if (o.individuel) Object.assign(d, o.individuel);
   if (!DATA.dossiers_fonciers) DATA.dossiers_fonciers = [];
   DATA.dossiers_fonciers.push(d);
   await fcSauver(d);
   await fcEvenement(d, '', 'ouverture', 'Dossier ouvert : ' + FC_PROCEDURES[o.type] + (o.situation ? ' (situation : ' + FC_SITUATIONS[o.situation].libelle + ')' : ''), { nouveau: d.reference, source: 'promoteur' });
+  if (appl && appl.etapes) await fcEvenement(d, '', 'modele', 'Modèle de dossier appliqué : ' + appl.etapes + ' réglage(s), échéance finale ' + (appl.echeance || '—'), { source: 'promoteur' });
   var avertissements = [];
   if (o.situation && FC_SITUATIONS[o.situation].procedure !== o.type) avertissements.push('La situation « ' + FC_SITUATIONS[o.situation].libelle + ' » oriente plutôt vers « ' + FC_PROCEDURES[FC_SITUATIONS[o.situation].procedure] + ' ». ' + FC_PROCEDURE_REF.non_equivalence);
   if (o.situation && FC_SITUATIONS[o.situation].a_determiner) avertissements.push('Procédure à déterminer avec les services compétents ou un professionnel habilité : ' + FC_SITUATIONS[o.situation].demarche);
@@ -59332,7 +59341,16 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
   if (['rejete', 'annule', 'bloque'].indexOf(statut) !== -1 && !motif) return { ok: false, erreur: 'Un motif est obligatoire pour le statut « ' + FC_STATUTS[statut] + ' ».' };
   if (FC_STATUTS_ACTIFS.indexOf(statut) !== -1 && !(e.responsable_id || d.responsable_id)) return { ok: false, erreur: 'Aucun responsable n\'est affecté à cette étape.' };
   if (d.niveau === 'individuel' && statut === 'termine' && FC_ETAPES_APRES_TITRE_MERE.indexOf(code) !== -1 && !d.titre_mere_derogation && !fcTitreMere(d.parcelle_id).disponible) return { ok: false, erreur: "Le titre de l'opération (titre mère) n'est pas disponible : cette étape ne peut pas être terminée." };
-  var derogation = false;
+  var derogation = false, ordre = false;
+  if (fcDependancesActives() && (FC_STATUTS_ACTIFS.indexOf(statut) !== -1 || statut === 'termine')) {
+    var manq = fcPrerequisManquants(d, code);
+    if (manq.length) {
+      if (!o.derogation_ordre) return { ok: false, erreur: 'Étape(s) préalable(s) non terminée(s) : ' + manq.map(function(x){ return x.libelle; }).join(' ; ') + '.', dependance: true };
+      if (!motif) return { ok: false, erreur: "Une dérogation à l'ordre des étapes exige un motif." };
+      if (!fcPeutGererDossier(d)) return { ok: false, erreur: "Seul le responsable du dossier (ou un administrateur) peut déroger à l'ordre des étapes." };
+      derogation = true; ordre = true;
+    }
+  }
   if (code === 'cloture' && statut === 'termine') {
     var restantes = d.etapes.filter(function(x){ return x.code !== 'cloture' && FC_STATUTS_FINAUX.indexOf(x.statut) === -1; });
     if (restantes.length) {
@@ -59362,7 +59380,7 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
   fcRecalculerStatut(d);
   await fcSauver(d);
   await fcEvenement(d, code, derogation ? 'derogation' : 'changement_statut',
-    e.libelle + ' : ' + FC_STATUTS[ancien] + ' → ' + FC_STATUTS[statut] + (derogation ? ' (dérogation sans justificatif)' : ''),
+    e.libelle + ' : ' + FC_STATUTS[ancien] + ' → ' + FC_STATUTS[statut] + (derogation ? (ordre ? " (dérogation à l'ordre des étapes)" : ' (dérogation sans justificatif)') : ''),
     { ancien: ancien, nouveau: statut, motif: motif, source: o.source || 'promoteur' });
   return { ok: true, dossier: d, derogation: derogation };
 }
@@ -59502,7 +59520,7 @@ function fcRenderDetail(id) {
   d.etapes.forEach(function(e){
     if (e.phase !== phase) { phase = e.phase; h += '<tr><td colspan="8" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;">Phase ' + phase + ' — ' + escHtml(FC_PHASES[phase]) + '</td></tr>'; }
     var figee = FC_STATUTS_FINAUX.indexOf(e.statut) !== -1, et = fcEtatEcheance(e);
-    h += '<tr><td>' + e.ordre + '</td><td>' + escHtml(e.libelle) + (e.justificatif_requis ? ' <span title="Justificatif requis" style="color:#B87333;">📎</span>' : '') + fcInfoEtapeHtml(d, e)
+    h += '<tr><td>' + e.ordre + '</td><td>' + escHtml(e.libelle) + (e.justificatif_requis ? ' <span title="Justificatif requis" style="color:#B87333;">📎</span>' : '') + fcInfoEtapeHtml(d, e) + fcHintDependance(d, e)
       + (e.issue ? '<br><span style="font-size:11px;color:#2e7d4f;">Issue officielle enregistrée : ' + escHtml(e.issue) + '</span>' : '') + (e.motif ? '<br><span style="font-size:11px;color:#c0392b;">Motif : ' + escHtml(e.motif) + '</span>' : '') + '</td>'
       + '<td>' + (figee ? fcBadgeStatut(e.statut) : '<select class="filter-select" onchange="fcStatutUI(\'' + d.id + '\',\'' + e.code + '\',this)">' + Object.keys(FC_STATUTS).map(function(k){ return '<option value="' + k + '"' + (k === e.statut ? ' selected' : '') + '>' + escHtml(FC_STATUTS[k]) + '</option>'; }).join('') + '</select>') + '</td>'
       + '<td>' + escHtml(fcNomUtilisateur(e.responsable_id || d.responsable_id)) + '</td>'
@@ -59530,6 +59548,10 @@ async function fcStatutUI(id, code, sel) {
   var statut = sel.value, motif = '';
   if (['rejete', 'annule', 'bloque'].indexOf(statut) !== -1) { motif = prompt('Motif obligatoire pour « ' + FC_STATUTS[statut] + ' » :') || ''; }
   var r = await fcChangerStatutEtape(id, code, statut, { motif: motif });
+  if (!r.ok && r.dependance && confirm(r.erreur + "\n\nPasser outre l'ordre des étapes (motif obligatoire, journalisé) ?")) {
+    var mo = prompt("Motif de la dérogation à l'ordre des étapes :") || '';
+    r = await fcChangerStatutEtape(id, code, statut, { motif: mo, derogation_ordre: true });
+  }
   if (!r.ok && (r.justificatif_manquant || r.controles_restants || r.etapes_restantes) && confirm(r.erreur + '\n\nTerminer quand même par dérogation (motif obligatoire, journalisée) ?')) {
     var m = prompt('Motif de la dérogation :') || '';
     r = await fcChangerStatutEtape(id, code, statut, { motif: m, derogation: true });
@@ -60521,6 +60543,7 @@ async function fcCycleNotifications() {
     if (!(DATA.dossiers_fonciers || []).length && !(DATA.missions_foncieres || []).length) return null;
     var g = await fcGenererAlertes(), r = await fcRattraperNotifications(), f = await fcTraiterFile();
     try { await fcRapportAuto(); } catch (e2) { console.warn('[Foncier Connect] rapport périodique', e2); }
+    try { fcMajBadgeJournee(); } catch (e3) {}
     if (typeof fcMajBadgeNotif === 'function') fcMajBadgeNotif();
     return { alertes: g, rattrapees: r, file: f };
   } catch (e) { console.warn('[Foncier Connect] cycle de notifications', e); return null; }
@@ -61573,6 +61596,213 @@ function fcExporterHistoriqueUI(format) {
   var id = (document.getElementById('fp-dossier') || {}).value, d = fcDossier(id); if (!d) return;
   var l = fcHistoriqueDossierLignes(id);
   if (format === 'pdf') openPrintPreview(fcHtmlTableau('Historique du dossier ' + d.reference, l), 'Historique ' + d.reference, true); else fcTelechargerTexte('historique-' + d.reference + '.csv', fcCsv(l));
+}
+
+
+/* ═══ Coordination des démarches — ordre des étapes, modèles de dossier, « Ma journée » (OD1) ═══
+   - Ordre des étapes : une étape ne démarre ni ne se termine tant que ses étapes préalables ne sont pas terminées (ou annulées) ; dérogation motivée,
+     réservée au responsable du dossier, journalisée. Réglable : Foncier › Modèles de dossier (DATA.params.fc_dependances, actif par défaut).
+   - Modèles : durées par étape et responsables par défaut, appliqués à l'ouverture (échéances calculées en cumulant les durées).
+   - Ma journée : ce qui demande une action aujourd'hui, avec l'action en un clic. */
+var FC_DEPENDANCES = {
+  completude_documents: ['creation_dossier'], identification_procedure: ['completude_documents'], verification_references: ['identification_procedure'], anomalies: ['verification_references'],
+  ind_verification_titre_mere: ['completude_documents'], mission_technique: ['anomalies'], documents_techniques: ['mission_technique'], reception_livrables: ['documents_techniques'],
+  controle_pieces: ['reception_livrables'], validation_technique: ['controle_pieces'], ind_identification_lot: ['ind_verification_titre_mere'], ind_pieces_souscripteur: ['completude_documents'],
+  preparation_dossier_admin: ['anomalies', 'validation_technique', 'ind_identification_lot', 'ind_pieces_souscripteur'], ind_acte_mutation: ['preparation_dossier_admin'], ind_droits_frais: ['ind_acte_mutation'],
+  depot: ['preparation_dossier_admin', 'ind_droits_frais'], recepisse: ['depot'], publication_requisition: ['depot'], recueil_oppositions: ['publication_requisition'], bornage_contre_bornage: ['publication_requisition'],
+  traitement_oppositions: ['recueil_oppositions'], suivi_instruction: ['recepisse'], reponse: ['suivi_instruction'], attestation_domaniale: ['reponse'], formalites_titre: ['reponse'], references_justificatifs: ['reponse'],
+  acd_signature: ['attestation_domaniale'], enregistrement_publicite: ['acd_signature', 'formalites_titre'], ind_titre_individuel: ['recepisse'], retrait_acd: ['enregistrement_publicite'],
+  formalites_livre_foncier: ['traitement_oppositions', 'bornage_contre_bornage'], verification_documents: ['reponse', 'ind_titre_individuel', 'retrait_acd', 'formalites_livre_foncier'],
+  concordance_references: ['verification_documents'], documents_finaux: ['concordance_references'], ind_remise_titre: ['documents_finaux'], maj_statut_foncier: ['documents_finaux'], publication_souscripteur: ['documents_finaux']
+};
+function fcDependancesActives() { return ((DATA.params || {}).fc_dependances) !== false; }
+/* Étapes préalables (de ce dossier) qui ne sont ni terminées ni annulées. */
+function fcPrerequisManquants(d, code) {
+  return (FC_DEPENDANCES[code] || []).map(function(c){ return fcEtape(d, c); }).filter(function(e){ return e && ['termine', 'annule'].indexOf(e.statut) === -1; });
+}
+function fcHintDependance(d, e) {
+  if (!fcDependancesActives() || FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return '';
+  var m = fcPrerequisManquants(d, e.code); if (!m.length) return '';
+  return '<br><span style="font-size:11px;color:#6a5acd;" title="Cette étape ne peut démarrer qu\'après ses étapes préalables (dérogation motivée possible)">🔒 Attend : ' + m.slice(0, 2).map(function(x){ return escHtml(x.libelle); }).join(' ; ') + (m.length > 2 ? ' (+' + (m.length - 2) + ')' : '') + '</span>';
+}
+/* Incohérences de séquence (données anciennes, dérogations) : étape terminée avant ses préalables ; clôture avec étapes restantes. */
+function fcIncoherences(d) {
+  var out = [];
+  (d.etapes || []).forEach(function(e){
+    if (e.statut !== 'termine' || e.code === 'cloture') return;
+    var m = fcPrerequisManquants(d, e.code);
+    if (m.length) out.push({ code: e.code, libelle: e.libelle, detail: 'Terminée alors que « ' + m[0].libelle + '»' + (m.length > 1 ? ' (+' + (m.length - 1) + ')' : '') + ' ne l\'est pas' });
+  });
+  var cl = fcEtape(d, 'cloture');
+  if (cl && cl.statut === 'termine') { var rest = d.etapes.filter(function(x){ return x.code !== 'cloture' && FC_STATUTS_FINAUX.indexOf(x.statut) === -1; }); if (rest.length) out.push({ code: 'cloture', libelle: 'Clôture', detail: rest.length + ' étape(s) non terminée(s) malgré la clôture' }); }
+  return out;
+}
+
+/* ── Modèles de dossier ── */
+function fcModeles() { return ((DATA.params || {}).fc_modeles) || {}; }
+function fcModeleActif(type) { var m = fcModeles()[type]; return m && m.actif !== false ? m : null; }
+function fcAppliquerModele(d, modele) {
+  var cumul = 0, applique = 0, derniere = '';
+  var users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; });
+  d.etapes.slice().sort(function(a, b){ return a.ordre - b.ordre; }).forEach(function(e){
+    var c = (modele.etapes || {})[e.code]; if (!c) return;
+    var j = parseInt(c.jours, 10);
+    if (j > 0) { cumul += j; e.date_cible = fcAjouterJours(d.date_ouverture, cumul); derniere = e.date_cible; applique++; }
+    if (c.responsable_id && users.some(function(u){ return u.id === c.responsable_id; })) { e.responsable_id = c.responsable_id; applique++; }
+  });
+  return { etapes: applique, jours: cumul, echeance: derniere };
+}
+/* Durées observées par type d'étape (journal horodaté), proposées comme point de départ d'un modèle. */
+function fcDureesSuggerees(type) {
+  var par = {};
+  fcDureesEtapes().forEach(function(x){
+    var d = fcDossier(x.dossier_id); if (!d || d.type_procedure !== type || !x.termine || !x.mesure) return;
+    var j = x.categories.interne + x.categories.prestataire + x.categories.document + x.categories.administration;
+    (par[x.etape_code] = par[x.etape_code] || []).push(j);
+  });
+  var out = {};
+  Object.keys(par).forEach(function(k){ if (par[k].length >= FC_SEUIL_MESURE) { var m = fcMoyenne(par[k]); out[k] = { jours: Math.max(1, Math.round(m.moyenne)), n: m.n }; } });
+  return out;
+}
+function fcPeutGererModeles() { return fcEstAdmin() || fcPeutVoirDirection(); }
+function fcRenderModeles() {
+  var host = document.getElementById('fm-root'); if (!host) return;
+  var type = APP._fmType || 'acd', m = fcModeles()[type] || { actif: true, etapes: {} }, users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; }), sug = APP._fmSug && APP._fmSug.type === type ? APP._fmSug.valeurs : null, ro = fcPeutGererModeles() ? '' : ' disabled ';
+  var etapes = fcEtapesPour(type, ''), phase = '', total = 0;
+  var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">📐 Modèles de dossier — délais et responsables par défaut</div>'
+    + '<div style="font-size:11px;color:var(--dim);margin-bottom:8px;">À l\'ouverture d\'un dossier de la procédure, les échéances sont calculées en <b>cumulant</b> les durées ci-dessous (en jours calendaires, à partir de la date d\'ouverture) et les responsables par défaut sont affectés. Une durée vide = pas d\'échéance. Les échéances restent modifiables dossier par dossier.</div>'
+    + '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;"><div class="form-group"><label>Procédure</label><select class="filter-select" onchange="APP._fmType=this.value;fcRenderModeles()">' + Object.keys(FC_PROCEDURES).filter(function(k){ return k !== 'rural_a_examiner' || true; }).map(function(k){ return '<option value="' + k + '"' + (k === type ? ' selected' : '') + '>' + escHtml(FC_PROCEDURES[k]) + (fcModeles()[k] ? ' ✔' : '') + '</option>'; }).join('') + '</select></div>'
+    + '<label style="font-size:12px;"><input type="checkbox" id="fm-actif" ' + (m.actif !== false ? 'checked ' : '') + ro + '> Appliquer ce modèle à l\'ouverture</label></div>'
+    + '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Durée (jours)</th><th>Responsable par défaut</th><th>Observé</th></tr></thead><tbody>';
+  etapes.forEach(function(e){
+    var c = (m.etapes || {})[e.code] || {}, j = parseInt(c.jours, 10) || 0; total += j;
+    if (e.phase !== phase) { phase = e.phase; h += '<tr><td colspan="5" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;">Phase ' + phase + ' — ' + escHtml(FC_PHASES[phase]) + '</td></tr>'; }
+    h += '<tr><td>' + e.ordre + '</td><td>' + escHtml(e.libelle) + '</td><td><input type="number" min="0" max="3650" class="form-control" style="width:90px;" id="fm-j-' + e.code + '" value="' + (j || '') + '" ' + ro + '></td>'
+      + '<td><select class="filter-select" id="fm-r-' + e.code + '" ' + ro + '><option value="">— responsable du dossier —</option>' + users.map(function(u){ return '<option value="' + u.id + '"' + (u.id === c.responsable_id ? ' selected' : '') + '>' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select></td>'
+      + '<td style="font-size:11px;color:var(--dim);">' + (sug && sug[e.code] ? sug[e.code].jours + ' j (' + sug[e.code].n + ' dossiers)' : '') + '</td></tr>';
+  });
+  h += '</tbody></table></div><div style="margin:8px 0;font-size:12px;">Délai total estimé : <b>' + total + ' jours</b></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="fcSauverModeleUI()" ' + ro + '>💾 Enregistrer le modèle</button> <button class="btn btn-secondary btn-sm" onclick="fcProposerDureesUI()" ' + ro + '>📊 Proposer les durées observées</button> <button class="btn btn-secondary btn-sm" onclick="fcSupprimerModeleUI()" ' + ro + '>Supprimer le modèle</button></div>'
+    + '<hr><label style="font-size:12px;"><input type="checkbox" id="fm-deps" ' + (fcDependancesActives() ? 'checked ' : '') + ro + ' onchange="fcBasculerDependancesUI(this.checked)"> <b>Imposer l\'ordre des étapes</b> : une étape ne démarre ni ne se termine avant ses étapes préalables (dérogation motivée du responsable, journalisée).</label></div>';
+  host.innerHTML = h;
+}
+async function fcEnregistrerParams() {
+  DATA.params._modifie = new Date().toISOString(); await dbPut('params', DATA.params); if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
+}
+async function fcSauverModeleUI() {
+  if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); return; }
+  var type = APP._fmType || 'acd', m = { actif: !!(document.getElementById('fm-actif') || {}).checked, etapes: {}, maj: new Date().toISOString(), maj_par: fcActeur().nom }, bad = '';
+  fcEtapesPour(type, '').forEach(function(e){
+    var j = (document.getElementById('fm-j-' + e.code) || {}).value, r = (document.getElementById('fm-r-' + e.code) || {}).value || '', n = j === '' || j == null ? 0 : parseInt(j, 10);
+    if (isNaN(n) || n < 0 || n > 3650) { bad = e.libelle; return; }
+    if (n > 0 || r) m.etapes[e.code] = { jours: n, responsable_id: r };
+  });
+  if (bad) { toast('Durée invalide pour « ' + bad + ' » (0 à 3650 jours).', 'error'); return; }
+  DATA.params = DATA.params || {}; DATA.params.fc_modeles = Object.assign({}, fcModeles()); DATA.params.fc_modeles[type] = m;
+  try { await fcEnregistrerParams(); toast('Modèle enregistré.', 'success'); } catch (e) { toast('Enregistrement impossible : ' + (e.message || e), 'error'); }
+  fcRenderModeles();
+}
+async function fcSupprimerModeleUI() {
+  if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); return; }
+  var type = APP._fmType || 'acd'; if (!fcModeles()[type]) return; if (!confirm('Supprimer le modèle « ' + FC_PROCEDURES[type] + ' » ? Les dossiers déjà ouverts ne changent pas.')) return;
+  DATA.params.fc_modeles = Object.assign({}, fcModeles()); delete DATA.params.fc_modeles[type]; await fcEnregistrerParams(); fcRenderModeles();
+}
+function fcProposerDureesUI() {
+  var type = APP._fmType || 'acd', s = fcDureesSuggerees(type), n = Object.keys(s).length;
+  if (!n) { toast('Pas assez de dossiers terminés (au moins ' + FC_SEUIL_MESURE + ' observations par étape) pour proposer des durées.', 'warning'); return; }
+  APP._fmSug = { type: type, valeurs: s }; fcRenderModeles();
+  Object.keys(s).forEach(function(k){ var el = document.getElementById('fm-j-' + k); if (el && !el.value) el.value = s[k].jours; });
+  toast(n + ' durée(s) proposée(s) d\'après vos dossiers : vérifiez puis enregistrez.', 'info');
+}
+async function fcBasculerDependancesUI(on) {
+  if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); fcRenderModeles(); return; }
+  DATA.params = DATA.params || {}; DATA.params.fc_dependances = !!on; await fcEnregistrerParams(); toast(on ? 'Ordre des étapes imposé.' : 'Ordre des étapes libre.', 'success');
+}
+
+/* ── Ma journée ── */
+function fcMaJournee(userId, aujourdhui) {
+  var t = aujourdhui || fcAuj(), sem = fcAjouterJours(t, 7), r = { retard: [], jour: [], prochaines: [], a_demarrer: [], pieces: [], a_valider: [], complements: [], notes: [], incoherences: [], sans_maj: [] };
+  var item = function(d, e, extra) { return Object.assign({ dossier_id: d.id, dossier: d.reference, code: e ? e.code : '', libelle: e ? e.libelle : '', date: e ? e.date_cible : '', statut: e ? e.statut : '', detail: '' }, extra || {}); };
+  fcDossiersActifs().forEach(function(d){
+    var mien = d.responsable_id === userId;
+    if (d.statut !== 'cloture') {
+      fcEtapesActives(d).forEach(function(e){
+        if (fcResponsableEtape(d, e) !== userId) return;
+        var pret = !fcDependancesActives() || !fcPrerequisManquants(d, e.code).length;
+        if (e.date_cible) {
+          var et = fcEtatEcheance(e, t);
+          if (et) r.retard.push(item(d, e, { pret: pret, detail: et === 'retard_interne' ? 'Retard interne' : 'Délai administratif dépassé' }));
+          else if (e.date_cible === t) r.jour.push(item(d, e, { pret: pret }));
+          else if (e.date_cible <= sem) r.prochaines.push(item(d, e, { pret: pret }));
+        }
+        if (['a_preparer', 'a_venir'].indexOf(e.statut) !== -1 && pret && (FC_DEPENDANCES[e.code] || e.code === 'creation_dossier') && !(e.date_cible && e.date_cible <= sem)) r.a_demarrer.push(item(d, e, { pret: true }));
+      });
+      if (mien) {
+        var der = fcDernierEvenement(d.id); if (der && der.slice(0, 10) < fcAjouterJours(t, -14)) r.sans_maj.push(item(d, null, { date: der.slice(0, 10), detail: 'Aucune mise à jour depuis 14 jours' }));
+        fcIncoherences(d).forEach(function(x){ r.incoherences.push(item(d, null, { libelle: x.libelle, detail: x.detail })); });
+      }
+    }
+    if (mien) {
+      (DATA.pieces_foncieres || []).forEach(function(p){ if (p.dossier_id === d.id && p.statut === 'a_verifier' && !p.retire && !p.remplacee_par) r.pieces.push(item(d, null, { piece_id: p.id, libelle: p.nom, date: String(p.depose_le || '').slice(0, 10), detail: (p.depose_par && p.depose_par.nom) || '' })); });
+      fcNotesDebours(d).forEach(function(n){ if (fcNoteEnRetard(n, t)) { var c = fcClient(n.client_id) || {}; r.notes.push(item(d, null, { libelle: n.numero + ' · ' + fcFmtF(n.montant), date: n.echeance, detail: ((c.prenoms || '') + ' ' + (c.nom || '')).trim() })); } });
+    }
+  });
+  var ind = fcIndicateursResponsable(userId, t);
+  ind.a_valider.forEach(function(x){ r.a_valider.push({ dossier_id: x.dossier_id, dossier: x.dossier, libelle: x.libelle, date: x.date, detail: x.detail, code: '', statut: '' }); });
+  ind.complements.forEach(function(x){ r.complements.push({ dossier_id: x.dossier_id, dossier: x.dossier, libelle: x.libelle, date: x.date, detail: x.detail, code: '', statut: '' }); });
+  return r;
+}
+var FC_SECTIONS_JOURNEE = [['retard', '⏰ En retard', 'etape'], ['jour', '📅 À faire aujourd\'hui', 'etape'], ['prochaines', '🗓️ Dans les 7 jours', 'etape'], ['a_demarrer', '▶ Prêtes à démarrer', 'etape'], ['pieces', '📥 Pièces à contrôler', 'piece'],
+  ['a_valider', '✅ Livrables à valider', 'ouvrir'], ['complements', '✉️ Demandes de complément', 'ouvrir'], ['notes', '💶 Notes de débours en retard', 'ouvrir'], ['incoherences', '⚠️ Incohérences de séquence', 'ouvrir'], ['sans_maj', '💤 Dossiers sans mise à jour', 'ouvrir']];
+function fcCompteJournee(r) { return r.retard.length + r.jour.length + r.pieces.length + r.a_valider.length + r.complements.length; }
+function fcMajBadgeJournee() {
+  var b = document.getElementById('fj-badge'); if (!b || !APP.currentUser) return;
+  var n = fcCompteJournee(fcMaJournee(fcActeur().id)); b.textContent = n; b.style.display = n ? 'inline-block' : 'none';
+}
+function fcRenderJournee() {
+  var host = document.getElementById('fj-root'); if (!host) return;
+  var moi = fcActeur(), uid = (fcPeutVoirDirection() && APP._fjUser) || moi.id, t = fcAuj(), r = fcMaJournee(uid, t), total = fcCompteJournee(r);
+  var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">☀️ Ma journée — ' + escHtml(dateShort(t)) + '</div>'
+    + '<div style="font-size:12px;color:var(--dim);margin-bottom:8px;">Ce qui demande une action : étapes en retard ou du jour, pièces à contrôler, livrables à valider. ' + (total ? '<b>' + total + ' élément(s) à traiter.</b>' : '<b style="color:#2e7d4f;">Rien d\'urgent. 👌</b>') + '</div>';
+  if (fcPeutVoirDirection()) h += '<div class="filters-bar"><div class="form-group"><label>Voir la journée de</label><select class="filter-select" onchange="APP._fjUser=this.value;fcRenderJournee()">' + (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; }).map(function(u){ return '<option value="' + u.id + '"' + (u.id === uid ? ' selected' : '') + '>' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select></div></div>';
+  var lecture = uid !== moi.id;
+  FC_SECTIONS_JOURNEE.forEach(function(s){
+    var l = r[s[0]]; if (!l.length) return;
+    h += '<div style="margin:12px 0 4px;font-weight:700;font-size:13px;">' + s[1] + ' <span style="color:var(--or);">(' + l.length + ')</span></div>';
+    l.slice(0, 25).forEach(function(i){
+      var a = '<button class="btn btn-secondary btn-sm" onclick="fcAllerDossier(\'' + i.dossier_id + '\')">Ouvrir</button>';
+      if (!lecture && s[2] === 'etape') {
+        if (['a_preparer', 'a_venir'].indexOf(i.statut) !== -1) a = '<button class="btn btn-primary btn-sm" ' + (i.pret ? '' : 'title="Étapes préalables non terminées : dérogation motivée requise" ') + 'onclick="fcJourEtapeUI(\'' + i.dossier_id + '\',\'' + i.code + '\',\'en_cours\')">▶ Démarrer</button> ' + a;
+        else if (FC_STATUTS_ACTIFS.indexOf(i.statut) !== -1) a = '<button class="btn btn-primary btn-sm" onclick="fcJourEtapeUI(\'' + i.dossier_id + '\',\'' + i.code + '\',\'termine\')">✔ Terminer</button> ' + a;
+        a += ' <button class="btn btn-secondary btn-sm" title="Reporter l\'échéance de 7 jours (journalisé)" onclick="fcJourReporterUI(\'' + i.dossier_id + '\',\'' + i.code + '\',7)">📅 +7 j</button>';
+      }
+      if (!lecture && s[2] === 'piece') a = '<button class="btn btn-primary btn-sm" onclick="fcJourPieceUI(\'' + i.piece_id + '\',\'acceptee\')">✔ Accepter</button> <button class="btn btn-secondary btn-sm" onclick="fcJourPieceUI(\'' + i.piece_id + '\',\'refusee\')">✖ Refuser</button> ' + a;
+      h += '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;padding:6px 0;border-bottom:1px solid var(--bord,#eee);font-size:12px;"><div><b>' + escHtml(i.dossier) + '</b> · ' + escHtml(i.libelle || '—')
+        + (i.date ? ' · <i>' + escHtml(dateShort(i.date)) + '</i>' : '') + (i.detail ? ' <span style="color:var(--dim);">— ' + escHtml(i.detail) + '</span>' : '') + (i.pret === false ? ' <span style="color:#6a5acd;" title="Étapes préalables non terminées">🔒</span>' : '') + '</div><div>' + a + '</div></div>';
+    });
+    if (l.length > 25) h += '<div style="font-size:11px;color:var(--dim);padding:4px 0;">… et ' + (l.length - 25) + ' autre(s) : affinez dans « Pilotage foncier ».</div>';
+  });
+  host.innerHTML = h + '</div>';
+  fcMajBadgeJournee();
+}
+async function fcJourEtapeUI(id, code, statut) {
+  var r = await fcChangerStatutEtape(id, code, statut, {});
+  if (!r.ok && r.dependance && confirm(r.erreur + '\n\nPasser outre l\'ordre des étapes (motif obligatoire, journalisé) ?')) {
+    var m = prompt('Motif de la dérogation à l\'ordre des étapes :') || ''; r = await fcChangerStatutEtape(id, code, statut, { motif: m, derogation_ordre: true });
+  }
+  if (!r.ok && (r.justificatif_manquant || r.controles_restants || r.etapes_restantes) && confirm(r.erreur + '\n\nTerminer quand même par dérogation (motif obligatoire, journalisée) ?')) {
+    var m2 = prompt('Motif de la dérogation :') || ''; r = await fcChangerStatutEtape(id, code, statut, { motif: m2, derogation: true });
+  }
+  fcMsg(r, statut === 'termine' ? 'Étape terminée.' : 'Étape démarrée.'); fcRenderJournee();
+}
+async function fcJourReporterUI(id, code, jours) {
+  var d = fcDossier(id), e = fcEtape(d, code); if (!e) return;
+  var base = e.date_cible && e.date_cible > fcAuj() ? e.date_cible : fcAuj();
+  fcMsg(await fcCorrigerEtape(id, code, { date_cible: fcAjouterJours(base, jours) }, 'Report de ' + jours + ' jours depuis « Ma journée »'), 'Échéance reportée.'); fcRenderJournee();
+}
+async function fcJourPieceUI(id, decision) {
+  var motif = ''; if (decision === 'refusee') { motif = prompt('Motif du refus (communiqué au souscripteur) :'); if (!motif) return; }
+  fcMsg(await fcDecisionPiece(id, decision, motif), 'Décision enregistrée.'); fcRenderJournee();
 }
 
 
