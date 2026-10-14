@@ -15,6 +15,11 @@
 -- Jamais : observations, motifs, responsables, montants, justificatifs,
 -- pièces jointes (leur contenu viendra avec une fonction dédiée).
 --
+-- NB Dashboard Supabase : « select … into variable » y est pris pour une création
+-- de table (il ajoute des ALTER TABLE … ENABLE ROW LEVEL SECURITY et échoue).
+-- La fonction utilise donc des affectations « v := (select …) ». Coller le
+-- fichier ENTIER (jusqu'à la dernière ligne « grant execute »).
+--
 -- Identité : lue UNIQUEMENT dans le jeton (claim client_id, kind='souscripteur'
 -- émis par portal-login). Aucun paramètre : impossible de demander le dossier
 -- d'un autre (IDOR). Sans jeton souscripteur : résultat vide.
@@ -53,8 +58,8 @@ begin
                               'contact', '{}'::jsonb);
   end if;
 
-  select data into v_client from public.pi_clients where id = v_client_id;
-  select data into v_params from public.pi_params where id = 'main';
+  v_client := (select data from public.pi_clients where id = v_client_id);
+  v_params := (select data from public.pi_params where id = 'main');
   v_params := coalesce(v_params, '{}'::jsonb);
   v_poids  := '{"C":2,"D":2,"E":1}'::jsonb || coalesce(v_params -> 'fc_poids_phases', '{}'::jsonb);
 
@@ -73,16 +78,16 @@ begin
 
   -- Lots du souscripteur (lot_ids prioritaire, sinon lot_id), puis leurs parcelles.
   if jsonb_typeof(v_client -> 'lot_ids') = 'array' and jsonb_array_length(v_client -> 'lot_ids') > 0 then
-    select array_agg(x) into v_lot_ids from jsonb_array_elements_text(v_client -> 'lot_ids') x;
+    v_lot_ids := (select array_agg(x) from jsonb_array_elements_text(v_client -> 'lot_ids') x);
   elsif coalesce(v_client ->> 'lot_id', '') <> '' then
     v_lot_ids := array[v_client ->> 'lot_id'];
   else
     v_lot_ids := '{}';
   end if;
 
-  select coalesce(array_agg(distinct l.data ->> 'parcelle_id'), '{}') into v_parcelles
-  from public.pi_lots l
-  where l.id = any (v_lot_ids) and coalesce(l.data ->> 'parcelle_id', '') <> '';
+  v_parcelles := (select coalesce(array_agg(distinct l.data ->> 'parcelle_id'), '{}')
+                  from public.pi_lots l
+                  where l.id = any (v_lot_ids) and coalesce(l.data ->> 'parcelle_id', '') <> '');
 
   for d in
     select df.id, df.data as j
@@ -94,18 +99,18 @@ begin
     -- Titre individuel : seulement si ce souscripteur en fait partie.
     if d.j ->> 'niveau' = 'individuel' then
       if jsonb_typeof(d.j -> 'client_ids') = 'array' then
-        select array_agg(x) into v_client_ids from jsonb_array_elements_text(d.j -> 'client_ids') x;
+        v_client_ids := (select array_agg(x) from jsonb_array_elements_text(d.j -> 'client_ids') x);
       else
         v_client_ids := array[d.j ->> 'client_id'];
       end if;
       continue when not (v_client_id = any (coalesce(v_client_ids, '{}')));
     end if;
 
-    select coalesce(jsonb_agg(e order by (e ->> 'ordre')::numeric), '[]'::jsonb) into v_visibles
-    from jsonb_array_elements(coalesce(d.j -> 'etapes', '[]'::jsonb)) e
-    where e ->> 'visibilite' = 'souscripteur';
+    v_visibles := (select coalesce(jsonb_agg(e order by (e ->> 'ordre')::numeric), '[]'::jsonb)
+                   from jsonb_array_elements(coalesce(d.j -> 'etapes', '[]'::jsonb)) e
+                   where e ->> 'visibilite' = 'souscripteur');
 
-    select coalesce(jsonb_agg(jsonb_build_object(
+    v_pubs := (select coalesce(jsonb_agg(jsonb_build_object(
              'date', left(p.data ->> 'publie_le', 10),
              'titre', p.data ->> 'libelle_public',
              'description', p.data ->> 'description_publique',
@@ -117,17 +122,15 @@ begin
              end,
              'reference_source', p.data ->> 'source_ref')
            order by p.data ->> 'publie_le' desc), '[]'::jsonb)
-      into v_pubs
-    from public.pi_publications_foncieres p
-    where p.data ->> 'dossier_id' = d.id and not coalesce((p.data ->> 'retire')::boolean, false);
+      from public.pi_publications_foncieres p
+      where p.data ->> 'dossier_id' = d.id and not coalesce((p.data ->> 'retire')::boolean, false));
 
     -- Prochaine étape : première étape visible non finale, par ordre.
-    select jsonb_build_object('libelle', e ->> 'libelle', 'date_indicative', coalesce(e ->> 'date_cible', ''))
-      into v_prochaine
-    from jsonb_array_elements(v_visibles) e
-    where e ->> 'statut' not in ('termine', 'rejete', 'annule')
-    order by (e ->> 'ordre')::numeric
-    limit 1;
+    v_prochaine := (select jsonb_build_object('libelle', e ->> 'libelle', 'date_indicative', coalesce(e ->> 'date_cible', ''))
+                    from jsonb_array_elements(v_visibles) e
+                    where e ->> 'statut' not in ('termine', 'rejete', 'annule')
+                    order by (e ->> 'ordre')::numeric
+                    limit 1);
 
     -- Statut synthétique (mêmes règles que fcStatutSynthetique).
     v_statut := case
@@ -139,7 +142,7 @@ begin
       else 'Démarches à venir' end;
 
     -- Progression pondérée (mêmes règles que fcProgressionSouscripteur).
-    with suivies as (
+    v_prog := (with suivies as (
       select e ->> 'phase' as phase,
              coalesce((v_poids ->> (e ->> 'phase'))::numeric, 1) as w,
              (e ->> 'statut') = 'termine' as fait
@@ -157,28 +160,26 @@ begin
                                 when 'C' then 'Dépôt et instruction' when 'D' then 'Formalités foncières'
                                 when 'E' then 'Contrôle et clôture' end,
                      'etapes', etapes, 'terminees', terminees)) from par_phase), '{}'::jsonb),
-      'explication', 'Avancement des démarches suivies pour vous (étapes terminées sur étapes suivies, pondérées par phase). Ce pourcentage mesure l''avancement des démarches : ce n''est ni une probabilité d''obtention d''un document, ni une garantie juridique.')
-      into v_prog;
+      'explication', 'Avancement des démarches suivies pour vous (étapes terminées sur étapes suivies, pondérées par phase). Ce pourcentage mesure l''avancement des démarches : ce n''est ni une probabilité d''obtention d''un document, ni une garantie juridique.'));
 
     -- Libellés : lot(s) pour un titre individuel, programme, parcelle.
     if d.j ->> 'niveau' = 'individuel' then
       if jsonb_typeof(d.j -> 'lots_ids') = 'array' then
-        select array_agg(x) into v_lots_dossier from jsonb_array_elements_text(d.j -> 'lots_ids') x;
+        v_lots_dossier := (select array_agg(x) from jsonb_array_elements_text(d.j -> 'lots_ids') x);
       else
         v_lots_dossier := array[d.j ->> 'lot_id'];
       end if;
-      select 'Votre titre individuel — lot ' || coalesce(string_agg(
+      v_lib_niveau := (select 'Votre titre individuel — lot ' || coalesce(string_agg(
                coalesce(nullif(l.data ->> 'numero', ''), nullif(l.data ->> 'ref', ''), nullif(l.data ->> 'reference', ''),
                         nullif(l.data ->> 'nom', ''), l.id), ', '), '—')
-        into v_lib_niveau
-      from unnest(v_lots_dossier) with ordinality t(lid, ord)
-      join public.pi_lots l on l.id = t.lid;
+               from unnest(v_lots_dossier) with ordinality t(lid, ord)
+               join public.pi_lots l on l.id = t.lid);
       v_lib_niveau := coalesce(v_lib_niveau, 'Votre titre individuel — lot —');
     else
       v_lib_niveau := 'Titre de l''opération (parcelle mère)';
     end if;
 
-    select data into v_parc from public.pi_parcelles where id = d.j ->> 'parcelle_id';
+    v_parc := (select data from public.pi_parcelles where id = d.j ->> 'parcelle_id');
 
     v_dossiers := v_dossiers || jsonb_build_object(
       'id', d.id,
@@ -196,7 +197,7 @@ begin
       'historique', v_pubs);
   end loop;
 
-  select coalesce(jsonb_agg(jsonb_build_object(
+  v_demandes := (select coalesce(jsonb_agg(jsonb_build_object(
            'reference', x.data ->> 'reference',
            'date', x.data ->> 'date',
            'sujet', x.data ->> 'sujet',
@@ -206,9 +207,8 @@ begin
            'messages', (select coalesce(jsonb_agg(jsonb_build_object('date', m ->> 'date', 'de', m ->> 'de', 'texte', m ->> 'texte')), '[]'::jsonb)
                         from jsonb_array_elements(coalesce(x.data -> 'messages', '[]'::jsonb)) m))
          order by x.updated_at), '[]'::jsonb)
-    into v_demandes
-  from public.pi_demandes_fonciers x
-  where x.data ->> 'client_id' = v_client_id;
+    from public.pi_demandes_fonciers x
+    where x.data ->> 'client_id' = v_client_id);
 
   return v_out || jsonb_build_object('dossiers', v_dossiers, 'demandes', v_demandes);
 end
