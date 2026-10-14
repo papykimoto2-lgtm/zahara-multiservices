@@ -127,3 +127,11 @@ Limites connues : le suivi horodaté n'existe que pour les changements de statut
 
 ## Passage en base (14/10/2026)
 `supabase/foncier_connect.sql` crée les 9 tables `pi_*_fonciers` (RLS personnel, journal en ajout seul, aucun accès `anon`). 8 stores sont désormais dans `SUPA_STORE_MAP` ; `pieces_foncieres` reste local (pièces d'identité et titres). **Exécuter le script SQL sur le projet AVANT de publier ce code**, sinon la synchronisation de ces stores échoue.
+
+## Stockage privé des pièces (15/10/2026)
+`pieces_foncieres` n'est plus local uniquement : les **métadonnées** sont synchronisées (`pi_pieces_foncieres`, RLS personnel) et les **fichiers** partent dans le bucket **privé** `pieces-foncieres` (`supabase/foncier_pieces_stockage.sql`, à exécuter sur chaque projet).
+- Chemin `{dossier_id}/{pièce_id}`, 5 Mo, PDF/JPG/PNG/WebP. Dépôt et lecture réservés au personnel ; **aucune règle UPDATE/DELETE** : un fichier déposé n'est ni remplaçable ni supprimable (une nouvelle version = un nouvel objet).
+- La ligne publiée ne contient **ni base64 ni contenu** : seulement le chemin. Si l'envoi du fichier échoue, la ligne n'est **pas** publiée (aucune pièce fantôme) ; `fcSynchroniserPieces()` réessaie au démarrage (40 s) puis toutes les 30 min, et migre les pièces antérieures restées locales.
+- Autres postes : le contenu est obtenu par **URL signée de 2 minutes** (`fcContenuPiece`) ; consultation, téléchargement et contrôle d'intégrité (SHA-256 recalculée sur le fichier téléchargé) passent par là, toujours journalisés.
+- **Reste à faire** : dépôt de FICHIERS par le souscripteur et l'intervenant depuis le portail (aujourd'hui : référence ou lien), et consultation par le souscripteur d'une pièce publiée — exigent une fonction serveur (Edge Function) qui contrôle le jeton et signe l'URL ; ni anon ni souscripteur n'ont d'accès direct au bucket.
+- Tests : `tests-caisse/foncier-pieces-stockage.test.js` (5).
