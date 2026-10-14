@@ -75,3 +75,32 @@ test('attestation déjà validée (document figé sans pied) : le pied est ajout
   }, PARAMS);
   assert.equal(r.pied, 1); assert.equal(r.texte, true); assert.equal(r.stocke, true); assert.equal(r.idempotent, true); assert.equal(r.sansParam, true); assert.equal(r.css, true); assert.equal(r.lignes, 3);
 });
+
+test('identité du promoteur : la division du programme (ZMS Sarl) prévaut sur la société du groupe ; « ImmoSuite ERP » n\'est jamais imprimé', async () => {
+  const app = await ouvrirApp();
+  const r = await app.page.evaluate(function () {
+    window.attSoldeSolde = function () { return { solde: true, prix: 1000000, verse: 1000000, dateSolde: '2026-01-01', vs: [], frais: 0 }; };
+    DATA.params = { societe: 'ImmoSuite ERP', tel: '00 00', email: 'groupe@x.ci', ville: 'Abidjan' };
+    DATA.divisions = [{ id: 'dz', nom: 'Zahara', raisonSociale: 'ZMS Sarl', rccm: 'CI-ABJ-03-2020-M-11200', ncc: '1729048 Q', siegeSocial: 'Abidjan Cocody Angré 2 Plateau 7ème Tranche\n01 BP 6264 ABIDJAN 01', tel: '27 22 52 32 11', email: 'zamuser12@gmail.com' }];
+    DATA.programmes = [{ id: 'pz', nom: 'P', division_id: 'dz' }, { id: 'pg', nom: 'G' }];
+    var avec = attSoldeHtml({ id: 'c1', nom: 'BENDE', programme_id: 'pz' }, { numero: 'N' }), sans = attSoldeHtml({ id: 'c2', nom: 'X', programme_id: 'pg' }, { numero: 'N' });
+    var d = new DOMParser().parseFromString(avec, 'text/html'), d2 = new DOMParser().parseFromString(sans, 'text/html');
+    var figee = '<html><head></head><body><p>Nous, ImmoSuite ERP</p></body></html>';
+    var final = attSoldeHtmlFinal({ html: figee }, { id: 'c1', programme_id: 'pz' });
+    return { nous: (d.body.textContent.match(/Nous, ([^,]*),/) || [])[1], immo: /ImmoSuite/.test(avec), rccm: /CI-ABJ-03-2020-M-11200/.test(d.body.textContent), pied: [].slice.call(d.querySelectorAll('.pied > div')).map(function (x) { return x.textContent; }),
+      nousSans: (d2.body.textContent.match(/Nous, ([^,]*),/) || [])[1], immoSans: /ImmoSuite/.test(sans), piedFinal: new DOMParser().parseFromString(final, 'text/html').querySelector('.pied').textContent.indexOf('ZMS Sarl Siège Social') !== -1 };
+  });
+  assert.equal(r.nous, 'ZMS Sarl'); assert.equal(r.immo, false); assert.equal(r.rccm, true);
+  assert.deepEqual(r.pied, ['ZMS Sarl Siège Social : Abidjan Cocody Angré 2 Plateau 7ème Tranche', 'N° RCCM : CI-ABJ-03-2020-M-11200 – CC : 1729048 Q', '01 BP 6264 ABIDJAN 01 – TEL : 27 22 52 32 11   E-MAIL : zamuser12@gmail.com']);
+  assert.equal(r.nousSans, 'le promoteur', 'sans division ni raison sociale renseignée : jamais « ImmoSuite ERP »'); assert.equal(r.immoSans, false); assert.equal(r.piedFinal, true);
+});
+
+test('sans division : la raison sociale des Paramètres est utilisée', async () => {
+  const app = await ouvrirApp();
+  const nous = await app.page.evaluate(function () {
+    window.attSoldeSolde = function () { return { solde: true, prix: 1, verse: 1, dateSolde: '2026-01-01', vs: [], frais: 0 }; };
+    DATA.params = { societe: 'Zahara Multi Services' }; DATA.divisions = []; DATA.programmes = [];
+    var d = new DOMParser().parseFromString(attSoldeHtml({ id: 'c', nom: 'N' }, { numero: 'N' }), 'text/html'); return (d.body.textContent.match(/Nous, ([^,]*),/) || [])[1];
+  });
+  assert.equal(nous, 'Zahara Multi Services');
+});

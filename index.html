@@ -112833,16 +112833,35 @@ var ATT_PIED_CSS = '.pied{margin-top:30px;border-top:1px solid #000;padding-top:
 /* Une attestation déjà validée est figée (a.html) : elle peut avoir été émise avant l'ajout du pied de page.
    À l'affichage et à l'impression, on lui ajoute le pied de page d'entreprise SANS modifier le texte validé
    ni le document enregistré. Rien n'est ajouté si les paramètres de l'entreprise sont vides ou si le pied existe déjà. */
-function attSoldeHtmlFinal(a){
+/* Identité du promoteur pour les attestations : l'ENTITÉ du programme du souscripteur (Paramètres › Divisions : « chaque
+   division est considérée comme une entreprise » : raison sociale, RCCM, NCC, siège, téléphone, e-mail) prévaut sur la société
+   du groupe ; à défaut, Paramètres › Société. Le nom par défaut « ImmoSuite ERP » (jamais renseigné) n'est jamais imprimé. */
+function attSoldeEntreprise(c){
+  var p = DATA.params || {}, e = Object.assign({}, p);
+  var prog = (DATA.programmes||[]).find(function(x){ return c && x.id===c.programme_id; }) || {};
+  var d = prog.division_id ? (DATA.divisions||[]).find(function(x){ return x && x.id===prog.division_id && String(x._deleted)!=='true'; }) : null;
+  if (d) {
+    var nom = String(d.raisonSociale || d.nom || '').trim();
+    if (nom) e.societe = nom;
+    if (String(d.rccm||'').trim()) e.rccm = String(d.rccm).trim();
+    if (String(d.ncc||'').trim()) e.dgi = String(d.ncc).trim();
+    if (String(d.siegeSocial||'').trim()) e.adresse = String(d.siegeSocial).trim();
+    if (String(d.tel||'').trim()) e.tel = String(d.tel).trim();
+    if (String(d.email||'').trim()) e.email = String(d.email).trim();
+  }
+  if (String(e.societe||'').trim() === 'ImmoSuite ERP') e.societe = '';
+  return e;
+}
+function attSoldeHtmlFinal(a, c){
   var h = (a && a.html) || '';
   if (!h || h.indexOf('class="pied"') !== -1) return h;
-  var pied = docPiedDePageEntreprise(); if (!pied) return h;
+  var pied = docPiedDePageEntreprise(c ? attSoldeEntreprise(c) : null); if (!pied) return h;
   return h.replace('</head>', '<style>'+ATT_PIED_CSS+'</style></head>').replace('</body>', pied+'</body>');
 }
 function attSoldeHtml(c, opts){
   opts = opts || {};
   var ov = opts.overrides || {};
-  var p = DATA.params || {}, S = attSoldeSolde(c), E = function(x){ return escHtml(x==null?'':String(x)); };
+  var p = attSoldeEntreprise(c), S = attSoldeSolde(c), E = function(x){ return escHtml(x==null?'':String(x)); };
   var prog = (DATA.programmes||[]).find(function(x){ return x.id===c.programme_id; }) || {};
   var lotIds = (typeof _lotIdsDeClient==='function') ? _lotIdsDeClient(c) : (c.lot_id?[c.lot_id]:[]);
   var lots = lotIds.map(function(id){ return (DATA.lots||[]).find(function(l){return l.id===id;}); }).filter(Boolean);
@@ -113052,14 +113071,14 @@ async function attSoldeDemander(clientId){
 function attSoldeApercu(clientId){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
   var a = c.attestation_solde || {};
-  var html = (a.statut==='valide' && a.html) ? attSoldeHtmlFinal(a) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(), date:today(), projet:true});
+  var html = (a.statut==='valide' && a.html) ? attSoldeHtmlFinal(a, c) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(), date:today(), projet:true});
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
   w.document.write(html); w.document.close();
 }
 function attSoldeImprimer(clientId){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c || !c.attestation_solde || c.attestation_solde.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
-  w.document.write(attSoldeHtmlFinal(c.attestation_solde)); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400);
+  w.document.write(attSoldeHtmlFinal(c.attestation_solde, c)); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400);
 }
 function attSoldePublier(clientId, on){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c || !c.attestation_solde || c.attestation_solde.statut!=='valide') return;
