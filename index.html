@@ -112852,8 +112852,22 @@ function attSoldeEntreprise(c){
   if (String(e.societe||'').trim() === 'ImmoSuite ERP') e.societe = '';
   return e;
 }
+/* Paragraphe « Le promoteur » : société, RCCM, N° CC, agrément, siège. */
+function attSoldePromoteurTexte(p){
+  var E = function(x){ return escHtml(x==null?'':String(x)); };
+  return E(p.societe||'La société') + (p.rccm?(', RCCM '+E(p.rccm)):'') + (p.dgi?(', N° CC '+E(p.dgi)):'') + (p.agrement?(', agréée en qualité de promoteur immobilier sous le N° '+E(p.agrement)):', promoteur immobilier') + (p.adresse?(', siège : '+E(String(p.adresse).replace(/\s*\n\s*/g,', '))):'');
+}
 function attSoldeHtmlFinal(a, c){
   var h = (a && a.html) || '';
+  /* Document validé AVEC le nom par défaut « ImmoSuite ERP » (identité du promoteur jamais renseignée à l'époque) : on corrige
+     uniquement l'identification du promoteur (en-tête, paragraphe « Le promoteur », mentions du nom) ; le reste du texte validé,
+     les montants et le document enregistré ne changent pas. */
+  if (h && c && h.indexOf('ImmoSuite ERP') !== -1) {
+    var ent = attSoldeEntreprise(c), nom = escHtml(ent.societe || 'le promoteur');
+    h = h.replace(/(<h3>Le promoteur<\/h3><div class="art">)[\s\S]*?(\.<\/div>)/, function(m, a1, b1){ return a1 + attSoldePromoteurTexte(ent) + b1; });
+    h = h.replace('<strong style="font-size:15px;">ImmoSuite ERP</strong>', '<strong style="font-size:15px;">' + escHtml(ent.societe || '') + '</strong>');
+    h = h.split('ImmoSuite ERP').join(nom);
+  }
   if (!h || h.indexOf('class="pied"') !== -1) return h;
   var pied = docPiedDePageEntreprise(c ? attSoldeEntreprise(c) : null); if (!pied) return h;
   return h.replace('</head>', '<style>'+ATT_PIED_CSS+'</style></head>').replace('</body>', pied+'</body>');
@@ -112872,7 +112886,7 @@ function attSoldeHtml(c, opts){
   var lignes = S.vs.map(function(v){ return '<tr><td>'+E(dateShort(v.date))+'</td><td>'+E(v.ref||v.id)+'</td><td>'+E(v.mode||'—')+'</td><td style="text-align:right;">'+n(parseFloat(v.montant)||0)+'</td></tr>'; }).join('');
   var ident = ov.piece || [c.piece_type, c.piece_num && ('N° '+c.piece_num)].filter(Boolean).join(' ');
   if(ov.bien) bien = E(ov.bien);
-  var promoteur = E(p.societe||'La société') + (p.rccm?(', RCCM '+E(p.rccm)):'') + (p.dgi?(', N° CC '+E(p.dgi)):'') + (p.agrement?(', agréée en qualité de promoteur immobilier sous le N° '+E(p.agrement)):', promoteur immobilier') + (p.adresse?(', siège : '+E(String(p.adresse).replace(/\s*\n\s*/g,', '))):'');
+  var promoteur = attSoldePromoteurTexte(p);
   var h = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Attestation de solde '+E(opts.numero||'')+(opts.indicatif?' (indicatif)':'')+'</title>'
     + '<style>body{font-family:Georgia,serif;color:#1a1a1a;padding:38px 46px;max-width:760px;margin:0 auto;font-size:13px;line-height:1.55;position:relative;}'
     + 'h1{text-align:center;font-size:21px;letter-spacing:1px;margin:16px 0 2px;color:#1D3F7A;}.sub{text-align:center;font-size:12px;color:#555;margin-bottom:14px;}'
