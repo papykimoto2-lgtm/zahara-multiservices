@@ -87239,9 +87239,9 @@ function renderContentieuxJuridiques() {
    le registre de l'onglet « Attestations » du Département Juridique. Le dossier affiche aussi la liste
    des pièces attendues (contrat, attestation de solde, PV de livraison, acte notarié, titre foncier…).
    ══════════════════════════════════════════════════════════════════════════ */
-async function attLierJuridique(c, note) {
+async function attLierJuridique(c, note, kind) {
   try {
-    var a = c.attestation_solde;
+    var a = c[attChamp(kind)];
     var d = await clientLierDossierJuridique(c, note, a ? a.prix : 0, false);
     if (a && d) a.dossier_juridique_id = d.id;
     return d;
@@ -87255,6 +87255,10 @@ function attRegistreLignes() {
     if (a) L.push({ type:'solde', typeLib:'Attestation de solde', ref:a.numero, nom:nom, dossier:c.dossier || '', statut:a.statut, date:a.valide_le || a.date_demande || a.date_brouillon || '', clientId:c.id, djId:c.dossier_juridique_id || a.dossier_juridique_id || '', variantes:(a.variantes || []).length });
     else if (c.statut !== 'resilie' && typeof attSoldeSolde === 'function' && attSoldeSolde(c).solde)
       L.push({ type:'solde', typeLib:'Attestation de solde', ref:'—', nom:nom, dossier:c.dossier || '', statut:'a_etablir', date:'', clientId:c.id, djId:c.dossier_juridique_id || '', variantes:0 });
+    var af = c.attestation_solde_finale;
+    if (af) L.push({ type:'solde_finale', typeLib:'Attestation de solde (valeur finale)', ref:af.numero, nom:nom, dossier:c.dossier || '', statut:af.statut, date:af.valide_le || af.date_demande || af.date_brouillon || '', clientId:c.id, djId:c.dossier_juridique_id || af.dossier_juridique_id || '', variantes:0 });
+    else if (c.statut !== 'resilie' && typeof attSoldeApplicable === 'function' && attSoldeApplicable(c, 'finale') && attSoldeSolde(c, 'finale').solde)
+      L.push({ type:'solde_finale', typeLib:'Attestation de solde (valeur finale)', ref:'—', nom:nom, dossier:c.dossier || '', statut:'a_etablir', date:'', clientId:c.id, djId:c.dossier_juridique_id || '', variantes:0 });
   });
   if (typeof finGetAll === 'function' && typeof finDocEtat === 'function') {
     finGetAll().forEach(function(f){
@@ -87282,10 +87286,10 @@ function renderAttestationsJuridiques() {
   box.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Type</th><th>N°</th><th>Bénéficiaire</th><th>Statut</th><th>Date</th><th>Dossier juridique</th><th></th></tr></thead><tbody>' + liste.map(function(x){
     var s = ATT_STATUT_LIB[x.statut] || [x.statut, 'badge-bleu'], d = x.djId ? (DATA.dossiersJuridiques || []).find(function(z){ return z.id === x.djId; }) : null;
     var act = '';
-    if (x.type === 'solde') {
-      var cq = '\'' + x.clientId + '\'';
-      act = x.statut === 'valide' ? '<button class="btn btn-secondary btn-sm" onclick="attSoldeImprimer(' + cq + ')" title="Version officielle, sans modification">🖨 Sans modif.</button> <button class="btn btn-secondary btn-sm" onclick="attSoldeVarianteOuvrir(' + cq + ')" title="Version indicative avec modifications">✏️ Avec modif.</button>'
-        : '<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(' + cq + ')">👁 Voir</button>' + (x.statut === 'a_etablir' ? ' <button class="btn btn-primary btn-sm" onclick="attSoldeDemander(' + cq + ')">📜 Établir</button>' : '');
+    if (x.type === 'solde' || x.type === 'solde_finale') {
+      var cq = '\'' + x.clientId + '\'', kq = x.type === 'solde_finale' ? ',\'finale\'' : '';
+      act = x.statut === 'valide' ? '<button class="btn btn-secondary btn-sm" onclick="attSoldeImprimer(' + cq + kq + ')" title="Version officielle, sans modification">🖨 Sans modif.</button>' + (kq ? '' : ' <button class="btn btn-secondary btn-sm" onclick="attSoldeVarianteOuvrir(' + cq + ')" title="Version indicative avec modifications">✏️ Avec modif.</button>')
+        : '<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(' + cq + kq + ')">👁 Voir</button>' + (x.statut === 'a_etablir' ? ' <button class="btn btn-primary btn-sm" onclick="attSoldeDemander(' + cq + kq + ')">📜 Établir</button>' : '');
     } else if (x.type === 'cession') act = '<button class="btn btn-secondary btn-sm" onclick="finImprimerAttestation(\'' + x.finId + '\')">🖨 Imprimer</button>';
     else if (x.type === 'reservation' && typeof finImprimerAttestationReservation === 'function') act = '<button class="btn btn-secondary btn-sm" onclick="finImprimerAttestationReservation(\'' + x.finId + '\')">🖨 Imprimer</button>';
     return '<tr><td style="font-size:11px;">' + escHtml(x.typeLib) + (x.variantes ? '<br><span style="color:var(--or);">✏️ ' + x.variantes + ' version(s) indicative(s)</span>' : '') + '</td>'
@@ -87309,7 +87313,10 @@ async function djRenderPieces(d) {
   var P = [];
   P.push({ lib:'Contrat de vente / réservation', ok:true, det:'Généré depuis la fiche souscripteur', act:'<button class="btn btn-secondary btn-sm" onclick="printContrat(\'' + c.id + '\')">🖨</button>' });
   var stLib = a ? (ATT_STATUT_LIB[a.statut] || [a.statut])[0] : (solde ? 'à établir' : 'non soldé');
-  P.push({ lib:'Attestation de solde', ok:!!(a && a.statut === 'valide'), att:!!a, det:(a ? a.numero + ' — ' : '') + stLib, act:(a || solde) ? attSoldeCellule(c.id) : '' });
+  P.push({ lib:'Attestation de solde', ok:!!(a && a.statut === 'valide'), att:!!a, det:(a ? a.numero + ' — ' : '') + stLib, act:(a || solde) ? attSoldeCellule(c.id, 'initial') : '' });
+  var af = c.attestation_solde_finale, soldeF = typeof attSoldeApplicable === 'function' && attSoldeApplicable(c, 'finale') && attSoldeSolde(c, 'finale').solde;
+  if (af || soldeF || (typeof attSoldeApplicable === 'function' && attSoldeApplicable(c, 'finale')))
+    P.push({ lib:'Attestation de solde (valeur finale, avec modifications)', ok:!!(af && af.statut === 'valide'), att:!!af, det:(af ? af.numero + ' — ' : '') + (af ? (ATT_STATUT_LIB[af.statut] || [af.statut])[0] : (soldeF ? 'à établir' : 'valeur finale non soldée')), act:(af || soldeF) ? attSoldeCellule(c.id, 'finale') : '' });
   P.push({ lib:'Procès-verbal de livraison', ok:!!liv, det:liv ? ((liv.numero || '') + ' — ' + dateShort(liv.date)) : (solde ? 'à établir (Réception & Livraison)' : 'après solde'), act:'' });
   DJ_PIECES_ATTENDUES.forEach(function(t){
     var f = docs.find(function(x){ return String(x.description || '').toLowerCase().indexOf(t.toLowerCase().slice(0, 18)) !== -1; });
@@ -112559,7 +112566,7 @@ function printFacture(id){
 /* ══════════════════════════════════════════════════════
    VALIDATIONS HIÉRARCHIQUES — workflow générique
    ══════════════════════════════════════════════════════ */
-function valTypeLabel(t){ var m={bon_commande:'Bon de commande',situation:'Situation de travaux',convention:'Convention',facture_fournisseur:'Facture fournisseur',liberation_garantie:'Libération retenue garantie',reception_travaux:'Réception de travaux',livraison:'Livraison souscripteur',attestation_solde:'Attestation de solde',cession:'Cession foncière',autre:'Autre'}; return m[t]||t; }
+function valTypeLabel(t){ var m={bon_commande:'Bon de commande',situation:'Situation de travaux',convention:'Convention',facture_fournisseur:'Facture fournisseur',liberation_garantie:'Libération retenue garantie',reception_travaux:'Réception de travaux',livraison:'Livraison souscripteur',attestation_solde:'Attestation de solde',attestation_solde_finale:'Attestation de solde (valeur finale)',cession:'Cession foncière',autre:'Autre'}; return m[t]||t; }
 function valStatutBadge(st){ var m={en_attente:'badge-or',valide:'badge-vert',rejete:'badge-rouge',annule:'badge-rouge'}; var l={en_attente:'⏳ En attente',valide:'✅ Validé',rejete:'⛔ Rejeté',annule:'↩ Validation annulée'}; return '<span class="badge '+(m[st]||'badge-or')+'">'+(l[st]||st)+'</span>'; }
 function valPending(type,refId){ return (DATA.validations||[]).find(function(v){return v.type===type&&v.ref_id===refId&&v.statut==='en_attente';}); }
 async function valCreate(type,refId,libelle,montant,meta){
@@ -112594,15 +112601,16 @@ async function valApply(type,refId,decision){
     var rgr=(DATA.receptions_travaux||[]).find(function(x){return x.id===refId;});
     if(rgr && decision==='valide'){ rgr.rg_libere=true; rgr.rg_libere_date=today(); await dbPut('receptions_travaux',rgr); if(typeof syncToSupabase==='function')syncToSupabase('pi_receptions_travaux',rgr); }
   }
-  if(type==='attestation_solde'){
+  if(type==='attestation_solde' || type==='attestation_solde_finale'){
+    var kd = attKindDeType(type), champ = attChamp(kd);
     var ac=(DATA.clients||[]).find(function(x){return x.id===refId;});
-    if(ac && ac.attestation_solde){
-      var at=ac.attestation_solde, nomV=(APP.currentUser&&APP.currentUser.nom)||'—';
-      if(decision==='valide' && !attSoldeSolde(ac).solde){ at.statut='rejete'; at.motif='Souscripteur non soldé à la date de validation'; toast('⚠️ Ce souscripteur n\'est plus soldé : attestation refusée.','error'); }
+    if(ac && ac[champ]){
+      var at=ac[champ], nomV=(APP.currentUser&&APP.currentUser.nom)||'—';
+      if(decision==='valide' && !attSoldeSolde(ac, kd).solde){ at.statut='rejete'; at.motif=(kd==='finale'?'Valeur finale non soldée':'Souscripteur non soldé')+' à la date de validation'; toast('⚠️ Ce souscripteur n\'est plus soldé : attestation refusée.','error'); }
       else if(decision==='valide'){
         at.statut='valide'; at.valide_par=nomV; at.valide_le=today(); at.date_emission=today();
-        at.html=attSoldeHtml(ac,{numero:at.numero,date:today(),signataire:nomV});
-        await attLierJuridique(ac,'Attestation de solde N° '+at.numero+' validée par '+nomV+' (version officielle, sans modification).');
+        at.html=attSoldeHtml(ac,{numero:at.numero,date:today(),signataire:nomV,kind:kd});
+        await attLierJuridique(ac,attLibKind(kd)+' N° '+at.numero+' validée par '+nomV+' (version officielle, sans modification).',kd);
       } else {
         var vr=(DATA.validations||[]).filter(function(x){return x.type===type&&x.ref_id===refId&&x.statut==='rejete';}).pop();
         at.statut='rejete'; at.motif=(vr&&vr.motif)||'';
@@ -112663,7 +112671,7 @@ function renderValidations(){
         if(canDecide) acts='<button class="btn btn-primary btn-sm" onclick="valDecide(\''+v.id+'\',\'valide\')">✅ Valider</button> <button class="btn btn-danger btn-sm" onclick="valReject(\''+v.id+'\')">⛔ Rejeter</button>';
         else acts='<span style="font-size:11px;color:var(--blanc-dim);">réservé à la hiérarchie</span>';
       } else { acts='<span style="font-size:11px;color:var(--blanc-dim);">'+(v.valideur||'')+' · '+(v.date_decision||'')+(v.motif?(' · '+v.motif):'')+'</span>'; }
-      if(v.type==='attestation_solde') acts='<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(\''+v.ref_id+'\')">👁 Voir</button> '+acts;
+      if(v.type==='attestation_solde' || v.type==='attestation_solde_finale') acts='<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">👁 Voir</button> '+acts;
       return '<tr><td>'+valTypeLabel(v.type)+'</td><td style="font-size:12px;">'+v.libelle+'</td><td style="text-align:right;font-weight:600;">'+fmtF(Math.round(v.montant||0))+'</td><td style="font-size:11px;">'+(v.demandeur||'—')+'</td><td>'+(v.date_demande||'—')+'</td><td>'+valStatutBadge(v.statut)+'</td><td style="white-space:nowrap;">'+acts+'</td></tr>';
     }).join('');
   }
@@ -112771,7 +112779,7 @@ function renderLivAFaire(){
       + '<td style="text-align:right;">'+fmtF(Math.round(x.verse))+'</td>'
       + '<td style="font-size:11px;white-space:nowrap;">'+(x.dernier ? dateShort(x.dernier) : '—')+'</td>'
       + '<td style="font-size:11px;">'+al+'</td>'
-      + '<td style="white-space:nowrap;">'+attSoldeCellule(x.id)+'</td>'
+      + '<td style="white-space:nowrap;">'+attSoldeCellule(x.id,'initial')+(attSoldeApplicable(x,'finale')?'<div style="margin-top:4px;"><span style="font-size:9px;color:var(--blanc-dim);">Valeur finale :</span> '+attSoldeCellule(x.id,'finale')+'</div>':'')+'</td>'
       + '<td>'+(x.livre ? '<span class="badge badge-vert" style="font-size:10px;">Livré</span>' : '<button class="btn btn-primary btn-sm" onclick="livDepuisListe(\''+x.id+'\')" title="Ouvrir une livraison pour ce souscripteur">🔑 Livrer</button>')+'</td></tr>';
   }).join('');
 }
@@ -112793,25 +112801,63 @@ function livDepuisListe(clientId){
    Le texte validé est figé (att.html) : le souscripteur reçoit exactement ce que
    la direction a validé, même si les données évoluent ensuite.
    ══════════════════════════════════════════════════════════════════════════ */
-function attSoldeSolde(c){
-  var vs = (DATA.versements||[]).filter(function(v){ return v && v.client_id===c.id && v.statut!=='annule' && _versementSurPrix(v); })
+/* ══ Deux attestations de solde (documents remis au notaire) ══
+   · « initial » (client.attestation_solde) : quitus du PRIX INITIAL du bien ;
+   · « finale »  (client.attestation_solde_finale) : quitus de la VALEUR FINALE (prix initial + modifications de construction
+     demandées par le souscripteur et facturées au contrat). Elle n'existe que si le contrat comporte des modifications.
+   Prix initial = montant du contrat − modifications facturées (travaux modificatifs) − régularisations de surface.
+   Les versements s'imputent chronologiquement d'abord sur le prix initial, puis sur les modifications. */
+function attChamp(kind){ return kind==='finale' ? 'attestation_solde_finale' : 'attestation_solde'; }
+function attKindDeType(type){ return type==='attestation_solde_finale' ? 'finale' : 'initial'; }
+function attLibKind(kind){ return kind==='finale' ? 'Attestation de solde (valeur finale)' : 'Attestation de solde'; }
+function attSoldeModifs(c){
+  var m = [];
+  (c.demandes_modification||[]).forEach(function(d){
+    var mt = d && d.facture ? (parseFloat(d.montant_facture)||0) : 0;
+    if(mt) m.push({ date:String(d.date||'').slice(0,10), libelle:String(d.description||'Modification de construction'), montant:mt, nature:'Travaux modificatifs' });
+  });
+  (c.regularisations_surface||[]).forEach(function(r){
+    var mt = r ? (parseFloat(r.montant)||0) : 0;
+    if(mt) m.push({ date:String(r.date||'').slice(0,10), libelle:'Écart de surface de '+(r.ecart_m2!=null?r.ecart_m2:'?')+' m²'+(r.prix_m2?(' × '+fmtF(r.prix_m2)+' FCFA/m²'):''), montant:mt, nature:'Régularisation de surface' });
+  });
+  return m.sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); });
+}
+function attSoldePrix(c){
+  var total = parseFloat(c.montant_total)||0, m = attSoldeModifs(c), somme = m.reduce(function(s,x){ return s + x.montant; }, 0), initial = total - somme;
+  if(initial <= 0.5){ m = []; somme = 0; initial = total; }   /* données incohérentes : aucune décomposition inventée */
+  return { total:total, initial:initial, modifs:m, sommeModifs:somme };
+}
+function attSoldeApplicable(c, kind){ return kind==='finale' ? attSoldePrix(c).modifs.length>0 : true; }
+function attSoldeSolde(c, kind){
+  var P = attSoldePrix(c), fin = (kind==='finale'), plafonne = !fin && P.modifs.length>0;
+  var tous = (DATA.versements||[]).filter(function(v){ return v && v.client_id===c.id && v.statut!=='annule' && _versementSurPrix(v); })
     .sort(function(a,b){ return String(a.date||'').localeCompare(String(b.date||'')); });
-  var verse = vs.reduce(function(s,v){ return s + (parseFloat(v.montant)||0); }, 0);
-  var prix = parseFloat(c.montant_total)||0;
+  var totalVerse = tous.reduce(function(s,v){ return s + (parseFloat(v.montant)||0); }, 0);
+  var prix = fin ? P.total : P.initial, vs = tous, verse = totalVerse;
+  if(plafonne){   /* imputation sur le prix initial seulement */
+    var reste = prix; vs = [];
+    tous.forEach(function(v){
+      if(reste <= 0.5) return;
+      var m = parseFloat(v.montant)||0, imp = Math.min(m, reste); reste -= imp;
+      vs.push(Object.assign({}, v, { montant_impute:imp, partiel: imp < m - 0.5 }));
+    });
+    verse = Math.min(totalVerse, prix);
+  }
   /* Date de solde = date du versement qui a fait atteindre le prix. */
   var cumul = 0, dateSolde = '';
-  vs.some(function(v){ cumul += (parseFloat(v.montant)||0); if(cumul >= prix - 0.5){ dateSolde = String(v.date||'').slice(0,10); return true; } return false; });
+  tous.some(function(v){ cumul += (parseFloat(v.montant)||0); if(cumul >= prix - 0.5){ dateSolde = String(v.date||'').slice(0,10); return true; } return false; });
   var frais = (DATA.versements||[]).filter(function(v){ return v && v.client_id===c.id && v.statut!=='annule' && v.type==='frais_souscription'; })
     .reduce(function(s,v){ return s + (parseFloat(v.montant)||0); }, 0);
-  return { vs:vs, verse:verse, prix:prix, dateSolde:dateSolde, frais:frais, solde: prix > 0 && verse >= prix - 0.5 };
+  return { vs:vs, verse:verse, prix:prix, dateSolde:dateSolde, frais:frais, solde: prix > 0 && totalVerse >= prix - 0.5,
+           prixInitial:P.initial, totalContrat:P.total, modifs:P.modifs, sommeModifs:P.sommeModifs };
 }
-function attSoldeNumero(){
-  var an = new Date().getFullYear(), max = 0;
+function attSoldeNumero(kind){
+  var an = new Date().getFullYear(), max = 0, pre = kind==='finale' ? 'ATF' : 'ATS', champ = attChamp(kind), re = new RegExp('^'+pre+'-(\\d{4})-(\\d+)$');
   (DATA.clients||[]).forEach(function(c){
-    var m = c.attestation_solde && /^ATS-(\d{4})-(\d+)$/.exec(c.attestation_solde.numero||'');
+    var m = c[champ] && re.exec(c[champ].numero||'');
     if(m && parseInt(m[1],10)===an) max = Math.max(max, parseInt(m[2],10));
   });
-  return 'ATS-' + an + '-' + ('0000' + (max+1)).slice(-4);
+  return pre + '-' + an + '-' + ('0000' + (max+1)).slice(-4);
 }
 /* Corps du document. opts : {numero, date, signataire, fonction, projet}. Pas d'image embarquée (reste léger dans la fiche). */
 /* Pied de page d'entreprise des documents officiels, construit depuis Paramètres › Entreprise :
@@ -112829,7 +112875,7 @@ function docPiedDePageEntreprise(p){
   return lignes.length ? '<div class="pied">'+lignes.map(function(l){ return '<div>'+l+'</div>'; }).join('')+'</div>' : '';
 }
 /* Mise en page du pied de page d'entreprise des attestations (une page A4, pied collé en bas à l'impression). */
-var ATT_PIED_CSS = '.pied{margin-top:30px;border-top:1px solid #000;padding-top:6px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#222;line-height:1.5;}@page{size:A4;margin:12mm 16mm;}@media print{body{padding:0 0 22mm;max-width:none;font-size:11.5px;line-height:1.38;min-height:270mm;box-sizing:border-box;position:relative;}h1{font-size:18px;margin:8px 0 2px;}h3{margin:8px 0 3px;break-after:avoid;}.art{margin:3px 0;}table{margin:4px 0 6px;}td,th{padding:3px 8px;}.mont{margin:6px 0;padding:6px;font-size:14px;}.sig{page-break-inside:avoid;margin-top:16px;}.pied{position:absolute;left:0;right:0;bottom:0;margin:0;}}';
+var ATT_PIED_CSS = '.pied{margin-top:30px;border-top:1px solid #000;padding-top:6px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#222;line-height:1.5;}@page{size:A4;margin:12mm 16mm;}@media print{body{padding:0 0 22mm;max-width:none;font-size:10.8px;line-height:1.3;min-height:270mm;box-sizing:border-box;position:relative;}h1{font-size:18px;margin:8px 0 2px;}h3{margin:8px 0 3px;break-after:avoid;}.art{margin:2px 0;}table{margin:3px 0 4px;}td,th{padding:2px 8px;}.mont{margin:5px 0;padding:5px;font-size:13.5px;}.sig{page-break-inside:avoid;margin-top:8px;}h3{margin:5px 0 2px;}.pied{position:absolute;left:0;right:0;bottom:0;margin:0;}}';
 /* Une attestation déjà validée est figée (a.html) : elle peut avoir été émise avant l'ajout du pied de page.
    À l'affichage et à l'impression, on lui ajoute le pied de page d'entreprise SANS modifier le texte validé
    ni le document enregistré. Rien n'est ajouté si les paramètres de l'entreprise sont vides ou si le pied existe déjà. */
@@ -112875,7 +112921,8 @@ function attSoldeHtmlFinal(a, c){
 function attSoldeHtml(c, opts){
   opts = opts || {};
   var ov = opts.overrides || {};
-  var p = attSoldeEntreprise(c), S = attSoldeSolde(c), E = function(x){ return escHtml(x==null?'':String(x)); };
+  var kind = opts.kind==='finale' ? 'finale' : 'initial', fin = kind==='finale';
+  var p = attSoldeEntreprise(c), S = attSoldeSolde(c, kind), PX = attSoldePrix(c), avecModifs = PX.modifs.length>0, E = function(x){ return escHtml(x==null?'':String(x)); };
   var prog = (DATA.programmes||[]).find(function(x){ return x.id===c.programme_id; }) || {};
   var lotIds = (typeof _lotIdsDeClient==='function') ? _lotIdsDeClient(c) : (c.lot_id?[c.lot_id]:[]);
   var lots = lotIds.map(function(id){ return (DATA.lots||[]).find(function(l){return l.id===id;}); }).filter(Boolean);
@@ -112883,7 +112930,7 @@ function attSoldeHtml(c, opts){
   var bien = lots.length ? lots.map(function(l){ return 'Lot ' + E(l.numero||l.nom||'?') + (l.ilot?(', îlot '+E(l.ilot)):'') + (l.surface?(' — '+E(l.surface)+' m²'):'') + (l.type?(' ('+E(l.type)+')'):''); }).join(' ; ') : '—';
   var n = function(x){ return new Intl.NumberFormat('fr-FR').format(Math.round(x)); };
   var lettres = (typeof _montantEnLettres==='function') ? _montantEnLettres(S.prix) : '';
-  var lignes = S.vs.map(function(v){ return '<tr><td>'+E(dateShort(v.date))+'</td><td>'+E(v.ref||v.id)+'</td><td>'+E(v.mode||'—')+'</td><td style="text-align:right;">'+n(parseFloat(v.montant)||0)+'</td></tr>'; }).join('');
+  var lignes = S.vs.map(function(v){ return '<tr><td>'+E(dateShort(v.date))+'</td><td>'+E(v.ref||v.id)+'</td><td>'+E(v.mode||'—')+'</td><td style="text-align:right;">'+n(v.montant_impute!=null ? v.montant_impute : (parseFloat(v.montant)||0))+(v.partiel?' <span style="font-size:10px;color:#555;">(sur '+n(parseFloat(v.montant)||0)+', le solde est imputé sur les modifications)</span>':'')+'</td></tr>'; }).join('');
   var ident = ov.piece || [c.piece_type, c.piece_num && ('N° '+c.piece_num)].filter(Boolean).join(' ');
   if(ov.bien) bien = E(ov.bien);
   var promoteur = attSoldePromoteurTexte(p);
@@ -112900,7 +112947,7 @@ function attSoldeHtml(c, opts){
     + (opts.projet ? '<div class="projet">PROJET — NON VALIDÉ</div>' : '')
     + (opts.indicatif ? '<div class="projet">À TITRE INDICATIF</div>' : '')
     + '<div class="ref"><div><strong style="font-size:15px;">'+E(p.societe||'')+'</strong></div><div style="text-align:right;">N° <strong>'+E(opts.numero||'—')+'</strong><br>Dossier : '+E(c.dossier||c.id)+'</div></div>'
-    + '<h1>ATTESTATION DE SOLDE</h1><div class="sub">Quitus de paiement intégral du prix de vente</div>'
+    + '<h1>ATTESTATION DE SOLDE'+(fin?' — VALEUR FINALE DU BIEN':'')+'</h1><div class="sub">'+(fin?'Quitus de paiement intégral du prix initial et des modifications de construction demandées':(avecModifs?'Quitus de paiement intégral du prix initial de vente':'Quitus de paiement intégral du prix de vente'))+'</div>'
     + (opts.indicatif ? '<div style="border:2px solid #b45309;background:#fffbeb;padding:8px 12px;margin:8px 0;font-size:12px;"><strong>VERSION À TITRE INDICATIF</strong> — établie à la demande du souscripteur ('+E(opts.motif||'')+'). Elle ne remplace pas l\'attestation de solde sans modification n° '+E(opts.numero||'')+', seule à remettre au notaire.'
         + ((opts.modifs||[]).length ? '<br>Éléments modifiés : '+(opts.modifs||[]).map(function(m){ return E(m.libelle)+' (« '+E(m.avant||'—')+' » → « '+E(m.apres||'—')+' »)'; }).join(' ; ') : '')+'</div>' : '')
     + '<h3>Le promoteur</h3><div class="art">'+promoteur+'.</div>'
@@ -112913,14 +112960,19 @@ function attSoldeHtml(c, opts){
     + '<tr><th>Nature</th><td>'+(nature==='terrain'?'Terrain / parcelle':nature==='logement'?'Logement':'—')+'</td></tr>'
     + '<tr><th>Souscription</th><td>Contrat du '+E(dateShort(c.date_souscription||c.date_debut))+'</td></tr></table>'
     + '<h3>Situation financière</h3>'
-    + '<div class="art">Nous, '+E(p.societe||'le promoteur')+', attestons que <strong>'+E(ov.nom || ((c.nom||'')+' '+(c.prenoms||'')).trim())+'</strong> a <strong>intégralement réglé le prix de vente</strong> du bien désigné ci-dessus, fixé à <strong>'+n(S.prix)+' FCFA</strong>'+(lettres?(' ('+E(lettres)+' francs CFA)'):'')+', '
+    + '<div class="art">Nous, '+E(p.societe||'le promoteur')+', attestons que <strong>'+E(ov.nom || ((c.nom||'')+' '+(c.prenoms||'')).trim())+'</strong> a <strong>intégralement réglé '+(fin?'la valeur finale':(avecModifs?'le prix initial de vente':'le prix de vente'))+'</strong> du bien désigné ci-dessus, fixé à <strong>'+n(S.prix)+' FCFA</strong>'+(lettres?(' ('+E(lettres)+' francs CFA)'):'')+', '
     + (S.dateSolde?('le dernier versement ayant été constaté le <strong>'+E(dateShort(S.dateSolde))+'</strong>'):'')+'.</div>'
+    + (fin ? '<h3>Décomposition de la valeur du bien</h3><table><thead><tr><th>Date</th><th>Désignation</th><th style="text-align:right;">Montant (FCFA)</th></tr></thead><tbody>'
+        + '<tr><td>—</td><td>Prix initial du bien</td><td style="text-align:right;">'+n(PX.initial)+'</td></tr>'
+        + PX.modifs.map(function(m){ return '<tr><td>'+E(dateShort(m.date))+'</td><td>'+E(m.nature)+' : '+E(m.libelle)+'</td><td style="text-align:right;">'+n(m.montant)+'</td></tr>'; }).join('')
+        + '<tr><td colspan="2"><strong>Valeur finale du bien</strong></td><td style="text-align:right;"><strong>'+n(PX.total)+'</strong></td></tr></tbody></table>' : '')
+    + (!fin && avecModifs ? '<div class="art" style="font-size:11.5px;color:#444;">La présente attestation porte uniquement sur le <strong>prix initial</strong> du bien. Les modifications de construction demandées par le souscripteur, d\'un montant de <strong>'+n(PX.sommeModifs)+' FCFA</strong>, font l\'objet d\'une attestation de solde distincte (valeur finale du bien).</div>' : '')
     + '<table><thead><tr><th>Date</th><th>Référence</th><th>Mode</th><th style="text-align:right;">Montant (FCFA)</th></tr></thead><tbody>'+lignes
-    + '<tr><td colspan="3"><strong>Total versé sur le prix</strong></td><td style="text-align:right;"><strong>'+n(S.verse)+'</strong></td></tr></tbody></table>'
+    + '<tr><td colspan="3"><strong>'+(fin?'Total versé (prix initial et modifications)':(avecModifs?'Total imputé sur le prix initial':'Total versé sur le prix'))+'</strong></td><td style="text-align:right;"><strong>'+n(S.verse)+'</strong></td></tr></tbody></table>'
     + '<div class="mont">Solde restant dû : 0 FCFA</div>'
     + (S.frais>0?'<div class="art" style="font-size:11.5px;color:#555;">Les frais de souscription ('+n(S.frais)+' FCFA) ne sont pas imputés sur le prix et ne figurent pas dans le tableau ci-dessus.</div>':'')
     + '<h3>Portée et réserves</h3>'
-    + '<div class="art">1. Le souscripteur est libéré de toute obligation de paiement au titre du prix de vente du bien désigné ci-dessus.</div>'
+    + '<div class="art">1. Le souscripteur est libéré de toute obligation de paiement au titre '+(fin?'de la valeur finale (prix de vente et modifications de construction)':(avecModifs?'du prix initial de vente':'du prix de vente'))+' du bien désigné ci-dessus.</div>'
     + '<div class="art">2. La présente attestation est établie sous réserve de l\'encaissement effectif des sommes versées et sur la foi de la comptabilité du promoteur à la date de son émission.</div>'
     + '<div class="art">3. Elle ne constitue ni un titre de propriété ni un acte de vente authentique. Le transfert de propriété est constaté par acte authentique établi par notaire et inscrit à la Conservation de la propriété foncière, conformément à la législation ivoirienne en vigueur en matière de promotion immobilière et de construction.</div>'
     + '<div class="art">4. La livraison du bien (remise des clés ou du terrain) sera constatée par un procès-verbal de livraison contradictoire, dont la date sera notifiée au souscripteur.</div>'
@@ -112937,15 +112989,17 @@ function attSoldeHtml(c, opts){
    souscripteur n'est plus soldé (versement modifié ou annulé). */
 function attSoldeAuto(clientId){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
-  var S = attSoldeSolde(c), a = c.attestation_solde;
   if(c.statut==='resilie') return;
-  if(S.solde && !a){
-    c.attestation_solde = { numero:attSoldeNumero(), statut:'brouillon', date_brouillon:today(), prix:S.prix, verse:S.verse, date_solde:S.dateSolde, publie_portail:false };
-    attSoldeSauver(c);
-    toast('📜 Souscripteur soldé : attestation de solde préparée en brouillon (fiche du souscripteur → Documents).','success',7000);
-  } else if(!S.solde && a && a.statut==='brouillon'){
-    delete c.attestation_solde; attSoldeSauver(c);
-  }
+  ['initial','finale'].forEach(function(kind){
+    var champ = attChamp(kind), a = c[champ], S = attSoldeSolde(c, kind), ok = S.solde && attSoldeApplicable(c, kind);
+    if(ok && !a){
+      c[champ] = { numero:attSoldeNumero(kind), statut:'brouillon', date_brouillon:today(), prix:S.prix, verse:S.verse, date_solde:S.dateSolde, publie_portail:false };
+      attSoldeSauver(c);
+      toast('📜 '+(kind==='finale' ? 'Valeur finale soldée : attestation de solde (valeur finale) préparée en brouillon' : 'Souscripteur soldé : attestation de solde préparée en brouillon')+' (fiche du souscripteur → Documents).','success',7000);
+    } else if(!ok && a && a.statut==='brouillon'){
+      delete c[champ]; attSoldeSauver(c);
+    }
+  });
   attSoldeRafraichirUI(clientId);
 }
 /* Rafraîchit la liste « À livrer » et la zone Documents de la fiche souscripteur si elle est ouverte. */
@@ -112954,15 +113008,19 @@ function attSoldeRafraichirUI(clientId){
   var z = document.getElementById('doc-att-zone');
   if(z && typeof APP!=='undefined' && APP.editingId===clientId) z.innerHTML = attSoldeZoneClient(clientId);
 }
-function attSoldeZoneClient(clientId){
-  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return '';
-  if(!c.attestation_solde && !attSoldeSolde(c).solde) return '';
-  var a = c.attestation_solde;
-  return '<div style="margin-top:12px;padding:10px 12px;border:1px solid var(--bord);border-radius:8px;"><div class="form-section-title" style="margin-bottom:6px;">📜 Attestation de solde'
+function attSoldeBloc(c, kind){
+  var a = c[attChamp(kind)];
+  if(!a && (!attSoldeApplicable(c, kind) || !attSoldeSolde(c, kind).solde)) return '';
+  return '<div style="margin-top:12px;padding:10px 12px;border:1px solid var(--bord);border-radius:8px;"><div class="form-section-title" style="margin-bottom:6px;">📜 '+attLibKind(kind)
     + (a ? ' <span style="font-weight:normal;font-size:11px;">N° '+escHtml(a.numero||'')+'</span>' : '') + '</div>'
     + '<div style="font-size:11.5px;color:var(--blanc-dim);margin-bottom:6px;">'
-    + (!a ? 'Souscripteur soldé — aucune attestation préparée.' : a.statut==='brouillon' ? 'Brouillon généré automatiquement au constat du solde de tout compte. À soumettre au DG / gérant.' : a.statut==='en_attente' ? 'En attente de validation du DG / gérant.' : a.statut==='valide' ? 'Validée par '+escHtml(a.valide_par||'')+' le '+escHtml(dateShort(a.valide_le))+'.' : 'Rejetée'+(a.motif?(' : '+escHtml(a.motif)):'')+'.')
-    + '</div>' + attSoldeCellule(clientId) + '</div>';
+    + (kind==='finale' ? 'Quitus de la valeur finale du bien (prix initial + modifications de construction). ' : (attSoldePrix(c).modifs.length ? 'Quitus du prix initial du bien. ' : ''))
+    + (!a ? 'Souscripteur soldé — aucune attestation préparée.' : a.statut==='brouillon' ? 'Brouillon généré automatiquement au constat du solde. À soumettre au DG / gérant.' : a.statut==='en_attente' ? 'En attente de validation du DG / gérant.' : a.statut==='valide' ? 'Validée par '+escHtml(a.valide_par||'')+' le '+escHtml(dateShort(a.valide_le))+'.' : 'Rejetée'+(a.motif?(' : '+escHtml(a.motif)):'')+'.')
+    + '</div>' + attSoldeCellule(c.id, kind) + '</div>';
+}
+function attSoldeZoneClient(clientId){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return '';
+  return attSoldeBloc(c, 'initial') + attSoldeBloc(c, 'finale');
 }
 /* ── Impression « avec modifications » (à titre indicatif) ───────────────────
    Deux versions imprimables d'une attestation validée :
@@ -113044,8 +113102,8 @@ function attSoldeSauver(c){
 /* Annulation d'une validation faite par erreur : l'attestation repasse en brouillon (même numéro, aucun numéro perdu),
    elle est retirée du portail, la validation du journal est marquée « annulée » (jamais effacée) et le motif est conservé.
    Ensuite « Soumettre au DG » la renvoie en validation. Réservé à la hiérarchie, comme la validation. */
-async function attSoldeAnnulerValidation(clientId){
-  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c.attestation_solde;
+async function attSoldeAnnulerValidation(clientId, kind){
+  var champ = attChamp(kind), c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c[champ];
   if(!a || a.statut!=='valide'){ toast('Aucune attestation validée à annuler.','error'); return; }
   if(typeof hasRole==='function' && !hasRole('admin') && !hasRole('manager')){ toast('Annulation réservée à la hiérarchie.','error'); return; }
   var motif = prompt("Motif de l'annulation de la validation (obligatoire) :\nL'attestation N° "+a.numero+" repassera en brouillon et sera retirée du portail.", '');
@@ -113057,80 +113115,80 @@ async function attSoldeAnnulerValidation(clientId){
   a.statut = 'brouillon'; a.publie_portail = false;
   ['html','valide_par','valide_le','date_emission','publie_le','wa_envoye_le','variante','date_demande','demandeur','motif'].forEach(function(k){ delete a[k]; });
   a.date_brouillon = today();
-  (DATA.validations||[]).filter(function(v){ return v.type==='attestation_solde' && v.ref_id===clientId && v.statut==='valide'; }).forEach(function(v){
+  (DATA.validations||[]).filter(function(v){ return v.type===champ && v.ref_id===clientId && v.statut==='valide'; }).forEach(function(v){
     v.statut = 'annule'; v.motif = "Validation annulée par "+qui+" le "+today()+" : "+motif;
     dbPut('validations', v); if(typeof syncToSupabase==='function') syncToSupabase('pi_validations', v);
   });
-  await attLierJuridique(c, 'Validation de l\'attestation de solde N° '+a.numero+' annulée par '+qui+' ('+motif+'). Retour en brouillon.');
+  await attLierJuridique(c, 'Validation de l\''+attLibKind(kind).toLowerCase()+' N° '+a.numero+' annulée par '+qui+' ('+motif+'). Retour en brouillon.', kind);
   attSoldeSauver(c);
   etudesLiveRefresh('validations'); if(typeof renderValidations==='function') renderValidations();
   attSoldeRafraichirUI(clientId);
   toast("↩ Validation annulée : l'attestation est en brouillon. Cliquez « Soumettre au DG » pour la renvoyer.",'success',7000);
 }
-async function attSoldeDemander(clientId){
-  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
-  var S = attSoldeSolde(c);
-  if(c.statut==='resilie' || !S.solde){ toast('Ce souscripteur n\'est pas soldé : attestation impossible.','error'); return; }
-  var a = c.attestation_solde;
+async function attSoldeDemander(clientId, kind){
+  var champ = attChamp(kind), c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
+  var S = attSoldeSolde(c, kind);
+  if(c.statut==='resilie' || !S.solde || !attSoldeApplicable(c, kind)){ toast(kind==='finale' ? 'La valeur finale n\'est pas soldée : attestation impossible.' : 'Ce souscripteur n\'est pas soldé : attestation impossible.','error'); return; }
+  var a = c[champ];
   if(a && a.statut==='en_attente'){ toast('Une demande de validation est déjà en cours.','info'); return; }
   if(a && a.statut==='valide' && !confirm('Une attestation a déjà été validée ('+a.numero+'). En demander une nouvelle ?')) return;
   var nom = ((c.nom||'')+' '+(c.prenoms||'')).trim();
-  c.attestation_solde = { numero:(a && a.statut!=='valide') ? a.numero : attSoldeNumero(), statut:'en_attente', date_demande:today(),
+  c[champ] = { numero:(a && a.statut!=='valide') ? a.numero : attSoldeNumero(kind), statut:'en_attente', date_demande:today(),
     demandeur:(APP.currentUser&&APP.currentUser.nom)||'—', prix:S.prix, verse:S.verse, date_solde:S.dateSolde, publie_portail:false, annulations:(a && a.annulations) || undefined };
   attSoldeSauver(c);
-  var v = await valCreate('attestation_solde', c.id, 'Attestation de solde '+c.attestation_solde.numero+' — '+nom+(c.dossier?(' ('+c.dossier+')'):''), S.prix, {client_id:c.id});
+  var v = await valCreate(champ, c.id, attLibKind(kind)+' '+c[champ].numero+' — '+nom+(c.dossier?(' ('+c.dossier+')'):''), S.prix, {client_id:c.id});
   attSoldeRafraichirUI(c.id);
   toast('📤 Attestation transmise au DG / gérant pour validation (menu Validations).','success');
 }
-function attSoldeApercu(clientId){
+function attSoldeApercu(clientId, kind){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
-  var a = c.attestation_solde || {};
-  var html = (a.statut==='valide' && a.html) ? attSoldeHtmlFinal(a, c) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(), date:today(), projet:true});
+  var a = c[attChamp(kind)] || {};
+  var html = (a.statut==='valide' && a.html) ? attSoldeHtmlFinal(a, c) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind), date:today(), projet:true, kind:kind});
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
   w.document.write(html); w.document.close();
 }
-function attSoldeImprimer(clientId){
-  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c || !c.attestation_solde || c.attestation_solde.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
+function attSoldeImprimer(clientId, kind){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c[attChamp(kind)]; if(!a || a.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
-  w.document.write(attSoldeHtmlFinal(c.attestation_solde, c)); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400);
+  w.document.write(attSoldeHtmlFinal(a, c)); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400);
 }
-function attSoldePublier(clientId, on){
-  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c || !c.attestation_solde || c.attestation_solde.statut!=='valide') return;
-  c.attestation_solde.publie_portail = !!on; if(on) c.attestation_solde.publie_le = today();
-  attLierJuridique(c,'Attestation de solde N° '+c.attestation_solde.numero+(on?' publiée au portail du souscripteur.':' retirée du portail.'));
+function attSoldePublier(clientId, on, kind){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c[attChamp(kind)]; if(!a || a.statut!=='valide') return;
+  a.publie_portail = !!on; if(on) a.publie_le = today();
+  attLierJuridique(c, attLibKind(kind)+' N° '+a.numero+(on?' publiée au portail du souscripteur.':' retirée du portail.'), kind);
   attSoldeSauver(c); attSoldeRafraichirUI(c.id);
   toast(on?'🌐 Attestation disponible dans l\'espace portail du souscripteur.':'Attestation retirée du portail.','info');
 }
-function attSoldeWhatsApp(clientId){
-  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c || !c.attestation_solde || c.attestation_solde.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
+function attSoldeWhatsApp(clientId, kind){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c[attChamp(kind)]; if(!a || a.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
   if(!c.tel){ toast('Aucun numéro de téléphone pour ce souscripteur.','error'); return; }
-  var a = c.attestation_solde, p = DATA.params||{};
+  var p = DATA.params||{};
   var lien = (p.portail_url || (location.origin + '/portail-unique.html'));
-  var msg = 'Bonjour ' + ((c.prenoms||'')+' '+(c.nom||'')).trim() + ',\n\nNous avons le plaisir de vous confirmer que votre bien est entièrement soldé. Votre ATTESTATION DE SOLDE N° ' + a.numero
+  var msg = 'Bonjour ' + ((c.prenoms||'')+' '+(c.nom||'')).trim() + ',\n\nNous avons le plaisir de vous confirmer que ' + (kind==='finale' ? 'la valeur finale de votre bien (avec les modifications demandées) est entièrement soldée' : 'votre bien est entièrement soldé') + '. Votre ' + attLibKind(kind).toUpperCase() + ' N° ' + a.numero
     + ' (dossier ' + (c.dossier||'') + ') a été validée par la Direction.\n\n'
     + (a.publie_portail ? 'Vous pouvez la consulter et l\'imprimer depuis votre espace souscripteur (rubrique Documents) :\n' + lien + '\n\n' : 'Elle peut être retirée à nos bureaux ou vous être transmise sur demande.\n\n')
-    + 'Merci de votre confiance.\n' + (p.societe||'');
+    + 'Merci de votre confiance.\n' + (attSoldeEntreprise(c).societe||'');
   window.open('https://wa.me/' + telWhatsApp(c.tel) + '?text=' + encodeURIComponent(msg), '_blank');
   a.wa_envoye_le = today();
-  attLierJuridique(c,'Attestation de solde N° '+a.numero+' transmise par WhatsApp au souscripteur.');
+  attLierJuridique(c, attLibKind(kind)+' N° '+a.numero+' transmise par WhatsApp au souscripteur.', kind);
   attSoldeSauver(c); attSoldeRafraichirUI(c.id);
   toast('📲 WhatsApp ouvert avec le message prêt : cliquez sur Envoyer.' + (a.publie_portail ? '' : ' (Pensez à publier l\'attestation au portail pour que le lien fonctionne.)'),'info',7000);
 }
-function attSoldeCellule(clientId){
+function attSoldeCellule(clientId, kind){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return '';
-  var a = c.attestation_solde, b = 'style="font-size:10px;padding:2px 6px;"', q = '\''+clientId+'\'';
+  var a = c[attChamp(kind)], b = 'style="font-size:10px;padding:2px 6px;"', q = '\''+clientId+'\'', k = ',\''+(kind==='finale'?'finale':'initial')+'\'';
   if(!a || a.statut==='rejete' || a.statut==='brouillon'){
     return (a && a.statut==='rejete' ? '<div class="badge badge-rouge" style="font-size:10px;margin-bottom:3px;" title="'+escHtml(a.motif||'')+'">⛔ Rejetée</div><br>' : '')
-      + (a && a.statut==='brouillon' ? '<span class="badge badge-bleu" style="font-size:10px;">📝 Brouillon</span> <button class="btn btn-secondary btn-sm" '+b+' title="Aperçu" onclick="attSoldeApercu('+q+')">👁</button> ' : '')
-      + '<button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeDemander('+q+')">'+(a && a.statut==='brouillon' ? '📤 Soumettre au DG' : '📜 Faire valider')+'</button>';
+      + (a && a.statut==='brouillon' ? '<span class="badge badge-bleu" style="font-size:10px;">📝 Brouillon</span> <button class="btn btn-secondary btn-sm" '+b+' title="Aperçu" onclick="attSoldeApercu('+q+k+')">👁</button> ' : '')
+      + '<button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeDemander('+q+k+')">'+(a && a.statut==='brouillon' ? '📤 Soumettre au DG' : '📜 Faire valider')+'</button>';
   }
-  if(a.statut==='en_attente') return '<span class="badge badge-or" style="font-size:10px;">⏳ En attente DG/gérant</span> <button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeApercu('+q+')">👁</button>';
+  if(a.statut==='en_attente') return '<span class="badge badge-or" style="font-size:10px;">⏳ En attente DG/gérant</span> <button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeApercu('+q+k+')">👁</button>';
   return '<span class="badge badge-vert" style="font-size:10px;">✅ Validée</span> '
-    + '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer l\'attestation SANS modification : version officielle, à remettre au notaire" onclick="attSoldeImprimer('+q+')">🖨 Sans modif.</button> '
-    + '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer avec les modifications demandées par le souscripteur : version à titre indicatif" onclick="attSoldeVarianteOuvrir('+q+')">✏️ Avec modif.</button> '
-    + '<button class="btn '+(a.publie_portail?'btn-primary':'btn-secondary')+' btn-sm" '+b+' title="'+(a.publie_portail?'Publiée au portail — cliquer pour retirer':'Publier au portail du souscripteur')+'" onclick="attSoldePublier('+q+','+(a.publie_portail?'false':'true')+')">🌐</button> '
-    + '<button class="btn btn-secondary btn-sm" '+b+' title="Envoyer par WhatsApp" onclick="attSoldeWhatsApp('+q+')">📲</button> '
-    + '<button class="btn btn-secondary btn-sm" '+b+' title="Annuler la validation (validée par erreur) : retour en brouillon, puis nouvelle soumission au DG" onclick="attSoldeAnnulerValidation('+q+')">↩ Annuler la validation</button>'
+    + '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer l\'attestation SANS modification : version officielle, à remettre au notaire" onclick="attSoldeImprimer('+q+k+')">🖨 Sans modif.</button> '
+    + (kind==='finale' ? '' : '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer avec les modifications demandées par le souscripteur : version à titre indicatif" onclick="attSoldeVarianteOuvrir('+q+')">✏️ Avec modif.</button> ')
+    + '<button class="btn '+(a.publie_portail?'btn-primary':'btn-secondary')+' btn-sm" '+b+' title="'+(a.publie_portail?'Publiée au portail — cliquer pour retirer':'Publier au portail du souscripteur')+'" onclick="attSoldePublier('+q+','+(a.publie_portail?'false':'true')+k+')">🌐</button> '
+    + '<button class="btn btn-secondary btn-sm" '+b+' title="Envoyer par WhatsApp" onclick="attSoldeWhatsApp('+q+k+')">📲</button> '
+    + '<button class="btn btn-secondary btn-sm" '+b+' title="Annuler la validation (validée par erreur) : retour en brouillon, puis nouvelle soumission au DG" onclick="attSoldeAnnulerValidation('+q+k+')">↩ Annuler la validation</button>'
     + (a.wa_envoye_le?'<div style="font-size:9px;color:var(--blanc-dim);">WhatsApp : '+escHtml(dateShort(a.wa_envoye_le))+'</div>':'');
 }
 
