@@ -367,6 +367,7 @@
         <button class="nav-dropdown-trigger" type="button" onclick="toggleEspaceMenu(this)"><i class="fas fa-user-lock"></i> MON ESPACE <i class="fas fa-chevron-down" style="font-size:.65rem;"></i></button>
         <div class="nav-dropdown-menu" id="espace-menu">
           <button class="tab-link" data-tab="souscripteur"><i class="fas fa-chart-line"></i> Souscripteur</button>
+          <button class="tab-link" data-tab="intervenant"><i class="fas fa-user-tie"></i> Intervenant</button>
           <button class="tab-link" data-tab="apporteurs"><i class="fas fa-handshake"></i> Apporteur d'affaires</button>
           <button class="tab-link" data-tab="diaspo"><i class="fas fa-globe-africa"></i> Investisseur diaspora</button>
           <button class="tab-link" data-tab="foncier"><i class="fas fa-map-marked-alt"></i> Acquéreur foncier</button>
@@ -731,6 +732,25 @@
       </div>
     </div>
     <div id="sous-dash" style="display:none;"></div>
+  </div>
+
+  <!-- ═══ ESPACE INTERVENANT (géomètre, notaire, prestataire — Foncier Connect) ═══ -->
+  <div id="intervenant-pane" class="tab-pane">
+    <h3><i class="fas fa-user-tie"></i> Espace Intervenant</h3>
+    <div id="int-login" style="max-width:420px; margin:20px auto; text-align:center;">
+      <div class="card">
+        <h4 style="margin-bottom:16px;">Connexion intervenant</h4>
+        <input type="text" id="intLogin" autocomplete="username" aria-label="E-mail ou téléphone" placeholder="E-mail ou téléphone"
+          style="width:100%; padding:12px; margin:8px 0; border-radius:30px; border:1px solid #cfdfed;">
+        <input type="password" id="intCode" maxlength="8" autocomplete="one-time-code" autocapitalize="characters" aria-label="Code d'accès" placeholder="Code d'accès (8 caractères)"
+          onkeydown="if(event.key==='Enter')loginIntervenant()"
+          style="width:100%; padding:12px; margin:8px 0; border-radius:30px; border:1px solid #cfdfed; text-align:center; letter-spacing:4px; text-transform:uppercase;">
+        <div id="intError" class="badge-danger"></div>
+        <button id="intBtn" class="highlight-btn" style="margin-top:8px; width:100%;" onclick="loginIntervenant()">Se connecter</button>
+        <p style="margin-top:14px; font-size:0.72rem; color:#4b6a8b; line-height:1.6;">Géomètres, notaires et prestataires mandatés : l'identifiant est l'e-mail ou le téléphone communiqué à votre interlocuteur, et le code vous a été remis par lui. En cas de perte ou d'expiration, demandez-en un nouveau.</p>
+      </div>
+    </div>
+    <div id="int-dash" style="display:none;"></div>
   </div>
 
   <!-- ═══ ESPACE APPORTEUR ═══ -->
@@ -1225,6 +1245,14 @@
         if(!STAFF.length) await chargerStaff();
         demanderPermissionNotification();
         await chargerSouscripteur();
+      } else if (saved.espace === 'interv') {
+        /* Aucune fiche à relire : tout passe par fc_vue_intervenant() avec le jeton ; il est refusé s'il a expiré. */
+        INT.id=saved.id; try{ INT.nom=sessionStorage.getItem('pp_int_nom')||''; }catch(e){}
+        if(typeof basculerVersOnglet==='function') basculerVersOnglet('intervenant');
+        document.getElementById('int-login').style.display='none';
+        document.getElementById('int-dash').style.display='block';
+        document.getElementById('int-dash').innerHTML='<div class="loader"><span class="spinner dark"></span> Reprise de votre session…</div>';
+        await chargerIntervenant();
       } else if (saved.espace === 'apporteur') {
         var rows=await sb('pi_apporteurs?select=id,data&id=eq.'+encodeURIComponent(saved.id)+'&limit=1');
         var app=unwrap(rows)[0]; if(!app) throw new Error('expired');
@@ -1324,6 +1352,140 @@
     }
   }
   document.addEventListener('DOMContentLoaded', function(){ _restaurerSessionPortail(); });
+
+  /* ═══ ESPACE INTERVENANT ═══
+     Aucune table lue directement : tout passe par des fonctions serveur qui identifient l'intervenant par son JETON
+     (fc_vue_intervenant, fc_intervenant_accepter, fc_intervenant_demarrer). Il ne voit que ses missions envoyées :
+     jamais d'observations internes, de responsable, de montants ni de souscripteurs. */
+  var INT = { id:null, nom:'', missions:[], ouverte:null, occupe:null, msg:null, erreur:'' };
+  var INT_STATUTS = { envoyee:'À accepter', acceptee:'Acceptée', en_cours:'En cours', attente_informations:"En attente d'informations", livrable_soumis:'Livrable soumis', en_verification:'En vérification', a_corriger:'À corriger', validee:'Validée', cloturee:'Clôturée' };
+  var INT_COULEUR = { envoyee:'p-or', acceptee:'p-bleu', en_cours:'p-bleu', attente_informations:'p-or', livrable_soumis:'p-bleu', en_verification:'p-bleu', a_corriger:'p-rouge', validee:'p-vert', cloturee:'p-gris' };
+  var INT_ACTIVES = ['envoyee','acceptee','en_cours','attente_informations','livrable_soumis','en_verification','a_corriger'];
+  var INT_RANG = { a_corriger:0, envoyee:1, acceptee:2, en_cours:3, attente_informations:4, livrable_soumis:5, en_verification:6, validee:7, cloturee:8 };
+  var INT_ETAPES = { a_preparer:'À préparer', a_venir:'À venir', en_cours:'En cours', attente_intervenant:"En attente d'un intervenant", attente_document:"En attente d'un document", attente_administration:"En attente d'une administration", attente_decision:"En attente d'une décision", bloque:'Bloqué', rejete:'Rejeté', termine:'Terminé', annule:'Annulé' };
+  var INT_VERSIONS = { soumis:['En attente de vérification','p-bleu'], valide:['Validée','p-vert'], refuse:['Refusée','p-rouge'] };
+  var INT_ACTIONS = { accepter:{ fn:'fc_intervenant_accepter', ok:'Mission acceptée. Vous pouvez la démarrer quand vous êtes prêt.', confirmer:"Accepter cette mission ? Cette acceptation ne remplace pas un contrat lorsqu'il est nécessaire." },
+                      demarrer:{ fn:'fc_intervenant_demarrer', ok:'Mission démarrée.', confirmer:'' } };
+
+  async function loginIntervenant(){
+    var ident=(document.getElementById('intLogin').value||'').trim();
+    var code=(document.getElementById('intCode').value||'').trim().toUpperCase();   /* les codes sont en majuscules */
+    var btn=document.getElementById('intBtn');
+    document.getElementById('intError').style.display='none';
+    if(!ident||!code){ setErr('intError','Veuillez remplir tous les champs.'); return; }
+    var bfKey='int_bf_'+ident.slice(-6)+'_'+Math.floor(Date.now()/(10*60000));
+    var att={}; try{ att=JSON.parse(localStorage.getItem('int_bf')||'{}'); }catch(e){}
+    if((att[bfKey]||0)>=5){ setErr('intError','Trop de tentatives. Réessayez dans 10 minutes.'); return; }
+    btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Connexion…';
+    try{
+      var lg=await portalLogin('intervenant', ident, code);
+      delete att[bfKey]; try{ localStorage.setItem('int_bf',JSON.stringify(att)); }catch(e){}
+      INT.id=lg.id; INT.nom=lg.nom||''; INT.ouverte=null; INT.msg=null;
+      _persisterEspacePortail('interv', lg.id);
+      try{ sessionStorage.setItem('pp_int_nom', INT.nom); }catch(e){}
+      document.getElementById('int-login').style.display='none';
+      document.getElementById('int-dash').style.display='block';
+      document.getElementById('int-dash').innerHTML='<div class="loader"><span class="spinner dark"></span> Chargement de vos missions…</div>';
+      logConnexion('[INTERVENANT] '+ident, true, 'Portail intervenant — '+INT.nom);
+      await chargerIntervenant();
+    }catch(e){
+      att[bfKey]=(att[bfKey]||0)+1; try{ localStorage.setItem('int_bf',JSON.stringify(att)); }catch(e2){}
+      var reste=5-(att[bfKey]||0);
+      logConnexion('[INTERVENANT] '+ident, false, 'Code incorrect ('+(att[bfKey]||0)+'e tentative)');
+      setErr('intError', (e&&e.message==='rate') ? 'Trop de tentatives. Réessayez dans quelques minutes.' : 'Identifiant ou code incorrect, ou accès expiré.'+(reste<=2?' ('+reste+' tentative(s) restante(s))':''));
+    }
+    btn.disabled=false; btn.innerHTML='Se connecter';
+  }
+  async function _intRpc(fn, body){
+    var r=await fetch(SB_URL+'/rest/v1/rpc/'+fn,{ method:'POST', headers:_authHdr(true), body:JSON.stringify(body||{}) });
+    if(r.status===401||r.status===403) throw new Error('session');
+    if(!r.ok) throw new Error('http');
+    return await r.json();
+  }
+  async function chargerIntervenant(){
+    try{
+      var v=await _intRpc('fc_vue_intervenant');
+      INT.missions=(v&&Array.isArray(v.missions))?v.missions:[]; INT.erreur='';
+    }catch(e){
+      if(e&&e.message==='session'){ logoutIntervenant(); setErr('intError','Session expirée : reconnectez-vous.'); return; }
+      INT.erreur='Chargement impossible pour le moment. Réessayez.';
+    }
+    rendreIntervenant();
+  }
+  async function intAction(action, missionId){
+    var a=INT_ACTIONS[action]; if(!a||INT.occupe) return;
+    if(a.confirmer && !confirm(a.confirmer)) return;
+    INT.occupe=missionId; INT.msg=null; rendreIntervenant();
+    try{
+      var res=await _intRpc(a.fn, { p_mission: String(missionId) });
+      INT.msg = res && res.ok ? { t:'ok', m:a.ok } : { t:'err', m:(res&&res.erreur)||'Action impossible.' };
+    }catch(e){
+      if(e&&e.message==='session'){ INT.occupe=null; logoutIntervenant(); setErr('intError','Session expirée : reconnectez-vous.'); return; }
+      INT.msg={ t:'err', m:'Action impossible pour le moment. Réessayez.' };
+    }
+    INT.occupe=null; INT.ouverte=missionId;
+    await chargerIntervenant();
+  }
+  function intOuvrir(id){ INT.ouverte=(INT.ouverte===id)?null:id; INT.msg=null; rendreIntervenant(); }
+  function logoutIntervenant(){
+    INT.id=null; INT.nom=''; INT.missions=[]; INT.ouverte=null; INT.occupe=null; INT.msg=null; INT.erreur='';
+    _clearToken(); try{ sessionStorage.removeItem('pp_int_nom'); }catch(e){}
+    document.getElementById('int-dash').style.display='none'; document.getElementById('int-dash').innerHTML='';
+    document.getElementById('int-login').style.display='block'; document.getElementById('intCode').value='';
+  }
+  function _intEnRetard(m){ return INT_ACTIVES.indexOf(m.statut)!==-1 && m.echeance && String(m.echeance).slice(0,10) < new Date().toISOString().slice(0,10); }
+  function _intActions(m){
+    var ouvert=INT.occupe===m.id, id=esc(m.id), h='';
+    var btn=function(act,lib,coul){ return '<button class="highlight-btn" style="margin-top:8px;'+(coul?'background:'+coul+';':'')+'" '+(INT.occupe?'disabled':'')+' data-id="'+id+'" onclick="intAction(\''+act+'\',this.dataset.id)">'+(ouvert?'<span class="spinner"></span> …':lib)+'</button>'; };
+    var info=function(t){ return '<p style="font-size:.85rem;color:#1e4663;margin-top:6px;">'+t+'</p>'; };
+    if(m.statut==='envoyee') h=info('Cette mission vous est confiée. Acceptez-la pour commencer.')+btn('accepter','✅ Accepter la mission','#16a34a')
+        +'<p style="font-size:.72rem;color:#6b7f95;margin-top:6px;">L\'acceptation ne remplace pas un contrat lorsqu\'il est nécessaire.</p>';
+    else if(m.statut==='acceptee') h=info('Mission acceptée. Indiquez le démarrage du travail.')+btn('demarrer','▶ Démarrer la mission');
+    else if(m.statut==='en_cours'||m.statut==='attente_informations') h=info('Mission en cours. Le dépôt en ligne des livrables arrive prochainement : en attendant, transmettez-les à votre interlocuteur habituel.');
+    else if(m.statut==='a_corriger') h=info('<strong style="color:#991b1b;">Un livrable a été refusé.</strong> Corrigez les éléments indiqués ci-dessous puis transmettez la nouvelle version à votre interlocuteur.');
+    else if(m.statut==='livrable_soumis'||m.statut==='en_verification') h=info('Votre livrable est en cours de vérification par le promoteur.');
+    else if(m.statut==='validee'||m.statut==='cloturee') h=info('Mission validée. Merci pour votre travail.');
+    return h;
+  }
+  function _intDetail(m){
+    var h='<div style="margin-top:12px;border-top:1px solid #eef2f8;padding-top:12px;">';
+    if(m.description) h+='<p style="font-size:.88rem;white-space:pre-wrap;">'+esc(m.description)+'</p>';
+    h+=_intActions(m);
+    var et=m.etapes||[];
+    if(et.length) h+='<div style="margin-top:14px;"><strong style="font-size:.85rem;">Étapes concernées</strong>'+et.map(function(e){ return '<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #eef2f8;font-size:.84rem;"><span>'+esc(e.libelle||e.code)+(e.date_cible?' <span style="color:#6b7f95;">(cible '+esc(dshort(e.date_cible))+')</span>':'')+'</span><span class="pill p-gris">'+esc(INT_ETAPES[e.statut]||e.statut||'')+'</span></div>'; }).join('')+'</div>';
+    h+='<div style="margin-top:14px;"><strong style="font-size:.85rem;">Livrables attendus</strong>'+(m.livrables||[]).map(function(l){
+      var vs=l.versions||[];
+      return '<div style="padding:8px 0;border-bottom:1px solid #eef2f8;"><div style="font-size:.88rem;font-weight:600;">'+esc(l.libelle)+'</div>'
+        +(vs.length?vs.map(function(v){ var st=INT_VERSIONS[v.statut]||[v.statut||'','p-gris'];
+            return '<div style="font-size:.8rem;margin-top:4px;">Version '+esc(v.numero)+' · '+esc(dshort(v.date))+' <span class="pill '+st[1]+'">'+esc(st[0])+'</span>'
+              +(v.refus?'<div style="background:#fee2e2;color:#7f1d1d;border-radius:10px;padding:8px 10px;margin-top:4px;"><strong>À corriger :</strong> '+esc(v.refus.elements||'')+'<br><span style="font-size:.74rem;">Motif : '+esc(v.refus.motif||'—')+(v.refus.delai?' · avant le '+esc(dshort(v.refus.delai)):'')+'</span></div>':'')+'</div>'; }).join('')
+          :'<div style="font-size:.78rem;color:#6b7f95;margin-top:2px;">Aucune version déposée.</div>')+'</div>';
+    }).join('')+'</div></div>';
+    return h;
+  }
+  function rendreIntervenant(){
+    var ms=INT.missions.slice().sort(function(a,b){ var d=(INT_RANG[a.statut]!=null?INT_RANG[a.statut]:9)-(INT_RANG[b.statut]!=null?INT_RANG[b.statut]:9); return d||String(a.echeance||'').localeCompare(String(b.echeance||'')); });
+    var n=function(f){ return ms.filter(f).length; };
+    var h='<div class="stat-card"><h4>👷 Bienvenue'+(INT.nom?' '+esc(INT.nom):'')+'</h4><p style="font-size:.85rem;color:#4b6a8b;">Vos missions foncières confiées par le promoteur.</p>'
+      +'<button class="highlight-btn" style="margin-top:10px;margin-right:8px;background:#4b6a8b;" onclick="chargerIntervenant()">Actualiser</button>'
+      +'<button class="highlight-btn" style="margin-top:10px;background:#991b1b;" onclick="logoutIntervenant()">Déconnexion</button></div>';
+    /* Bandeau global : une mission peut disparaître de la liste entre-temps (annulée par le promoteur) ; l'erreur doit rester visible. */
+    if(INT.msg) h+='<div role="'+(INT.msg.t==='ok'?'status':'alert')+'" style="'+(INT.msg.t==='ok'?'background:#dcfce7;color:#166534;':'background:#fee2e2;color:#991b1b;')+'padding:10px 14px;border-radius:14px;margin:12px 0;font-size:.88rem;">'+esc(INT.msg.m)+'</div>';
+    h+='<div class="kpi-row">'+kpiBox('À accepter',n(function(m){return m.statut==='envoyee';}),'')+kpiBox('En cours',n(function(m){return ['acceptee','en_cours','attente_informations'].indexOf(m.statut)!==-1;}),'')
+      +kpiBox('À corriger',n(function(m){return m.statut==='a_corriger';}),'color:#991b1b;')+kpiBox('En retard',n(_intEnRetard),'color:#991b1b;')+'</div>';
+    if(INT.erreur) h+='<div class="badge-danger" style="display:block;">'+esc(INT.erreur)+'</div>';
+    if(!ms.length&&!INT.erreur) h+='<div class="card"><p style="color:#4b6a8b;">Aucune mission pour le moment. Si vous en attendez une, contactez votre interlocuteur.</p></div>';
+    h+=ms.map(function(m){
+      var ouvert=INT.ouverte===m.id, retard=_intEnRetard(m), d=m.dossier||{};
+      return '<div class="card"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start;">'
+        +'<div><strong>'+esc(m.reference)+'</strong> — '+esc(m.titre)+'<div style="font-size:.78rem;color:#6b7f95;margin-top:2px;">Dossier '+esc(d.reference||'—')+(d.parcelle?' · '+esc(d.parcelle):'')+'</div></div>'
+        +'<span class="pill '+(INT_COULEUR[m.statut]||'p-gris')+'">'+esc(INT_STATUTS[m.statut]||m.statut)+'</span></div>'
+        +'<div style="font-size:.82rem;margin-top:8px;">Échéance : <strong>'+esc(dshort(m.echeance))+'</strong>'+(retard?' <span class="pill p-rouge">En retard</span>':'')+'</div>'
+        +'<button class="highlight-btn" style="margin-top:8px;padding:8px 16px;background:#4b6a8b;" data-id="'+esc(m.id)+'" onclick="intOuvrir(this.dataset.id)">'+(ouvert?'Fermer':'Ouvrir')+'</button>'
+        +(ouvert?_intDetail(m):'')+'</div>';
+    }).join('');
+    document.getElementById('int-dash').innerHTML=h;
+  }
 
   function fmt(n){ return Math.round(n||0).toLocaleString('fr-FR'); }
   function dshort(d){ if(!d) return '—'; return String(d).slice(0,10).split('-').reverse().join('/'); }
