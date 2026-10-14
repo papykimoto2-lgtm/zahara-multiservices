@@ -1454,7 +1454,7 @@
     if(!STAFF.length) STAFF.push({ id:'admin', nom:'Administration '+_brandNom(), poste:'Support', type:'admin' });
   }
 
-  var S = { client:null, versements:[], programmes:[], lots:[], rapports:[], conventions:[], messages:[], interlocuteur:null };
+  var S = { client:null, versements:[], programmes:[], lots:[], rapports:[], conventions:[], messages:[], interlocuteur:null, suivi:null };
 
   async function loginSouscripteur(){
     var ident=(document.getElementById('sousLogin').value||'').trim();
@@ -1508,9 +1508,54 @@
       S.versements=unwrap(r[0]); S.programmes=unwrap(r[1]); S.lots=unwrap(r[2]); S.rapports=unwrap(r[3]); S.conventions=unwrap(r[4]); S.dossiers=unwrap(r[5]); S.dossier=(S.dossiers||[]).filter(function(d){return d&&d.publie_portail;}).sort(function(a,b){return (b.created_at||'').localeCompare(a.created_at||'');})[0]||(S.dossiers||[])[0]||null;
       S.messages=await pmsgFetch('souscripteur', S.client.id);
     }catch(e){ S.versements=S.versements||[]; }
+    S.suivi=await chargerSuiviTitre();
     rendreSouscripteur();
     /* Badge messages non lus */
     setTimeout(function(){ mettreAJourBadge('s', compterNonLus(S.messages)); }, 100);
+  }
+
+  /* Suivi du titre foncier : fonction serveur fc_vue_souscripteur() (SECURITY DEFINER).
+     Aucun paramètre : le souscripteur est identifié par son jeton, il ne peut pas
+     demander le dossier d'un autre. Elle ne renvoie QUE la vue publique (étapes
+     « souscripteur », publications non retirées) — jamais d'observations internes.
+     Échec (fonction absente, réseau) : l'onglet reste simplement masqué. */
+  async function chargerSuiviTitre(){
+    try{
+      var r=await fetch(SB_URL+'/rest/v1/rpc/fc_vue_souscripteur',{ method:'POST', headers:_authHdr(true), body:'{}' });
+      if(!r.ok) return null;
+      var v=await r.json();
+      return (v && Array.isArray(v.dossiers) && (v.dossiers.length || (v.demandes||[]).length)) ? v : null;
+    }catch(e){ return null; }
+  }
+  function blocSuiviTitre(){
+    var v=S.suivi; if(!v) return '';
+    var h='<div class="card"><strong style="font-size:1rem;">📜 Suivi de mon titre foncier</strong>'
+      +'<p style="font-size:.8rem;color:#4b6a8b;margin-top:6px;">Informations transmises par votre promoteur sur l\'avancement des démarches. Elles ne constituent ni une garantie ni une décision de l\'administration.</p></div>';
+    (v.dossiers||[]).forEach(function(d){
+      var p=d.progression||{}, pct=Math.max(0,Math.min(100,parseInt(p.pourcentage,10)||0));
+      h+='<div class="card"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;"><strong>'+esc(d.libelle_niveau||'Dossier foncier')+'</strong><span class="pill p-bleu">'+esc(d.statut||'')+'</span></div>'
+        +'<div style="font-size:.82rem;color:#4b6a8b;margin:6px 0;">Dossier <strong>'+esc(d.reference||'')+'</strong>'+(d.programme?(' · '+esc(d.programme)):'')+(d.parcelle?(' · Parcelle : '+esc(d.parcelle)):'')+'</div>'
+        +'<div class="prog"><div style="width:'+pct+'%;"></div></div>'
+        +'<div style="font-size:.8rem;margin-top:4px;"><strong>'+pct+' %</strong> des démarches suivies sont terminées'+(d.derniere_mise_a_jour?(' · mis à jour le '+esc(dshort(d.derniere_mise_a_jour))):'')+'</div>';
+      var ph=p.par_phase||{};
+      var lignes=Object.keys(ph).sort().map(function(k){ var x=ph[k]||{}; return '<li>'+esc(x.libelle||k)+' : '+(parseInt(x.terminees,10)||0)+' / '+(parseInt(x.etapes,10)||0)+' étape(s)</li>'; }).join('');
+      if(lignes) h+='<ul style="font-size:.8rem;margin:8px 0 0 18px;color:#1e4663;">'+lignes+'</ul>';
+      if(p.explication) h+='<div style="font-size:.72rem;color:#6b7f95;margin-top:8px;">'+esc(p.explication)+'</div>';
+      if(d.prochaine_etape) h+='<div class="card" style="background:#eef3fc;border-color:#cfe0f5;margin-top:10px;"><strong>Prochaine étape</strong><div style="font-size:.85rem;">'+esc(d.prochaine_etape.libelle||'')+(d.prochaine_etape.date_indicative?(' <span style="color:#4b6a8b;">(date indicative : '+esc(dshort(d.prochaine_etape.date_indicative))+')</span>'):'')+'</div></div>';
+      var hist=d.historique||[];
+      h+='<div style="margin-top:12px;"><strong style="font-size:.85rem;">Historique des informations</strong>'
+        +(hist.length?hist.map(function(x){ return '<div style="padding:8px 0;border-bottom:1px solid #eef2f8;"><div style="font-size:.74rem;color:#4b6a8b;">'+esc(dshort(x.date))+'</div><strong style="font-size:.88rem;">'+esc(x.titre||'')+'</strong>'+(x.description?('<div style="font-size:.82rem;">'+esc(x.description)+'</div>'):'')+'<div style="font-size:.72rem;color:#6b7f95;">Source : '+esc(x.source||'')+(x.reference_source?(' — réf. '+esc(x.reference_source)):'')+'</div></div>'; }).join(''):'<p style="font-size:.82rem;color:#4b6a8b;margin-top:6px;">Aucune information publiée pour le moment.</p>')
+        +'</div></div>';
+    });
+    var dm=v.demandes||[];
+    if(dm.length){
+      h+='<div class="card"><strong>Mes demandes d\'information</strong>'+dm.map(function(x){
+        return '<div style="padding:8px 0;border-bottom:1px solid #eef2f8;"><div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;"><strong style="font-size:.85rem;">'+esc(x.reference||'')+' — '+esc(x.sujet||'')+'</strong><span class="pill p-gris">'+esc(x.statut||'')+'</span></div>'
+          +'<div style="font-size:.74rem;color:#4b6a8b;">'+esc(dshort(x.date))+'</div>'
+          +(x.messages||[]).map(function(m){ return '<div style="font-size:.82rem;margin-top:4px;"><em>'+esc(m.de||'')+' ('+esc(dshort(m.date))+')</em> : '+esc(m.texte||'')+'</div>'; }).join('')+'</div>';
+      }).join('')+'</div>';
+    }
+    return h;
   }
 
   function sProgNom(){ var p=S.programmes.find(function(x){return x.id===S.client.programme_id;}); return (p&&(p.nom||p.libelle))||S.client.programme||'—'; }
@@ -1540,6 +1585,7 @@
       +'<button onclick="sSub(this,\'ver\')">Versements</button>'
       +'<button onclick="sSub(this,\'tra\')">Travaux</button>'
       +'<button onclick="sSub(this,\'rec\')">🔑 Réception</button>'
+      +(S.suivi?'<button onclick="sSub(this,\'tit\')">📜 Suivi du titre</button>':'')
       +'<button onclick="sSub(this,\'doc\')">Documents</button>'
       +'<button onclick="sSub(this,\'msg\')",id="s-msg-badge-btn">💬 Messagerie</button></div>';
     var prog=S.programmes.find(function(x){return x.id===c.programme_id;})||{};
@@ -1551,6 +1597,7 @@
     html+='<div class="sub" id="s-ver"><div class="card"><strong>💳 Historique des versements</strong><div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Mode</th></tr></thead><tbody>'+tableVers(vs)+'</tbody></table></div></div></div>';
     html+='<div class="sub" id="s-tra">'+blocTravaux()+'</div>';
     html+='<div class="sub" id="s-rec">'+blocReception()+'</div>';
+    if(S.suivi) html+='<div class="sub" id="s-tit">'+blocSuiviTitre()+'</div>';
     html+='<div class="sub" id="s-doc"><div class="card"><strong>📁 Mes documents</strong><div style="display:flex; flex-direction:column; gap:12px; margin-top:12px; max-width:340px;"><button class="highlight-btn" style="background:#0077b6;" onclick="docEcheancier()">📅 Échéancier personnalisé</button><button class="highlight-btn" style="background:#0077b6;" onclick="docAttestation()">📑 Attestation de versements</button>'+sAttSoldeBtn()+'</div></div></div>';
     html+='<div class="sub" id="s-msg"><div class="card">'
       +'<strong style="font-size:1rem;">💬 Messagerie</strong>'
@@ -1674,7 +1721,7 @@
     return blocMaison+'<div class="card"><strong>🚧 Photos générales du chantier</strong><div class="photo-grid">'+ph+'</div></div><div class="card"><strong>📋 Rapports d\'avancement</strong><div style="margin-top:10px;">'+rp+'</div></div>';
   }
   function _clearToken(){ SB_TOKEN=null; _effacerSessionPortail(); }
-  function logoutSouscripteur(){ S.client=null; _clearToken(); document.getElementById('sous-dash').style.display='none'; document.getElementById('sous-login').style.display='block'; document.getElementById('sousCode').value=''; }
+  function logoutSouscripteur(){ S.client=null; S.suivi=null; _clearToken(); document.getElementById('sous-dash').style.display='none'; document.getElementById('sous-login').style.display='block'; document.getElementById('sousCode').value=''; }
   function docEcheancier(){
     var c=S.client, total=parseFloat(c.montant_total)||0, apport=parseFloat(c.apport)||0, duree=parseInt(c.duree)||0, mens=duree?Math.ceil((total-apport)/duree):0, debut=new Date(c.date_debut||Date.now()), rows='';
     for(var i=0;i<duree;i++){ var ech=new Date(debut.getFullYear(),debut.getMonth()+i,1); rows+='<tr><td>'+(i+1)+'</td><td>'+ech.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})+'</td><td>'+fmt(mens)+' FCFA</td></tr>'; }
