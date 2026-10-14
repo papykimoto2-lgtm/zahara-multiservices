@@ -77,6 +77,7 @@ function preparer() {
   window._caisseAjouterRegle = async function () {};
   window.requireCompteDefaut = function (k) { return k === 'ecart_caisse_manquant' ? '658' : '758'; };
   DATA.params = DATA.params || {};
+  DATA.params.fc_dependances = false;   /* Foncier : ordre des étapes libre par défaut dans les tests historiques ; foncier-modeles-journee.test.js l'active */
   DATA.params.comptes_defaut = { virement_interne: '585' };
   DATA.params.caisse_ventilation_map = { 'virement interne caisse': '585' };
   DATA.caisses = [{ id: 'c1', nom: 'CAISSE TEST', compte: '571' }];
