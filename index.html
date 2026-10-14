@@ -112828,6 +112828,17 @@ function docPiedDePageEntreprise(p){
   var lignes = [l1, ids.join(' – '), l3].filter(Boolean);
   return lignes.length ? '<div class="pied">'+lignes.map(function(l){ return '<div>'+l+'</div>'; }).join('')+'</div>' : '';
 }
+/* Mise en page du pied de page d'entreprise des attestations (une page A4, pied collé en bas à l'impression). */
+var ATT_PIED_CSS = '.pied{margin-top:30px;border-top:1px solid #000;padding-top:6px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#222;line-height:1.5;}@page{size:A4;margin:12mm 16mm;}@media print{body{padding:0 0 22mm;max-width:none;font-size:11.5px;line-height:1.38;min-height:270mm;box-sizing:border-box;position:relative;}h1{font-size:18px;margin:8px 0 2px;}h3{margin:8px 0 3px;break-after:avoid;}.art{margin:3px 0;}table{margin:4px 0 6px;}td,th{padding:3px 8px;}.mont{margin:6px 0;padding:6px;font-size:14px;}.sig{page-break-inside:avoid;margin-top:16px;}.pied{position:absolute;left:0;right:0;bottom:0;margin:0;}}';
+/* Une attestation déjà validée est figée (a.html) : elle peut avoir été émise avant l'ajout du pied de page.
+   À l'affichage et à l'impression, on lui ajoute le pied de page d'entreprise SANS modifier le texte validé
+   ni le document enregistré. Rien n'est ajouté si les paramètres de l'entreprise sont vides ou si le pied existe déjà. */
+function attSoldeHtmlFinal(a){
+  var h = (a && a.html) || '';
+  if (!h || h.indexOf('class="pied"') !== -1) return h;
+  var pied = docPiedDePageEntreprise(); if (!pied) return h;
+  return h.replace('</head>', '<style>'+ATT_PIED_CSS+'</style></head>').replace('</body>', pied+'</body>');
+}
 function attSoldeHtml(c, opts){
   opts = opts || {};
   var ov = opts.overrides || {};
@@ -112852,8 +112863,7 @@ function attSoldeHtml(c, opts){
     + '.mont{border:2px solid #1D3F7A;text-align:center;padding:10px;margin:10px 0;font-size:15px;font-weight:bold;color:#1D3F7A;}'
     + '.sig{display:flex;justify-content:space-between;margin-top:34px;}.sig div{width:46%;text-align:center;font-size:12px;}'
     + '.projet{position:fixed;top:40%;left:8%;font-size:64px;color:rgba(200,0,0,.13);transform:rotate(-24deg);font-weight:bold;pointer-events:none;}'
-    + '.pied{margin-top:30px;border-top:1px solid #000;padding-top:6px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#222;line-height:1.5;}'
-    + '@page{size:A4;margin:12mm 16mm;}@media print{body{padding:0 0 22mm;max-width:none;font-size:11.5px;line-height:1.38;min-height:270mm;box-sizing:border-box;position:relative;}h1{font-size:18px;margin:8px 0 2px;}h3{margin:8px 0 3px;break-after:avoid;}.art{margin:3px 0;}table{margin:4px 0 6px;}td,th{padding:3px 8px;}.mont{margin:6px 0;padding:6px;font-size:14px;}.sig{page-break-inside:avoid;margin-top:16px;}.pied{position:absolute;left:0;right:0;bottom:0;margin:0;}}</style></head><body>'
+    + ATT_PIED_CSS + '</style></head><body>'
     + (opts.projet ? '<div class="projet">PROJET — NON VALIDÉ</div>' : '')
     + (opts.indicatif ? '<div class="projet">À TITRE INDICATIF</div>' : '')
     + '<div class="ref"><div><strong style="font-size:15px;">'+E(p.societe||'')+'</strong></div><div style="text-align:right;">N° <strong>'+E(opts.numero||'—')+'</strong><br>Dossier : '+E(c.dossier||c.id)+'</div></div>'
@@ -113042,14 +113052,14 @@ async function attSoldeDemander(clientId){
 function attSoldeApercu(clientId){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
   var a = c.attestation_solde || {};
-  var html = (a.statut==='valide' && a.html) ? a.html : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(), date:today(), projet:true});
+  var html = (a.statut==='valide' && a.html) ? attSoldeHtmlFinal(a) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(), date:today(), projet:true});
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
   w.document.write(html); w.document.close();
 }
 function attSoldeImprimer(clientId){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c || !c.attestation_solde || c.attestation_solde.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
-  w.document.write(c.attestation_solde.html); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400);
+  w.document.write(attSoldeHtmlFinal(c.attestation_solde)); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400);
 }
 function attSoldePublier(clientId, on){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c || !c.attestation_solde || c.attestation_solde.statut!=='valide') return;
