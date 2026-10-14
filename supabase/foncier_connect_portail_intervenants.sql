@@ -1,5 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- Foncier Connect — portail intervenants (P1) : fonction fc_vue_intervenant()
+-- Foncier Connect — portail intervenants (P1-P2) : fc_vue_intervenant(),
+-- fc_intervenant_accepter(), fc_intervenant_demarrer()
 -- À exécuter sur le projet Supabase de Zahara ET sur celui de Menco, après
 -- foncier_connect.sql. Idempotent.
 --
@@ -19,12 +20,25 @@
 -- Le jeton dure 2 h, mais l'accès est revérifié À CHAQUE APPEL : relation
 -- archivée, fiche supprimée, code retiré ou expiré => résultat vide aussitôt.
 --
+-- Actions (P2) : l'intervenant accepte puis démarre SA mission. Chaque action :
+--   · vérifie que la mission lui appartient (sinon « Mission introuvable ») ;
+--   · applique la table de transitions de l'ERP (envoyée → acceptée → en cours) ;
+--   · modifie la ligne par fusion de champs précis (statut, acceptation,
+--     _modifie), JAMAIS un remplacement complet, et par comparaison atomique
+--     du statut attendu : un double clic ou une modification simultanée par
+--     le personnel ne passe pas deux fois ;
+--   · écrit l'événement au journal (source « prestataire »), au format de
+--     l'ERP : le responsable est notifié comme pour une action saisie dans l'ERP.
+--
 -- NB Dashboard Supabase : « select … into variable » y est pris pour une
 -- création de table. La fonction utilise donc des affectations
 -- « v := (select …) ». Coller le fichier ENTIER (jusqu'à « grant execute »).
 -- ═══════════════════════════════════════════════════════════════════════════
 
-create or replace function public.fc_vue_intervenant()
+-- ── Contrôle d'accès commun ────────────────────────────────────────────────
+-- Renvoie {id, nom} si le jeton est celui d'un intervenant dont l'accès est
+-- toujours valable ; NULL sinon. Interne : non appelable par les utilisateurs.
+create or replace function public.fc__intervenant_courant()
 returns jsonb
 language plpgsql
 stable
@@ -32,13 +46,12 @@ security definer
 set search_path = ''
 as $fn$
 declare
-  v_id       text := auth.jwt() ->> 'intervenant_id';
-  v_i        jsonb;
-  v_exp      timestamptz;
-  v_missions jsonb;
+  v_id  text := auth.jwt() ->> 'intervenant_id';
+  v_i   jsonb;
+  v_exp timestamptz;
 begin
   if coalesce(auth.jwt() ->> 'kind', '') <> 'intervenant' or coalesce(v_id, '') = '' then
-    return jsonb_build_object('intervenant_id', v_id, 'missions', '[]'::jsonb);
+    return null;
   end if;
 
   v_i := (select data from public.pi_intervenants_fonciers where id = v_id);
@@ -49,7 +62,7 @@ begin
     v_exp := null;   -- date illisible : même comportement que portal-login (jamais « expiré »)
   end;
 
-  -- Accès toujours valable ? relation active, fiche non supprimée, code présent et non expiré.
+  -- Relation active, fiche non supprimée, code présent et non expiré.
   if v_i is null
      or coalesce(v_i ->> 'statut_relation', '') <> 'actif'
      or coalesce(v_i ->> '_deleted', '') = 'true'
@@ -57,6 +70,28 @@ begin
      or (v_exp is not null and v_exp < now())
      or exists (select 1 from public.pi_suppressions s where s.id = 'ts::intervenants_fonciers::' || v_id)
   then
+    return null;
+  end if;
+
+  return jsonb_build_object('id', v_id, 'nom', coalesce(v_i ->> 'nom_organisation', v_id));
+end
+$fn$;
+
+revoke all on function public.fc__intervenant_courant() from public, anon, authenticated;
+
+-- ── Lecture : ses missions ─────────────────────────────────────────────────
+create or replace function public.fc_vue_intervenant()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $fn$
+declare
+  v_id       text := auth.jwt() ->> 'intervenant_id';
+  v_missions jsonb;
+begin
+  if public.fc__intervenant_courant() is null then
     return jsonb_build_object('intervenant_id', v_id, 'missions', '[]'::jsonb);
   end if;
 
@@ -111,6 +146,95 @@ begin
   return jsonb_build_object('intervenant_id', v_id, 'missions', v_missions);
 end
 $fn$;
+
+-- ── Actions : accepter, démarrer ───────────────────────────────────────────
+-- Cœur commun. p_de = statut attendu, p_vers = nouveau statut.
+create or replace function public.fc__intervenant_changer_statut(p_mission text, p_de text, p_vers text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $fn$
+declare
+  v_c     jsonb := public.fc__intervenant_courant();
+  v_m     jsonb;
+  v_n     int;
+  v_now   timestamptz := now();
+  v_iso   text := to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+  v_lib   jsonb := '{"envoyee":"Envoyée","acceptee":"Acceptée","en_cours":"En cours","attente_informations":"En attente d''informations","livrable_soumis":"Livrable soumis","en_verification":"En vérification","a_corriger":"À corriger","validee":"Validée","cloturee":"Clôturée"}';
+  v_set   jsonb;
+  v_eid   text := replace(gen_random_uuid()::text, '-', '');
+begin
+  if v_c is null then
+    return jsonb_build_object('ok', false, 'erreur', 'Accès au portail non valide : reconnectez-vous.');
+  end if;
+  if p_mission is null or length(p_mission) > 64 then
+    return jsonb_build_object('ok', false, 'erreur', 'Mission introuvable.');
+  end if;
+
+  v_m := (select data from public.pi_missions_foncieres
+          where id = p_mission and data ->> 'intervenant_id' = v_c ->> 'id');
+  if v_m is null
+     or coalesce(v_m ->> 'statut', '') in ('brouillon', 'annulee')
+     or not exists (select 1 from public.pi_dossiers_fonciers d where d.id = v_m ->> 'dossier_id')
+  then
+    return jsonb_build_object('ok', false, 'erreur', 'Mission introuvable.');
+  end if;
+
+  if v_m ->> 'statut' <> p_de then
+    return jsonb_build_object('ok', false, 'erreur',
+      'Passage impossible : ' || coalesce(v_lib ->> (v_m ->> 'statut'), v_m ->> 'statut') || ' → ' || (v_lib ->> p_vers) || '.');
+  end if;
+
+  v_set := jsonb_build_object('statut', p_vers, '_modifie', v_iso);
+  if p_vers = 'acceptee' then
+    v_set := v_set || jsonb_build_object('acceptation', jsonb_build_object(
+      'reference', 'Portail intervenants',
+      'date', to_char(v_now at time zone 'UTC', 'YYYY-MM-DD'),
+      'enregistre_par', v_c ->> 'nom'));
+  end if;
+
+  -- Comparaison atomique du statut attendu : une seule des deux requêtes simultanées aboutit.
+  update public.pi_missions_foncieres
+     set data = data || v_set, updated_at = v_now
+   where id = p_mission
+     and data ->> 'intervenant_id' = v_c ->> 'id'
+     and data ->> 'statut' = p_de;
+  get diagnostics v_n = row_count;
+  if v_n = 0 then
+    return jsonb_build_object('ok', false, 'erreur', 'La mission vient d''être modifiée : actualisez la page.');
+  end if;
+
+  -- Journal (ajout seul), même format que fcEvenement() de l'ERP.
+  insert into public.pi_evenements_fonciers(id, data, updated_at)
+  values (
+    v_eid,
+    jsonb_build_object(
+      'id', v_eid, 'dossier_id', v_m ->> 'dossier_id', 'etape_code', coalesce(v_m ->> 'etape_code', ''),
+      'type', 'mission_statut',
+      'description', (v_m ->> 'reference') || ' : ' || (v_lib ->> p_de) || ' → ' || (v_lib ->> p_vers),
+      'ancien', p_de, 'nouveau', p_vers, 'source', 'prestataire',
+      'source_ref', case when p_vers = 'acceptee' then 'Portail intervenants' else '' end,
+      'motif', '', 'acteur', v_c ->> 'nom', 'acteur_id', v_c ->> 'id', 'acteur_role', 'intervenant',
+      'date', v_iso, 'mission_id', p_mission),
+    v_now);
+  return jsonb_build_object('ok', true, 'statut', p_vers);
+end
+$fn$;
+
+create or replace function public.fc_intervenant_accepter(p_mission text)
+returns jsonb language sql security definer set search_path = ''
+as $fn$ select public.fc__intervenant_changer_statut(p_mission, 'envoyee', 'acceptee') $fn$;
+
+create or replace function public.fc_intervenant_demarrer(p_mission text)
+returns jsonb language sql security definer set search_path = ''
+as $fn$ select public.fc__intervenant_changer_statut(p_mission, 'acceptee', 'en_cours') $fn$;
+
+revoke all on function public.fc__intervenant_changer_statut(text, text, text) from public, anon, authenticated;
+revoke all on function public.fc_intervenant_accepter(text) from public, anon;
+revoke all on function public.fc_intervenant_demarrer(text) from public, anon;
+grant execute on function public.fc_intervenant_accepter(text) to authenticated;
+grant execute on function public.fc_intervenant_demarrer(text) to authenticated;
 
 -- Réservée aux utilisateurs connectés ; sans jeton « intervenant » le résultat est vide.
 revoke all on function public.fc_vue_intervenant() from public, anon;
