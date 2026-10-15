@@ -232,3 +232,23 @@ Limites connues : le suivi horodaté n'existe que pour les changements de statut
 - Actions : 🖨 imprimer / PDF (en-tête de la société, référence, destinataire, pied de page légal), 📋 copier, 📨 envoyer par e-mail (file de notifications existante, dédupliquée par référence). Chaque action est journalisée (événement `courrier`, référence **COU-AAAA-NNNN** identique pour un même courrier).
 - Direction / administrateurs : Foncier › Modèles de dossier › « 📝 Modèles de courrier » modifie objet et texte de chaque modèle (champs {{...}} vérifiés), avec rétablissement du texte d'origine. Stockage `DATA.params.fc_gabarits_courrier`.
 - Aucune migration SQL. Tests : `foncier-courriers.test.js` (5).
+
+## PG1 — Listes volumineuses : pagination, recherche, historique progressif
+
+- **Liste des dossiers** : 25 lignes par page (navigation « « ‹ Précédent · Suivant › » »), recherche multicritère insensible à la casse et aux accents (référence, parcelle, procédure, statut, responsable, souscripteur, lot, IDUFCI, n° de dossier, étape courante ; tous les mots doivent correspondre), filtres statut / responsable / « risque élevé ou critique », compteur « N sur M », bouton « Effacer ». La saisie de recherche est temporisée (250 ms) et ne redessine que le tableau.
+- **Historique d'un dossier** : 30 événements affichés, bouton « Afficher 30 événements de plus (N restants) ».
+- **Notifications** (25 par page, au lieu de 200 d'un bloc) et **missions** (15 par page) paginées.
+- Mesure : 2 000 dossiers → 25 lignes dessinées, rendu, filtre et recherche en moins de 2 s (testé). « Imprimer la liste » reste complète.
+- Aucune migration SQL. Tests : `foncier-pagination.test.js` (5).
+
+## FIN1 — Finitions : actions groupées, archivage, Kanban, calendrier + ICS, budget du titre, décharge de remise, recherche globale
+
+- **Actions groupées** (liste des dossiers) : cases à cocher (par ligne ou toute la page), barre « N dossier(s) sélectionné(s) » : réaffecter le responsable, appliquer une priorité, fixer une échéance, archiver. Chaque dossier applique sa propre règle (`fcModifierDossier`) : les refus (dossier clos, droits, responsable inconnu) sont rapportés dossier par dossier, sans bloquer les autres.
+- **Archivage** : dossier clôturé ou annulé → « Archiver » (journalisé, réversible). Masqué de la liste sauf case « Inclure les archivés » ; bouton « Archiver les dossiers clos depuis plus de N mois » (24 par défaut, réglable). Exclu du Kanban ; les indicateurs de délais conservent l'historique.
+- **🗂 Kanban** : étape courante de chaque dossier par statut (À préparer/à venir, En cours, Attente intervenant/document/administration/décision, Bloqué), score de risque en couleur, filtre responsable. Glisser-déposer ou « Déplacer vers… » (tactile) : mêmes règles que dans le dossier (ordre des étapes, justificatif, motif, dérogations).
+- **📅 Calendrier** : échéances du mois (étapes, échéance du dossier, missions, règlements de notes de débours), filtre responsable, navigation, détail du jour, **export .ics** (importable dans Google Agenda, Outlook, Apple Calendrier ; événements « journée entière », identifiants stables).
+- **📊 Budget prévisionnel du titre** : par nature de frais, comparé au réel TTC (écart, dépassement, « sans budget »), budget type réglable (Modèles de dossier › « Archivage et budget type »), agrégat et dépassements dans Pilotage › Coûts du titre.
+- **🔑 Décharge de remise** : impression de la décharge à signer (société, remis à, pièce d'identité, signatures), enregistrement unique de la remise (référence DEC-AAAA-NNNN, justificatif ajouté à l'étape « Remise du titre », journal). Le scan signé se joint à l'étape.
+- **🔎 Recherche globale** : dossiers, souscripteurs, intervenants, missions, pièces (hors confidentielles et retirées), courriers (COU-), notes de débours, décharges, avec accents ignorés.
+- **Relances automatiques aux intervenants** : déjà couvertes par les règles de relance des missions (avant / jour J / après / escalade, Foncier › Notifications), via la file d'e-mails de l'ERP.
+- Aucune migration SQL. Tests : `foncier-finitions.test.js` (8).
