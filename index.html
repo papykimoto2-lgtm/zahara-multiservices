@@ -114428,7 +114428,7 @@ async function valApply(type,refId,decision){
       if(decision==='valide' && !attSoldeSolde(ac, kd).solde){ at.statut='rejete'; at.motif=(kd==='finale'?'Valeur finale non soldée':'Souscripteur non soldé')+' à la date de validation'; toast('⚠️ Ce souscripteur n\'est plus soldé : attestation refusée.','error'); }
       else if(decision==='valide'){
         at.statut='valide'; at.valide_par=nomV; at.valide_le=today(); at.date_emission=today();
-        at.html=attSoldeHtml(ac,{numero:at.numero,date:today(),signataire:nomV,kind:kd});
+        at.html=attSoldeHtml(ac,{numero:at.numero,date:today(),signataire:nomV,kind:kd,sansVisa:!!at.sans_visa});
         await attLierJuridique(ac,attLibKind(kd)+' N° '+at.numero+' validée par '+nomV+' (version officielle, sans modification).',kd);
       } else {
         var vr=(DATA.validations||[]).filter(function(x){return x.type===type&&x.ref_id===refId&&x.statut==='rejete';}).pop();
@@ -114801,7 +114801,7 @@ function attSoldeHtml(c, opts){
     + '<div class="art">4. La livraison du bien (remise des clés ou du terrain) sera constatée par un procès-verbal de livraison contradictoire, dont la date sera notifiée au souscripteur.</div>'
     + '<div class="art">5. La présente attestation est délivrée à l\'intéressé(e) pour servir et valoir ce que de droit, notamment auprès '+(ov.destinataire?E(ov.destinataire):'du notaire et de la Conservation foncière')+'.</div>'
     + (ov.observations ? '<div class="art">6. '+E(ov.observations)+'</div>' : '')
-    + '<div class="sig"><div>Le souscripteur<br><br><br>(lu et pris connaissance)</div>'
+    + '<div class="sig">'+(opts.sansVisa ? '<div></div>' : ATT_VISA_BLOC)
     + '<div>Fait à '+E(p.ville||'____________')+', le '+E(dateShort(opts.date||today()))+'<br><strong>'+E(opts.fonction||'Le Directeur Général / Le Gérant')+'</strong><br>'+E(opts.signataire||'')+'<br><br><br>Signature et cachet</div></div>'
     + docPiedDePageEntreprise(p)
     + '</body></html>';
@@ -115014,7 +115014,7 @@ async function attSoldeVarianteImprimer(imprimer){
   var motif = (document.getElementById('att-var-motif').value || '').trim();
   if(!modifs.length){ toast('Aucune modification saisie : imprimez l\'attestation sans modification.','error'); return; }
   if(!motif){ toast('Indiquez le motif de la modification (demande du souscripteur).','error'); return; }
-  var html = attSoldeHtml(c, { numero:a.numero, date:a.date_emission||a.valide_le, signataire:a.valide_par, indicatif:true, overrides:champs, motif:motif, modifs:modifs });
+  var html = attSoldeHtml(c, { numero:a.numero, date:a.date_emission||a.valide_le, signataire:a.valide_par, indicatif:true, overrides:champs, motif:motif, modifs:modifs, sansVisa:!!a.sans_visa });
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
   w.document.write(html); w.document.close();
   if(imprimer){
@@ -115081,7 +115081,7 @@ async function attSoldeDemander(clientId, kind){
 function attSoldeApercu(clientId, kind){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
   var a = c[attChamp(kind)] || {};
-  var html = (a.statut==='valide' && a.html) ? attSoldeHtmlFinal(a, c) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind), date:today(), projet:true, kind:kind});
+  var html = (a.statut==='valide' && a.html) ? attSoldeHtmlFinal(a, c) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind), date:today(), projet:true, kind:kind, sansVisa:!!a.sans_visa});
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
   w.document.write(html); w.document.close();
 }
@@ -115112,21 +115112,53 @@ function attSoldeWhatsApp(clientId, kind){
   attSoldeSauver(c); attSoldeRafraichirUI(c.id);
   toast('📲 WhatsApp ouvert avec le message prêt : cliquez sur Envoyer.' + (a.publie_portail ? '' : ' (Pensez à publier l\'attestation au portail pour que le lien fonctionne.)'),'info',7000);
 }
+/* Visa du souscripteur (case « Le souscripteur — lu et pris connaissance ») : retirable par la hiérarchie, attestation par attestation.
+   Sur une attestation déjà validée, le texte figé (portail, notaire) est mis à jour : seul le bloc de visa change, motif obligatoire, tracé. */
+var ATT_VISA_BLOC = '<div>Le souscripteur<br><br><br>(lu et pris connaissance)</div>';
+function attSoldeVisaHtml(h, sans){
+  if(!h) return h;
+  return sans ? h.replace('<div class="sig">'+ATT_VISA_BLOC, '<div class="sig"><div></div>') : h.replace('<div class="sig"><div></div>', '<div class="sig">'+ATT_VISA_BLOC);
+}
+function attSoldeBtnVisa(q, k, a, b){
+  return '<button class="btn btn-secondary btn-sm" '+b+' title="'+(a.sans_visa ? 'Le visa du souscripteur est retiré — cliquer pour le remettre' : 'Retirer le visa du souscripteur de l\'attestation')+'" onclick="attSoldeVisaBasculer('+q+k+')">'+(a.sans_visa ? '🖊 Remettre le visa' : '🖊 Retirer le visa')+'</button> ';
+}
+async function attSoldeVisaBasculer(clientId, kind){
+  var champ = attChamp(kind), c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c[champ];
+  if(!a){ toast('Attestation introuvable.','error'); return; }
+  if(typeof hasRole==='function' && !hasRole('admin') && !hasRole('manager') && !hasRole('dg')){ toast('Réservé à la direction.','error'); return; }
+  var sans = !a.sans_visa, motif = '';
+  if(a.statut==='valide'){
+    motif = prompt("Attestation N° "+a.numero+" déjà validée : le bloc de visa du souscripteur sera "+(sans?'retiré':'remis')+" sur le document du portail et du notaire.\nMotif (obligatoire) :", '');
+    if(motif===null) return;
+    motif = String(motif).trim();
+    if(!motif){ toast('Le motif est obligatoire sur une attestation validée.','error'); return; }
+    var h1 = attSoldeVisaHtml(a.html, sans);
+    if(a.html && h1===a.html){ toast('Bloc de visa introuvable dans ce document (format ancien) : aucune modification.','error'); return; }
+    a.html = h1; if(a.html_notaire) a.html_notaire = attSoldeVisaHtml(a.html_notaire, sans);
+  }
+  a.sans_visa = sans;
+  a.visa_historique = (a.visa_historique||[]).concat([{ le:today(), par:(APP.currentUser&&APP.currentUser.nom)||'—', retire:sans, motif:motif }]);
+  try{ await attLierJuridique(c, attLibKind(kind)+' N° '+a.numero+' : visa du souscripteur '+(sans?'retiré':'remis')+(motif?' — '+motif:'')+'.', kind); }catch(e){}
+  attSoldeSauver(c); attSoldeRafraichirUI(c.id);
+  toast(sans ? '🖊 Visa du souscripteur retiré.' : '🖊 Visa du souscripteur remis.','success');
+}
 function attSoldeCellule(clientId, kind){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return '';
   var a = c[attChamp(kind)], b = 'style="font-size:10px;padding:2px 6px;"', q = '\''+clientId+'\'', k = ',\''+(kind==='finale'?'finale':'initial')+'\'';
   if(!a || a.statut==='rejete' || a.statut==='brouillon'){
     return (a && a.statut==='rejete' ? '<div class="badge badge-rouge" style="font-size:10px;margin-bottom:3px;" title="'+escHtml(a.motif||'')+'">⛔ Rejetée</div><br>' : '')
       + (a && a.statut==='brouillon' ? '<span class="badge badge-bleu" style="font-size:10px;">📝 Brouillon</span> <button class="btn btn-secondary btn-sm" '+b+' title="Aperçu" onclick="attSoldeApercu('+q+k+')">👁</button> ' : '')
+      + (a && a.statut==='brouillon' ? attSoldeBtnVisa(q,k,a,b) : '')
       + '<button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeDemander('+q+k+')">'+(a && a.statut==='brouillon' ? '📤 Soumettre au DG' : '📜 Faire valider')+'</button>';
   }
-  if(a.statut==='en_attente') return '<span class="badge badge-or" style="font-size:10px;">⏳ En attente DG/gérant</span> <button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeApercu('+q+k+')">👁</button>';
+  if(a.statut==='en_attente') return '<span class="badge badge-or" style="font-size:10px;">⏳ En attente DG/gérant</span> <button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeApercu('+q+k+')">👁</button> '+attSoldeBtnVisa(q,k,a,b);
   return '<span class="badge badge-vert" style="font-size:10px;">✅ Validée</span> '
     + '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer l\'attestation SANS modification : version officielle, à remettre au notaire" onclick="attSoldeImprimer('+q+k+')">🖨 Sans modif.</button> '
     + (kind==='finale' ? '' : '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer avec les modifications demandées par le souscripteur : version à titre indicatif" onclick="attSoldeVarianteOuvrir('+q+')">✏️ Avec modif.</button> ')
     + '<button class="btn '+(a.publie_portail?'btn-primary':'btn-secondary')+' btn-sm" '+b+' title="'+(a.publie_portail?'Publiée au portail — cliquer pour retirer':'Publier au portail du souscripteur')+'" onclick="attSoldePublier('+q+','+(a.publie_portail?'false':'true')+k+')">🌐</button> '
     + '<button class="btn btn-secondary btn-sm" '+b+' title="Envoyer par WhatsApp" onclick="attSoldeWhatsApp('+q+k+')">📲</button> '
     + (attNotaireDe(c) ? '<button class="btn '+(a.transmis_notaire?'btn-primary':'btn-secondary')+' btn-sm" '+b+' title="'+(a.transmis_notaire?'Transmise au notaire — cliquer pour retirer':'Transmettre au notaire (espace Intervenant)')+'" onclick="attSoldeNotaire('+q+','+(a.transmis_notaire?'false':'true')+k+')">⚖️</button> ' : '')
+    + attSoldeBtnVisa(q,k,a,b)
     + '<button class="btn btn-secondary btn-sm" '+b+' title="Annuler la validation (validée par erreur) : retour en brouillon, puis nouvelle soumission au DG" onclick="attSoldeAnnulerValidation('+q+k+')">↩ Annuler la validation</button>'
     + (a.wa_envoye_le?'<div style="font-size:9px;color:var(--blanc-dim);">WhatsApp : '+escHtml(dateShort(a.wa_envoye_le))+'</div>':'');
 }
