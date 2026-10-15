@@ -29957,7 +29957,12 @@ async function doLogin() {
   // ── Recherche de l'utilisateur (version la plus récente prioritaire) ──
   /* Comparaison insensible à la casse — voir la note sur `u` ci-dessus. */
   var user = DATA.users.find(function(x){ return x.login && x.login.toLowerCase() === u.toLowerCase(); });
-  var cloudUser = await fetchUserFromCloud(u);
+  /* [Perf connexion] sbFetch n'a aucun délai maximal : sur un réseau mobile lent, la connexion restait suspendue tant que le cloud ne répondait pas.
+     Quand le compte existe déjà en local, on n'attend le cloud (vérification « plus récent gagne ») que 4 s ; passé ce délai, on poursuit avec la version locale. */
+  var cloudUser = null;
+  try {
+    cloudUser = user ? await Promise.race([fetchUserFromCloud(u), new Promise(function(r){ setTimeout(function(){ r(null); }, window.__LOGIN_CLOUD_TIMEOUT_MS || 4000); })]) : await fetchUserFromCloud(u);
+  } catch (eCloud) { cloudUser = null; }
   if (cloudUser) {
     /* Ne remplacer la version locale que si le cloud est réellement plus récent.
        Sinon un changement de mot de passe fait hors-ligne (poussé en attente
@@ -30085,6 +30090,19 @@ async function doLogin() {
 
   await startSession(user);
 
+  /* [Perf connexion] L'application s'ouvre dès la session locale établie ; l'Edge Function staff-login (réseau, démarrage à froid, jusqu'à 3 essais)
+     n'est plus attendue avant l'affichage. La synchronisation ne démarre qu'après elle, comme avant. */
+  /* Rôles à jour avant le premier rendu — évite des modules manquants si
+     la session précédente (ou le chargement initial) date d'avant une
+     modification de rôle. */
+  try { if (typeof loadCustomRoles === 'function') await loadCustomRoles(); if (typeof rebuildRoleMatrix === 'function') rebuildRoleMatrix(); } catch(e){}
+
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('user-name').textContent   = user.nom;
+  document.getElementById('user-avatar').textContent = user.nom[0].toUpperCase();
+  goTo('dashboard');
+
   /* Établit la session Supabase JWT (Edge Function staff-login) en parallèle
      de la session locale. Sans cet appel, STAFF.token reste toujours null et
      sbAuth() retombe systématiquement sur la clé anon — ce qui, depuis la
@@ -30138,16 +30156,6 @@ async function doLogin() {
   startInactivityTimer();
   await logConnexion(u, true, 'Connexion réussie');
 
-  /* Rôles à jour avant le premier rendu — évite des modules manquants si
-     la session précédente (ou le chargement initial) date d'avant une
-     modification de rôle. */
-  try { if (typeof loadCustomRoles === 'function') await loadCustomRoles(); if (typeof rebuildRoleMatrix === 'function') rebuildRoleMatrix(); } catch(e){}
-
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  document.getElementById('user-name').textContent   = user.nom;
-  document.getElementById('user-avatar').textContent = user.nom[0].toUpperCase();
-  goTo('dashboard');
 
   /* Pull silencieux en arrière-plan : récupère les données cloud sans bloquer l'UI.
      Délai 1,5 s pour laisser le dashboard se rendre avant la mise à jour. */
