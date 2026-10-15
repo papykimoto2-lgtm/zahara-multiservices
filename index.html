@@ -59224,7 +59224,11 @@ function fcProtegerMutations(noms) {
     var f = window[nom]; if (typeof f !== 'function' || f.__protegee) return;
     var g = async function() {
       if (!fcDroitEcriture()) return { ok: false, erreur: 'Votre profil ne permet pas de modifier le module Foncier.' };
-      try { return await f.apply(this, arguments); }
+      try {
+        var cible = typeof fcDossierDesArguments === 'function' ? fcDossierDesArguments(arguments) : null, conflit = cible ? await fcConflitDossier(cible) : null;
+        if (conflit) { fcApresConflit(); return { ok: false, conflit: true, erreur: fcMessageConflit(conflit) }; }
+        return await f.apply(this, arguments);
+      }
       catch (e) { console.error('[Foncier Connect] ' + nom, e); return { ok: false, erreur: 'Enregistrement impossible : ' + ((e && e.message) || e) }; }
     };
     g.__protegee = true; window[nom] = g;
@@ -59282,7 +59286,7 @@ async function fcEvenement(d, code, type, description, extra) {
   if (typeof fcNotifierSansRisque === 'function') { var _dn = fcDossier(e.dossier_id); if (_dn) await fcNotifierSansRisque(_dn, e); }   /* RM-10 : l'événement est déjà enregistré */
   return e;
 }
-async function fcSauver(d) { d._modifie = new Date().toISOString(); await fcDb('dossiers_fonciers', d); }
+async function fcSauver(d) { d._modifie = new Date().toISOString(); d._v = (parseInt(d._v, 10) || 0) + 1; d._modifie_par = fcActeur().nom; await fcDb('dossiers_fonciers', d); }
 
 /* Ouverture d'un dossier (§6.2). Retourne { ok, dossier } ou { ok:false, erreur }. */
 async function fcOuvrirDossier(o) {
@@ -59341,7 +59345,7 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
   if (['rejete', 'annule', 'bloque'].indexOf(statut) !== -1 && !motif) return { ok: false, erreur: 'Un motif est obligatoire pour le statut « ' + FC_STATUTS[statut] + ' ».' };
   if (FC_STATUTS_ACTIFS.indexOf(statut) !== -1 && !(e.responsable_id || d.responsable_id)) return { ok: false, erreur: 'Aucun responsable n\'est affecté à cette étape.' };
   if (d.niveau === 'individuel' && statut === 'termine' && FC_ETAPES_APRES_TITRE_MERE.indexOf(code) !== -1 && !d.titre_mere_derogation && !fcTitreMere(d.parcelle_id).disponible) return { ok: false, erreur: "Le titre de l'opération (titre mère) n'est pas disponible : cette étape ne peut pas être terminée." };
-  var derogation = false, ordre = false;
+  var derogation = false, ordre = false, completude = false;
   if (fcDependancesActives() && (FC_STATUTS_ACTIFS.indexOf(statut) !== -1 || statut === 'termine')) {
     var manq = fcPrerequisManquants(d, code);
     if (manq.length) {
@@ -59349,6 +59353,15 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
       if (!motif) return { ok: false, erreur: "Une dérogation à l'ordre des étapes exige un motif." };
       if (!fcPeutGererDossier(d)) return { ok: false, erreur: "Seul le responsable du dossier (ou un administrateur) peut déroger à l'ordre des étapes." };
       derogation = true; ordre = true;
+    }
+  }
+  if (code === 'cloture' && statut === 'termine' && fcControleClotureActif()) {
+    var bloquants = fcControleCompletude(d).filter(function(x){ return x.bloquant; });
+    if (bloquants.length) {
+      if (!o.derogation_completude) return { ok: false, erreur: 'Clôture impossible, à traiter d\'abord : ' + bloquants.map(function(x){ return x.libelle + ' (' + x.detail + ')'; }).join(' ; ') + '.', completude: true, points: bloquants };
+      if (!motif) return { ok: false, erreur: 'Une dérogation au contrôle de clôture exige un motif.' };
+      if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) peut déroger au contrôle de clôture.' };
+      derogation = true; completude = true;
     }
   }
   if (code === 'cloture' && statut === 'termine') {
@@ -59380,7 +59393,7 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
   fcRecalculerStatut(d);
   await fcSauver(d);
   await fcEvenement(d, code, derogation ? 'derogation' : 'changement_statut',
-    e.libelle + ' : ' + FC_STATUTS[ancien] + ' → ' + FC_STATUTS[statut] + (derogation ? (ordre ? " (dérogation à l'ordre des étapes)" : ' (dérogation sans justificatif)') : ''),
+    e.libelle + ' : ' + FC_STATUTS[ancien] + ' → ' + FC_STATUTS[statut] + (derogation ? (completude ? ' (dérogation au contrôle de clôture)' : ordre ? " (dérogation à l'ordre des étapes)" : ' (dérogation sans justificatif)') : ''),
     { ancien: ancien, nouveau: statut, motif: motif, source: o.source || 'promoteur' });
   return { ok: true, dossier: d, derogation: derogation };
 }
@@ -59515,6 +59528,7 @@ function fcRenderDetail(id) {
   h += fcPanneauModification(d);
   h += '<div style="margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer le dossier</button> <button class="btn btn-secondary btn-sm" onclick="fcAllerJalons(\'' + d.parcelle_id + '\')">🧭 Voir les jalons du titre de la parcelle</button></div>';
   h += fcPanneauDossier(d);
+  h += fcPanneauCompletude(d);
   var phase = '';
   h += '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Statut</th><th>Responsable</th><th>Échéance</th><th>Justificatifs</th><th>Visibilité</th><th></th></tr></thead><tbody>';
   d.etapes.forEach(function(e){
@@ -59551,6 +59565,10 @@ async function fcStatutUI(id, code, sel) {
   if (!r.ok && r.dependance && confirm(r.erreur + "\n\nPasser outre l'ordre des étapes (motif obligatoire, journalisé) ?")) {
     var mo = prompt("Motif de la dérogation à l'ordre des étapes :") || '';
     r = await fcChangerStatutEtape(id, code, statut, { motif: mo, derogation_ordre: true });
+  }
+  if (!r.ok && r.completude && confirm(r.erreur + '\n\nClôturer quand même par dérogation (motif obligatoire, journalisée) ?')) {
+    var mc = prompt('Motif de la dérogation au contrôle de clôture :') || '';
+    r = await fcChangerStatutEtape(id, code, statut, { motif: mc, derogation_completude: true });
   }
   if (!r.ok && (r.justificatif_manquant || r.controles_restants || r.etapes_restantes) && confirm(r.erreur + '\n\nTerminer quand même par dérogation (motif obligatoire, journalisée) ?')) {
     var m = prompt('Motif de la dérogation :') || '';
@@ -61599,6 +61617,73 @@ function fcExporterHistoriqueUI(format) {
 }
 
 
+/* ═══ Concurrence et clôture (FG1) ═══
+   - Concurrence : chaque enregistrement d'un dossier incrémente un compteur (_v) et mémorise l'auteur. Avant toute modification, la version enregistrée dans le cloud est comparée à
+     celle affichée ; si un collègue a enregistré entre-temps, la modification est refusée (rien n'est écrasé), les données sont actualisées et l'utilisateur recommence.
+     Sans réseau ou si le cloud ne répond pas sous 2,5 s, la modification passe (le mode hors ligne reste possible). Réglable : DATA.params.fc_controle_concurrence (actif par défaut).
+   - Clôture : le dossier ne se clôture que si tout est traité (pièces à contrôler, missions, demandes, contrôles en anomalie, frais et notes du titre) ; dérogation motivée du responsable,
+     journalisée. Réglable : DATA.params.fc_controle_cloture (actif par défaut). */
+function fcControleConcurrenceActif() { return ((DATA.params || {}).fc_controle_concurrence) !== false; }
+function fcControleClotureActif() { return ((DATA.params || {}).fc_controle_cloture) !== false; }
+async function fcConflitDossier(d) {
+  if (!d || !fcControleConcurrenceActif() || typeof sbFetch !== 'function') return null;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
+  try {
+    var rows = await Promise.race([sbFetch('pi_dossiers_fonciers?id=eq.' + encodeURIComponent(d.id) + '&select=*', 'GET'), new Promise(function(res){ setTimeout(function(){ res(null); }, 2500); })]);
+    if (!Array.isArray(rows) || !rows.length) return null;
+    var c = (typeof _supaUnwrap === 'function') ? _supaUnwrap('pi_dossiers_fonciers', rows[0]) : rows[0];
+    if (!c) return null;
+    var vc = parseInt(c._v, 10) || 0, vl = parseInt(d._v, 10) || 0;
+    if (vc > vl) return { version_cloud: vc, version_locale: vl, par: c._modifie_par || '', le: c._modifie || '' };
+  } catch (e) { /* hors ligne ou cloud indisponible : on ne bloque pas le travail */ }
+  return null;
+}
+/* Dossier visé par les arguments d'une mutation (identifiant de dossier ou de pièce en premier argument). */
+function fcDossierDesArguments(args) {
+  var a = args && args[0]; if (typeof a !== 'string') return null;
+  var d = fcDossier(a); if (d) return d;
+  var p = typeof fcPiece === 'function' ? fcPiece(a) : null; return p ? fcDossier(p.dossier_id) : null;
+}
+function fcApresConflit() {
+  try { if (typeof syncPullStore === 'function') Promise.resolve(syncPullStore('dossiers_fonciers')).then(function(){ if (typeof fcRender === 'function') fcRender(); if (typeof fcRenderJournee === 'function') fcRenderJournee(); }).catch(function(){}); } catch (e) { /* silencieux */ }
+}
+function fcMessageConflit(c) {
+  return 'Ce dossier a été modifié' + (c.par ? ' par ' + c.par : '') + ' depuis votre dernier affichage (version ' + c.version_cloud + ' au lieu de ' + c.version_locale + '). Rien n\'a été écrasé : vos données sont actualisées, recommencez votre modification.';
+}
+
+/* Contrôle de complétude : ce qui reste à traiter avant de clôturer. */
+function fcControleCompletude(d) {
+  var pts = [], bloc = function(code, lib, det) { pts.push({ code: code, libelle: lib, detail: det, bloquant: true }); };
+  var pieces = (DATA.pieces_foncieres || []).filter(function(p){ return p.dossier_id === d.id && p.statut === 'a_verifier' && !p.retire && !p.remplacee_par; });
+  if (pieces.length) bloc('pieces', 'Pièces à contrôler', pieces.length + ' pièce(s) déposée(s) par un souscripteur sans décision');
+  var missions = (DATA.missions_foncieres || []).filter(function(m){ return m.dossier_id === d.id && ['brouillon', 'validee', 'cloturee', 'annulee'].indexOf(m.statut) === -1; });
+  if (missions.length) bloc('missions', 'Missions en cours', missions.length + ' mission(s) ni validée(s) ni clôturée(s)');
+  var dem = (DATA.demandes_fonciers || []).filter(function(x){ return x.dossier_id === d.id && x.statut !== 'cloturee'; });
+  if (dem.length) bloc('demandes', 'Demandes de complément ouvertes', dem.length + ' demande(s) non clôturée(s)');
+  var ctrl = (d.controles || []).filter(function(c){ return c.statut === 'anomalie'; });
+  if (ctrl.length) bloc('controles', 'Contrôles en anomalie', ctrl.map(function(c){ return c.libelle || c.code; }).join(', '));
+  if (fcEstIndividuel(d)) {
+    var fr = fcFraisTitre(d).filter(function(f){ return f.statut === 'saisi'; });
+    if (fr.length) bloc('frais', 'Frais du titre non comptabilisés', fr.length + ' frais saisi(s) sans écriture comptable');
+    var nt = fcNotesDebours(d).filter(function(n){ return n.statut === 'emise'; });
+    if (nt.length) bloc('notes', 'Notes de débours non encaissées', nt.map(function(n){ return n.numero; }).join(', '));
+  }
+  var sans = d.etapes.filter(function(e){ return e.statut === 'termine' && e.justificatif_requis && !(e.justificatifs || []).length; });
+  if (sans.length) pts.push({ code: 'justificatifs', libelle: 'Étapes terminées par dérogation, sans justificatif', detail: sans.map(function(e){ return e.libelle; }).join(' ; '), bloquant: false });
+  return pts;
+}
+function fcPanneauCompletude(d) {
+  if (d.statut === 'cloture' || d.statut === 'annule') return '';
+  var p = fcControleCompletude(d), b = p.filter(function(x){ return x.bloquant; });
+  return '<div style="margin:8px 0;padding:8px 10px;border-radius:8px;border:1px solid ' + (b.length ? '#B87333' : '#2e7d4f') + ';font-size:12px;"><b>' + (b.length ? '⚠ Avant la clôture : ' + b.length + ' point(s) à traiter' : '✅ Aucun point bloquant pour la clôture') + '</b>'
+    + p.map(function(x){ return '<div style="margin-top:3px;">' + (x.bloquant ? '• ' : 'ℹ ') + '<b>' + escHtml(x.libelle) + '</b> — ' + escHtml(x.detail) + '</div>'; }).join('') + '</div>';
+}
+async function fcBasculerReglageUI(cle, on, libelle) {
+  if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); fcRenderModeles(); return; }
+  DATA.params = DATA.params || {}; DATA.params[cle] = !!on; await fcEnregistrerParams(); toast(libelle + (on ? ' : activé.' : ' : désactivé.'), 'success');
+}
+
+
 /* ═══ Coordination des démarches — ordre des étapes, modèles de dossier, « Ma journée » (OD1) ═══
    - Ordre des étapes : une étape ne démarre ni ne se termine tant que ses étapes préalables ne sont pas terminées (ou annulées) ; dérogation motivée,
      réservée au responsable du dossier, journalisée. Réglable : Foncier › Modèles de dossier (DATA.params.fc_dependances, actif par défaut).
@@ -61683,7 +61768,9 @@ function fcRenderModeles() {
   });
   h += '</tbody></table></div><div style="margin:8px 0;font-size:12px;">Délai total estimé : <b>' + total + ' jours</b></div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="fcSauverModeleUI()" ' + ro + '>💾 Enregistrer le modèle</button> <button class="btn btn-secondary btn-sm" onclick="fcProposerDureesUI()" ' + ro + '>📊 Proposer les durées observées</button> <button class="btn btn-secondary btn-sm" onclick="fcSupprimerModeleUI()" ' + ro + '>Supprimer le modèle</button></div>'
-    + '<hr><label style="font-size:12px;"><input type="checkbox" id="fm-deps" ' + (fcDependancesActives() ? 'checked ' : '') + ro + ' onchange="fcBasculerDependancesUI(this.checked)"> <b>Imposer l\'ordre des étapes</b> : une étape ne démarre ni ne se termine avant ses étapes préalables (dérogation motivée du responsable, journalisée).</label></div>';
+    + '<hr><label style="font-size:12px;"><input type="checkbox" id="fm-deps" ' + (fcDependancesActives() ? 'checked ' : '') + ro + ' onchange="fcBasculerDependancesUI(this.checked)"> <b>Imposer l\'ordre des étapes</b> : une étape ne démarre ni ne se termine avant ses étapes préalables (dérogation motivée du responsable, journalisée).</label>'
+    + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleClotureActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_cloture\',this.checked,\'Contrôle de clôture\')"> <b>Contrôler la complétude à la clôture</b> : pièces à contrôler, missions, demandes, anomalies, frais et notes du titre.</label>'
+    + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleConcurrenceActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_concurrence\',this.checked,\'Protection contre les modifications simultanées\')"> <b>Protéger contre les modifications simultanées</b> : refuser une modification si un collègue a enregistré le dossier entre-temps.</label></div>';
   host.innerHTML = h;
 }
 async function fcEnregistrerParams() {
@@ -61792,6 +61879,9 @@ async function fcJourEtapeUI(id, code, statut) {
   }
   if (!r.ok && (r.justificatif_manquant || r.controles_restants || r.etapes_restantes) && confirm(r.erreur + '\n\nTerminer quand même par dérogation (motif obligatoire, journalisée) ?')) {
     var m2 = prompt('Motif de la dérogation :') || ''; r = await fcChangerStatutEtape(id, code, statut, { motif: m2, derogation: true });
+  }
+  if (!r.ok && r.completude && confirm(r.erreur + '\n\nClôturer quand même par dérogation (motif obligatoire, journalisée) ?')) {
+    var m3 = prompt('Motif de la dérogation au contrôle de clôture :') || ''; r = await fcChangerStatutEtape(id, code, statut, { motif: m3, derogation_completude: true });
   }
   fcMsg(r, statut === 'termine' ? 'Étape terminée.' : 'Étape démarrée.'); fcRenderJournee();
 }

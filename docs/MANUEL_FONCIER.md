@@ -43,6 +43,8 @@ Dans le détail du dossier, chaque étape a un statut, un responsable, une éch�
 - **Ordre des étapes** (actif par défaut) : 🔒 *Attend : …* sous une étape = ses étapes préalables ne sont pas terminées. Démarrer ou terminer exige alors une **dérogation motivée**, réservée au responsable du dossier ou à un administrateur, journalisée. « Bloqué », « rejeté », « annulé » restent toujours possibles. Une étape annulée compte comme franchie.
 - **Dérogation** (justificatif manquant, contrôles non conclus, clôture avec étapes restantes) : motif obligatoire, journalisée.
 - **Étape terminée** : plus de modification directe ; utiliser **Corriger** (motif obligatoire, ancienne valeur conservée).
+- **Modifications simultanées** : si un collègue a enregistré le même dossier entre-temps, votre modification est refusée sans rien écraser, les données sont actualisées, recommencez. Hors ligne, le travail n'est pas bloqué.
+- **Clôture** : panneau « Avant la clôture » en haut du dossier. Sont exigés : pièces contrôlées, missions validées ou clôturées, demandes de complément closes, contrôles sans anomalie, et pour un titre individuel frais comptabilisés et notes de débours encaissées. Dérogation motivée du responsable, journalisée.
 - **Historique** : ajout seul, jamais modifié ni supprimé.
 - **Retards** : « retard interne » et « délai administratif dépassé » sont distingués ; aucun retard n'est imputé à un tiers sans donnée.
 
@@ -123,6 +125,8 @@ Onglets : Promoteur · Responsable foncier · Intervenants · Direction · **Co�
 | « Étape(s) préalable(s) non terminée(s) » | Ordre imposé | Terminer le préalable, ou dérogation motivée (responsable) |
 | « Cette étape exige un justificatif » | Justificatif manquant | Ajouter le justificatif (bouton +) |
 | « Compte non paramétré » | Comptes par défaut incomplets | Paramètres › Comptes par défaut › Titre foncier |
+| « Ce dossier a été modifié par … » | Un collègue a enregistré avant vous | Recommencer après actualisation (automatique) |
+| « Clôture impossible, à traiter d'abord » | Points ouverts (pièces, missions, frais…) | Les traiter, ou dérogation motivée du responsable |
 | « Titre mère non disponible » | Titre de l'opération absent | Compléter le dossier global (références + document officiel contrôlé) |
 | Onglet Coûts / Rapport absent | Profil non direction | Demander le droit à un administrateur |
 | Le souscripteur ne voit pas la note | Note non publiée | Publier la note au portail |
