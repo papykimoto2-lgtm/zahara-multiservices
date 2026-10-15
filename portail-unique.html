@@ -2144,6 +2144,7 @@
     var m=[];
     (c.demandes_modification||[]).forEach(function(d){ var mt=d&&d.facture?(parseFloat(d.montant_facture)||0):0; if(mt) m.push({date:String(d.date||'').slice(0,10),nature:'Travaux modificatifs',libelle:String(d.description||'Modification de construction'),montant:mt}); });
     (c.regularisations_surface||[]).forEach(function(r){ var mt=r?(parseFloat(r.montant)||0):0; if(mt) m.push({date:String(r.date||'').slice(0,10),nature:'Régularisation de surface',libelle:'Écart de surface de '+(r.ecart_m2!=null?r.ecart_m2:'?')+' m²'+(r.prix_m2?(' × '+fmt(r.prix_m2)+' FCFA/m²'):''),montant:mt}); });
+    (c.terrains_supplementaires||[]).forEach(function(t){ var mt=t?(parseFloat(t.montant)||0):0; if(mt) m.push({date:String(t.date||'').slice(0,10),nature:'Terrain supplémentaire',libelle:'Terrain supplémentaire'+(t.surface_m2?' de '+t.surface_m2+' m²':'')+(t.prix_m2?(' × '+fmt(t.prix_m2)+' FCFA/m²'):'')+(t.lot_libelle?' — lot '+t.lot_libelle:''),montant:mt}); });
     return m.sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); });
   }
   function sPrixModifs(){
