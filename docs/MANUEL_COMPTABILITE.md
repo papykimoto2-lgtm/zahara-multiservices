@@ -139,11 +139,7 @@ L'ERP attribue une **référence** : JL-année-numéro de 5 chiffres. L'écritur
 **Où** : onglet **Tiers** (acquéreurs 4111, clients 411, fournisseurs 401, personnel 422, autres tiers 461).
 
 1. Vérifier que chaque écriture de tiers porte son **tiers auxiliaire**. Le lettrage et le FEC en ont besoin.
-2. Lancer le **lettrage automatique** de l'exercice :
-
-    - correspondances **exactes 1 pour 1** entre un débit et un crédit du même tiers ;
-
-    - **reliquat de solde nul** : un tiers globalement soldé reçoit une seule lettre.
+2. Lancer le **lettrage automatique** de l'exercice : il lettre les correspondances **exactes 1 pour 1** entre un débit et un crédit du même tiers, et les **reliquats de solde nul** (un tiers globalement soldé reçoit une seule lettre).
 3. Consulter les **postes ouverts** (non lettrés) : par tiers, nombre de lignes, dernier mouvement, solde ouvert. Le total des soldes débiteurs est le montant à recouvrer, celui des soldes créditeurs le montant à payer.
 4. Le **délettrage** retire toutes les lettres de l'exercice, sans modifier les écritures.
 
