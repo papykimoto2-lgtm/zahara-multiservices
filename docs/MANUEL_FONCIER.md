@@ -75,6 +75,10 @@ Chaque dossier ouvert porte un score de 0 à 100 (faible < 20, modéré, élevé
 - Mission : acceptation, démarrage, livrables par versions, soumission, vérification, validation ou correction. Messagerie par mission.
 - Le notaire voit **uniquement** ce qui lui est transmis : identité, bien, avancement, pièces cochées « transmis au notaire », attestations. Chaque consultation est journalisée.
 
+### Courriers types
+
+Dans le dossier, **✉️ Courriers types** : choisir le modèle (pièces complémentaires, point d'avancement, rappel de règlement, remise du titre, lettre de mission, rappel d'échéance, transmission au notaire, demande à l'administration, courrier libre) et le destinataire. Le courrier est prérempli avec les données du dossier ; complétez les « [à compléter] », modifiez le texte si besoin, puis **imprimer / PDF**, **copier** ou **envoyer par e-mail**. Chaque action est journalisée avec une référence COU-AAAA-NNNN. La direction adapte les textes dans Modèles de dossier › « Modèles de courrier ».
+
 ## 8. Information du souscripteur
 
 - Foncier › 2.5 : publier une information (source obligatoire), la retirer (motif), prévisualiser ce que voit le souscripteur.
