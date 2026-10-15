@@ -56,6 +56,10 @@ retards · à faire aujourd'hui · dans les 7 jours · étapes prêtes à démar
 Actions en un clic : **Démarrer**, **Terminer** (mêmes garde-fous que l'écran du dossier), **+7 j** (report journalisé), **Accepter / Refuser** une pièce (motif obligatoire au refus, communiqué au souscripteur), **Ouvrir**.
 La direction peut consulter la journée d'un autre utilisateur (lecture seule).
 
+### Score de risque
+
+Chaque dossier ouvert porte un score de 0 à 100 (faible < 20, modéré, élevé à partir de 45, critique à partir de 70), visible en badge dans la liste (bouton « Trier par risque »), en détail dans le dossier (facteurs et points), dans Pilotage › 🚨 Dossiers à risque et dans Ma journée. Il repose sur des faits : blocage, retards internes, inactivité, pièces expirées ou non contrôlées, missions en retard, incohérences, notes en retard. Un délai d'administration dépassé pèse peu et n'est jamais une faute imputée. C'est une aide à la priorisation, pas un jugement.
+
 ## 6. Pièces et documents
 
 - Dépôt par étape, versions, contrôle d'intégrité, expiration (alerte à 30 jours), archivage motivé. Foncier › Documents : classement et recherche.

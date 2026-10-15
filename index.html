@@ -59497,13 +59497,14 @@ function fcRender() {
     + '<div class="form-group"><label>Priorité</label><select class="filter-select" id="fc-n-prio"><option value="normale">Normale</option><option value="haute">Haute</option><option value="basse">Basse</option></select></div>'
     + '<div class="form-group"><label>Échéance</label><input type="date" class="form-control" id="fc-n-cible"></div>'
     + '<button class="btn btn-primary btn-sm" onclick="fcOuvrirUI()">Ouvrir le dossier</button></div><div id="fc-n-sit-info"></div></div>';
-  var ds = (DATA.dossiers_fonciers || []).slice().sort(function(a, b){ return (b.created_at || '').localeCompare(a.created_at || ''); });
-  h += '<div class="card"><div class="card-title">📋 Dossiers <button class="btn btn-secondary btn-sm" style="float:right;" onclick="fcImprimerListeUI()">🖨 Imprimer la liste</button></div>';
+  var ctxR = fcContexteRisque(), risqueDe = function(x){ return fcScoreRisque(x, fcAuj(), ctxR); };
+  var ds = (DATA.dossiers_fonciers || []).slice().sort(APP._fcTriRisque ? function(a, b){ return risqueDe(b).score - risqueDe(a).score || (b.created_at || '').localeCompare(a.created_at || ''); } : function(a, b){ return (b.created_at || '').localeCompare(a.created_at || ''); });
+  h += '<div class="card"><div class="card-title">📋 Dossiers <button class="btn btn-secondary btn-sm" style="float:right;" onclick="fcImprimerListeUI()">🖨 Imprimer la liste</button> <button class="btn btn-secondary btn-sm" style="float:right;margin-right:6px;" onclick="APP._fcTriRisque=!APP._fcTriRisque;fcRender()">' + (APP._fcTriRisque ? '↕ Tri par date' : '🚨 Trier par risque') + '</button></div>';
   if (!ds.length) h += '<div style="color:var(--dim);padding:10px;">Aucun dossier. Ouvrez-en un à partir d\'une parcelle.</div>';
   else h += '<div class="table-wrap"><table><thead><tr><th>Référence</th><th>Parcelle</th><th>Procédure</th><th>Statut</th><th>Étape courante</th><th>Responsable</th><th>Échéance</th><th></th></tr></thead><tbody>'
     + ds.map(function(d){
       var e = fcProchaineEtape(d), et = e ? fcEtatEcheance(e) : '';
-      return '<tr><td><strong>' + escHtml(d.reference) + '</strong>' + (fcEstIndividuel(d) ? '<br><span style="font-size:10px;color:#B87333;">Titre individuel</span>' : '') + '</td><td>' + escHtml(fcLibelleParcelle(d.parcelle_id)) + (fcEstIndividuel(d) ? '<br><span style="font-size:11px;color:var(--dim);">lot ' + escHtml((d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ')) + ' · ' + escHtml((d.client_ids || [d.client_id]).map(function(id){ return (fcClient(id) || {}).nom || id; }).join(', ')) + '</span>' : '') + '</td><td>' + escHtml(FC_PROCEDURES[d.type_procedure] || d.type_procedure) + '</td><td>' + escHtml(d.statut) + '</td>'
+      return '<tr><td><strong>' + escHtml(d.reference) + '</strong>' + fcBadgeRisque(risqueDe(d)) + (fcEstIndividuel(d) ? '<br><span style="font-size:10px;color:#B87333;">Titre individuel</span>' : '') + '</td><td>' + escHtml(fcLibelleParcelle(d.parcelle_id)) + (fcEstIndividuel(d) ? '<br><span style="font-size:11px;color:var(--dim);">lot ' + escHtml((d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ')) + ' · ' + escHtml((d.client_ids || [d.client_id]).map(function(id){ return (fcClient(id) || {}).nom || id; }).join(', ')) + '</span>' : '') + '</td><td>' + escHtml(FC_PROCEDURES[d.type_procedure] || d.type_procedure) + '</td><td>' + escHtml(d.statut) + '</td>'
         + '<td>' + (e ? escHtml(e.libelle) + '<br>' + fcBadgeStatut(e.statut) : '—') + '</td><td>' + escHtml(fcNomUtilisateur((e && e.responsable_id) || d.responsable_id)) + '</td>'
         + '<td>' + escHtml((e && e.date_cible) || d.date_cible || '—') + (et ? '<br><span style="color:#c0392b;font-size:11px;">' + (et === 'retard_interne' ? 'Retard interne' : 'Délai administratif dépassé') + '</span>' : '') + '</td>'
         + '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="fcOuvrirDetail(\'' + d.id + '\')">Ouvrir</button> <button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer</button></td></tr>';
@@ -59528,6 +59529,7 @@ function fcRenderDetail(id) {
   h += fcPanneauModification(d);
   h += '<div style="margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer le dossier</button> <button class="btn btn-secondary btn-sm" onclick="fcAllerJalons(\'' + d.parcelle_id + '\')">🧭 Voir les jalons du titre de la parcelle</button></div>';
   h += fcPanneauDossier(d);
+  h += fcPanneauRisque(d);
   h += fcPanneauCompletude(d);
   var phase = '';
   h += '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Statut</th><th>Responsable</th><th>Échéance</th><th>Justificatifs</th><th>Visibilité</th><th></th></tr></thead><tbody>';
@@ -61511,6 +61513,7 @@ function fcIndicateursDirection(aujourdhui) {
 /* ── Exports ── */
 function fcLignesPilotage(vue, userId, aujourdhui) {
   var L = [];
+  if (vue === 'risques') return fcLignesRisques(aujourdhui);
   if (vue === 'couts') return fcLignesCouts(aujourdhui);
   if (vue === 'rapport') return fcLignesRapport(aujourdhui);
   if (vue === 'promoteur') { var p = fcIndicateursPromoteur(aujourdhui); L.push(['Indicateur', 'Valeur']); [['Dossiers', p.total], ['En cours', p.en_cours], ['Clôturés', p.clotures], ['Bloqués', p.bloques], ['Incomplets (documents manquants)', p.incomplets], ['En attente d\'un prestataire', p.attente_prestataire], ['En attente d\'une administration', p.attente_administration], ['Retard interne', p.retard_interne], ['Délai administratif dépassé', p.delai_administratif_depasse], ['Missions en retard', p.missions_en_retard], ['Documents à contrôler', p.documents_a_controler], ['Souscripteurs à informer', p.souscripteurs_a_informer], ['Documents expirant sous 30 jours', p.documents_expirants], ['Dont titres individuels en cours', p.dont_individuels]].forEach(function(x){ L.push(x); }); }
@@ -61558,7 +61561,7 @@ function fcRenderPilotageCorps() {
   var host = document.getElementById('fp-root'); if (!host) return;
   var vue = APP._fpVue || 'promoteur', moi = fcActeur(), uid = APP._fpUser || moi.id, t = fcAuj();
   if (['direction', 'couts', 'rapport'].indexOf(vue) !== -1 && !fcPeutVoirDirection()) vue = APP._fpVue = 'promoteur';
-  var onglets = [['promoteur', '🏢 Promoteur'], ['responsable', '🧑‍💼 Responsable foncier'], ['intervenants', '🤝 Intervenants']].concat(fcPeutVoirDirection() ? [['direction', '📈 Direction'], ['couts', '💶 Coûts du titre'], ['rapport', '📑 Rapport périodique']] : []);
+  var onglets = [['promoteur', '🏢 Promoteur'], ['risques', '🚨 Dossiers à risque'], ['responsable', '🧑‍💼 Responsable foncier'], ['intervenants', '🤝 Intervenants']].concat(fcPeutVoirDirection() ? [['direction', '📈 Direction'], ['couts', '💶 Coûts du titre'], ['rapport', '📑 Rapport périodique']] : []);
   var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">🎯 Pilotage foncier</div><div style="font-size:11px;color:var(--dim);margin-bottom:8px;">Les durées sont calculées à partir du journal horodaté. Une valeur reposant sur moins de ' + FC_SEUIL_MESURE + ' observations est signalée comme indicative. Un retard n\'est jamais attribué à une administration ou à un prestataire sans donnée suffisante.</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">' + onglets.map(function(o){ return '<button class="btn ' + (o[0] === vue ? 'btn-primary' : 'btn-secondary') + ' btn-sm" onclick="APP._fpVue=\'' + o[0] + '\';fcRenderPilotage()">' + o[1] + '</button>'; }).join('') + '</div>';
   h += fcBarreFiltresPilotage();
@@ -61575,6 +61578,8 @@ function fcRenderPilotageCorps() {
       h += '<div style="margin:8px 0;"><div style="font-weight:700;font-size:13px;">' + k[1] + ' <span style="color:var(--or);">(' + r[k[0]].length + ')</span></div>'
         + (r[k[0]].length ? r[k[0]].map(function(i){ return '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid var(--bord,#eee);"><a href="#" onclick="fcAllerDossier(\'' + i.dossier_id + '\');return false;">' + escHtml(i.dossier) + '</a> · ' + escHtml(i.libelle) + (i.date ? ' · <i>' + escHtml(i.date) + '</i>' : '') + (i.detail ? ' · ' + escHtml(i.detail) : '') + '</div>'; }).join('') : '<div style="font-size:12px;color:var(--dim);">Rien à signaler.</div>') + '</div>';
     });
+  } else if (vue === 'risques') {
+    h += fcHtmlRisques(t);
   } else if (vue === 'couts') {
     h += fcHtmlCouts(t);
   } else if (vue === 'rapport') {
@@ -61602,7 +61607,7 @@ function fcRenderPilotageCorps() {
     + (dossiers.length ? ' <select class="filter-select" id="fp-dossier">' + dossiers.map(function(d){ return '<option value="' + d.id + '">' + escHtml(d.reference) + '</option>'; }).join('') + '</select> <button class="btn btn-secondary btn-sm" onclick="fcExporterHistoriqueUI(\'csv\')">⬇ Historique du dossier</button> <button class="btn btn-secondary btn-sm" onclick="fcExporterHistoriqueUI(\'pdf\')">🖨 Historique (PDF)</button>' : '') + '</div></div>';
   host.innerHTML = h;
 }
-var FC_TITRES_PILOTAGE = { promoteur: 'Tableau de bord du promoteur', responsable: 'Tableau de bord du responsable foncier', intervenants: 'Tableau de bord des intervenants', direction: 'Tableau de bord de direction', couts: 'Coûts du titre foncier', rapport: 'Rapport périodique de pilotage foncier', retards: 'Rapport des retards' };
+var FC_TITRES_PILOTAGE = { promoteur: 'Tableau de bord du promoteur', responsable: 'Tableau de bord du responsable foncier', intervenants: 'Tableau de bord des intervenants', direction: 'Tableau de bord de direction', couts: 'Coûts du titre foncier', risques: 'Dossiers à risque', rapport: 'Rapport périodique de pilotage foncier', retards: 'Rapport des retards' };
 function fcExporterPilotageUI(vue, format) {
   if (!fcPeutExporter()) { fcMsg({ ok: false, erreur: "Votre profil ne permet pas d'exporter les données foncières." }); return; }
   if (['direction', 'couts', 'rapport'].indexOf(vue) !== -1 && !fcPeutVoirDirection()) { fcMsg({ ok: false, erreur: 'Réservé à la direction.' }); return; }
@@ -61614,6 +61619,77 @@ function fcExporterHistoriqueUI(format) {
   var id = (document.getElementById('fp-dossier') || {}).value, d = fcDossier(id); if (!d) return;
   var l = fcHistoriqueDossierLignes(id);
   if (format === 'pdf') openPrintPreview(fcHtmlTableau('Historique du dossier ' + d.reference, l), 'Historique ' + d.reference, true); else fcTelechargerTexte('historique-' + d.reference + '.csv', fcCsv(l));
+}
+
+
+/* ═══ Score de risque par dossier (RK1) ═══
+   Indicateur d'aide à la priorisation, de 0 à 100, calculé uniquement à partir de faits mesurables du dossier (retards, blocages, pièces, missions, comptabilité).
+   Chaque point est expliqué ; aucun jugement sur un tiers (un délai d'administration dépassé pèse peu et n'est jamais présenté comme une faute). Ne remplace pas l'avis du responsable. */
+var FC_NIVEAUX_RISQUE = [[70, 'critique', 'Critique', '#c0392b'], [45, 'eleve', 'Élevé', '#d9822b'], [20, 'modere', 'Modéré', '#B87333'], [0, 'faible', 'Faible', '#2e7d4f']];
+function fcNiveauRisque(score) { return FC_NIVEAUX_RISQUE.find(function(n){ return score >= n[0]; }); }
+/* Index calculés une seule fois pour tout le portefeuille (évite de reparcourir les journaux pour chaque dossier). */
+function fcContexteRisque() {
+  var ctx = { dernier: {}, missions: {}, pieces: {} };
+  (DATA.evenements_fonciers || []).forEach(function(e){ var x = String(e.date || '').slice(0, 10); if (x && x > (ctx.dernier[e.dossier_id] || '')) ctx.dernier[e.dossier_id] = x; });
+  (DATA.missions_foncieres || []).forEach(function(m){ (ctx.missions[m.dossier_id] = ctx.missions[m.dossier_id] || []).push(m); });
+  (DATA.pieces_foncieres || []).forEach(function(p){ if (!p.retire && !p.remplacee_par) (ctx.pieces[p.dossier_id] = ctx.pieces[p.dossier_id] || []).push(p); });
+  return ctx;
+}
+function fcScoreRisque(d, aujourdhui, ctx) {
+  var t = aujourdhui || fcAuj(); ctx = ctx || fcContexteRisque();
+  if (!d || ['cloture', 'annule'].indexOf(d.statut) !== -1) return { score: 0, niveau: fcNiveauRisque(0), motifs: [] };
+  var m = [], ajoute = function(lib, pts) { if (pts > 0) m.push({ libelle: lib, points: pts }); };
+  if (!d.responsable_id) ajoute('Aucun responsable', 15);
+  if (d.statut === 'bloque') ajoute('Dossier bloqué', 25);
+  var retards = 0, pire = 0, admin = 0;
+  fcEtapesActives(d).forEach(function(e){
+    var et = fcEtatEcheance(e, t); if (!et) return;
+    if (et === 'retard_interne') { retards++; pire = Math.max(pire, fcJours(e.date_cible, t)); } else admin++;
+  });
+  ajoute(retards + ' étape(s) en retard interne', Math.min(30, retards * 10));
+  if (pire > 14) ajoute('Retard de plus de 14 jours', 5);
+  ajoute(admin + ' délai(s) administratif(s) dépassé(s) (information)', Math.min(10, admin * 3));
+  if (d.date_cible && d.date_cible < t) ajoute('Échéance du dossier dépassée', 10);
+  var der = ctx.dernier[d.id] || String(d.created_at || d.date_ouverture || '').slice(0, 10);
+  if (der) { var inactif = fcJours(der, t); if (inactif > 30) ajoute('Aucune activité depuis plus de 30 jours', 15); else if (inactif > 14) ajoute('Aucune activité depuis plus de 14 jours', 10); }
+  var pcs = ctx.pieces[d.id] || [], expirees = pcs.filter(function(p){ return fcPieceExpiration(p, t) === 'expiree'; }).length, avt = pcs.filter(function(p){ return p.statut === 'a_verifier' && p.depose_le && fcJours(String(p.depose_le).slice(0, 10), t) > 7; }).length;
+  ajoute(expirees + ' document(s) expiré(s)', Math.min(10, expirees * 5)); ajoute(avt + ' pièce(s) en attente de contrôle depuis plus de 7 jours', Math.min(10, avt * 5));
+  var mr = (ctx.missions[d.id] || []).filter(function(x){ return fcMissionEnRetard(x, t); }).length; ajoute(mr + ' mission(s) en retard', Math.min(16, mr * 8));
+  var inc = typeof fcIncoherences === 'function' ? fcIncoherences(d).length : 0; ajoute(inc + ' incohérence(s) de séquence', inc ? 10 : 0);
+  var nr = fcNotesDebours(d).filter(function(n){ return fcNoteEnRetard(n, t); }).length; ajoute(nr + ' note(s) de débours en retard', nr ? 10 : 0);
+  var score = Math.min(100, m.reduce(function(s, x){ return s + x.points; }, 0));
+  return { score: score, niveau: fcNiveauRisque(score), motifs: m.sort(function(a, b){ return b.points - a.points; }) };
+}
+function fcDossiersARisque(aujourdhui, options) {
+  options = options || {}; var t = aujourdhui || fcAuj(), ctx = fcContexteRisque(), min = options.min == null ? 20 : options.min;
+  return fcDossiersActifs().filter(function(d){ return d.statut !== 'cloture' && (!options.responsable_id || d.responsable_id === options.responsable_id); })
+    .map(function(d){ return { dossier: d, risque: fcScoreRisque(d, t, ctx) }; })
+    .filter(function(x){ return x.risque.score >= min; })
+    .sort(function(a, b){ return b.risque.score - a.risque.score || String(a.dossier.reference).localeCompare(String(b.dossier.reference)); });
+}
+function fcBadgeRisque(r) {
+  if (!r || !r.score) return '';
+  return ' <span class="pill" style="background:' + r.niveau[3] + ';color:#fff;font-size:10px;padding:1px 7px;border-radius:9px;" title="' + escHtml(r.motifs.map(function(x){ return x.libelle + ' (+' + x.points + ')'; }).join(' ; ')) + '">' + r.score + ' · ' + escHtml(r.niveau[2]) + '</span>';
+}
+function fcPanneauRisque(d) {
+  var r = fcScoreRisque(d); if (['cloture', 'annule'].indexOf(d.statut) !== -1) return '';
+  return '<div style="margin:8px 0;padding:8px 10px;border-radius:8px;border:1px solid ' + r.niveau[3] + ';font-size:12px;"><b>Risque : <span style="color:' + r.niveau[3] + ';">' + r.score + '/100 — ' + escHtml(r.niveau[2]) + '</span></b> <span style="color:var(--dim);">(indicatif, aide à la priorisation)</span>'
+    + (r.motifs.length ? r.motifs.map(function(x){ return '<div style="margin-top:3px;">• ' + escHtml(x.libelle) + ' <b>+' + x.points + '</b></div>'; }).join('') : '<div style="margin-top:3px;color:#2e7d4f;">Aucun facteur de risque détecté.</div>') + '</div>';
+}
+function fcHtmlRisques(t) {
+  var l = fcDossiersARisque(t, { min: 1 }), cnt = function(n){ return l.filter(function(x){ return x.risque.niveau[1] === n; }).length; };
+  var h = '<div style="font-size:11px;color:var(--dim);margin-bottom:8px;">Score de 0 à 100 calculé sur des faits mesurables (retards, blocages, inactivité, pièces, missions, comptabilité). Il aide à décider quoi traiter en premier ; il ne qualifie ni un intervenant ni une administration.</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">' + fcKpi('Critique', cnt('critique'), '#c0392b') + fcKpi('Élevé', cnt('eleve'), '#d9822b') + fcKpi('Modéré', cnt('modere'), '#B87333') + fcKpi('Faible', cnt('faible'), '#2e7d4f') + '</div>';
+  if (!l.length) return h + '<div style="color:#2e7d4f;margin-top:10px;">Aucun dossier ouvert ne présente de facteur de risque. 👌</div>';
+  return h + '<div class="table-wrap" style="margin-top:10px;"><table><thead><tr><th>Dossier</th><th>Risque</th><th>Responsable</th><th>Facteurs principaux</th><th></th></tr></thead><tbody>'
+    + l.slice(0, 50).map(function(x){ var d = x.dossier; return '<tr><td><strong>' + escHtml(d.reference) + '</strong><br><span style="font-size:11px;color:var(--dim);">' + escHtml(fcLibelleParcelle(d.parcelle_id)) + '</span></td><td>' + fcBadgeRisque(x.risque) + '</td><td>' + escHtml(fcNomUtilisateur(d.responsable_id)) + '</td><td style="font-size:11px;">'
+      + x.risque.motifs.slice(0, 3).map(function(m){ return escHtml(m.libelle) + ' (+' + m.points + ')'; }).join('<br>') + '</td><td><button class="btn btn-secondary btn-sm" onclick="fcAllerDossier(\'' + d.id + '\')">Ouvrir</button></td></tr>'; }).join('')
+    + '</tbody></table></div>' + (l.length > 50 ? '<div style="font-size:11px;color:var(--dim);">… et ' + (l.length - 50) + ' autre(s) de moindre risque.</div>' : '');
+}
+function fcLignesRisques(t) {
+  var L = [['Dossier', 'Parcelle', 'Responsable', 'Score', 'Niveau', 'Facteurs']];
+  fcDossiersARisque(t, { min: 1 }).forEach(function(x){ L.push([x.dossier.reference, fcLibelleParcelle(x.dossier.parcelle_id), fcNomUtilisateur(x.dossier.responsable_id), x.risque.score, x.risque.niveau[2], x.risque.motifs.map(function(m){ return m.libelle + ' (+' + m.points + ')'; }).join(' ; ')]); });
+  return L;
 }
 
 
@@ -61808,7 +61884,7 @@ async function fcBasculerDependancesUI(on) {
 
 /* ── Ma journée ── */
 function fcMaJournee(userId, aujourdhui) {
-  var t = aujourdhui || fcAuj(), sem = fcAjouterJours(t, 7), r = { retard: [], jour: [], prochaines: [], a_demarrer: [], pieces: [], a_valider: [], complements: [], notes: [], incoherences: [], sans_maj: [] };
+  var t = aujourdhui || fcAuj(), sem = fcAjouterJours(t, 7), r = { risque: [], retard: [], jour: [], prochaines: [], a_demarrer: [], pieces: [], a_valider: [], complements: [], notes: [], incoherences: [], sans_maj: [] };
   var item = function(d, e, extra) { return Object.assign({ dossier_id: d.id, dossier: d.reference, code: e ? e.code : '', libelle: e ? e.libelle : '', date: e ? e.date_cible : '', statut: e ? e.statut : '', detail: '' }, extra || {}); };
   fcDossiersActifs().forEach(function(d){
     var mien = d.responsable_id === userId;
@@ -61834,12 +61910,13 @@ function fcMaJournee(userId, aujourdhui) {
       fcNotesDebours(d).forEach(function(n){ if (fcNoteEnRetard(n, t)) { var c = fcClient(n.client_id) || {}; r.notes.push(item(d, null, { libelle: n.numero + ' · ' + fcFmtF(n.montant), date: n.echeance, detail: ((c.prenoms || '') + ' ' + (c.nom || '')).trim() })); } });
     }
   });
+  fcDossiersARisque(t, { min: 45, responsable_id: userId }).slice(0, 5).forEach(function(x){ r.risque.push({ dossier_id: x.dossier.id, dossier: x.dossier.reference, code: '', libelle: 'Risque ' + x.risque.score + '/100 (' + x.risque.niveau[2] + ')', date: '', statut: '', detail: x.risque.motifs.slice(0, 2).map(function(m){ return m.libelle; }).join(' ; ') }); });
   var ind = fcIndicateursResponsable(userId, t);
   ind.a_valider.forEach(function(x){ r.a_valider.push({ dossier_id: x.dossier_id, dossier: x.dossier, libelle: x.libelle, date: x.date, detail: x.detail, code: '', statut: '' }); });
   ind.complements.forEach(function(x){ r.complements.push({ dossier_id: x.dossier_id, dossier: x.dossier, libelle: x.libelle, date: x.date, detail: x.detail, code: '', statut: '' }); });
   return r;
 }
-var FC_SECTIONS_JOURNEE = [['retard', '⏰ En retard', 'etape'], ['jour', '📅 À faire aujourd\'hui', 'etape'], ['prochaines', '🗓️ Dans les 7 jours', 'etape'], ['a_demarrer', '▶ Prêtes à démarrer', 'etape'], ['pieces', '📥 Pièces à contrôler', 'piece'],
+var FC_SECTIONS_JOURNEE = [['risque', '🚨 Dossiers à surveiller en priorité', 'ouvrir'], ['retard', '⏰ En retard', 'etape'], ['jour', '📅 À faire aujourd\'hui', 'etape'], ['prochaines', '🗓️ Dans les 7 jours', 'etape'], ['a_demarrer', '▶ Prêtes à démarrer', 'etape'], ['pieces', '📥 Pièces à contrôler', 'piece'],
   ['a_valider', '✅ Livrables à valider', 'ouvrir'], ['complements', '✉️ Demandes de complément', 'ouvrir'], ['notes', '💶 Notes de débours en retard', 'ouvrir'], ['incoherences', '⚠️ Incohérences de séquence', 'ouvrir'], ['sans_maj', '💤 Dossiers sans mise à jour', 'ouvrir']];
 function fcCompteJournee(r) { return r.retard.length + r.jour.length + r.pieces.length + r.a_valider.length + r.complements.length; }
 function fcMajBadgeJournee() {
@@ -62034,6 +62111,7 @@ function fcRapportPeriodique(type, decalage, aujourdhui) {
       ['Dossiers en cours', s.en_cours, s.total + ' dossier(s) au total'], ['Dossiers bloqués', s.bloques, ''], ['Dossiers avec retard interne', s.retard_interne, ''], ['Délai administratif dépassé', s.delai_administratif_depasse, 'statut déclaré, aucune imputation'],
       ['Missions en retard', pm.missions_en_retard, ''], ['Documents à contrôler', pm.documents_a_controler, ''], ['Documents expirant sous 30 jours', pm.documents_expirants, ''],
       ['Étapes terminées dans les délais (%)', dir.respect_echeances.pourcentage == null ? '' : dir.respect_echeances.pourcentage, dir.respect_echeances.fiable ? 'mesuré sur ' + dir.respect_echeances.n + ' étape(s)' : 'données insuffisantes'],
+      ['Dossiers à risque élevé ou critique', fcDossiersARisque(t, { min: 45 }).length, fcDossiersARisque(t, { min: 70 }).length + ' critique(s) — indicatif'],
       ['Frais avancés à refacturer (FCFA)', c.a_refacturer, ''], ['Refacturé en attente de règlement (FCFA)', c.refacture_en_attente, ''], ['Notes de débours en retard', c.en_retard.n, fcFmtF(c.en_retard.montant)]];
     return { periode: p, precedente: pre, lignes: L, resume: 'Ouverts ' + a.ouverts + ' · clôturés ' + a.clotures + ' · en cours ' + s.en_cours + ' · bloqués ' + s.bloques + ' · notes en retard ' + c.en_retard.n + ' (' + fcFmtF(c.en_retard.montant) + ') · encaissé ' + fcFmtF(a.encaisse) };
   });
