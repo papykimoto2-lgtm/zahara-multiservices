@@ -224,3 +224,11 @@ Limites connues : le suivi horodaté n'existe que pour les changements de statut
 - Boutons « Créer la mission » (brouillon) et « Créer et envoyer » (création puis envoi à l'intervenant). La mission mémorise le modèle utilisé (`modele`).
 - Éditeur « 🧩 Modèles de mission par type d'intervenant » (direction / administrateurs) : nom court, titre, délai, étape, livrables (un par ligne), consignes ; ajout, suppression, enregistrement par type, rétablissement des modèles par défaut. Stockage `DATA.params.fc_modeles_mission` ; les modèles ne s'appliquent qu'aux nouvelles missions.
 - Aucune migration SQL. Tests : `foncier-missions-types.test.js` (4).
+
+## GC1 — Courriers types
+
+- Dossier › « ✉️ Courriers types » : 9 modèles (souscripteur : pièces complémentaires, point d'avancement, rappel de règlement d'une note de débours, remise du titre ; intervenant : lettre de mission, rappel d'échéance de mission, transmission au notaire ; administration : demande d'état d'avancement ; courrier libre).
+- Le courrier est préparé avec les données du dossier ({{dossier}}, {{lots}}, {{parcelle}}, {{souscripteur}}, {{intervenant}}, pièces attendues, avancement, note de débours, mission et livrables…). Une donnée absente apparaît « [à compléter] » et est signalée. Texte modifiable avant action.
+- Actions : 🖨 imprimer / PDF (en-tête de la société, référence, destinataire, pied de page légal), 📋 copier, 📨 envoyer par e-mail (file de notifications existante, dédupliquée par référence). Chaque action est journalisée (événement `courrier`, référence **COU-AAAA-NNNN** identique pour un même courrier).
+- Direction / administrateurs : Foncier › Modèles de dossier › « 📝 Modèles de courrier » modifie objet et texte de chaque modèle (champs {{...}} vérifiés), avec rétablissement du texte d'origine. Stockage `DATA.params.fc_gabarits_courrier`.
+- Aucune migration SQL. Tests : `foncier-courriers.test.js` (5).

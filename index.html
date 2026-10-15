@@ -59530,6 +59530,7 @@ function fcRenderDetail(id) {
   h += '<div style="margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer le dossier</button> <button class="btn btn-secondary btn-sm" onclick="fcAllerJalons(\'' + d.parcelle_id + '\')">🧭 Voir les jalons du titre de la parcelle</button></div>';
   h += fcPanneauDossier(d);
   h += fcPanneauRisque(d);
+  h += fcPanneauCourriers(d);
   h += fcPanneauCompletude(d);
   var phase = '';
   h += '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Statut</th><th>Responsable</th><th>Échéance</th><th>Justificatifs</th><th>Visibilité</th><th></th></tr></thead><tbody>';
@@ -59559,6 +59560,7 @@ function fcRenderDetail(id) {
     + (evs.length ? evs.map(function(x){ return '<div style="padding:4px 0;border-bottom:1px solid var(--bord,#eee);"><b>' + escHtml(x.date.slice(0, 16).replace('T', ' ')) + '</b> · ' + escHtml(x.acteur || '—') + ' · ' + escHtml(x.description) + (x.motif ? ' <i>(motif : ' + escHtml(x.motif) + ')</i>' : '') + '</div>'; }).join('') : '<div style="color:var(--dim);">Aucun événement.</div>')
     + '</div></div>';
   host.innerHTML = h;
+  fcMajCourrierUI(d.id);
 }
 async function fcStatutUI(id, code, sel) {
   var statut = sel.value, motif = '';
@@ -61741,6 +61743,163 @@ async function fcRetablirModelesMissionUI() {
 }
 
 
+/* ═══ Courriers types (GC1) ═══
+   Gabarits de courriers préremplis avec les données du dossier, modifiables avant impression / copie / envoi. Chaque action est journalisée (référence COU-AAAA-NNNN).
+   Champs {{...}} : une donnée manquante reste visible « [à compléter] ». La direction adapte le texte des gabarits dans Foncier › Modèles de dossier › « Modèles de courrier » (DATA.params.fc_gabarits_courrier). */
+var FC_GABARITS_COURRIER = [
+  { code: 'complement_souscripteur', libelle: 'Souscripteur — pièces complémentaires', pour: 'client', objet: 'Dossier foncier {{dossier}} — pièces complémentaires à fournir',
+    corps: 'Madame, Monsieur {{souscripteur}},\n\nDans le cadre de la sécurisation du titre foncier de votre bien ({{lots}}, {{parcelle}}), nous vous prions de bien vouloir nous remettre les pièces suivantes :\n\n{{pieces_attendues}}\n\nVous pouvez les déposer directement depuis votre espace en ligne ou les remettre à nos services.\n\nNous restons à votre disposition pour toute précision.\n\nCordialement,\n{{responsable}}\n{{societe}}' },
+  { code: 'avancement_souscripteur', libelle: 'Souscripteur — point d’avancement', pour: 'client', objet: 'Dossier foncier {{dossier}} — point d’avancement',
+    corps: 'Madame, Monsieur {{souscripteur}},\n\nNous vous informons de l’avancement des démarches relatives au titre foncier de votre bien ({{lots}}, {{parcelle}}) : {{progression}} des démarches suivies pour vous sont terminées.\n\nProchaine étape : {{prochaine_etape}}.\n\nCes informations rendent compte de l’avancement des démarches ; elles ne constituent ni une garantie ni une décision de l’administration.\n\nCordialement,\n{{responsable}}\n{{societe}}' },
+  { code: 'relance_note', libelle: 'Souscripteur — rappel de règlement (note de débours)', pour: 'note', objet: 'Rappel — note de débours {{note_numero}} à régler',
+    corps: 'Madame, Monsieur {{souscripteur}},\n\nSauf erreur ou omission de notre part, la note de débours {{note_numero}} d’un montant de {{note_montant}}, relative aux frais avancés pour l’établissement de votre titre foncier (dossier {{dossier}}), n’a pas encore été réglée. Son échéance était fixée au {{note_echeance}}.\n\nNous vous remercions de bien vouloir procéder au règlement dans les meilleurs délais, en rappelant la référence {{note_numero}}. Si vous avez déjà payé, merci de nous en transmettre la preuve.\n\nCordialement,\n{{responsable}}\n{{societe}}' },
+  { code: 'remise_titre', libelle: 'Souscripteur — remise du titre foncier', pour: 'client', objet: 'Dossier foncier {{dossier}} — remise de votre titre foncier',
+    corps: 'Madame, Monsieur {{souscripteur}},\n\nNous avons le plaisir de vous informer que votre titre foncier relatif à {{lots}} ({{parcelle}}) est prêt à vous être remis.\n\nMerci de vous présenter à nos services muni(e) d’une pièce d’identité. Une décharge de remise vous sera demandée.\n\nCordialement,\n{{responsable}}\n{{societe}}' },
+  { code: 'ordre_mission', libelle: 'Intervenant — lettre de mission', pour: 'mission', objet: 'Mission {{mission_reference}} — {{mission_titre}}',
+    corps: 'Madame, Monsieur {{intervenant}},\n\nNous vous confions la mission suivante dans le cadre du dossier {{dossier}} ({{parcelle}}) :\n\n{{mission_titre}} (réf. {{mission_reference}})\n\nConsignes :\n{{mission_consignes}}\n\nLivrables attendus :\n{{mission_livrables}}\n\nÉchéance : {{mission_echeance}}.\n\nMerci de confirmer votre acceptation et de déposer vos livrables sur votre espace intervenant.\n\nCordialement,\n{{responsable}}\n{{societe}}' },
+  { code: 'relance_mission', libelle: 'Intervenant — rappel d’échéance', pour: 'mission', objet: 'Rappel — mission {{mission_reference}} (échéance {{mission_echeance}})',
+    corps: 'Madame, Monsieur {{intervenant}},\n\nNous nous permettons de vous rappeler la mission {{mission_reference}} — {{mission_titre}} (dossier {{dossier}}), dont l’échéance est fixée au {{mission_echeance}}.\n\nLivrables attendus :\n{{mission_livrables}}\n\nMerci de nous indiquer l’état d’avancement et la date de remise prévue, ou de nous signaler toute difficulté.\n\nCordialement,\n{{responsable}}\n{{societe}}' },
+  { code: 'transmission_notaire', libelle: 'Notaire — transmission du dossier', pour: 'intervenant', objet: 'Transmission du dossier foncier {{dossier}}',
+    corps: 'Maître {{intervenant}},\n\nNous vous transmettons le dossier foncier {{dossier}} relatif à {{lots}} ({{parcelle}}), au nom de {{souscripteur}}, en vue de l’établissement de l’acte.\n\nPièces transmises :\n{{pieces_dossier}}\n\nNous restons à votre disposition pour tout complément.\n\nCordialement,\n{{responsable}}\n{{societe}}' },
+  { code: 'suivi_administration', libelle: 'Administration — demande d’état d’avancement', pour: 'aucun', objet: 'Demande d’état d’avancement — dossier {{numero_dossier}}',
+    corps: 'Madame, Monsieur,\n\nNous avons déposé auprès de vos services le dossier référencé {{numero_dossier}} (parcelle {{parcelle}}, notre référence {{dossier}}). Nous vous serions reconnaissants de bien vouloir nous indiquer l’état d’avancement de son instruction et, le cas échéant, les pièces complémentaires à fournir.\n\nNous vous remercions de votre diligence.\n\nVeuillez agréer, Madame, Monsieur, l’expression de nos salutations distinguées.\n\n{{responsable}}\n{{societe}}' },
+  { code: 'libre', libelle: 'Courrier libre', pour: 'aucun', objet: 'Dossier foncier {{dossier}}', corps: '' }
+];
+var FC_CHAMPS_COURRIER = ['date', 'societe', 'responsable', 'dossier', 'procedure', 'parcelle', 'lots', 'souscripteur', 'intervenant', 'pieces_attendues', 'pieces_dossier', 'progression', 'prochaine_etape', 'note_numero', 'note_montant', 'note_echeance', 'mission_reference', 'mission_titre', 'mission_echeance', 'mission_livrables', 'mission_consignes', 'numero_dossier'];
+function fcGabaritCourrier(code) {
+  var g = FC_GABARITS_COURRIER.find(function(x){ return x.code === code; }); if (!g) return null;
+  var perso = ((DATA.params || {}).fc_gabarits_courrier || {})[code];
+  return perso ? Object.assign({}, g, { objet: perso.objet, corps: perso.corps, personnalise: true }) : g;
+}
+function fcListeTexte(l) { return (l || []).map(function(x){ return '- ' + x; }).join('\n'); }
+function fcChampsCourrier(d, o) {
+  o = o || {}; var c = o.client_id ? fcClient(o.client_id) : null, m = o.mission_id ? fcMission(o.mission_id) : null, n = o.note_id ? fcNoteDebours(d, o.note_id) : null, iv = o.intervenant_id ? fcIntervenant(o.intervenant_id) : (m ? fcIntervenant(m.intervenant_id) : null);
+  if (!c && n) c = fcClient(n.client_id);
+  if (!c && (d.client_ids || [d.client_id]).filter(Boolean).length === 1) c = fcClient((d.client_ids || [d.client_id]).filter(Boolean)[0]);
+  var lots = (d.lots_ids || [d.lot_id]).filter(Boolean).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); });
+  var prochaine = (d.etapes || []).filter(function(e){ return e.visibilite === 'souscripteur' && FC_STATUTS_FINAUX.indexOf(e.statut) === -1; }).sort(function(a, b){ return a.ordre - b.ordre; })[0];
+  var attente = (d.etapes || []).filter(function(e){ return e.statut === 'attente_document' && (e.pieces || []).length; });
+  var pieces = attente.length ? attente.reduce(function(a, e){ return a.concat(e.pieces); }, []) : ((fcProchaineEtape(d) || {}).pieces || []);
+  var pdossier = (DATA.pieces_foncieres || []).filter(function(p){ return p.dossier_id === d.id && !p.retire && !p.remplacee_par && p.confidentialite !== 'restreinte'; }).map(function(p){ return p.nom; });
+  var t = fcAuj();
+  return {
+    date: dateShort(t), societe: (typeof attSoldeEntreprise === 'function' ? attSoldeEntreprise(c || {}).societe : '') || '', responsable: fcNomUtilisateur(d.responsable_id), dossier: d.reference, procedure: FC_PROCEDURES[d.type_procedure] || '',
+    parcelle: fcLibelleParcelle(d.parcelle_id), lots: lots.length ? (lots.length > 1 ? 'lots ' : 'lot ') + lots.join(', ') : '', souscripteur: c ? ((c.prenoms || '') + ' ' + (c.nom || '')).trim() : '', intervenant: iv ? iv.nom_organisation : '',
+    pieces_attendues: fcListeTexte(pieces), pieces_dossier: fcListeTexte(pdossier), progression: fcProgressionSouscripteur(d).pourcentage + ' %', prochaine_etape: prochaine ? prochaine.libelle : '',
+    note_numero: n ? n.numero : '', note_montant: n ? fcFmtF(n.montant) : '', note_echeance: n ? dateShort(n.echeance) : '', mission_reference: m ? m.reference : '', mission_titre: m ? m.titre : '', mission_echeance: m ? dateShort(m.echeance) : '',
+    mission_livrables: m ? fcListeTexte((m.livrables || []).map(function(l){ return l.libelle; })) : '', mission_consignes: m ? (m.description || '—') : '', numero_dossier: d.numero_dossier_guf || d.idufci || ''
+  };
+}
+/* Fusion {{champ}} → valeur ; une valeur absente devient « [à compléter] » et est signalée. */
+function fcFusionnerCourrier(texte, champs, manquants) {
+  return String(texte || '').replace(/\{\{\s*([a-z_]+)\s*\}\}/g, function(tout, k){ var v = champs[k]; if (v == null || String(v).trim() === '') { if (manquants && manquants.indexOf(k) === -1) manquants.push(k); return '[à compléter]'; } return String(v); });
+}
+function fcPreparerCourrier(dossierId, code, o) {
+  o = o || {}; var d = fcDossier(dossierId), g = fcGabaritCourrier(code);
+  if (!d) return { ok: false, erreur: 'Dossier introuvable.' };
+  if (!g) return { ok: false, erreur: 'Modèle de courrier inconnu.' };
+  var dest = { nom: '', email: '' };
+  if (g.pour === 'client') { var c = o.client_id ? fcClient(o.client_id) : null; if (!c || (d.client_ids || [d.client_id]).indexOf(c.id) === -1) { var uniq = (d.client_ids || [d.client_id]).filter(Boolean); c = uniq.length === 1 ? fcClient(uniq[0]) : null; if (!c) return { ok: false, erreur: 'Choisissez le souscripteur destinataire.' }; } o.client_id = c.id; dest = { nom: ((c.prenoms || '') + ' ' + (c.nom || '')).trim(), email: c.email || '' }; }
+  if (g.pour === 'mission') { var m = o.mission_id ? fcMission(o.mission_id) : null; if (!m || m.dossier_id !== d.id) return { ok: false, erreur: 'Choisissez la mission concernée.' }; var im = fcIntervenant(m.intervenant_id) || {}; dest = { nom: im.nom_organisation || '', email: im.email || '' }; }
+  if (g.pour === 'note') { var n = o.note_id ? fcNoteDebours(d, o.note_id) : null; if (!n || n.statut !== 'emise') return { ok: false, erreur: 'Choisissez une note de débours émise (non encaissée).' }; var cn = fcClient(n.client_id) || {}; o.client_id = n.client_id; dest = { nom: ((cn.prenoms || '') + ' ' + (cn.nom || '')).trim(), email: cn.email || '' }; }
+  if (g.pour === 'intervenant') { var iv = o.intervenant_id ? fcIntervenant(o.intervenant_id) : null; if (!iv) return { ok: false, erreur: 'Choisissez l’intervenant destinataire.' }; dest = { nom: iv.nom_organisation, email: iv.email || '' }; }
+  var champs = fcChampsCourrier(d, o), manquants = [];
+  return { ok: true, gabarit: g, objet: fcFusionnerCourrier(g.objet, champs, manquants), corps: fcFusionnerCourrier(g.corps, champs, manquants), destinataire: dest, manquants: manquants, contexte: o };
+}
+function fcNumeroCourrier() {
+  var an = new Date().getFullYear(), max = 0, re = new RegExp('^COU-' + an + '-(\\d+)$');
+  (DATA.evenements_fonciers || []).forEach(function(e){ var m = re.exec(e.courrier_ref || ''); if (m) max = Math.max(max, parseInt(m[1], 10)); });
+  return 'COU-' + an + '-' + ('0000' + (max + 1)).slice(-4);
+}
+function fcHtmlCourrier(d, objet, corps, ref, dest, o) {
+  var c = o && o.client_id ? fcClient(o.client_id) : null, p = (typeof attSoldeEntreprise === 'function') ? attSoldeEntreprise(c || {}) : (DATA.params || {}), E = function(x){ return escHtml(x == null ? '' : String(x)); };
+  var paras = String(corps || '').split(/\n{2,}/).map(function(x){ return '<p class="art">' + E(x).replace(/\n/g, '<br>') + '</p>'; }).join('');
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + E(ref) + '</title><style>body{font-family:Georgia,serif;color:#1a1a1a;padding:38px 46px;max-width:760px;margin:0 auto;font-size:13px;line-height:1.6;position:relative;}.ref{display:flex;justify-content:space-between;font-size:12px;color:#444;border-bottom:2px solid #1D3F7A;padding-bottom:8px;}.dest{margin:22px 0 10px 48%;font-size:13px;}.obj{margin:16px 0;font-weight:bold;}.art{margin:8px 0;text-align:justify;}' + (typeof ATT_PIED_CSS === 'string' ? ATT_PIED_CSS : '') + '</style></head><body>'
+    + '<div class="ref"><div><strong style="font-size:15px;">' + E(p.societe || '') + '</strong></div><div style="text-align:right;">Réf. <strong>' + E(ref) + '</strong><br>' + E(dateShort(fcAuj())) + '</div></div>'
+    + (dest && dest.nom ? '<div class="dest">' + E(dest.nom) + '</div>' : '') + '<div class="obj">Objet : ' + E(objet) + '</div>' + paras + (typeof docPiedDePageEntreprise === 'function' ? docPiedDePageEntreprise(p) : '') + '</body></html>';
+}
+async function fcEnregistrerCourrier(dossierId, o) {
+  o = o || {}; var d = fcDossier(dossierId), g = fcGabaritCourrier(o.code); if (!d || !g) return { ok: false, erreur: 'Dossier ou modèle introuvable.' };
+  if (['impression', 'copie', 'email'].indexOf(o.action) === -1) return { ok: false, erreur: 'Action inconnue.' };
+  var ref = o.ref || fcNumeroCourrier();
+  await fcEvenement(d, '', 'courrier', 'Courrier ' + ref + ' « ' + g.libelle + ' » — ' + ({ impression: 'imprimé', copie: 'copié', email: 'envoyé par e-mail' })[o.action] + (o.destinataire ? ' — ' + o.destinataire : ''), { source: 'promoteur', courrier_ref: ref, courrier_action: o.action, courrier_modele: g.code });
+  return { ok: true, ref: ref };
+}
+fcProtegerMutations(['fcEnregistrerCourrier']);
+
+/* Interface : panneau dans le dossier */
+function fcPanneauCourriers(d) {
+  if (d.statut === 'annule') return '';
+  return '<div class="card" style="margin:8px 0;"><details><summary class="card-title" style="cursor:pointer;">✉️ Courriers types</summary>'
+    + '<div style="font-size:11px;color:var(--dim);margin:6px 0;">Choisissez un modèle : le courrier est préparé avec les données du dossier, modifiable avant impression, copie ou envoi. Chaque action est journalisée.</div>'
+    + '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;"><div class="form-group"><label>Modèle</label><select class="filter-select" id="fcc-g" onchange="fcMajCourrierUI(\'' + d.id + '\')">' + FC_GABARITS_COURRIER.map(function(g){ return '<option value="' + g.code + '">' + escHtml(g.libelle) + '</option>'; }).join('') + '</select></div>'
+    + '<div class="form-group" id="fcc-pour-zone"></div><button class="btn btn-primary btn-sm" onclick="fcPreparerCourrierUI(\'' + d.id + '\')">Préparer le courrier</button></div><div id="fcc-zone"></div></details></div>';
+}
+function fcMajCourrierUI(dossierId) {
+  var d = fcDossier(dossierId), g = fcGabaritCourrier((document.getElementById('fcc-g') || {}).value), z = document.getElementById('fcc-pour-zone'); if (!d || !g || !z) return;
+  var opts = [];
+  if (g.pour === 'client') opts = (d.client_ids || [d.client_id]).filter(Boolean).map(function(id){ var c = fcClient(id) || {}; return [id, ((c.prenoms || '') + ' ' + (c.nom || '')).trim() || id]; });
+  if (g.pour === 'mission') opts = (DATA.missions_foncieres || []).filter(function(m){ return m.dossier_id === d.id && m.statut !== 'annulee'; }).map(function(m){ return [m.id, m.reference + ' — ' + m.titre + ' (' + fcNomIntervenant(m.intervenant_id) + ')']; });
+  if (g.pour === 'note') opts = fcNotesDebours(d).filter(function(n){ return n.statut === 'emise'; }).map(function(n){ return [n.id, n.numero + ' — ' + fcFmtF(n.montant) + ' (échéance ' + dateShort(n.echeance) + ')']; });
+  if (g.pour === 'intervenant') opts = (DATA.intervenants_fonciers || []).filter(function(i){ return i.statut_relation === 'actif'; }).map(function(i){ return [i.id, i.nom_organisation + ' (' + (FC_TYPES_INTERVENANT[i.type] || i.type) + ')']; });
+  var lib = { client: 'Souscripteur', mission: 'Mission', note: 'Note de débours', intervenant: 'Intervenant' }[g.pour];
+  z.innerHTML = lib ? '<label>' + lib + '</label><select class="filter-select" id="fcc-pour">' + (opts.length ? opts.map(function(x){ return '<option value="' + x[0] + '">' + escHtml(x[1]) + '</option>'; }).join('') : '<option value="">— aucun —</option>') + '</select>' : '';
+}
+function fcPreparerCourrierUI(dossierId) {
+  var g = document.getElementById('fcc-g'), pour = (document.getElementById('fcc-pour') || {}).value || '', code = g && g.value, gab = fcGabaritCourrier(code), o = {};
+  if (gab) { if (gab.pour === 'client') o.client_id = pour; if (gab.pour === 'mission') o.mission_id = pour; if (gab.pour === 'note') o.note_id = pour; if (gab.pour === 'intervenant') o.intervenant_id = pour; }
+  var r = fcPreparerCourrier(dossierId, code, o); var zone = document.getElementById('fcc-zone'); if (!zone) return;
+  if (!r.ok) { zone.innerHTML = '<div style="color:#c0392b;font-size:12px;margin-top:8px;">' + escHtml(r.erreur) + '</div>'; return; }
+  APP._fcCourrier = { dossier_id: dossierId, code: code, ref: '', destinataire: r.destinataire, contexte: r.contexte };
+  zone.innerHTML = '<div style="margin-top:10px;">' + (r.manquants.length ? '<div style="font-size:12px;color:#B87333;margin-bottom:6px;">⚠ À compléter : ' + r.manquants.map(function(k){ return escHtml(k.replace(/_/g, ' ')); }).join(', ') + ' (cherchez « [à compléter] » dans le texte).</div>' : '')
+    + '<div style="font-size:12px;margin-bottom:4px;">Destinataire : <b>' + escHtml(r.destinataire.nom || '—') + '</b>' + (r.destinataire.email ? ' · ' + escHtml(r.destinataire.email) : ' · <i>aucun e-mail connu</i>') + '</div>'
+    + '<input class="form-control" id="fcc-objet" value="' + escHtml(r.objet) + '" style="margin-bottom:6px;"><textarea class="form-control" id="fcc-corps" rows="14">' + escHtml(r.corps) + '</textarea>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button class="btn btn-primary btn-sm" onclick="fcCourrierActionUI(\'impression\')">🖨 Imprimer / PDF</button> <button class="btn btn-secondary btn-sm" onclick="fcCourrierActionUI(\'copie\')">📋 Copier le texte</button> <button class="btn btn-secondary btn-sm" ' + (r.destinataire.email ? '' : 'disabled title="Aucun e-mail connu pour ce destinataire" ') + 'onclick="fcCourrierActionUI(\'email\')">📨 Envoyer par e-mail</button></div></div>';
+}
+async function fcCourrierActionUI(action) {
+  var s = APP._fcCourrier, objet = (document.getElementById('fcc-objet') || {}).value || '', corps = (document.getElementById('fcc-corps') || {}).value || ''; if (!s) return;
+  if (!corps.trim()) { toast('Le courrier est vide.', 'error'); return; }
+  if (/\[à compléter\]/.test(objet + corps) && !confirm('Le courrier contient encore des « [à compléter] ». Continuer quand même ?')) return;
+  var d = fcDossier(s.dossier_id), ref = s.ref || fcNumeroCourrier();
+  if (action === 'email') {
+    if (!s.destinataire.email) { toast('Aucun e-mail connu pour ce destinataire.', 'error'); return; }
+    if (!confirm('Envoyer ce courrier par e-mail à ' + s.destinataire.nom + ' (' + s.destinataire.email + ') ?')) return;
+    var n = await fcCreerNotification({ dedup: 'courrier:' + ref, titre: objet, template_code: 'courrier', dossier_id: d.id, urgent: false, message: corps, destinataire: { type: 'externe', id: s.contexte.client_id || s.contexte.intervenant_id || s.destinataire.nom, nom: s.destinataire.nom, email: s.destinataire.email, telephone: '' } });
+    if (!n.creees.length) { toast('Ce courrier a déjà été mis en file d’envoi.', 'info'); return; }
+  } else if (action === 'copie') {
+    try { await navigator.clipboard.writeText(objet + '\n\n' + corps); } catch (e) { var t = document.getElementById('fcc-corps'); if (t) { t.select(); try { document.execCommand('copy'); } catch (e2) {} } }
+  } else if (typeof openPrintPreview === 'function') openPrintPreview(fcHtmlCourrier(d, objet, corps, ref, s.destinataire, s.contexte), 'Courrier ' + ref, false);
+  var r = await fcEnregistrerCourrier(s.dossier_id, { code: s.code, action: action, ref: ref, destinataire: s.destinataire.nom }); if (r.ok) s.ref = r.ref;
+  toast(({ impression: 'Courrier prêt à imprimer', copie: 'Texte copié', email: 'Courrier mis en file d’envoi' })[action] + ' — réf. ' + ref + '.', 'success');
+}
+
+/* Éditeur des modèles de courrier (direction) */
+function fcEditeurGabaritsCourrier() {
+  if (!fcPeutGererModeles()) return '';
+  var code = APP._fgcCode || FC_GABARITS_COURRIER[0].code, g = fcGabaritCourrier(code);
+  return '<div class="card"><details id="fgc-details"><summary class="card-title" style="cursor:pointer;">📝 Modèles de courrier' + (((DATA.params || {}).fc_gabarits_courrier || {})[code] ? ' <span style="font-size:11px;color:#B87333;">(personnalisé)</span>' : '') + '</summary>'
+    + '<div style="font-size:11px;color:var(--dim);margin:6px 0;">Champs disponibles : ' + FC_CHAMPS_COURRIER.map(function(k){ return '<code>{{' + k + '}}</code>'; }).join(' ') + '. Un champ sans donnée apparaît « [à compléter] ».</div>'
+    + '<div class="filters-bar" style="align-items:end;"><div class="form-group"><label>Modèle</label><select class="filter-select" onchange="APP._fgcCode=this.value;fcRenderModeles();var d=document.getElementById(\'fgc-details\');if(d)d.open=true;">' + FC_GABARITS_COURRIER.map(function(x){ return '<option value="' + x.code + '"' + (x.code === code ? ' selected' : '') + '>' + escHtml(x.libelle) + '</option>'; }).join('') + '</select></div></div>'
+    + '<input class="form-control" id="fgc-objet" value="' + escHtml(g.objet) + '" style="margin-bottom:6px;"><textarea class="form-control" id="fgc-corps" rows="12">' + escHtml(g.corps) + '</textarea>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button class="btn btn-primary btn-sm" onclick="fcSauverGabaritUI()">💾 Enregistrer ce modèle</button> <button class="btn btn-secondary btn-sm" onclick="fcRetablirGabaritUI()">↺ Rétablir le texte d’origine</button></div></details></div>';
+}
+async function fcSauverGabaritUI() {
+  if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); return; }
+  var code = APP._fgcCode || FC_GABARITS_COURRIER[0].code, objet = ((document.getElementById('fgc-objet') || {}).value || '').trim(), corps = ((document.getElementById('fgc-corps') || {}).value || '').trim();
+  if (!objet) { toast('L’objet du courrier est obligatoire.', 'error'); return; }
+  if (code !== 'libre' && !corps) { toast('Le texte du courrier est obligatoire.', 'error'); return; }
+  var inconnus = (objet + ' ' + corps).match(/\{\{\s*[a-z_]+\s*\}\}/g) || []; inconnus = inconnus.map(function(x){ return x.replace(/[{}\s]/g, ''); }).filter(function(k){ return FC_CHAMPS_COURRIER.indexOf(k) === -1; });
+  if (inconnus.length) { toast('Champ(s) inconnu(s) : ' + inconnus.join(', ') + '.', 'error'); return; }
+  DATA.params = DATA.params || {}; DATA.params.fc_gabarits_courrier = Object.assign({}, DATA.params.fc_gabarits_courrier || {}); DATA.params.fc_gabarits_courrier[code] = { objet: objet, corps: corps };
+  await fcEnregistrerParams(); toast('Modèle de courrier enregistré.', 'success'); fcRenderModeles(); var d = document.getElementById('fgc-details'); if (d) d.open = true;
+}
+async function fcRetablirGabaritUI() {
+  if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); return; }
+  var code = APP._fgcCode || FC_GABARITS_COURRIER[0].code; if (!((DATA.params || {}).fc_gabarits_courrier || {})[code]) { toast('Ce modèle est déjà celui d’origine.', 'info'); return; }
+  DATA.params.fc_gabarits_courrier = Object.assign({}, DATA.params.fc_gabarits_courrier); delete DATA.params.fc_gabarits_courrier[code]; await fcEnregistrerParams(); fcRenderModeles(); var d = document.getElementById('fgc-details'); if (d) d.open = true;
+}
+
+
 /* ═══ Score de risque par dossier (RK1) ═══
    Indicateur d'aide à la priorisation, de 0 à 100, calculé uniquement à partir de faits mesurables du dossier (retards, blocages, pièces, missions, comptabilité).
    Chaque point est expliqué ; aucun jugement sur un tiers (un délai d'administration dépassé pèse peu et n'est jamais présenté comme une faute). Ne remplace pas l'avis du responsable. */
@@ -61973,7 +62132,7 @@ function fcRenderModeles() {
     + '<hr><label style="font-size:12px;"><input type="checkbox" ' + (fcDelaisAutoActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_delais_auto\',this.checked,\'Échéances estimées\')"> <b>Estimer les échéances d\'après vos dossiers</b> : pour les étapes sans durée dans le modèle, l\'échéance utilise la durée habituelle observée (75 % des dossiers terminés plus vite, au moins ' + FC_SEUIL_MESURE + ' dossiers), marquée « estimée ».</label>'
     + '<br><label style="font-size:12px;"><input type="checkbox" id="fm-deps" ' + (fcDependancesActives() ? 'checked ' : '') + ro + ' onchange="fcBasculerDependancesUI(this.checked)"> <b>Imposer l\'ordre des étapes</b> : une étape ne démarre ni ne se termine avant ses étapes préalables (dérogation motivée du responsable, journalisée).</label>'
     + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleClotureActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_cloture\',this.checked,\'Contrôle de clôture\')"> <b>Contrôler la complétude à la clôture</b> : pièces à contrôler, missions, demandes, anomalies, frais et notes du titre.</label>'
-    + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleConcurrenceActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_concurrence\',this.checked,\'Protection contre les modifications simultanées\')"> <b>Protéger contre les modifications simultanées</b> : refuser une modification si un collègue a enregistré le dossier entre-temps.</label></div>';
+    + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleConcurrenceActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_concurrence\',this.checked,\'Protection contre les modifications simultanées\')"> <b>Protéger contre les modifications simultanées</b> : refuser une modification si un collègue a enregistré le dossier entre-temps.</label></div>' + fcEditeurGabaritsCourrier();
   host.innerHTML = h;
 }
 async function fcEnregistrerParams() {
