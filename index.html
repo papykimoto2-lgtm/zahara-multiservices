@@ -975,6 +975,20 @@ textarea.form-control { resize:vertical; min-height:90px; }
   .app-body { margin-left:0; }
 }
 
+/* Liste des dossiers fonciers : cartes empilées sur mobile (SUP2) */
+@media (max-width: 700px) {
+  #fc-liste-corps .table-wrap { overflow: visible; }
+  #fc-liste-corps table, #fc-liste-corps tbody { display: block; width: 100%; min-width: 0 !important; }
+  #fc-liste-corps thead { display: none; }
+  #fc-liste-corps tr { display: block; position: relative; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border, #d9d9e3); border-radius: 12px; background: var(--card, #fff); }
+  #fc-liste-corps td { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border: 0; text-align: right; white-space: normal; }
+  #fc-liste-corps td[data-label]::before { content: attr(data-label); flex: 0 0 38%; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--dim, #5b5b7b); }
+  #fc-liste-corps td.fc-c-ref { font-size: 15px; padding-right: 36px; }
+  #fc-liste-corps td.fc-c-ck { position: absolute; top: 10px; right: 12px; padding: 0; }
+  #fc-liste-corps td.fc-c-ck input { width: 22px; height: 22px; }
+  #fc-liste-corps td.fc-c-act { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border, #e3e3ec); margin-top: 4px; }
+  #fc-liste-corps td.fc-c-act .btn { flex: 1 1 auto; min-height: 40px; }
+}
 @media (max-width: 767px) {
   .bottom-nav { display:block; }
   .sidebar {
@@ -62250,10 +62264,10 @@ function fcDossiersListe(ctx) {
 }
 function fcLigneDossierHtml(d, ctxR) {
   var e = fcProchaineEtape(d), et = e ? fcEtatEcheance(e) : '';
-  return '<tr><td><input type="checkbox" class="fc-ck-d" value="' + d.id + '" ' + (APP._fcSelect && APP._fcSelect[d.id] ? 'checked ' : '') + 'onchange="fcCocherDossierUI(this.value,this.checked)"></td><td><strong>' + escHtml(d.reference) + '</strong>' + (d.archive ? ' <span style="font-size:10px;color:#6a5acd;">🗄 archivé</span>' : '') + fcBadgeRisque(fcScoreRisque(d, fcAuj(), ctxR)) + (fcEstIndividuel(d) ? '<br><span style="font-size:10px;color:#B87333;">Titre individuel</span>' : '') + '</td><td>' + escHtml(fcLibelleParcelle(d.parcelle_id)) + (fcEstIndividuel(d) ? '<br><span style="font-size:11px;color:var(--dim);">lot ' + escHtml((d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ')) + ' · ' + escHtml((d.client_ids || [d.client_id]).map(function(id){ return (fcClient(id) || {}).nom || id; }).join(', ')) + '</span>' : '') + '</td><td>' + escHtml(FC_PROCEDURES[d.type_procedure] || d.type_procedure) + '</td><td>' + escHtml(d.statut) + '</td>'
-    + '<td>' + (e ? escHtml(e.libelle) + '<br>' + fcBadgeStatut(e.statut) : '—') + '</td><td>' + escHtml(fcNomUtilisateur((e && e.responsable_id) || d.responsable_id)) + '</td>'
-    + '<td>' + escHtml((e && e.date_cible) || d.date_cible || '—') + (et ? '<br><span style="color:#c0392b;font-size:11px;">' + (et === 'retard_interne' ? 'Retard interne' : 'Délai administratif dépassé') + '</span>' : '') + '</td>'
-    + '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="fcOuvrirDetail(\'' + d.id + '\')">Ouvrir</button> <button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer</button>' + (fcEstAdmin() ? ' <button class="btn btn-secondary btn-sm" style="color:#c0392b;" title="Supprimer le dossier" onclick="fcSupprimerDossierUI(\'' + d.id + '\')">🗑 Supprimer</button>' : '') + '</td></tr>';
+  return '<tr><td class="fc-c-ck"><input type="checkbox" class="fc-ck-d" value="' + d.id + '" ' + (APP._fcSelect && APP._fcSelect[d.id] ? 'checked ' : '') + 'onchange="fcCocherDossierUI(this.value,this.checked)"></td><td class="fc-c-ref" data-label="Référence"><strong>' + escHtml(d.reference) + '</strong>' + (d.archive ? ' <span style="font-size:10px;color:#6a5acd;">🗄 archivé</span>' : '') + fcBadgeRisque(fcScoreRisque(d, fcAuj(), ctxR)) + (fcEstIndividuel(d) ? '<br><span style="font-size:10px;color:#B87333;">Titre individuel</span>' : '') + '</td><td data-label="Parcelle">' + escHtml(fcLibelleParcelle(d.parcelle_id)) + (fcEstIndividuel(d) ? '<br><span style="font-size:11px;color:var(--dim);">lot ' + escHtml((d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ')) + ' · ' + escHtml((d.client_ids || [d.client_id]).map(function(id){ return (fcClient(id) || {}).nom || id; }).join(', ')) + '</span>' : '') + '</td><td data-label="Procédure">' + escHtml(FC_PROCEDURES[d.type_procedure] || d.type_procedure) + '</td><td data-label="Statut">' + escHtml(d.statut) + '</td>'
+    + '<td data-label="Étape courante">' + (e ? escHtml(e.libelle) + '<br>' + fcBadgeStatut(e.statut) : '—') + '</td><td data-label="Responsable">' + escHtml(fcNomUtilisateur((e && e.responsable_id) || d.responsable_id)) + '</td>'
+    + '<td data-label="Échéance">' + escHtml((e && e.date_cible) || d.date_cible || '—') + (et ? '<br><span style="color:#c0392b;font-size:11px;">' + (et === 'retard_interne' ? 'Retard interne' : 'Délai administratif dépassé') + '</span>' : '') + '</td>'
+    + '<td class="fc-c-act" style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="fcOuvrirDetail(\'' + d.id + '\')">Ouvrir</button> <button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer</button>' + (fcEstAdmin() ? ' <button class="btn btn-secondary btn-sm" style="color:#c0392b;" title="Supprimer le dossier" onclick="fcSupprimerDossierUI(\'' + d.id + '\')">🗑 Supprimer</button>' : '') + '</td></tr>';
 }
 /* ═══ Suppression définitive d'un dossier (SUP1) ═══
    Réservée aux administrateurs, motif obligatoire, refusée dès qu'une trace comptable existe (frais comptabilisés, note de débours émise ou encaissée) :
