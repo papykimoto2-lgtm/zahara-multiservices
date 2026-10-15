@@ -62253,7 +62253,44 @@ function fcLigneDossierHtml(d, ctxR) {
   return '<tr><td><input type="checkbox" class="fc-ck-d" value="' + d.id + '" ' + (APP._fcSelect && APP._fcSelect[d.id] ? 'checked ' : '') + 'onchange="fcCocherDossierUI(this.value,this.checked)"></td><td><strong>' + escHtml(d.reference) + '</strong>' + (d.archive ? ' <span style="font-size:10px;color:#6a5acd;">🗄 archivé</span>' : '') + fcBadgeRisque(fcScoreRisque(d, fcAuj(), ctxR)) + (fcEstIndividuel(d) ? '<br><span style="font-size:10px;color:#B87333;">Titre individuel</span>' : '') + '</td><td>' + escHtml(fcLibelleParcelle(d.parcelle_id)) + (fcEstIndividuel(d) ? '<br><span style="font-size:11px;color:var(--dim);">lot ' + escHtml((d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ')) + ' · ' + escHtml((d.client_ids || [d.client_id]).map(function(id){ return (fcClient(id) || {}).nom || id; }).join(', ')) + '</span>' : '') + '</td><td>' + escHtml(FC_PROCEDURES[d.type_procedure] || d.type_procedure) + '</td><td>' + escHtml(d.statut) + '</td>'
     + '<td>' + (e ? escHtml(e.libelle) + '<br>' + fcBadgeStatut(e.statut) : '—') + '</td><td>' + escHtml(fcNomUtilisateur((e && e.responsable_id) || d.responsable_id)) + '</td>'
     + '<td>' + escHtml((e && e.date_cible) || d.date_cible || '—') + (et ? '<br><span style="color:#c0392b;font-size:11px;">' + (et === 'retard_interne' ? 'Retard interne' : 'Délai administratif dépassé') + '</span>' : '') + '</td>'
-    + '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="fcOuvrirDetail(\'' + d.id + '\')">Ouvrir</button> <button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer</button></td></tr>';
+    + '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="fcOuvrirDetail(\'' + d.id + '\')">Ouvrir</button> <button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer</button>' + (fcEstAdmin() ? ' <button class="btn btn-secondary btn-sm" style="color:#c0392b;" title="Supprimer le dossier" onclick="fcSupprimerDossierUI(\'' + d.id + '\')">🗑 Supprimer</button>' : '') + '</td></tr>';
+}
+/* ═══ Suppression définitive d'un dossier (SUP1) ═══
+   Réservée aux administrateurs, motif obligatoire, refusée dès qu'une trace comptable existe (frais comptabilisés, note de débours émise ou encaissée) :
+   ces dossiers s'annulent puis s'archivent. Suppression propagée (tombstone), instantané conservé au journal d'audit. */
+function fcObstaclesSuppression(d) {
+  var o = [];
+  fcFraisTitre(d).forEach(function(f){ if (['comptabilise', 'paye'].indexOf(f.statut) !== -1) o.push('frais comptabilisé : ' + ((FC_FRAIS_TITRE[f.nature] || {}).lib || f.nature)); });
+  (d.notes_debours || []).forEach(function(n){ if (['emise', 'encaissee'].indexOf(n.statut) !== -1) o.push('note de débours ' + (n.numero || '') + ' ' + n.statut); });
+  return o;
+}
+async function fcSupprimerDossier(id, motif) {
+  var d = fcDossier(id); if (!d) return { ok: false, erreur: 'Dossier introuvable.' };
+  if (!fcEstAdmin()) return { ok: false, erreur: 'Seul un administrateur supprime un dossier. Annulez ou archivez-le.' };
+  motif = String(motif || '').trim(); if (motif.length < 10) return { ok: false, erreur: 'Motif obligatoire (10 caractères minimum).' };
+  var ob = fcObstaclesSuppression(d); if (ob.length) return { ok: false, erreur: 'Suppression impossible (trace comptable) : ' + ob.join(' ; ') + '. Annulez puis archivez le dossier.' };
+  var snap = JSON.parse(JSON.stringify(d)), ref = d.reference;
+  try { snap._motif_suppression = motif; await logAudit('dossiers_fonciers', id, 'delete', snap, null); } catch (e) { return { ok: false, erreur: 'Journal d’audit indisponible : suppression refusée.' }; }
+  var liens = [['evenements_fonciers'], ['missions_foncieres'], ['pieces_foncieres']];
+  for (var i = 0; i < liens.length; i++) {
+    var s = liens[i][0], l = (DATA[s] || []).filter(function(x){ return x.dossier_id === id; });
+    for (var j = 0; j < l.length; j++) await deleteRecord(s, l[j].id, { skipIntegrity: true });
+  }
+  var ok = await deleteRecord('dossiers_fonciers', id, { skipIntegrity: true });
+  if (ok === false) return { ok: false, erreur: 'Suppression refusée (droits du profil).' };
+  if (APP._fcSel === id) APP._fcSel = null;
+  if (APP._fcSelect) delete APP._fcSelect[id];
+  return { ok: true, reference: ref };
+}
+async function fcSupprimerDossierUI(id) {
+  var d = fcDossier(id); if (!d) return;
+  if (!fcEstAdmin()) { toast('Réservé aux administrateurs.', 'error'); return; }
+  var ob = fcObstaclesSuppression(d);
+  if (ob.length) { toast('Suppression impossible (trace comptable). Annulez puis archivez le dossier.', 'error'); return; }
+  var m = prompt('Supprimer définitivement le dossier ' + d.reference + ' (étapes, missions, pièces et journal liés) ? Irréversible.\nMotif (10 caractères min) :', '');
+  if (m === null) return;
+  var r = await fcSupprimerDossier(id, m);
+  if (fcMsg(r, 'Dossier ' + (r.reference || '') + ' supprimé.')) fcRender();
 }
 function fcRenderListeCorps() {
   var host = document.getElementById('fc-liste-corps'); if (!host) return;
