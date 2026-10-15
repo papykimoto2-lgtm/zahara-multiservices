@@ -18391,8 +18391,9 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div id="c-lot-diag" style="display:none;"></div>
             <div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">La liste reste celle du programme choisi ; la recherche n'en restreint que l'affichage. Le lot déjà sélectionné y reste toujours.</div>
           </div>
-          <div class="form-group span-2">
+          <div class="form-group span-2" id="c-grp-lots-supp">
             <label>Autres lots de ce souscripteur (même programme, même échéancier/montant total)</label>
+            <div id="c-lots-supp-note" style="display:none;font-size:11.5px;color:#B45309;margin-bottom:4px;"></div>
             <div style="display:flex;gap:8px;align-items:center;">
               <select class="form-control" id="c-lot-supplementaire" style="flex:1;">
                 <option value="">— Ajouter un autre lot —</option>
@@ -18778,6 +18779,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
       </div>
       <div class="form-group"><label>Montant à facturer (FCFA)</label><input type="number" class="form-control" id="ts2-montant" min="0" style="font-weight:700;color:var(--or,#B87333);"></div>
       <div class="form-group"><label style="display:flex;gap:8px;align-items:center;font-weight:400;"><input type="checkbox" id="ts2-deja"> Montant déjà inclus dans le montant du contrat (régularisation d'un dossier existant)</label></div>
+      <div id="ts2-historique" style="font-size:12px;margin-bottom:8px;"></div>
       <div class="form-group"><label>Motif / justification (obligatoire)</label><textarea class="form-control" id="ts2-motif" rows="2" placeholder="Ex. Acquisition d'une parcelle contiguë — demande du souscripteur du 12/09/2026."></textarea></div>
     </div>
     <div class="modal-footer">
@@ -33278,6 +33280,12 @@ async function saveClient() {
   //    du <select>) car le DOM peut être obsolète (import concurrent, sync distante). ──
   var _lotIdChoisi = document.getElementById('c-lot') ? document.getElementById('c-lot').value : '';
   var _lotIdsSupplémentaires = (APP._clientLotsSupplementaires || []).slice();
+  /* Souscription au logement : un seul lot. On bloque tout AJOUT de lot ; un ancien dossier déjà multi-lots reste enregistrable tant qu'il n'en gagne pas. */
+  if (typeof clientFormNature === 'function' && clientFormNature() === 'logement') {
+    var _cExist = APP.editingId ? DATA.clients.find(function(x){ return x.id === APP.editingId; }) : null;
+    var _dejaSupp = _cExist ? Math.max(0, (typeof _lotIdsDeClient === 'function' ? _lotIdsDeClient(_cExist).length : 1) - 1) : 0;
+    if (_lotIdsSupplémentaires.length > _dejaSupp) { toast('Souscription au logement : un seul lot par souscription. Retirez les lots supplémentaires ou créez une autre souscription.', 'error'); return; }
+  }
   var _tousLotIdsChoisis = _lotIdChoisi ? [_lotIdChoisi].concat(_lotIdsSupplémentaires) : _lotIdsSupplémentaires.slice();
   for (var _li = 0; _li < _tousLotIdsChoisis.length; _li++) {
     var _lotVerif = DATA.lots.find(function(l) { return l.id === _tousLotIdsChoisis[_li]; });
@@ -52677,9 +52685,20 @@ function updateLotsSupplementairesSelect() {
   sel.innerHTML = '<option value="">— Ajouter un autre lot (' + candidats.length + ' disponible(s) sur ce programme) —</option>'
     + candidats.map(function(l){ return '<option value="'+l.id+'">Lot '+l.numero+(l.ilot?' / Îlot '+l.ilot:'')+(l.surface?' — '+Math.round(l.surface)+' m²':'')+' — '+(l.type||'')+' — '+new Intl.NumberFormat('fr-FR').format(l.prix||0)+' FCFA</option>'; }).join('');
 }
+/* Nature du bien du formulaire : « terrain » (plusieurs lots possibles sur une même souscription), « logement » (un seul lot par souscription)
+   ou « indetermine » tant qu'aucun lot / choix manuel ne la fixe. Le choix manuel prime sur la nature du lot. */
+function clientFormNature() {
+  var sel = document.getElementById('c-nature-manuel'), ch = sel ? sel.value : 'auto';
+  if (ch === 'terrain') return 'terrain';
+  if (ch === 'maison' || ch === 'logement') return 'logement';
+  var lotEl = document.getElementById('c-lot'), lot = lotEl ? (DATA.lots||[]).find(function(l){ return l.id === lotEl.value; }) : null;
+  if (lot && lot.nature) return lot.nature === 'terrain' ? 'terrain' : 'logement';
+  return 'indetermine';
+}
 function ajouterLotSupplementaireClient() {
   var sel = document.getElementById('c-lot-supplementaire');
   if (!sel || !sel.value) return;
+  if (clientFormNature() === 'logement') { toast('Souscription au logement : un seul lot par souscription. Créez une autre souscription pour ce lot.', 'error'); return; }
   var lot = (DATA.lots||[]).find(function(l){ return l.id===sel.value; });
   APP._clientLotsSupplementaires = (APP._clientLotsSupplementaires || []).concat([sel.value]);
   /* Pré-incrémente le montant total du prix du lot ajouté — point de départ
@@ -52752,7 +52771,16 @@ function ouvrirTerrainSupplementaire(){
   var legacy = parseFloat(c.terrain_supplementaire)||0;
   document.getElementById('ts2-montant').value = legacy > 0 && !(c.terrains_supplementaires||[]).length ? legacy : '';
   document.getElementById('ts2-deja').checked = legacy > 0 && !(c.terrains_supplementaires||[]).length;
+  ts2Historique(c);
   openModal('modal-terrain-supp');
+}
+function ts2Historique(c){
+  var box = document.getElementById('ts2-historique'); if(!box) return;
+  var l = (c.terrains_supplementaires||[]);
+  box.innerHTML = l.length ? '<strong>Terrains supplémentaires déjà enregistrés</strong>' + l.map(function(t){
+    return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--bord);"><span>'+escHtml(dateShort(t.date))+' — '+escHtml(fcfa(t.montant))+(t.surface_m2?' · '+escHtml(String(t.surface_m2))+' m²':'')+(t.lot_libelle?' · lot '+escHtml(t.lot_libelle):'')+'</span>'
+      + '<button type="button" class="btn btn-secondary btn-sm" onclick="imprimerAvenantTerrainSupp(\''+escHtml(t.id)+'\',\''+escHtml(c.id)+'\')">🖨 Avenant</button></div>';
+  }).join('') : '';
 }
 function ts2Recalculer(){
   var sf = parseFloat(document.getElementById('ts2-surface').value) || 0, px = parseFloat(document.getElementById('ts2-prix-m2').value) || 0;
@@ -52784,6 +52812,41 @@ async function confirmerTerrainSupplementaire(){
   var set = function(id, v){ var e = document.getElementById(id); if (e) e.value = v; };
   set('c-montant-total', c.montant_total); set('c-superficie-supplementaire', c.superficie_supplementaire||''); set('c-superficie-totale', c.superficie_totale||'');
   toast('✅ Terrain supplémentaire enregistré'+(deja ? '' : ' — montant du contrat +'+fcfa(montant))+'.'+((c.attestation_solde_finale||c.attestation_solde) ? ' Les attestations déjà émises restent inchangées : régénérez-les si besoin.' : ''), 'success');
+  if (!deja) imprimerAvenantTerrainSupp(t.id, c.id);
+}
+/* Avenant signable : terrain supplémentaire acquis après la souscription (le lot principal et son prix initial ne changent pas). */
+function imprimerAvenantTerrainSupp(tid, clientId){
+  var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; }), t = c && (c.terrains_supplementaires||[]).find(function(x){ return x.id===tid; });
+  if (!t) { toast('Terrain supplémentaire introuvable.','error'); return; }
+  var soc = (DATA.params&&(DATA.params.societe||DATA.params.nom))||'', E = escHtml;
+  var w = window.open('','_blank');
+  if (!w) { toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  w.document.write('<html><head><title>Avenant — Terrain supplémentaire</title>'
+    +'<style>body{font-family:Georgia,serif;padding:38px;color:#111;font-size:13px;line-height:1.55;}'
+    +'h1{font-size:17px;margin:0 0 4px;}table{width:100%;border-collapse:collapse;margin:10px 0;}'
+    +'td{padding:5px 8px;border:1px solid #ccc;}td.k{width:45%;background:#f5f5f5;}'
+    +'.pied{margin-top:26px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Avenant terrain supplémentaire', c.dossier||c.id)
+    +'<h1>'+E(soc)+'</h1>'
+    +'<h1 style="margin-top:14px;">Avenant — Terrain supplémentaire</h1>'
+    +'<div style="color:#555;font-size:11.5px;">Réf. souscripteur : '+E(c.dossier||c.id)+' — '+E(dateShort(t.date))+'</div>'
+    +'<h2>Souscripteur</h2><table><tbody>'
+    +'<tr><td class="k">Nom</td><td>'+E(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</td></tr>'
+    +'</tbody></table>'
+    +'<h2>Objet</h2><p>'+E(t.motif)+'</p>'
+    +'<table><tbody>'
+    +(t.lot_libelle?'<tr><td class="k">Lot concerné</td><td>'+E(t.lot_libelle)+'</td></tr>':'')
+    +(t.surface_m2?'<tr><td class="k">Surface supplémentaire</td><td>'+E(String(t.surface_m2))+' m²</td></tr>':'')
+    +(t.prix_m2?'<tr><td class="k">Prix au m²</td><td>'+E(fcfa(t.prix_m2))+'</td></tr>':'')
+    +'<tr><td class="k"><b>Montant du terrain supplémentaire</b></td><td><b>'+E(fcfa(t.montant))+'</b></td></tr>'
+    +'<tr><td class="k">Montant total du contrat'+(t.deja_inclus?' (terrain déjà inclus)':' après avenant')+'</td><td>'+E(fcfa(c.montant_total))+'</td></tr>'
+    +'</tbody></table>'
+    +'<div class="pied">Le présent avenant constate l\'acquisition d\'un terrain supplémentaire postérieurement à la souscription. Il complète le contrat initial à hauteur du montant ci-dessus, '
+    +'distinctement du prix initial du bien, et n\'emporte aucune autre modification des conditions convenues.<br><br>'
+    +'Fait à '+E((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+E(dateShort(t.date))+'<br><br>'
+    +'Pour '+E(soc)+' : ___________________________<br><br>Le souscripteur (bon pour accord) : ___________________________</div>'
+    +'</body></html>');
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 function ouvrirRegularisationSurface(){
   var clientId = APP.editingId;
@@ -53213,6 +53276,7 @@ function retirerLotSupplementaireClient(lotId) {
 function renderLotsSupplementairesListe() {
   var box = document.getElementById('c-lots-supplementaires-liste');
   if (!box) return;
+  try { var _le = document.getElementById('c-lot'); if (_le && typeof updateNatureBienUI === 'function') updateNatureBienUI((DATA.lots||[]).find(function(l){ return l.id === _le.value; })); } catch (e) { /* affichage seulement */ }
   var ids = APP._clientLotsSupplementaires || [];
   if (!ids.length) { box.innerHTML = '<span style="font-size:11px;color:var(--blanc-dim);">Aucun lot supplémentaire.</span>'; return; }
   box.innerHTML = ids.map(function(id) {
@@ -53257,6 +53321,12 @@ function updateNatureBienUI(lot) {
         badge.style.color = '#B87333';
       }
     }
+  }
+  var grpSupp = document.getElementById('c-grp-lots-supp');
+  if (grpSupp) {
+    var interdit = natureConnue && !isTerrain, nbSupp = (APP._clientLotsSupplementaires || []).length, noteSupp = document.getElementById('c-lots-supp-note');
+    grpSupp.style.display = (interdit && !nbSupp) ? 'none' : '';
+    if (noteSupp) { noteSupp.style.display = (interdit && nbSupp) ? '' : 'none'; noteSupp.textContent = (interdit && nbSupp) ? '⚠ Souscription au logement : un seul lot par souscription. Ce dossier en compte plusieurs (ancien format) ; vous pouvez en retirer, pas en ajouter.' : ''; }
   }
   var grpMode = document.getElementById('c-grp-mode-livraison');
   var grpStanding = document.getElementById('c-grp-standing');
