@@ -18442,8 +18442,10 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <input type="number" class="form-control" id="c-superficie-totale" readonly style="color:var(--or);font-weight:bold;">
           </div>
           <div class="form-group">
-            <label>Terrain supplémentaire (FCFA)</label>
+            <label>Terrain supplémentaire (FCFA) — indicatif</label>
             <input type="number" class="form-control" id="c-terrain-supplementaire" placeholder="0">
+            <button type="button" class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="ouvrirTerrainSupplementaire()">➕ Facturer un terrain supplémentaire</button>
+            <div style="font-size:11px;color:var(--dim);margin-top:4px;">Un terrain ajouté après la souscription se facture ici : il est détaillé dans l'attestation de solde finale, pas dans le prix initial.</div>
           </div>
           <div class="form-group">
             <label>Coût de la villa (FCFA)</label>
@@ -18759,6 +18761,31 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
   </div>
 </div>
 
+<!-- Modal Terrain supplémentaire -->
+<div class="modal-overlay" id="modal-terrain-supp">
+  <div class="modal">
+    <div class="modal-header"><h3>➕ Facturer un terrain supplémentaire</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-terrain-supp')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="ts2-client-id">
+      <div class="alert alert-info" style="font-size:11.5px;">
+        Supplément ultérieur à la souscription. Il s'ajoute au montant du contrat et figure comme ligne distincte dans l'attestation de solde finale et le détail des modifications ; le prix initial ne change pas.
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Date</label><input type="date" class="form-control" id="ts2-date"></div>
+        <div class="form-group"><label>Lot concerné (optionnel)</label><select class="form-control" id="ts2-lot"></select></div>
+        <div class="form-group"><label>Surface (m²)</label><input type="number" class="form-control" id="ts2-surface" min="0" step="any" oninput="ts2Recalculer()"></div>
+        <div class="form-group"><label>Prix au m² (FCFA)</label><input type="number" class="form-control" id="ts2-prix-m2" min="0" step="any" oninput="ts2Recalculer()"></div>
+      </div>
+      <div class="form-group"><label>Montant à facturer (FCFA)</label><input type="number" class="form-control" id="ts2-montant" min="0" style="font-weight:700;color:var(--or,#B87333);"></div>
+      <div class="form-group"><label style="display:flex;gap:8px;align-items:center;font-weight:400;"><input type="checkbox" id="ts2-deja"> Montant déjà inclus dans le montant du contrat (régularisation d'un dossier existant)</label></div>
+      <div class="form-group"><label>Motif / justification (obligatoire)</label><textarea class="form-control" id="ts2-motif" rows="2" placeholder="Ex. Acquisition d'une parcelle contiguë — demande du souscripteur du 12/09/2026."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-terrain-supp')">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmerTerrainSupplementaire()">Enregistrer</button>
+    </div>
+  </div>
+</div>
 <!-- Modal Régularisation de surface -->
 <div class="modal-overlay" id="modal-regul-surface">
   <div class="modal">
@@ -52712,6 +52739,52 @@ function clientCompareSurface() {
   }
 }
 
+/* Terrain supplémentaire facturé après la souscription (SUP3) : ligne distincte de l'attestation de solde finale. */
+function ouvrirTerrainSupplementaire(){
+  var c = (DATA.clients||[]).find(function(x){ return x.id===APP.editingId; });
+  if (!c) { toast('Enregistrez d\'abord le souscripteur avant de facturer un terrain supplémentaire.','error'); return; }
+  if (!exigerDroit('Souscripteurs', 'v', 'la facturation d\'un terrain supplémentaire')) return;
+  var ids = (typeof _lotIdsDeClient === 'function' ? _lotIdsDeClient(c) : (c.lot_ids||[]));
+  document.getElementById('ts2-client-id').value = c.id;
+  document.getElementById('ts2-date').value = today();
+  document.getElementById('ts2-lot').innerHTML = '<option value="">—</option>' + ids.map(function(id){ var l=(DATA.lots||[]).find(function(x){ return x.id===id; }); return '<option value="'+escHtml(id)+'">'+escHtml(l?(l.numero||id):id)+'</option>'; }).join('');
+  ['ts2-surface','ts2-prix-m2','ts2-motif'].forEach(function(i){ document.getElementById(i).value = ''; });
+  var legacy = parseFloat(c.terrain_supplementaire)||0;
+  document.getElementById('ts2-montant').value = legacy > 0 && !(c.terrains_supplementaires||[]).length ? legacy : '';
+  document.getElementById('ts2-deja').checked = legacy > 0 && !(c.terrains_supplementaires||[]).length;
+  openModal('modal-terrain-supp');
+}
+function ts2Recalculer(){
+  var sf = parseFloat(document.getElementById('ts2-surface').value) || 0, px = parseFloat(document.getElementById('ts2-prix-m2').value) || 0;
+  if (sf > 0 && px > 0) document.getElementById('ts2-montant').value = Math.round(sf * px);
+}
+async function confirmerTerrainSupplementaire(){
+  var c = (DATA.clients||[]).find(function(x){ return x.id===document.getElementById('ts2-client-id').value; });
+  if (!c) { toast('Souscripteur introuvable.','error'); return; }
+  if (!exigerDroit('Souscripteurs', 'v', 'la facturation d\'un terrain supplémentaire')) return;
+  var montant = Math.round(parseFloat(document.getElementById('ts2-montant').value) || 0), motif = document.getElementById('ts2-motif').value.trim();
+  var surface = parseFloat(document.getElementById('ts2-surface').value) || 0, prix = parseFloat(document.getElementById('ts2-prix-m2').value) || 0;
+  var date = document.getElementById('ts2-date').value || today(), lotId = document.getElementById('ts2-lot').value, deja = !!document.getElementById('ts2-deja').checked;
+  if (montant <= 0) { toast('Montant à facturer invalide.','error'); return; }
+  if (!motif) { toast('Précisez le motif (demande du souscripteur, acte, relevé...).','error'); return; }
+  var lot = lotId ? (DATA.lots||[]).find(function(l){ return l.id===lotId; }) : null;
+  var t = { id: uid(), date: date, lot_id: lotId||'', lot_libelle: lot ? String(lot.numero||'') : '', surface_m2: surface||0, prix_m2: prix||0, montant: montant, motif: motif, deja_inclus: deja,
+    valide_par: (APP.currentUser&&APP.currentUser.nom)||'—' };
+  c.terrains_supplementaires = c.terrains_supplementaires || [];
+  c.terrains_supplementaires.push(t);
+  if (!deja) c.montant_total = (parseFloat(c.montant_total)||0) + montant;
+  if (surface > 0) { c.superficie_supplementaire = (parseFloat(c.superficie_supplementaire)||0) + surface; c.superficie_totale = (parseFloat(c.superficie_reelle)||0) + c.superficie_supplementaire; }
+  c._modifie = new Date().toISOString();
+  if (APP.editingId === c.id) APP._clientBaseModifie = c._modifie;
+  await logAudit('clients', c.id, 'terrain_supplementaire', null, t);
+  if (!deja) await clientLierDossierJuridique(c, 'Terrain supplémentaire facturé — '+fcfa(montant)+'. '+motif, montant);
+  await dbPut('clients', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+  closeModal('modal-terrain-supp');
+  var set = function(id, v){ var e = document.getElementById(id); if (e) e.value = v; };
+  set('c-montant-total', c.montant_total); set('c-superficie-supplementaire', c.superficie_supplementaire||''); set('c-superficie-totale', c.superficie_totale||'');
+  toast('✅ Terrain supplémentaire enregistré'+(deja ? '' : ' — montant du contrat +'+fcfa(montant))+'.'+((c.attestation_solde_finale||c.attestation_solde) ? ' Les attestations déjà émises restent inchangées : régénérez-les si besoin.' : ''), 'success');
+}
 function ouvrirRegularisationSurface(){
   var clientId = APP.editingId;
   var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; });
@@ -114551,7 +114624,7 @@ function livDepuisListe(clientId){
    · « initial » (client.attestation_solde) : quitus du PRIX INITIAL du bien ;
    · « finale »  (client.attestation_solde_finale) : quitus de la VALEUR FINALE (prix initial + modifications de construction
      demandées par le souscripteur et facturées au contrat). Elle n'existe que si le contrat comporte des modifications.
-   Prix initial = montant du contrat − modifications facturées (travaux modificatifs) − régularisations de surface.
+   Prix initial = montant du contrat − modifications facturées (travaux modificatifs) − régularisations de surface − terrains supplémentaires facturés après la souscription.
    Les versements s'imputent chronologiquement d'abord sur le prix initial, puis sur les modifications. */
 function attChamp(kind){ return kind==='finale' ? 'attestation_solde_finale' : 'attestation_solde'; }
 function attKindDeType(type){ return type==='attestation_solde_finale' ? 'finale' : 'initial'; }
@@ -114565,6 +114638,10 @@ function attSoldeModifs(c){
   (c.regularisations_surface||[]).forEach(function(r){
     var mt = r ? (parseFloat(r.montant)||0) : 0;
     if(mt) m.push({ date:String(r.date||'').slice(0,10), libelle:'Écart de surface de '+(r.ecart_m2!=null?r.ecart_m2:'?')+' m²'+(r.prix_m2?(' × '+fmtF(r.prix_m2)+' FCFA/m²'):''), montant:mt, nature:'Régularisation de surface' });
+  });
+  (c.terrains_supplementaires||[]).forEach(function(t){
+    var mt = t ? (parseFloat(t.montant)||0) : 0;
+    if(mt) m.push({ date:String(t.date||'').slice(0,10), libelle:'Terrain supplémentaire'+(t.surface_m2?' de '+t.surface_m2+' m²':'')+(t.prix_m2?(' × '+fmtF(t.prix_m2)+' FCFA/m²'):'')+(t.lot_libelle?' — lot '+t.lot_libelle:''), montant:mt, nature:'Terrain supplémentaire' });
   });
   return m.sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); });
 }
