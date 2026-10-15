@@ -16,6 +16,10 @@ Principe : l'ERP **suit et coordonne** les démarches. « Terminé » ne signifi
 | Suivi quotidien | Foncier › Ma journée, Notifications | Tous |
 | Pilotage | Foncier › Pilotage foncier | Direction |
 
+### Retrouver un dossier
+
+La liste affiche 25 dossiers par page. Tapez dans **Recherche** n'importe quel élément (référence, parcelle, nom du souscripteur, lot, responsable, n° de dossier, étape) : plusieurs mots se cumulent, les accents et majuscules sont ignorés. Filtres : statut, responsable, « risque élevé ou critique ». **Effacer** remet tout à zéro. L'historique d'un dossier affiche les 30 derniers événements, avec « Afficher plus ».
+
 ## 2. Ouvrir un dossier
 
 1. Foncier › 2.2 Dossiers fonciers › **Ouvrir un dossier**.

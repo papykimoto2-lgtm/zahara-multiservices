@@ -232,3 +232,11 @@ Limites connues : le suivi horodaté n'existe que pour les changements de statut
 - Actions : 🖨 imprimer / PDF (en-tête de la société, référence, destinataire, pied de page légal), 📋 copier, 📨 envoyer par e-mail (file de notifications existante, dédupliquée par référence). Chaque action est journalisée (événement `courrier`, référence **COU-AAAA-NNNN** identique pour un même courrier).
 - Direction / administrateurs : Foncier › Modèles de dossier › « 📝 Modèles de courrier » modifie objet et texte de chaque modèle (champs {{...}} vérifiés), avec rétablissement du texte d'origine. Stockage `DATA.params.fc_gabarits_courrier`.
 - Aucune migration SQL. Tests : `foncier-courriers.test.js` (5).
+
+## PG1 — Listes volumineuses : pagination, recherche, historique progressif
+
+- **Liste des dossiers** : 25 lignes par page (navigation « « ‹ Précédent · Suivant › » »), recherche multicritère insensible à la casse et aux accents (référence, parcelle, procédure, statut, responsable, souscripteur, lot, IDUFCI, n° de dossier, étape courante ; tous les mots doivent correspondre), filtres statut / responsable / « risque élevé ou critique », compteur « N sur M », bouton « Effacer ». La saisie de recherche est temporisée (250 ms) et ne redessine que le tableau.
+- **Historique d'un dossier** : 30 événements affichés, bouton « Afficher 30 événements de plus (N restants) ».
+- **Notifications** (25 par page, au lieu de 200 d'un bloc) et **missions** (15 par page) paginées.
+- Mesure : 2 000 dossiers → 25 lignes dessinées, rendu, filtre et recherche en moins de 2 s (testé). « Imprimer la liste » reste complète.
+- Aucune migration SQL. Tests : `foncier-pagination.test.js` (5).
