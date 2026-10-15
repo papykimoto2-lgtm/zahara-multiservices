@@ -216,3 +216,11 @@ Limites connues : le suivi horodaté n'existe que pour les changements de statut
 - Saisie manuelle d'une échéance : suggestion affichée et préremplie (durée habituelle + nombre de dossiers). Une échéance saisie ou corrigée n'est plus « estimée ».
 - Foncier › Modèles de dossier : la durée observée (P75, moyenne, médiane, nombre de dossiers) est toujours affichée ; « Proposer les durées observées » remplit les champs vides. Réglage « Estimer les échéances d'après vos dossiers » (`fc_delais_auto`, actif par défaut).
 - Aucune migration SQL. Tests : `foncier-delais-auto.test.js` (4).
+
+## MM1 — Missions types par type d'intervenant
+
+- Foncier › 2.3 Intervenants & missions › Nouvelle mission : choisir le dossier et l'intervenant affiche les **missions types de son type** (géomètre : bornage, morcellement, levé, identification de lot, contre-bornage ; notaire : acte de mutation, vérification du titre, droits et frais, enregistrement ; avocat, conseil juridique, prestataire technique, intermédiaire, promoteur partenaire, organisme public, autre).
+- Un clic préremplit : titre (avec la référence du dossier), **consignes** (visibles sur le portail de l'intervenant), **livrables** (cases cochées, décochables, plus un champ pour en ajouter), **échéance** (aujourd'hui + délai type), **étape** liée (proposée seulement si elle existe et n'est pas terminée dans le dossier). Tout reste modifiable.
+- Boutons « Créer la mission » (brouillon) et « Créer et envoyer » (création puis envoi à l'intervenant). La mission mémorise le modèle utilisé (`modele`).
+- Éditeur « 🧩 Modèles de mission par type d'intervenant » (direction / administrateurs) : nom court, titre, délai, étape, livrables (un par ligne), consignes ; ajout, suppression, enregistrement par type, rétablissement des modèles par défaut. Stockage `DATA.params.fc_modeles_mission` ; les modèles ne s'appliquent qu'aux nouvelles missions.
+- Aucune migration SQL. Tests : `foncier-missions-types.test.js` (4).

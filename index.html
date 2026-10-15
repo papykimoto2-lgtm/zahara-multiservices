@@ -59684,7 +59684,7 @@ async function fcCreerMission(o) {
     titre: String(o.titre).trim(), description: String(o.description || '').trim(),
     livrables: livrables.map(function(l){ return { id: uid(), libelle: l, versions: [] }; }),
     echeance: o.echeance, statut: 'brouillon', responsable_validation_id: o.responsable_validation_id || d.responsable_id,
-    contrat_reference: String(o.contrat_reference || '').trim(), acceptation: null,
+    contrat_reference: String(o.contrat_reference || '').trim(), acceptation: null, modele: String(o.modele || ''),
     perimetre: { dossier_id: d.id, etapes: o.etape_code ? [o.etape_code] : [] }, created_at: fcAuj()
   };
   if (!m.responsable_validation_id) return { ok: false, erreur: 'Aucun responsable de validation.' };
@@ -59827,14 +59827,16 @@ function fcRenderIntervenants() {
   h += is.length ? '<div class="table-wrap"><table><thead><tr><th>Organisation</th><th>Type</th><th>Contact</th><th>Référence</th><th>Relation</th><th>Accès portail</th></tr></thead><tbody>'
     + is.map(function(i){ return '<tr><td><strong>' + escHtml(i.nom_organisation) + '</strong></td><td>' + escHtml(FC_TYPES_INTERVENANT[i.type] || i.type) + '</td><td>' + escHtml(i.contact_nom) + '<br><span style="font-size:11px;color:var(--dim);">' + escHtml(i.telephone) + ' ' + escHtml(i.email) + '</span></td><td>' + escHtml(i.reference_professionnelle || '—') + '</td><td>' + escHtml(i.statut_relation) + '</td><td>' + fcCelluleAccesIntervenant(i) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div style="color:var(--dim);padding:8px;">Aucun intervenant enregistré.</div>';
   h += '</div><div class="card"><div class="card-title">📌 Nouvelle mission</div><div class="filters-bar" style="align-items:end;flex-wrap:wrap;">'
-    + '<div class="form-group"><label>Dossier</label><select class="filter-select" id="fi-m-dossier">' + ds.map(function(d){ return '<option value="' + d.id + '">' + escHtml(d.reference + ' — ' + fcLibelleParcelle(d.parcelle_id)) + '</option>'; }).join('') + '</select></div>'
-    + '<div class="form-group"><label>Intervenant</label><select class="filter-select" id="fi-m-interv">' + is.filter(function(i){ return i.statut_relation === 'actif'; }).map(function(i){ return '<option value="' + i.id + '">' + escHtml(i.nom_organisation) + '</option>'; }).join('') + '</select></div>'
+    + '<div class="form-group"><label>Dossier</label><select class="filter-select" id="fi-m-dossier" onchange="fcMajFormMission()">' + ds.map(function(d){ return '<option value="' + d.id + '">' + escHtml(d.reference + ' — ' + fcLibelleParcelle(d.parcelle_id)) + '</option>'; }).join('') + '</select></div>'
+    + '<div class="form-group"><label>Intervenant</label><select class="filter-select" id="fi-m-interv" onchange="fcMajFormMission()">' + is.filter(function(i){ return i.statut_relation === 'actif'; }).map(function(i){ return '<option value="' + i.id + '">' + escHtml(i.nom_organisation) + '</option>'; }).join('') + '</select></div>'
     + '<div class="form-group"><label>Titre</label><input class="form-control" id="fi-m-titre"></div>'
-    + '<div class="form-group"><label>Livrables (séparés par « ; »)</label><input class="form-control" id="fi-m-livr" placeholder="Plan de bornage ; PV de bornage"></div>'
+    + '<div class="form-group" style="min-width:260px;"><label>Livrables attendus</label><div id="fi-m-livrables" style="font-size:12px;margin-bottom:4px;"></div><input class="form-control" id="fi-m-livr" placeholder="Autres livrables (séparés par « ; »)"></div>'
+    + '<div class="form-group" style="min-width:260px;"><label>Consignes à l\'intervenant (visibles sur son portail)</label><textarea class="form-control" id="fi-m-desc" rows="2"></textarea></div>'
     + '<div class="form-group"><label>Échéance</label><input type="date" class="form-control" id="fi-m-ech"></div>'
-    + '<div class="form-group"><label>Étape concernée</label><select class="filter-select" id="fi-m-etape"><option value="">— aucune —</option><option value="mission_technique">Attribution de la mission</option><option value="reception_livrables">Réception des livrables</option><option value="documents_techniques">Documents techniques</option></select></div>'
+    + '<div class="form-group"><label>Étape concernée</label><select class="filter-select" id="fi-m-etape"><option value="">— aucune —</option></select></div>'
     + '<div class="form-group"><label>Contrat (référence)</label><input class="form-control" id="fi-m-contrat"></div>'
-    + '<button class="btn btn-primary btn-sm" onclick="fcMissionUI()">Créer la mission</button></div>';
+    + '<button class="btn btn-primary btn-sm" onclick="fcMissionUI()">Créer la mission</button> <button class="btn btn-secondary btn-sm" title="Crée la mission puis l\'envoie à l\'intervenant" onclick="fcMissionUI(true)">Créer et envoyer</button></div>'
+    + '<div id="fi-m-modeles" style="margin-top:8px;"></div><div id="fi-m-info" style="font-size:11px;color:#6a5acd;margin-top:4px;"></div>';
   var ms = (DATA.missions_foncieres || []).slice().sort(function(a, b){ return (b.created_at || '').localeCompare(a.created_at || ''); });
   h += ms.length ? '<div class="table-wrap"><table><thead><tr><th>Mission</th><th>Dossier</th><th>Intervenant</th><th>Statut</th><th>Échéance</th><th>Contrat</th><th></th></tr></thead><tbody>'
     + ms.map(function(m){
@@ -59843,8 +59845,9 @@ function fcRenderIntervenants() {
         + '<td>' + escHtml(m.echeance) + (retard ? '<br><span style="color:#c0392b;font-size:11px;">En retard</span>' : '') + '</td><td>' + escHtml(m.contrat_reference || '—') + '</td>'
         + '<td><button class="btn btn-secondary btn-sm" onclick="fcMissionDetail(\'' + m.id + '\')">Ouvrir' + (fcMessagesNonLus(m) ? ' 💬' + fcMessagesNonLus(m) : '') + '</button></td></tr>';
     }).join('') + '</tbody></table></div>' : '<div style="color:var(--dim);padding:8px;">Aucune mission.</div>';
-  h += '</div><div id="fi-detail"></div>';
+  h += '</div>' + fcEditeurModelesMission() + '<div id="fi-detail"></div>';
   host.innerHTML = h;
+  fcMajFormMission();
   if (APP._fiSel && fcMission(APP._fiSel)) fcRenderMissionDetail(APP._fiSel);
 }
 async function fcIntervenantUI() {
@@ -59957,10 +59960,13 @@ function fcCopierAcces() {
   catch (e) { t.select(); try { document.execCommand('copy'); toast('Message copié.', 'success'); } catch (e2) {} }
 }
 
-async function fcMissionUI() {
+async function fcMissionUI(envoyer) {
   var g = function(i){ return (document.getElementById(i) || {}).value || ''; };
-  var r = await fcCreerMission({ dossier_id: g('fi-m-dossier'), intervenant_id: g('fi-m-interv'), titre: g('fi-m-titre'), livrables: g('fi-m-livr').split(';'), echeance: g('fi-m-ech'), etape_code: g('fi-m-etape'), contrat_reference: g('fi-m-contrat') });
-  if (fcMsg(r, 'Mission créée (brouillon).')) { APP._fiSel = r.mission.id; fcRenderIntervenants(); }
+  var coches = Array.prototype.map.call(document.querySelectorAll('#fi-m-livrables input.fi-m-l:checked'), function(x){ return x.value; });
+  var r = await fcCreerMission({ dossier_id: g('fi-m-dossier'), intervenant_id: g('fi-m-interv'), titre: g('fi-m-titre'), description: g('fi-m-desc'), livrables: coches.concat(g('fi-m-livr').split(';')), echeance: g('fi-m-ech'), etape_code: g('fi-m-etape'), contrat_reference: g('fi-m-contrat'), modele: APP._fiModele || '' });
+  if (!fcMsg(r, 'Mission créée (brouillon).')) return;
+  if (envoyer === true) { var s = await fcChangerStatutMission(r.mission.id, 'envoyee', {}); fcMsg(s, 'Mission créée et envoyée à l\'intervenant.'); }
+  APP._fiSel = r.mission.id; fcRenderIntervenants();
 }
 function fcMissionDetail(id) { APP._fiSel = id; fcRenderMissionDetail(id); fcMarquerMessagesLus(id).then(function(r){ if (r && r.marques) fcRenderMissionDetail(id); }).catch(function(){}); var el = document.getElementById('fi-detail'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth' }); }
 function fcRenderMissionDetail(id) {
@@ -61620,6 +61626,118 @@ function fcExporterHistoriqueUI(format) {
   var id = (document.getElementById('fp-dossier') || {}).value, d = fcDossier(id); if (!d) return;
   var l = fcHistoriqueDossierLignes(id);
   if (format === 'pdf') openPrintPreview(fcHtmlTableau('Historique du dossier ' + d.reference, l), 'Historique ' + d.reference, true); else fcTelechargerTexte('historique-' + d.reference + '.csv', fcCsv(l));
+}
+
+
+/* ═══ Missions types par type d'intervenant (MM1) ═══
+   Choisir l'intervenant affiche ses missions types ; un clic préremplit titre, consignes, livrables (cochables), échéance et étape. Tout reste modifiable.
+   Le catalogue ci-dessous est un point de départ : la direction l'adapte dans Foncier › Intervenants & missions › « Modèles de mission » (DATA.params.fc_modeles_mission). */
+var FC_MODELES_MISSION_DEFAUT = {
+  geometre: [
+    { code: 'bornage', libelle: 'Bornage et plan de bornage', titre: 'Bornage de la parcelle et plan de bornage', delai: 21, etape: 'documents_techniques', livrables: ['Plan de bornage signé et daté', 'Procès-verbal de bornage', 'Fichier des coordonnées des bornes'], description: 'Implanter les bornes, établir le plan de bornage et le procès-verbal. Indiquer la superficie mesurée et joindre les coordonnées des bornes en format numérique.' },
+    { code: 'morcellement', libelle: 'Plan de morcellement en lots', titre: 'Plan de morcellement en lots', delai: 30, etape: 'documents_techniques', livrables: ['Plan de morcellement', 'Tableau des lots (numéro, îlot, superficie)', 'Fichier numérique du plan (DWG ou PDF)'], description: 'Établir le plan de morcellement de la parcelle en lots. Le tableau reprend pour chaque lot le numéro, l’îlot et la superficie.' },
+    { code: 'leve', libelle: 'Levé topographique', titre: 'Levé topographique', delai: 14, etape: 'documents_techniques', livrables: ['Plan topographique', 'Carnet ou fichier de levé'], description: 'Réaliser le levé de la parcelle et remettre le plan accompagné des données de terrain.' },
+    { code: 'identification_lot', libelle: 'Identification d’un lot (titre individuel)', titre: 'Identification du lot dans le morcellement', delai: 10, etape: 'ind_identification_lot', livrables: ['Extrait du plan de morcellement', 'Numéro de lot, îlot et superficie', 'Coordonnées ou plan du lot'], description: 'Identifier le lot du souscripteur dans le morcellement approuvé et fournir les éléments nécessaires au titre individuel.' },
+    { code: 'contre_bornage', libelle: 'Contre-bornage', titre: 'Contre-bornage', delai: 14, etape: 'bornage_contre_bornage', livrables: ['Procès-verbal de contre-bornage', 'Plan mis à jour'], description: 'Procéder au contre-bornage et remettre le procès-verbal et le plan mis à jour.' }
+  ],
+  notaire: [
+    { code: 'acte_mutation', libelle: 'Acte de mutation au nom du souscripteur', titre: 'Acte de mutation au nom du souscripteur', delai: 30, etape: 'ind_acte_mutation', livrables: ['Projet d’acte de mutation', 'Acte signé', 'Décompte des droits et frais'], description: 'Préparer l’acte de mutation au nom du souscripteur à partir des pièces du dossier. Joindre le décompte détaillé des droits et frais.' },
+    { code: 'verif_titre', libelle: 'Vérification du titre et état des charges', titre: 'Vérification du titre et état des charges', delai: 14, etape: 'ind_verification_titre_mere', livrables: ['Note de vérification du titre', 'État des charges et inscriptions'], description: 'Vérifier le titre de l’opération et signaler toute charge ou inscription pouvant affecter le lot.' },
+    { code: 'droits_frais', libelle: 'Droits d’enregistrement et frais', titre: 'Paiement des droits d’enregistrement et frais de mutation', delai: 10, etape: 'ind_droits_frais', livrables: ['Décompte détaillé', 'Quittances des droits et frais'], description: 'Établir le décompte, procéder au paiement des droits et frais, et remettre les quittances.' },
+    { code: 'enregistrement', libelle: 'Enregistrement et publicité foncière', titre: 'Enregistrement et publicité foncière', delai: 21, etape: 'enregistrement_publicite', livrables: ['Quittances d’enregistrement', 'Attestation de dépôt ou de publication'], description: 'Faire enregistrer l’acte et accomplir les formalités de publicité foncière.' }
+  ],
+  avocat: [
+    { code: 'avis', libelle: 'Avis juridique sur le dossier', titre: 'Avis juridique sur le dossier', delai: 14, etape: '', livrables: ['Note d’analyse juridique', 'Recommandations'], description: 'Analyser la situation juridique du dossier et formuler des recommandations.' },
+    { code: 'oppositions', libelle: 'Traitement des oppositions', titre: 'Traitement des oppositions', delai: 30, etape: 'traitement_oppositions', livrables: ['Analyse des oppositions', 'Projet de réponse ou de mainlevée', 'Compte rendu des démarches'], description: 'Analyser les oppositions reçues, proposer la suite à donner et rendre compte des démarches.' }
+  ],
+  conseil_juridique: [
+    { code: 'revue', libelle: 'Revue juridique des pièces', titre: 'Revue juridique des pièces du dossier', delai: 10, etape: 'completude_documents', livrables: ['Note de conformité des pièces', 'Liste des pièces à compléter'], description: 'Contrôler la conformité juridique des pièces et lister celles à compléter ou à corriger.' },
+    { code: 'redaction', libelle: 'Rédaction d’un courrier ou d’un acte', titre: 'Rédaction d’un courrier ou d’un acte', delai: 7, etape: '', livrables: ['Projet de document', 'Version finale'], description: 'Rédiger le document demandé et le soumettre pour validation avant signature.' }
+  ],
+  prestataire_technique: [
+    { code: 'diagnostic', libelle: 'Diagnostic technique', titre: 'Diagnostic technique', delai: 14, etape: 'documents_techniques', livrables: ['Rapport de diagnostic', 'Photos et annexes'], description: 'Réaliser le diagnostic demandé et remettre un rapport accompagné de ses annexes.' },
+    { code: 'numerisation', libelle: 'Numérisation et classement des pièces', titre: 'Numérisation et classement des pièces', delai: 7, etape: 'completude_documents', livrables: ['Fichiers numérisés (PDF)', 'Index des pièces'], description: 'Numériser les pièces du dossier, les nommer clairement et fournir un index.' }
+  ],
+  intermediaire: [
+    { code: 'depot_suivi', libelle: 'Dépôt et suivi auprès du service compétent', titre: 'Dépôt et suivi du dossier auprès du service compétent', delai: 21, etape: 'depot', livrables: ['Récépissé de dépôt', 'Compte rendu de suivi', 'Pièces complémentaires demandées'], description: 'Déposer le dossier, en suivre l’instruction et signaler toute demande de complément.' },
+    { code: 'retrait', libelle: 'Retrait des documents délivrés', titre: 'Retrait des documents délivrés', delai: 14, etape: 'documents_finaux', livrables: ['Copies des documents retirés', 'Décharge de retrait'], description: 'Retirer les documents délivrés et en remettre une copie lisible avec la décharge.' }
+  ],
+  promoteur_partenaire: [
+    { code: 'coordination', libelle: 'Coordination avec le promoteur partenaire', titre: 'Coordination avec le promoteur partenaire', delai: 30, etape: '', livrables: ['Compte rendu de coordination', 'Pièces échangées'], description: 'Coordonner les démarches communes et rendre compte des échanges.' }
+  ],
+  organisme_public: [
+    { code: 'information', libelle: 'Réponse à une demande d’information', titre: 'Réponse à une demande d’information', delai: 30, etape: 'suivi_instruction', livrables: ['Réponse écrite'], description: 'Répondre à la demande d’information relative au dossier.' }
+  ],
+  autre: [
+    { code: 'libre', libelle: 'Mission libre', titre: 'Mission', delai: 14, etape: '', livrables: [], description: '' }
+  ]
+};
+function fcModelesMission(type) {
+  var perso = ((DATA.params || {}).fc_modeles_mission || {})[type];
+  return Array.isArray(perso) ? perso : (FC_MODELES_MISSION_DEFAUT[type] || FC_MODELES_MISSION_DEFAUT.autre);
+}
+function fcModeleMission(type, code) { return fcModelesMission(type).find(function(m){ return m.code === code; }) || null; }
+/* Valeurs préremplies pour (dossier, intervenant, mission type). L'étape n'est proposée que si elle existe encore dans ce dossier. */
+function fcPreRemplirMission(dossierId, intervenantId, code, aujourdhui) {
+  var d = fcDossier(dossierId), i = fcIntervenant(intervenantId), m = d && i ? fcModeleMission(i.type, code) : null; if (!m) return null;
+  var e = m.etape ? fcEtape(d, m.etape) : null;
+  return { code: m.code, libelle: m.libelle, titre: m.titre + ' — ' + d.reference, description: m.description || '', livrables: (m.livrables || []).slice(), echeance: fcAjouterJours(aujourdhui || fcAuj(), parseInt(m.delai, 10) || 14), etape_code: e && FC_STATUTS_FINAUX.indexOf(e.statut) === -1 ? m.etape : '' };
+}
+function fcMajFormMission() {
+  var g = function(id){ return document.getElementById(id); }, host = g('fi-m-modeles'); if (!host) return;
+  var iv = fcIntervenant((g('fi-m-interv') || {}).value), d = fcDossier((g('fi-m-dossier') || {}).value), sel = g('fi-m-etape');
+  if (sel) { var cur = sel.value; sel.innerHTML = '<option value="">— aucune —</option>' + (d ? d.etapes.filter(function(e){ return FC_STATUTS_FINAUX.indexOf(e.statut) === -1; }).map(function(e){ return '<option value="' + e.code + '">' + escHtml(e.libelle) + '</option>'; }).join('') : ''); if (cur && d && fcEtape(d, cur)) sel.value = cur; }
+  host.innerHTML = iv ? '<span style="font-size:12px;margin-right:6px;"><b>Missions types — ' + escHtml(FC_TYPES_INTERVENANT[iv.type] || iv.type) + ' :</b></span>' + fcModelesMission(iv.type).map(function(m){ return '<button type="button" class="btn btn-secondary btn-sm" id="fi-mt-' + m.code + '" onclick="fcAppliquerModeleMissionUI(\'' + m.code + '\')" title="' + escHtml((m.livrables || []).join(' · ')) + '">' + escHtml(m.libelle) + '</button>'; }).join(' ')
+    : '<span style="font-size:12px;color:var(--dim);">Choisissez un intervenant pour voir ses missions types.</span>';
+  APP._fiModele = ''; var info = g('fi-m-info'); if (info) info.textContent = ''; var l = g('fi-m-livrables'); if (l) l.innerHTML = '<span style="color:var(--dim);">Choisissez une mission type, ou saisissez vos livrables ci-dessous.</span>';
+}
+function fcAppliquerModeleMissionUI(code) {
+  var g = function(id){ return document.getElementById(id); }, p = fcPreRemplirMission((g('fi-m-dossier') || {}).value, (g('fi-m-interv') || {}).value, code); if (!p) return;
+  if (g('fi-m-titre')) g('fi-m-titre').value = p.titre; if (g('fi-m-desc')) g('fi-m-desc').value = p.description; if (g('fi-m-ech')) g('fi-m-ech').value = p.echeance; if (g('fi-m-etape')) g('fi-m-etape').value = p.etape_code;
+  if (g('fi-m-livrables')) g('fi-m-livrables').innerHTML = p.livrables.length ? p.livrables.map(function(l, i){ return '<label style="display:block;"><input type="checkbox" class="fi-m-l" value="' + escHtml(l) + '" checked> ' + escHtml(l) + '</label>'; }).join('') : '<span style="color:var(--dim);">Aucun livrable type : saisissez-les ci-dessous.</span>';
+  if (g('fi-m-livr')) g('fi-m-livr').value = '';
+  APP._fiModele = p.code; document.querySelectorAll('#fi-m-modeles button').forEach(function(b){ b.className = 'btn btn-sm ' + (b.id === 'fi-mt-' + p.code ? 'btn-primary' : 'btn-secondary'); });
+  if (g('fi-m-info')) g('fi-m-info').textContent = 'Prérempli depuis « ' + p.libelle + ' » : vérifiez puis ajustez (titre, livrables, échéance). Échéance proposée : ' + p.echeance + '.';
+}
+
+/* Éditeur des modèles de mission (direction / administrateurs) */
+function fcLigneModeleMissionHtml(m) {
+  var etapes = '<option value="">— aucune —</option>' + FC_ETAPES_REF.map(function(s){ return '<option value="' + s[0] + '"' + (s[0] === m.etape ? ' selected' : '') + '>' + escHtml(s[1]) + '</option>'; }).join('');
+  return '<tr class="fmm-l" data-code="' + escHtml(m.code || '') + '"><td><input class="form-control f-lib" value="' + escHtml(m.libelle || '') + '" placeholder="Nom court (bouton)"></td><td><input class="form-control f-titre" value="' + escHtml(m.titre || '') + '"></td>'
+    + '<td><input type="number" min="1" max="365" class="form-control f-delai" style="width:70px;" value="' + (parseInt(m.delai, 10) || 14) + '"></td><td><select class="filter-select f-etape">' + etapes + '</select></td>'
+    + '<td><textarea class="form-control f-liv" rows="3" placeholder="Un livrable par ligne">' + escHtml((m.livrables || []).join('\n')) + '</textarea></td><td><textarea class="form-control f-desc" rows="3">' + escHtml(m.description || '') + '</textarea></td>'
+    + '<td><button type="button" class="btn btn-secondary btn-sm" onclick="this.closest(\'tr\').remove()">✖</button></td></tr>';
+}
+function fcEditeurModelesMission() {
+  if (!fcPeutGererModeles()) return '';
+  var type = APP._fmmType || 'geometre', l = fcModelesMission(type), perso = Array.isArray(((DATA.params || {}).fc_modeles_mission || {})[type]);
+  return '<div class="card"><details><summary class="card-title" style="cursor:pointer;">🧩 Modèles de mission par type d\'intervenant' + (perso ? ' <span style="font-size:11px;color:#B87333;">(personnalisés)</span>' : '') + '</summary>'
+    + '<div style="font-size:11px;color:var(--dim);margin:6px 0;">Ces modèles préremplissent la création d\'une mission (titre, consignes, livrables, délai, étape). Adaptez-les à vos pratiques : ils ne s\'appliquent qu\'aux nouvelles missions.</div>'
+    + '<div class="filters-bar" style="align-items:end;"><div class="form-group"><label>Type d\'intervenant</label><select class="filter-select" onchange="APP._fmmType=this.value;fcRenderIntervenants();var d=document.querySelector(\'#fi-root details\');if(d)d.open=true;">' + Object.keys(FC_TYPES_INTERVENANT).map(function(k){ return '<option value="' + k + '"' + (k === type ? ' selected' : '') + '>' + escHtml(FC_TYPES_INTERVENANT[k]) + '</option>'; }).join('') + '</select></div></div>'
+    + '<div class="table-wrap"><table><thead><tr><th>Nom court</th><th>Titre de la mission</th><th>Délai (j)</th><th>Étape liée</th><th>Livrables (un par ligne)</th><th>Consignes</th><th></th></tr></thead><tbody id="fmm-corps">' + l.map(fcLigneModeleMissionHtml).join('') + '</tbody></table></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById(\'fmm-corps\').insertAdjacentHTML(\'beforeend\',fcLigneModeleMissionHtml({}))">➕ Ajouter un modèle</button> <button type="button" class="btn btn-primary btn-sm" onclick="fcSauverModelesMissionUI()">💾 Enregistrer pour ce type</button> <button type="button" class="btn btn-secondary btn-sm" onclick="fcRetablirModelesMissionUI()">↺ Rétablir les modèles par défaut</button></div></details></div>';
+}
+async function fcSauverModelesMissionUI() {
+  if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); return; }
+  var type = APP._fmmType || 'geometre', liste = [], vus = {}, erreur = '';
+  document.querySelectorAll('#fmm-corps tr.fmm-l').forEach(function(tr){
+    var q = function(c){ return (tr.querySelector(c) || {}).value || ''; }, lib = q('.f-lib').trim(), delai = parseInt(q('.f-delai'), 10), liv = q('.f-liv').split('\n').map(function(x){ return x.trim(); }).filter(Boolean);
+    if (!lib) { erreur = 'Chaque modèle a besoin d\'un nom court.'; return; }
+    if (!(delai >= 1 && delai <= 365)) { erreur = 'Délai invalide pour « ' + lib + ' » (1 à 365 jours).'; return; }
+    var code = tr.getAttribute('data-code') || ('m' + (liste.length + 1) + '_' + lib.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 20)); while (vus[code]) code += '_';
+    vus[code] = true; liste.push({ code: code, libelle: lib, titre: q('.f-titre').trim() || lib, delai: delai, etape: q('.f-etape'), livrables: liv, description: q('.f-desc').trim() });
+  });
+  if (erreur) { toast(erreur, 'error'); return; }
+  if (!liste.length) { toast('Gardez au moins un modèle (ou rétablissez les modèles par défaut).', 'error'); return; }
+  DATA.params = DATA.params || {}; DATA.params.fc_modeles_mission = Object.assign({}, DATA.params.fc_modeles_mission || {}); DATA.params.fc_modeles_mission[type] = liste;
+  try { await fcEnregistrerParams(); toast('Modèles de mission enregistrés pour ce type.', 'success'); } catch (e) { toast('Enregistrement impossible : ' + (e.message || e), 'error'); }
+  fcRenderIntervenants(); var d = document.querySelector('#fi-root details'); if (d) d.open = true;
+}
+async function fcRetablirModelesMissionUI() {
+  if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); return; }
+  var type = APP._fmmType || 'geometre'; if (!((DATA.params || {}).fc_modeles_mission || {})[type]) { toast('Ce type utilise déjà les modèles par défaut.', 'info'); return; }
+  if (!confirm('Rétablir les modèles par défaut pour ce type d\'intervenant ?')) return;
+  DATA.params.fc_modeles_mission = Object.assign({}, DATA.params.fc_modeles_mission); delete DATA.params.fc_modeles_mission[type]; await fcEnregistrerParams(); fcRenderIntervenants(); var d = document.querySelector('#fi-root details'); if (d) d.open = true;
 }
 
 

@@ -71,6 +71,7 @@ Chaque dossier ouvert porte un score de 0 à 100 (faible < 20, modéré, élevé
 ## 7. Intervenants et missions
 
 - Répertoire (notaire, géomètre, …) avec statut de relation. Accès au portail : code, expiration, révocation (fiche de l'intervenant).
+- **Créer une mission** : choisir le dossier et l'intervenant, puis cliquer une **mission type** (boutons propres à son métier : bornage, acte de mutation, dépôt et suivi…). Titre, consignes, livrables cochables, échéance et étape sont préremplis ; ajustez puis « Créer la mission » ou « Créer et envoyer ». La direction adapte les modèles dans « 🧩 Modèles de mission par type d'intervenant ».
 - Mission : acceptation, démarrage, livrables par versions, soumission, vérification, validation ou correction. Messagerie par mission.
 - Le notaire voit **uniquement** ce qui lui est transmis : identité, bien, avancement, pièces cochées « transmis au notaire », attestations. Chaque consultation est journalisée.
 
