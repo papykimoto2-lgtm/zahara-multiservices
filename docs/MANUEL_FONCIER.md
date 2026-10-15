@@ -32,6 +32,7 @@ Réservé à la direction et aux administrateurs.
 - À l'ouverture : échéance de chaque étape = date d'ouverture + cumul des durées. Les échéances restent modifiables dossier par dossier.
 - « Proposer les durées observées » : reprend les durées réelles des dossiers terminés (au moins 3 observations par étape).
 - Case « Imposer l'ordre des étapes » : voir §4.
+- **Échéances estimées** : pour une étape sans durée dans le modèle, l'échéance reprend la durée habituelle de vos dossiers terminés (3 sur 4 se sont terminés plus vite ; au moins 3 dossiers observés). Elle est marquée 📈 *estimée* ; la saisie d'une échéance propose cette suggestion. Réglage « Estimer les échéances d'après vos dossiers ».
 
 ## 4. Faire avancer un dossier
 

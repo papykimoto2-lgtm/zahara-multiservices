@@ -59309,14 +59309,14 @@ async function fcOuvrirDossier(o) {
     controles: fcControlesInitiaux(), procedure_ref_version: FC_PROCEDURE_REF.version
   };
   d.etapes.forEach(function(e){ e.responsable_id = d.responsable_id; });
-  var modele = o.sans_modele ? null : fcModeleActif(o.type), appl = modele ? fcAppliquerModele(d, modele) : null;
+  var modele = o.sans_modele ? null : (fcModeleActif(o.type) || (fcDelaisAutoActif() ? { etapes: {} } : null)), appris = (modele && fcDelaisAutoActif()) ? fcDureesSuggerees(o.type) : {}, appl = modele ? fcAppliquerModele(d, modele, appris) : null;
   if (appl && !d.date_cible && appl.echeance) d.date_cible = appl.echeance;
   if (o.individuel) Object.assign(d, o.individuel);
   if (!DATA.dossiers_fonciers) DATA.dossiers_fonciers = [];
   DATA.dossiers_fonciers.push(d);
   await fcSauver(d);
   await fcEvenement(d, '', 'ouverture', 'Dossier ouvert : ' + FC_PROCEDURES[o.type] + (o.situation ? ' (situation : ' + FC_SITUATIONS[o.situation].libelle + ')' : ''), { nouveau: d.reference, source: 'promoteur' });
-  if (appl && appl.etapes) await fcEvenement(d, '', 'modele', 'Modèle de dossier appliqué : ' + appl.etapes + ' réglage(s), échéance finale ' + (appl.echeance || '—'), { source: 'promoteur' });
+  if (appl && appl.etapes) await fcEvenement(d, '', 'modele', 'Modèle de dossier appliqué : ' + appl.etapes + ' réglage(s), échéance finale ' + (appl.echeance || '—') + (appl.auto ? ', dont ' + appl.auto + ' échéance(s) estimée(s) d\'après la durée habituelle de vos dossiers (75 % terminés plus vite)' : ''), { source: 'promoteur' });
   var avertissements = [];
   if (o.situation && FC_SITUATIONS[o.situation].procedure !== o.type) avertissements.push('La situation « ' + FC_SITUATIONS[o.situation].libelle + ' » oriente plutôt vers « ' + FC_PROCEDURES[FC_SITUATIONS[o.situation].procedure] + ' ». ' + FC_PROCEDURE_REF.non_equivalence);
   if (o.situation && FC_SITUATIONS[o.situation].a_determiner) avertissements.push('Procédure à déterminer avec les services compétents ou un professionnel habilité : ' + FC_SITUATIONS[o.situation].demarche);
@@ -59436,7 +59436,7 @@ async function fcCorrigerEtape(dossierId, code, champs, motif) {
   }
   for (var k2 in (champs || {})) {
     if (String(e[k2] || '') === String(champs[k2] || '')) continue;
-    var ancien = e[k2]; e[k2] = champs[k2]; touche++;
+    var ancien = e[k2]; e[k2] = champs[k2]; touche++; if (k2 === 'date_cible') delete e.date_cible_auto;
     await fcEvenement(d, code, 'correction', e.libelle + ' : ' + k2 + ' corrigé', { ancien: String(ancien || ''), nouveau: String(champs[k2] || ''), motif: String(motif).trim() });
   }
   if (touche) await fcSauver(d);
@@ -59540,7 +59540,7 @@ function fcRenderDetail(id) {
       + (e.issue ? '<br><span style="font-size:11px;color:#2e7d4f;">Issue officielle enregistrée : ' + escHtml(e.issue) + '</span>' : '') + (e.motif ? '<br><span style="font-size:11px;color:#c0392b;">Motif : ' + escHtml(e.motif) + '</span>' : '') + '</td>'
       + '<td>' + (figee ? fcBadgeStatut(e.statut) : '<select class="filter-select" onchange="fcStatutUI(\'' + d.id + '\',\'' + e.code + '\',this)">' + Object.keys(FC_STATUTS).map(function(k){ return '<option value="' + k + '"' + (k === e.statut ? ' selected' : '') + '>' + escHtml(FC_STATUTS[k]) + '</option>'; }).join('') + '</select>') + '</td>'
       + '<td>' + escHtml(fcNomUtilisateur(e.responsable_id || d.responsable_id)) + '</td>'
-      + '<td>' + escHtml(e.date_cible || '—') + (et ? '<br><span style="color:#c0392b;font-size:11px;">' + (et === 'retard_interne' ? 'Retard interne' : 'Délai administratif dépassé') + '</span>' : '') + '</td>'
+      + '<td>' + escHtml(e.date_cible || '—') + (e.date_cible_auto ? ' <span title="Échéance estimée d\'après la durée habituelle de vos dossiers (75 % terminés plus vite)" style="font-size:10px;color:#6a5acd;">📈 estimée</span>' : '') + (et ? '<br><span style="color:#c0392b;font-size:11px;">' + (et === 'retard_interne' ? 'Retard interne' : 'Délai administratif dépassé') + '</span>' : '') + '</td>'
       + '<td>' + e.justificatifs.length + ' <button class="btn btn-secondary btn-sm" onclick="fcJustifUI(\'' + d.id + '\',\'' + e.code + '\')">+</button> <button class="btn btn-secondary btn-sm" title="Fichiers joints à cette étape" onclick="fcPiecesUI(\'' + d.id + '\',\'' + e.code + '\')">📎 ' + fcPiecesEtape(d.id, e.code).length + (fcPiecesEtape(d.id, e.code).some(function(x){ return x.statut === 'a_verifier'; }) ? ' ⚠' : '') + '</button>'
       + e.justificatifs.map(function(j){ return '<div style="font-size:11px;color:var(--dim);">' + escHtml(j.reference || j.note) + ' · ' + escHtml(FC_SOURCES[j.source] || j.source) + '</div>'; }).join('') + '</td>'
       + '<td style="font-size:11px;">' + escHtml(e.visibilite) + '</td>'
@@ -59587,8 +59587,9 @@ async function fcJustifUI(id, code) {
 }
 async function fcEcheanceUI(id, code) {
   if (!fcDroitEcriture()) { toast('Votre profil ne permet pas de modifier le module Foncier.', 'error'); return; }
-  var d = fcDossier(id), e = fcEtape(d, code), v = prompt('Échéance (AAAA-MM-JJ) :', e.date_cible || ''); if (v === null) return;
-  try { e.date_cible = v.trim(); await fcSauver(d);
+  var d = fcDossier(id), e = fcEtape(d, code), hab = fcDureesSuggerees(d.type_procedure)[code], sugg = hab ? fcAjouterJours(fcAuj(), hab.jours) : '';
+  var v = prompt('Échéance (AAAA-MM-JJ) :' + (hab ? '\nSuggestion : ' + sugg + ' (durée habituelle ' + hab.jours + ' j sur ' + hab.n + ' dossiers)' : ''), e.date_cible || sugg); if (v === null) return;
+  try { e.date_cible = v.trim(); delete e.date_cible_auto; await fcSauver(d);
   await fcEvenement(d, code, 'echeance', e.libelle + ' : échéance fixée au ' + (e.date_cible || '—')); fcRender(); } catch (er) { toast('Enregistrement impossible : ' + (er.message || er), 'error'); }
 }
 async function fcCorrigerUI(id, code) {
@@ -61802,16 +61803,17 @@ function fcIncoherences(d) {
 /* ── Modèles de dossier ── */
 function fcModeles() { return ((DATA.params || {}).fc_modeles) || {}; }
 function fcModeleActif(type) { var m = fcModeles()[type]; return m && m.actif !== false ? m : null; }
-function fcAppliquerModele(d, modele) {
-  var cumul = 0, applique = 0, derniere = '';
+function fcAppliquerModele(d, modele, appris) {
+  var cumul = 0, applique = 0, derniere = '', auto = 0; appris = appris || {};
   var users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; });
   d.etapes.slice().sort(function(a, b){ return a.ordre - b.ordre; }).forEach(function(e){
-    var c = (modele.etapes || {})[e.code]; if (!c) return;
-    var j = parseInt(c.jours, 10);
-    if (j > 0) { cumul += j; e.date_cible = fcAjouterJours(d.date_ouverture, cumul); derniere = e.date_cible; applique++; }
+    var c = (modele.etapes || {})[e.code] || {};
+    var j = parseInt(c.jours, 10), habituel = false;
+    if (!(j > 0) && appris[e.code]) { j = appris[e.code].jours; habituel = true; }
+    if (j > 0) { cumul += j; e.date_cible = fcAjouterJours(d.date_ouverture, cumul); derniere = e.date_cible; applique++; if (habituel) { e.date_cible_auto = true; auto++; } }
     if (c.responsable_id && users.some(function(u){ return u.id === c.responsable_id; })) { e.responsable_id = c.responsable_id; applique++; }
   });
-  return { etapes: applique, jours: cumul, echeance: derniere };
+  return { etapes: applique, jours: cumul, echeance: derniere, auto: auto };
 }
 /* Durées observées par type d'étape (journal horodaté), proposées comme point de départ d'un modèle. */
 function fcDureesSuggerees(type) {
@@ -61822,13 +61824,19 @@ function fcDureesSuggerees(type) {
     (par[x.etape_code] = par[x.etape_code] || []).push(j);
   });
   var out = {};
-  Object.keys(par).forEach(function(k){ if (par[k].length >= FC_SEUIL_MESURE) { var m = fcMoyenne(par[k]); out[k] = { jours: Math.max(1, Math.round(m.moyenne)), n: m.n }; } });
+  Object.keys(par).forEach(function(k){ if (par[k].length >= FC_SEUIL_MESURE) { var m = fcMoyenne(par[k]); out[k] = { jours: Math.max(1, Math.ceil(fcPercentile(par[k], 0.75))), moyenne: m.moyenne, mediane: Math.round(fcPercentile(par[k], 0.5) * 10) / 10, n: m.n }; } });
   return out;
 }
+/* Percentile « rang le plus proche » : P75 = durée en dessous de laquelle 3 dossiers sur 4 se sont terminés. */
+function fcPercentile(valeurs, p) {
+  var a = valeurs.slice().sort(function(x, y){ return x - y; }); if (!a.length) return 0;
+  return a[Math.min(a.length - 1, Math.max(0, Math.ceil(p * a.length) - 1))];
+}
+function fcDelaisAutoActif() { return ((DATA.params || {}).fc_delais_auto) !== false; }
 function fcPeutGererModeles() { return fcEstAdmin() || fcPeutVoirDirection(); }
 function fcRenderModeles() {
   var host = document.getElementById('fm-root'); if (!host) return;
-  var type = APP._fmType || 'acd', m = fcModeles()[type] || { actif: true, etapes: {} }, users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; }), sug = APP._fmSug && APP._fmSug.type === type ? APP._fmSug.valeurs : null, ro = fcPeutGererModeles() ? '' : ' disabled ';
+  var type = APP._fmType || 'acd', m = fcModeles()[type] || { actif: true, etapes: {} }, users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; }), sug = fcDureesSuggerees(type), ro = fcPeutGererModeles() ? '' : ' disabled ';
   var etapes = fcEtapesPour(type, ''), phase = '', total = 0;
   var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">📐 Modèles de dossier — délais et responsables par défaut</div>'
     + '<div style="font-size:11px;color:var(--dim);margin-bottom:8px;">À l\'ouverture d\'un dossier de la procédure, les échéances sont calculées en <b>cumulant</b> les durées ci-dessous (en jours calendaires, à partir de la date d\'ouverture) et les responsables par défaut sont affectés. Une durée vide = pas d\'échéance. Les échéances restent modifiables dossier par dossier.</div>'
@@ -61840,11 +61848,12 @@ function fcRenderModeles() {
     if (e.phase !== phase) { phase = e.phase; h += '<tr><td colspan="5" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;">Phase ' + phase + ' — ' + escHtml(FC_PHASES[phase]) + '</td></tr>'; }
     h += '<tr><td>' + e.ordre + '</td><td>' + escHtml(e.libelle) + '</td><td><input type="number" min="0" max="3650" class="form-control" style="width:90px;" id="fm-j-' + e.code + '" value="' + (j || '') + '" ' + ro + '></td>'
       + '<td><select class="filter-select" id="fm-r-' + e.code + '" ' + ro + '><option value="">— responsable du dossier —</option>' + users.map(function(u){ return '<option value="' + u.id + '"' + (u.id === c.responsable_id ? ' selected' : '') + '>' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select></td>'
-      + '<td style="font-size:11px;color:var(--dim);">' + (sug && sug[e.code] ? sug[e.code].jours + ' j (' + sug[e.code].n + ' dossiers)' : '') + '</td></tr>';
+      + '<td style="font-size:11px;color:var(--dim);">' + (sug && sug[e.code] ? '<span title="Durée sous laquelle 3 dossiers sur 4 se sont terminés (moyenne ' + sug[e.code].moyenne + ' j, médiane ' + sug[e.code].mediane + ' j)">' + sug[e.code].jours + ' j (P75, ' + sug[e.code].n + ' dossiers)</span>' : '') + '</td></tr>';
   });
   h += '</tbody></table></div><div style="margin:8px 0;font-size:12px;">Délai total estimé : <b>' + total + ' jours</b></div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="fcSauverModeleUI()" ' + ro + '>💾 Enregistrer le modèle</button> <button class="btn btn-secondary btn-sm" onclick="fcProposerDureesUI()" ' + ro + '>📊 Proposer les durées observées</button> <button class="btn btn-secondary btn-sm" onclick="fcSupprimerModeleUI()" ' + ro + '>Supprimer le modèle</button></div>'
-    + '<hr><label style="font-size:12px;"><input type="checkbox" id="fm-deps" ' + (fcDependancesActives() ? 'checked ' : '') + ro + ' onchange="fcBasculerDependancesUI(this.checked)"> <b>Imposer l\'ordre des étapes</b> : une étape ne démarre ni ne se termine avant ses étapes préalables (dérogation motivée du responsable, journalisée).</label>'
+    + '<hr><label style="font-size:12px;"><input type="checkbox" ' + (fcDelaisAutoActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_delais_auto\',this.checked,\'Échéances estimées\')"> <b>Estimer les échéances d\'après vos dossiers</b> : pour les étapes sans durée dans le modèle, l\'échéance utilise la durée habituelle observée (75 % des dossiers terminés plus vite, au moins ' + FC_SEUIL_MESURE + ' dossiers), marquée « estimée ».</label>'
+    + '<br><label style="font-size:12px;"><input type="checkbox" id="fm-deps" ' + (fcDependancesActives() ? 'checked ' : '') + ro + ' onchange="fcBasculerDependancesUI(this.checked)"> <b>Imposer l\'ordre des étapes</b> : une étape ne démarre ni ne se termine avant ses étapes préalables (dérogation motivée du responsable, journalisée).</label>'
     + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleClotureActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_cloture\',this.checked,\'Contrôle de clôture\')"> <b>Contrôler la complétude à la clôture</b> : pièces à contrôler, missions, demandes, anomalies, frais et notes du titre.</label>'
     + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleConcurrenceActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_concurrence\',this.checked,\'Protection contre les modifications simultanées\')"> <b>Protéger contre les modifications simultanées</b> : refuser une modification si un collègue a enregistré le dossier entre-temps.</label></div>';
   host.innerHTML = h;
