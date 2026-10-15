@@ -18391,8 +18391,9 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div id="c-lot-diag" style="display:none;"></div>
             <div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">La liste reste celle du programme choisi ; la recherche n'en restreint que l'affichage. Le lot déjà sélectionné y reste toujours.</div>
           </div>
-          <div class="form-group span-2">
+          <div class="form-group span-2" id="c-grp-lots-supp">
             <label>Autres lots de ce souscripteur (même programme, même échéancier/montant total)</label>
+            <div id="c-lots-supp-note" style="display:none;font-size:11.5px;color:#B45309;margin-bottom:4px;"></div>
             <div style="display:flex;gap:8px;align-items:center;">
               <select class="form-control" id="c-lot-supplementaire" style="flex:1;">
                 <option value="">— Ajouter un autre lot —</option>
@@ -33279,6 +33280,12 @@ async function saveClient() {
   //    du <select>) car le DOM peut être obsolète (import concurrent, sync distante). ──
   var _lotIdChoisi = document.getElementById('c-lot') ? document.getElementById('c-lot').value : '';
   var _lotIdsSupplémentaires = (APP._clientLotsSupplementaires || []).slice();
+  /* Souscription au logement : un seul lot. On bloque tout AJOUT de lot ; un ancien dossier déjà multi-lots reste enregistrable tant qu'il n'en gagne pas. */
+  if (typeof clientFormNature === 'function' && clientFormNature() === 'logement') {
+    var _cExist = APP.editingId ? DATA.clients.find(function(x){ return x.id === APP.editingId; }) : null;
+    var _dejaSupp = _cExist ? Math.max(0, (typeof _lotIdsDeClient === 'function' ? _lotIdsDeClient(_cExist).length : 1) - 1) : 0;
+    if (_lotIdsSupplémentaires.length > _dejaSupp) { toast('Souscription au logement : un seul lot par souscription. Retirez les lots supplémentaires ou créez une autre souscription.', 'error'); return; }
+  }
   var _tousLotIdsChoisis = _lotIdChoisi ? [_lotIdChoisi].concat(_lotIdsSupplémentaires) : _lotIdsSupplémentaires.slice();
   for (var _li = 0; _li < _tousLotIdsChoisis.length; _li++) {
     var _lotVerif = DATA.lots.find(function(l) { return l.id === _tousLotIdsChoisis[_li]; });
@@ -52678,9 +52685,20 @@ function updateLotsSupplementairesSelect() {
   sel.innerHTML = '<option value="">— Ajouter un autre lot (' + candidats.length + ' disponible(s) sur ce programme) —</option>'
     + candidats.map(function(l){ return '<option value="'+l.id+'">Lot '+l.numero+(l.ilot?' / Îlot '+l.ilot:'')+(l.surface?' — '+Math.round(l.surface)+' m²':'')+' — '+(l.type||'')+' — '+new Intl.NumberFormat('fr-FR').format(l.prix||0)+' FCFA</option>'; }).join('');
 }
+/* Nature du bien du formulaire : « terrain » (plusieurs lots possibles sur une même souscription), « logement » (un seul lot par souscription)
+   ou « indetermine » tant qu'aucun lot / choix manuel ne la fixe. Le choix manuel prime sur la nature du lot. */
+function clientFormNature() {
+  var sel = document.getElementById('c-nature-manuel'), ch = sel ? sel.value : 'auto';
+  if (ch === 'terrain') return 'terrain';
+  if (ch === 'maison' || ch === 'logement') return 'logement';
+  var lotEl = document.getElementById('c-lot'), lot = lotEl ? (DATA.lots||[]).find(function(l){ return l.id === lotEl.value; }) : null;
+  if (lot && lot.nature) return lot.nature === 'terrain' ? 'terrain' : 'logement';
+  return 'indetermine';
+}
 function ajouterLotSupplementaireClient() {
   var sel = document.getElementById('c-lot-supplementaire');
   if (!sel || !sel.value) return;
+  if (clientFormNature() === 'logement') { toast('Souscription au logement : un seul lot par souscription. Créez une autre souscription pour ce lot.', 'error'); return; }
   var lot = (DATA.lots||[]).find(function(l){ return l.id===sel.value; });
   APP._clientLotsSupplementaires = (APP._clientLotsSupplementaires || []).concat([sel.value]);
   /* Pré-incrémente le montant total du prix du lot ajouté — point de départ
@@ -53258,6 +53276,7 @@ function retirerLotSupplementaireClient(lotId) {
 function renderLotsSupplementairesListe() {
   var box = document.getElementById('c-lots-supplementaires-liste');
   if (!box) return;
+  try { var _le = document.getElementById('c-lot'); if (_le && typeof updateNatureBienUI === 'function') updateNatureBienUI((DATA.lots||[]).find(function(l){ return l.id === _le.value; })); } catch (e) { /* affichage seulement */ }
   var ids = APP._clientLotsSupplementaires || [];
   if (!ids.length) { box.innerHTML = '<span style="font-size:11px;color:var(--blanc-dim);">Aucun lot supplémentaire.</span>'; return; }
   box.innerHTML = ids.map(function(id) {
@@ -53302,6 +53321,12 @@ function updateNatureBienUI(lot) {
         badge.style.color = '#B87333';
       }
     }
+  }
+  var grpSupp = document.getElementById('c-grp-lots-supp');
+  if (grpSupp) {
+    var interdit = natureConnue && !isTerrain, nbSupp = (APP._clientLotsSupplementaires || []).length, noteSupp = document.getElementById('c-lots-supp-note');
+    grpSupp.style.display = (interdit && !nbSupp) ? 'none' : '';
+    if (noteSupp) { noteSupp.style.display = (interdit && nbSupp) ? '' : 'none'; noteSupp.textContent = (interdit && nbSupp) ? '⚠ Souscription au logement : un seul lot par souscription. Ce dossier en compte plusieurs (ancien format) ; vous pouvez en retirer, pas en ajouter.' : ''; }
   }
   var grpMode = document.getElementById('c-grp-mode-livraison');
   var grpStanding = document.getElementById('c-grp-standing');
