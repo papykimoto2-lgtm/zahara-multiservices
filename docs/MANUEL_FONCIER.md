@@ -113,6 +113,16 @@ Onglets : Promoteur · Responsable foncier · Intervenants · Direction · **Co�
 - Coûts : frais engagés TTC, part promoteur / souscripteur, à refacturer, refacturé, encaissé, notes en retard, par nature et par opération.
 - Rapport : hebdomadaire, mensuel, trimestriel ; comparaison à la période précédente ; PDF, CSV, envoi à la direction (une fois par période).
 
+## 11 bis. Outils de suivi
+
+- **🔎 Recherche** : une seule zone pour retrouver dossier, souscripteur, intervenant, mission, pièce, courrier (COU-…), note de débours (NDF-…) ou décharge (DEC-…).
+- **🗂 Kanban** : l'étape courante de chaque dossier, par statut. Glissez une carte vers une autre colonne pour changer le statut (ou « Déplacer vers… » sur tablette). Les règles habituelles s'appliquent (ordre des étapes, justificatif, motif, dérogation).
+- **📅 Calendrier** : échéances du mois (étapes, dossiers, missions, règlements). **Exporter (.ics)** pour les retrouver dans votre agenda.
+- **Actions groupées** : dans la liste des dossiers, cochez plusieurs dossiers puis réaffectez, fixez la priorité ou l'échéance, ou archivez. Les refus sont listés dossier par dossier.
+- **Archivage** : un dossier clos ou annulé peut être archivé (réversible) ; il disparaît de la liste sauf « Inclure les archivés ». Le bouton « Archiver les dossiers clos depuis plus de N mois » traite les anciens en une fois.
+- **Budget du titre** : dans un dossier individuel, fixez un budget par nature de frais ; l'écart avec le réel et les dépassements s'affichent, et se retrouvent dans Pilotage › Coûts du titre.
+- **Remise du titre** : imprimez la décharge à signer, puis **Enregistrer la remise** (date, remis à, pièce d'identité) ; la décharge DEC-… devient le justificatif de l'étape. Joignez-y le scan signé.
+
 ## 12. Droits
 
 | Action | Droit requis |

@@ -10087,6 +10087,9 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
               <button class="tab-btn active" onclick="switchTab('foncier','dashboard');renderFoncierDashboard()" title="Récapitulatif du portefeuille — répartition, valeur, alertes"><i>📊</i>Tableau de bord</button>
               <button class="tab-btn" onclick="switchTab('foncier','notifications')" title="Alertes, échéances et notifications"><i>🔔</i>Notifications <span id="fn-badge" style="display:none;background:#dc3545;color:#fff;border-radius:10px;padding:0 6px;font-size:10px;"></span></button>
               <button class="tab-btn" onclick="switchTab('foncier','journee')" title="Ce qui demande une action aujourd'hui, avec l'action en un clic"><i>☀️</i>Ma journée <span id="fj-badge" style="display:none;background:#dc3545;color:#fff;border-radius:10px;padding:0 6px;font-size:10px;margin-left:4px;">0</span></button>
+              <button class="tab-btn" onclick="switchTab('foncier','recherche')" title="Chercher un dossier, un souscripteur, un intervenant, une mission, un document"><i>🔎</i>Recherche</button>
+              <button class="tab-btn" onclick="switchTab('foncier','kanban')" title="Étape courante de chaque dossier, par statut, avec glisser-déposer"><i>🗂</i>Kanban</button>
+              <button class="tab-btn" onclick="switchTab('foncier','calendrier')" title="Échéances du mois, export vers votre agenda"><i>📅</i>Calendrier</button>
               <button class="tab-btn" onclick="switchTab('foncier','pilotage')" title="Tableaux de bord : promoteur, responsable, intervenants, direction"><i>🎯</i>Pilotage foncier</button>
               <button class="tab-btn" onclick="switchTab('foncier','documents')" title="Gestion documentaire : classement, versions, expiration, recherche"><i>🗂️</i>Documents</button>
             </div>
@@ -10642,6 +10645,9 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
         <div class="tab-pane" id="tab-foncier-pilotage"><div id="fp-root"></div></div>
         <div class="tab-pane" id="tab-foncier-journee"><div id="fj-root"></div></div>
         <div class="tab-pane" id="tab-foncier-modeles"><div id="fm-root"></div></div>
+        <div class="tab-pane" id="tab-foncier-recherche"><div id="fr-root"></div></div>
+        <div class="tab-pane" id="tab-foncier-kanban"><div id="fk-root"></div></div>
+        <div class="tab-pane" id="tab-foncier-calendrier"><div id="fcal-root"></div></div>
         <div class="tab-pane" id="tab-foncier-documents"><div id="fd-root"></div></div>
 
         <div class="tab-pane" id="tab-foncier-fisc">
@@ -30549,6 +30555,9 @@ function switchTab(context, tab) {
   if (context==='foncier' && tab==='pilotage' && typeof fcRenderPilotage==='function') fcRenderPilotage();
   if (context==='foncier' && tab==='journee' && typeof fcRenderJournee==='function') fcRenderJournee();
   if (context==='foncier' && tab==='modeles' && typeof fcRenderModeles==='function') fcRenderModeles();
+  if (context==='foncier' && tab==='recherche' && typeof fcRenderRecherche==='function') fcRenderRecherche();
+  if (context==='foncier' && tab==='kanban' && typeof fcRenderKanban==='function') fcRenderKanban();
+  if (context==='foncier' && tab==='calendrier' && typeof fcRenderCalendrier==='function') fcRenderCalendrier();
   if (context==='foncier' && tab==='documents' && typeof fcRenderDocuments==='function') fcRenderDocuments();
   if (context==='recliv' && tab==='garsav' && typeof garInit==='function') { garInit(); }
   if (context==='conventions' && tab==='cautions' && typeof cauInit==='function') { cauInit(); }
@@ -59497,7 +59506,7 @@ function fcRender() {
     + '<div class="form-group"><label>Priorité</label><select class="filter-select" id="fc-n-prio"><option value="normale">Normale</option><option value="haute">Haute</option><option value="basse">Basse</option></select></div>'
     + '<div class="form-group"><label>Échéance</label><input type="date" class="form-control" id="fc-n-cible"></div>'
     + '<button class="btn btn-primary btn-sm" onclick="fcOuvrirUI()">Ouvrir le dossier</button></div><div id="fc-n-sit-info"></div></div>';
-  h += '<div class="card"><div class="card-title">📋 Dossiers <button class="btn btn-secondary btn-sm" style="float:right;" onclick="fcImprimerListeUI()">🖨 Imprimer la liste</button> <button class="btn btn-secondary btn-sm" style="float:right;margin-right:6px;" onclick="APP._fcTriRisque=!APP._fcTriRisque;fcRender()">' + (APP._fcTriRisque ? '↕ Tri par date' : '🚨 Trier par risque') + '</button></div>' + fcHtmlFiltresListe() + '<div id="fc-liste-corps"></div>';
+  h += '<div class="card"><div class="card-title">📋 Dossiers <button class="btn btn-secondary btn-sm" style="float:right;" onclick="fcImprimerListeUI()">🖨 Imprimer la liste</button> <button class="btn btn-secondary btn-sm" style="float:right;margin-right:6px;" onclick="APP._fcTriRisque=!APP._fcTriRisque;fcRender()">' + (APP._fcTriRisque ? '↕ Tri par date' : '🚨 Trier par risque') + '</button></div>' + fcHtmlFiltresListe() + '<div id="fc-barre-groupee"></div><div id="fc-liste-corps"></div>';
   h += '</div>' + fcPanneauReference() + '<div id="fc-detail"></div>';
   host.innerHTML = h;
   fcRenderListeCorps();
@@ -59520,6 +59529,7 @@ function fcRenderDetail(id) {
   h += '<div style="margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer le dossier</button> <button class="btn btn-secondary btn-sm" onclick="fcAllerJalons(\'' + d.parcelle_id + '\')">🧭 Voir les jalons du titre de la parcelle</button></div>';
   h += fcPanneauDossier(d);
   h += fcPanneauRisque(d);
+  h += fcPanneauArchive(d);
   h += fcPanneauCourriers(d);
   h += fcPanneauCompletude(d);
   var phase = '';
@@ -59541,6 +59551,8 @@ function fcRenderDetail(id) {
   h += fcPanneauPieces(d);
   h += fcPanneauTitresIndividuels(d);
   h += fcPanneauFrais(d);
+  h += fcPanneauBudget(d);
+  h += fcPanneauRemise(d);
   var pubs = (DATA.publications_foncieres || []).filter(function(x){ return x.dossier_id === d.id; }).sort(function(a, b){ return b.publie_le.localeCompare(a.publie_le); });
   h += '<div class="card-title" style="margin-top:14px;">📣 Informations publiées au souscripteur</div>' + (pubs.length ? pubs.map(function(x){
     return '<div style="padding:5px 0;border-bottom:1px solid var(--bord,#eee);font-size:12px;' + (x.retire ? 'opacity:.55;' : '') + '"><b>' + escHtml(x.publie_le.slice(0, 10)) + '</b> · ' + escHtml(x.libelle_public) + ' <i>(' + escHtml(FC_LIBELLES_SOURCE[x.source]) + ')</i>'
@@ -61892,6 +61904,313 @@ async function fcRetablirGabaritUI() {
 }
 
 
+/* ═══ Finitions de la coordination (FIN1) : actions groupées, archivage, Kanban, calendrier + ICS, budget du titre, décharge de remise, recherche globale ═══ */
+
+/* ── Archivage ── */
+function fcArchivageMois() { var m = parseInt((DATA.params || {}).fc_archivage_mois, 10); return m > 0 ? m : 24; }
+function fcDossiersArchivables(aujourdhui) {
+  var lim = new Date((aujourdhui || fcAuj()) + 'T00:00:00Z'); lim.setUTCMonth(lim.getUTCMonth() - fcArchivageMois()); var l = lim.toISOString().slice(0, 10);
+  return (DATA.dossiers_fonciers || []).filter(function(d){ return !d.archive && ['cloture', 'annule'].indexOf(d.statut) !== -1 && String(d.date_cloture || d.date_ouverture || d.created_at || '9999').slice(0, 10) <= l; });
+}
+async function fcArchiverDossier(dossierId, on) {
+  var d = fcDossier(dossierId); if (!d) return { ok: false, erreur: 'Dossier introuvable.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) archive un dossier.' };
+  if (on && ['cloture', 'annule'].indexOf(d.statut) === -1) return { ok: false, erreur: 'Seul un dossier clôturé ou annulé s’archive.' };
+  if (!!d.archive === !!on) return { ok: true, inchange: true };
+  d.archive = !!on; d.archive_le = on ? new Date().toISOString() : ''; await fcSauver(d);
+  await fcEvenement(d, '', 'archivage', 'Dossier ' + (on ? 'archivé' : 'sorti des archives'), { source: 'promoteur' });
+  return { ok: true };
+}
+async function fcArchiverLesAnciens() {
+  var l = fcDossiersArchivables(), n = 0, echecs = [];
+  for (var i = 0; i < l.length; i++) { var r = await fcArchiverDossier(l[i].id, true); if (r.ok) n++; else echecs.push({ reference: l[i].reference, erreur: r.erreur }); }
+  return { ok: true, archives: n, echecs: echecs };
+}
+fcProtegerMutations(['fcArchiverDossier', 'fcArchiverLesAnciens']);
+
+/* ── Actions groupées sur la liste ── */
+function fcSelectionListe() { APP._fcSelect = APP._fcSelect || {}; return Object.keys(APP._fcSelect).filter(function(k){ return APP._fcSelect[k] && fcDossier(k); }); }
+async function fcActionGroupeDossiers(ids, champs) {
+  ids = (ids || []).filter(function(x, i, a){ return a.indexOf(x) === i; }); if (!ids.length) return { ok: false, erreur: 'Sélectionnez au moins un dossier.' };
+  var reussis = 0, inchanges = 0, echecs = [];
+  for (var i = 0; i < ids.length; i++) {
+    var d = fcDossier(ids[i]), r = await fcModifierDossier(ids[i], champs);
+    if (r.ok && r.inchange) inchanges++; else if (r.ok) reussis++; else echecs.push({ reference: d ? d.reference : ids[i], erreur: r.erreur });
+  }
+  return { ok: true, reussis: reussis, inchanges: inchanges, echecs: echecs };
+}
+fcProtegerMutations(['fcActionGroupeDossiers']);
+function fcCocherDossierUI(id, on) { APP._fcSelect = APP._fcSelect || {}; if (on) APP._fcSelect[id] = true; else delete APP._fcSelect[id]; fcMajBarreGroupee(); }
+function fcCocherPageUI(on) { document.querySelectorAll('#fc-liste-corps input.fc-ck-d').forEach(function(c){ c.checked = !!on; fcCocherDossierUI(c.value, !!on); }); }
+function fcMajBarreGroupee() {
+  var z = document.getElementById('fc-barre-groupee'); if (!z) return; var n = fcSelectionListe().length;
+  if (!n) { z.innerHTML = ''; return; }
+  var users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; });
+  z.innerHTML = '<div style="border:1px solid var(--or);border-radius:8px;padding:8px 10px;margin:6px 0;font-size:12px;"><b>' + n + ' dossier(s) sélectionné(s)</b> — '
+    + '<select class="filter-select" id="fc-g-resp"><option value="">Responsable…</option>' + users.map(function(u){ return '<option value="' + u.id + '">' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select> <button class="btn btn-secondary btn-sm" onclick="fcGroupeUI(\'responsable_id\',\'fc-g-resp\')">Réaffecter</button> '
+    + '<select class="filter-select" id="fc-g-prio"><option value="">Priorité…</option>' + Object.keys(FC_PRIORITES).map(function(k){ return '<option value="' + k + '">' + FC_PRIORITES[k] + '</option>'; }).join('') + '</select> <button class="btn btn-secondary btn-sm" onclick="fcGroupeUI(\'priorite\',\'fc-g-prio\')">Appliquer</button> '
+    + '<input type="date" class="form-control" id="fc-g-cible" style="width:150px;display:inline-block;"> <button class="btn btn-secondary btn-sm" onclick="fcGroupeUI(\'date_cible\',\'fc-g-cible\')">Échéance</button> '
+    + '<button class="btn btn-secondary btn-sm" onclick="fcGroupeArchiverUI()">🗄 Archiver</button> <button class="btn btn-secondary btn-sm" onclick="APP._fcSelect={};fcRenderListeCorps();fcMajBarreGroupee()">✖ Désélectionner</button><div id="fc-g-detail"></div></div>';
+}
+function fcRapportGroupe(r, zone) {
+  var z = document.getElementById('fc-g-detail'); var msg = r.ok ? (r.reussis || r.archives || 0) + ' dossier(s) mis à jour' + (r.inchanges ? ', ' + r.inchanges + ' déjà à jour' : '') + (r.echecs.length ? ', ' + r.echecs.length + ' refusé(s)' : '') + '.' : r.erreur;
+  if (typeof toast === 'function') toast(msg, r.ok && !r.echecs.length ? 'success' : 'warning');
+  if (z) z.innerHTML = r.ok && r.echecs.length ? '<div style="margin-top:6px;color:#c0392b;">' + r.echecs.map(function(e){ return escHtml(e.reference) + ' : ' + escHtml(e.erreur); }).join('<br>') + '</div>' : '';
+}
+async function fcGroupeUI(champ, idChamp) {
+  var v = (document.getElementById(idChamp) || {}).value || ''; if (!v) { toast('Choisissez une valeur.', 'error'); return; }
+  var c = {}; c[champ] = v; var r = await fcActionGroupeDossiers(fcSelectionListe(), c); fcRenderListeCorps(); fcMajBarreGroupee(); fcRapportGroupe(r);
+}
+async function fcGroupeArchiverUI() {
+  var ids = fcSelectionListe(), echecs = [], n = 0;
+  for (var i = 0; i < ids.length; i++) { var r = await fcArchiverDossier(ids[i], true); if (r.ok) n++; else echecs.push({ reference: (fcDossier(ids[i]) || {}).reference, erreur: r.erreur }); }
+  APP._fcSelect = {}; fcRenderListeCorps(); fcMajBarreGroupee(); fcRapportGroupe({ ok: true, archives: n, echecs: echecs, inchanges: 0, reussis: n });
+}
+async function fcArchiverAnciensUI() {
+  var n = fcDossiersArchivables().length; if (!n) { toast('Aucun dossier à archiver.', 'info'); return; }
+  if (!confirm('Archiver ' + n + ' dossier(s) clos depuis plus de ' + fcArchivageMois() + ' mois ? Ils restent consultables (case « Inclure les archivés »).')) return;
+  var r = await fcArchiverLesAnciens(); toast(r.archives + ' dossier(s) archivé(s).', 'success'); fcRenderListeCorps();
+}
+
+/* ── Kanban des étapes courantes ── */
+var FC_COLONNES_KANBAN = [['a_preparer', 'À préparer / à venir'], ['en_cours', 'En cours'], ['attente_intervenant', 'Attente intervenant'], ['attente_document', 'Attente document'], ['attente_administration', 'Attente administration'], ['attente_decision', 'Attente décision'], ['bloque', 'Bloqué']];
+function fcCartesKanban(filtre) {
+  var cols = {}; FC_COLONNES_KANBAN.forEach(function(c){ cols[c[0]] = []; }); filtre = filtre || {}; var ctx = fcContexteRisque(), t = fcAuj();
+  fcDossiersActifs().filter(function(d){ return ['cloture', 'annule'].indexOf(d.statut) === -1 && !d.archive; }).forEach(function(d){
+    var e = fcProchaineEtape(d); if (!e) return; var resp = e.responsable_id || d.responsable_id; if (filtre.responsable && resp !== filtre.responsable) return;
+    var col = e.statut === 'a_venir' ? 'a_preparer' : e.statut; if (!cols[col]) return;
+    cols[col].push({ dossier: d, etape: e, responsable_id: resp, retard: fcEtatEcheance(e, t), risque: fcScoreRisque(d, t, ctx) });
+  });
+  Object.keys(cols).forEach(function(k){ cols[k].sort(function(a, b){ return b.risque.score - a.risque.score || String(a.dossier.reference).localeCompare(String(b.dossier.reference)); }); });
+  return cols;
+}
+function fcRenderKanban() {
+  var host = document.getElementById('fk-root'); if (!host) return;
+  var moi = fcActeur(), f = APP._fkFiltre || '', cols = fcCartesKanban({ responsable: f === 'moi' ? moi.id : f }), users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; }), max = APP._fkMax || 20;
+  var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">🗂 Tableau Kanban — étape courante de chaque dossier</div><div style="font-size:11px;color:var(--dim);margin-bottom:8px;">Glissez une carte vers une colonne pour changer le statut de son étape (mêmes règles et mêmes dérogations que dans le dossier). Sur écran tactile, utilisez « Déplacer vers… ».</div>'
+    + '<div class="filters-bar"><div class="form-group"><label>Responsable</label><select class="filter-select" onchange="APP._fkFiltre=this.value;fcRenderKanban()"><option value="">Tous</option><option value="moi"' + (f === 'moi' ? ' selected' : '') + '>Mes dossiers</option>' + users.map(function(u){ return '<option value="' + u.id + '"' + (u.id === f ? ' selected' : '') + '>' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select></div></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(' + FC_COLONNES_KANBAN.length + ',minmax(190px,1fr));gap:8px;overflow-x:auto;">';
+  FC_COLONNES_KANBAN.forEach(function(c){
+    var l = cols[c[0]];
+    h += '<div class="fk-col" data-statut="' + c[0] + '" ondragover="event.preventDefault()" ondrop="fcDeposerCarteUI(event,\'' + c[0] + '\')" style="background:var(--card2,#f5f1ea);border-radius:8px;padding:6px;min-height:120px;"><div style="font-weight:700;font-size:12px;margin-bottom:6px;">' + escHtml(c[1]) + ' <span style="color:var(--or);">(' + l.length + ')</span></div>';
+    l.slice(0, max).forEach(function(x){
+      var d = x.dossier, e = x.etape;
+      h += '<div class="fk-carte" draggable="true" ondragstart="event.dataTransfer.setData(\'text/plain\',\'' + d.id + '|' + e.code + '\')" style="background:#fff;border:1px solid var(--bord,#ddd);border-left:4px solid ' + x.risque.niveau[3] + ';border-radius:6px;padding:6px;margin-bottom:6px;font-size:11px;cursor:grab;">'
+        + '<b>' + escHtml(d.reference) + '</b>' + fcBadgeRisque(x.risque) + '<div>' + escHtml(e.libelle) + '</div><div style="color:var(--dim);">' + escHtml(fcNomUtilisateur(x.responsable_id)) + (e.date_cible ? ' · ' + escHtml(dateShort(e.date_cible)) : '') + '</div>'
+        + (x.retard ? '<div style="color:#c0392b;">' + (x.retard === 'retard_interne' ? 'Retard interne' : 'Délai administratif dépassé') + '</div>' : '')
+        + '<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;"><button class="btn btn-secondary btn-sm" onclick="fcAllerDossier(\'' + d.id + '\')">Ouvrir</button><select class="filter-select" style="font-size:11px;" onchange="if(this.value)fcDeplacerCarteUI(\'' + d.id + '\',\'' + e.code + '\',this.value)"><option value="">Déplacer vers…</option>'
+        + FC_COLONNES_KANBAN.concat([['termine', 'Terminé']]).filter(function(k){ return k[0] !== c[0]; }).map(function(k){ return '<option value="' + k[0] + '">' + escHtml(k[1]) + '</option>'; }).join('') + '</select></div></div>';
+    });
+    if (l.length > max) h += '<button class="btn btn-secondary btn-sm" onclick="APP._fkMax=(APP._fkMax||20)+20;fcRenderKanban()">+ ' + (l.length - max) + ' autres</button>';
+    h += '</div>';
+  });
+  host.innerHTML = h + '</div></div>';
+}
+async function fcDeplacerCarteUI(dossierId, code, statut) {
+  var cible = statut === 'a_preparer' ? 'a_preparer' : statut;
+  await fcStatutUI(dossierId, code, { value: cible }); fcRenderKanban();
+}
+function fcDeposerCarteUI(ev, statut) {
+  ev.preventDefault(); var p = String(ev.dataTransfer.getData('text/plain') || '').split('|'); if (p.length !== 2) return; return fcDeplacerCarteUI(p[0], p[1], statut);
+}
+
+/* ── Calendrier des échéances + export ICS ── */
+function fcEvenementsCalendrier(du, au, filtre) {
+  filtre = filtre || {}; var ev = [], dans = function(x){ return x && x >= du && x <= au; }, resp = function(r){ return !filtre.responsable || r === filtre.responsable; };
+  fcDossiersActifs().filter(function(d){ return ['cloture', 'annule'].indexOf(d.statut) === -1; }).forEach(function(d){
+    fcEtapesActives(d).forEach(function(e){ var r = fcResponsableEtape(d, e); if (dans(e.date_cible) && resp(r)) ev.push({ id: 'e-' + d.id + '-' + e.code, date: e.date_cible, type: 'etape', libelle: d.reference + ' — ' + e.libelle, dossier_id: d.id, responsable_id: r, retard: !!fcEtatEcheance(e) }); });
+    if (dans(d.date_cible) && resp(d.responsable_id)) ev.push({ id: 'd-' + d.id, date: d.date_cible, type: 'dossier', libelle: d.reference + ' — échéance du dossier', dossier_id: d.id, responsable_id: d.responsable_id, retard: d.date_cible < fcAuj() });
+    fcNotesDebours(d).forEach(function(n){ if (n.statut === 'emise' && dans(n.echeance) && resp(d.responsable_id)) ev.push({ id: 'n-' + n.id, date: n.echeance, type: 'note', libelle: d.reference + ' — règlement note ' + n.numero, dossier_id: d.id, responsable_id: d.responsable_id, retard: fcNoteEnRetard(n) }); });
+  });
+  (DATA.missions_foncieres || []).forEach(function(m){ var d = fcDossier(m.dossier_id); if (d && ['cloture', 'annule'].indexOf(d.statut) === -1 && FC_MISSIONS_ACTIVES.indexOf(m.statut) !== -1 && dans(m.echeance) && resp(m.responsable_validation_id || d.responsable_id)) ev.push({ id: 'm-' + m.id, date: m.echeance, type: 'mission', libelle: m.reference + ' — ' + m.titre + ' (' + fcNomIntervenant(m.intervenant_id) + ')', dossier_id: m.dossier_id, responsable_id: m.responsable_validation_id, retard: fcMissionEnRetard(m) }); });
+  return ev.sort(function(a, b){ return a.date.localeCompare(b.date) || a.libelle.localeCompare(b.libelle); });
+}
+var FC_TYPES_CAL = { etape: ['Étape', '#1565c0'], dossier: ['Dossier', '#6a5acd'], mission: ['Mission', '#B87333'], note: ['Règlement', '#2e7d4f'] };
+function fcMoisCalendrier() { return APP._fkMois || fcAuj().slice(0, 7); }
+function fcRenderCalendrier() {
+  var host = document.getElementById('fcal-root'); if (!host) return;
+  var mois = fcMoisCalendrier(), y = +mois.slice(0, 4), m = +mois.slice(5, 7), premier = new Date(Date.UTC(y, m - 1, 1)), nbj = new Date(Date.UTC(y, m, 0)).getUTCDate(), dec = (premier.getUTCDay() + 6) % 7;
+  var du = mois + '-01', au = mois + '-' + ('0' + nbj).slice(-2), f = APP._fcalFiltre || '', moi = fcActeur(), ev = fcEvenementsCalendrier(du, au, { responsable: f === 'moi' ? moi.id : f }), parJour = {};
+  ev.forEach(function(e){ (parJour[e.date] = parJour[e.date] || []).push(e); });
+  var users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; }), sel = APP._fcalJour || '';
+  var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">📅 Calendrier des échéances — ' + escHtml(FC_MOIS[m - 1].charAt(0).toUpperCase() + FC_MOIS[m - 1].slice(1)) + ' ' + y + '</div>'
+    + '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;"><button class="btn btn-secondary btn-sm" onclick="fcMoisCalUI(-1)">◀</button><button class="btn btn-secondary btn-sm" onclick="APP._fkMois=\'\';APP._fcalJour=\'\';fcRenderCalendrier()">Aujourd’hui</button><button class="btn btn-secondary btn-sm" onclick="fcMoisCalUI(1)">▶</button>'
+    + '<div class="form-group"><label>Responsable</label><select class="filter-select" onchange="APP._fcalFiltre=this.value;fcRenderCalendrier()"><option value="">Tous</option><option value="moi"' + (f === 'moi' ? ' selected' : '') + '>Mes échéances</option>' + users.map(function(u){ return '<option value="' + u.id + '"' + (u.id === f ? ' selected' : '') + '>' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select></div>'
+    + '<button class="btn btn-primary btn-sm" onclick="fcExporterIcsUI()" title="Fichier .ics à importer dans Google Agenda, Outlook, Apple Calendrier">⬇ Exporter (.ics)</button></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:11px;">' + ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(function(j){ return '<div style="font-weight:700;text-align:center;">' + j + '</div>'; }).join('');
+  for (var i = 0; i < dec; i++) h += '<div></div>';
+  for (var j = 1; j <= nbj; j++) {
+    var date = mois + '-' + ('0' + j).slice(-2), l = parJour[date] || [], auj = date === fcAuj();
+    h += '<div onclick="APP._fcalJour=\'' + date + '\';fcRenderCalendrier()" style="min-height:62px;border:1px solid ' + (date === sel ? 'var(--or)' : 'var(--bord,#ddd)') + ';border-radius:6px;padding:3px;cursor:pointer;' + (auj ? 'background:#fff8e6;' : '') + '"><div style="font-weight:' + (auj ? '700' : '400') + ';">' + j + '</div>'
+      + l.slice(0, 3).map(function(e){ return '<div title="' + escHtml(e.libelle) + '" style="background:' + (e.retard ? '#c0392b' : FC_TYPES_CAL[e.type][1]) + ';color:#fff;border-radius:3px;padding:0 3px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(e.libelle) + '</div>'; }).join('') + (l.length > 3 ? '<div style="color:var(--dim);">+' + (l.length - 3) + '</div>' : '') + '</div>';
+  }
+  h += '</div><div style="font-size:11px;color:var(--dim);margin-top:6px;">' + Object.keys(FC_TYPES_CAL).map(function(k){ return '<span style="color:' + FC_TYPES_CAL[k][1] + ';">■</span> ' + FC_TYPES_CAL[k][0]; }).join(' · ') + ' · <span style="color:#c0392b;">■</span> en retard · ' + ev.length + ' échéance(s) ce mois</div>';
+  var jour = sel && sel.slice(0, 7) === mois ? (parJour[sel] || []) : [];
+  if (sel && sel.slice(0, 7) === mois) h += '<div style="margin-top:10px;"><b>' + escHtml(dateShort(sel)) + '</b>' + (jour.length ? jour.map(function(e){ return '<div style="padding:4px 0;border-bottom:1px solid var(--bord,#eee);font-size:12px;"><span style="color:' + (e.retard ? '#c0392b' : FC_TYPES_CAL[e.type][1]) + ';">■</span> ' + escHtml(e.libelle) + ' · ' + escHtml(fcNomUtilisateur(e.responsable_id)) + ' <button class="btn btn-secondary btn-sm" onclick="fcAllerDossier(\'' + e.dossier_id + '\')">Ouvrir</button></div>'; }).join('') : '<div style="color:var(--dim);font-size:12px;">Aucune échéance ce jour.</div>') + '</div>';
+  host.innerHTML = h + '</div>';
+}
+function fcMoisCalUI(delta) { var m = fcMoisCalendrier(), d = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7) - 1 + delta, 1)); APP._fkMois = d.toISOString().slice(0, 7); APP._fcalJour = ''; fcRenderCalendrier(); }
+function fcIcsEchapper(x) { return String(x == null ? '' : x).replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
+function fcIcsPlier(ligne) { var out = [], s = ligne; while (s.length > 74) { out.push(s.slice(0, 74)); s = ' ' + s.slice(74); } out.push(s); return out.join('\r\n'); }
+function fcGenererIcs(evenements, nom) {
+  var maintenant = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''), L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ImmoSuite//Foncier//FR', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:' + fcIcsEchapper(nom || 'Échéances foncières')];
+  evenements.forEach(function(e){
+    var d0 = e.date.replace(/-/g, ''), fin = new Date(e.date + 'T00:00:00Z'); fin.setUTCDate(fin.getUTCDate() + 1);
+    L.push('BEGIN:VEVENT', 'UID:' + e.id + '@immosuite-foncier', 'DTSTAMP:' + maintenant, 'DTSTART;VALUE=DATE:' + d0, 'DTEND;VALUE=DATE:' + fin.toISOString().slice(0, 10).replace(/-/g, ''), fcIcsPlier('SUMMARY:' + fcIcsEchapper((e.retard ? '⚠ ' : '') + e.libelle)),
+      fcIcsPlier('DESCRIPTION:' + fcIcsEchapper(FC_TYPES_CAL[e.type][0] + ' — responsable : ' + fcNomUtilisateur(e.responsable_id))), 'CATEGORIES:' + fcIcsEchapper(FC_TYPES_CAL[e.type][0]), 'TRANSP:TRANSPARENT', 'END:VEVENT');
+  });
+  L.push('END:VCALENDAR'); return L.join('\r\n') + '\r\n';
+}
+function fcExporterIcsUI() {
+  var f = APP._fcalFiltre || '', t = fcAuj(), ev = fcEvenementsCalendrier(fcAjouterJours(t, -30), fcAjouterJours(t, 365), { responsable: f === 'moi' ? fcActeur().id : f });
+  if (!ev.length) { toast('Aucune échéance à exporter.', 'info'); return; }
+  fcTelechargerTexte('echeances-foncier-' + t + '.ics', fcGenererIcs(ev, 'Échéances foncières'), 'text/calendar;charset=utf-8'); toast(ev.length + ' échéance(s) exportée(s).', 'success');
+}
+
+/* ── Budget prévisionnel du titre ── */
+function fcBudgetTitre(d) {
+  var b = d.budget_titre || {}, reel = {}; fcFraisTitre(d).filter(function(f){ return f.statut !== 'annule'; }).forEach(function(f){ reel[f.nature] = (reel[f.nature] || 0) + fcTotalFrais(f); });
+  var lignes = Object.keys(FC_FRAIS_TITRE).map(function(k){ var p = parseFloat(b[k]) || 0, r = Math.round((reel[k] || 0) * 100) / 100; return { nature: k, libelle: FC_FRAIS_TITRE[k].lib, prevu: p, reel: r, ecart: Math.round((p - r) * 100) / 100, depasse: p > 0 && r > p, sans_budget: !p && r > 0 }; });
+  var tp = lignes.reduce(function(s, x){ return s + x.prevu; }, 0), tr = lignes.reduce(function(s, x){ return s + x.reel; }, 0);
+  return { lignes: lignes, prevu: tp, reel: tr, ecart: Math.round((tp - tr) * 100) / 100, defini: tp > 0, depassements: lignes.filter(function(x){ return x.depasse || x.sans_budget; }) };
+}
+async function fcDefinirBudgetTitre(dossierId, budget) {
+  var d = fcDossier(dossierId); if (!d || !fcEstIndividuel(d)) return { ok: false, erreur: 'Dossier de titre individuel introuvable.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) fixe le budget.' };
+  if (['cloture', 'annule'].indexOf(d.statut) !== -1) return { ok: false, erreur: 'Dossier ' + d.statut + ' : budget figé.' };
+  var nouveau = {};
+  for (var k in (budget || {})) { if (!FC_FRAIS_TITRE[k]) return { ok: false, erreur: 'Nature de frais inconnue : ' + k + '.' }; var v = parseFloat(budget[k]); if (budget[k] !== '' && budget[k] != null && (isNaN(v) || v < 0 || v > 1e10)) return { ok: false, erreur: 'Montant invalide pour « ' + FC_FRAIS_TITRE[k].lib + ' ».' }; if (v > 0) nouveau[k] = Math.round(v * 100) / 100; }
+  d.budget_titre = nouveau; await fcSauver(d);
+  await fcEvenement(d, '', 'budget', 'Budget prévisionnel du titre : ' + (Object.keys(nouveau).length ? Object.keys(nouveau).map(function(k){ return FC_FRAIS_TITRE[k].lib + ' ' + nouveau[k]; }).join(' ; ') : 'effacé'), { source: 'promoteur' });
+  return { ok: true, budget: nouveau };
+}
+fcProtegerMutations(['fcDefinirBudgetTitre']);
+function fcPanneauBudget(d) {
+  if (!fcEstIndividuel(d)) return '';
+  var b = fcBudgetTitre(d), gerer = fcPeutGererDossier(d) && ['cloture', 'annule'].indexOf(d.statut) === -1, defaut = (DATA.params || {}).fc_budget_defaut || {};
+  return '<div class="card" style="margin:8px 0;"><details' + (b.depassements.length ? ' open' : '') + '><summary class="card-title" style="cursor:pointer;">📊 Budget prévisionnel du titre ' + (b.defini ? '<span style="font-size:11px;color:' + (b.ecart < 0 ? '#c0392b' : '#2e7d4f') + ';">' + (b.ecart < 0 ? 'dépassé de ' + fcFmtF(-b.ecart) : 'reste ' + fcFmtF(b.ecart)) + '</span>' : '<span style="font-size:11px;color:var(--dim);">non défini</span>') + '</summary>'
+    + '<div class="table-wrap"><table><thead><tr><th>Nature</th><th>Prévu (FCFA)</th><th>Réel (TTC)</th><th>Écart</th></tr></thead><tbody>' + b.lignes.map(function(x){
+      return '<tr><td>' + escHtml(x.libelle) + '</td><td>' + (gerer ? '<input type="number" min="0" class="form-control" style="width:130px;" id="fb-' + x.nature + '" value="' + (x.prevu || '') + '">' : fcFmtF(x.prevu)) + '</td><td>' + fcFmtF(x.reel) + '</td><td style="color:' + (x.depasse || x.sans_budget ? '#c0392b' : '#2e7d4f') + ';">' + (x.sans_budget ? 'Sans budget' : (x.prevu ? (x.ecart < 0 ? '−' + fcFmtF(-x.ecart) + ' (dépassement)' : fcFmtF(x.ecart)) : '—')) + '</td></tr>'; }).join('')
+    + '<tr style="font-weight:700;"><td>Total</td><td>' + fcFmtF(b.prevu) + '</td><td>' + fcFmtF(b.reel) + '</td><td>' + (b.defini ? fcFmtF(b.ecart) : '—') + '</td></tr></tbody></table></div>'
+    + (gerer ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;"><button class="btn btn-primary btn-sm" onclick="fcSauverBudgetUI(\'' + d.id + '\')">💾 Enregistrer le budget</button>' + (Object.keys(defaut).length ? ' <button class="btn btn-secondary btn-sm" onclick="fcBudgetTypeUI(\'' + d.id + '\')">Appliquer le budget type</button>' : '') + '</div>' : '') + '</details></div>';
+}
+async function fcSauverBudgetUI(id) {
+  var b = {}; Object.keys(FC_FRAIS_TITRE).forEach(function(k){ var el = document.getElementById('fb-' + k); if (el) b[k] = el.value; });
+  var r = await fcDefinirBudgetTitre(id, b); fcMsg(r, 'Budget enregistré.'); fcRenderDetail(id);
+}
+async function fcBudgetTypeUI(id) { var r = await fcDefinirBudgetTitre(id, (DATA.params || {}).fc_budget_defaut || {}); fcMsg(r, 'Budget type appliqué.'); fcRenderDetail(id); }
+
+/* ── Décharge de remise du titre ── */
+function fcReferenceDecharge() {
+  var an = new Date().getFullYear(), max = 0, re = new RegExp('^DEC-' + an + '-(\\d+)$');
+  (DATA.dossiers_fonciers || []).forEach(function(d){ var m = re.exec((d.remise_titre || {}).ref || ''); if (m) max = Math.max(max, parseInt(m[1], 10)); });
+  return 'DEC-' + an + '-' + ('0000' + (max + 1)).slice(-4);
+}
+async function fcEnregistrerRemiseTitre(dossierId, o) {
+  o = o || {}; var d = fcDossier(dossierId), e = d && fcEtape(d, 'ind_remise_titre');
+  if (!d || !fcEstIndividuel(d) || !e) return { ok: false, erreur: 'Dossier de titre individuel introuvable.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) enregistre la remise.' };
+  if (d.statut === 'annule') return { ok: false, erreur: 'Dossier annulé.' };
+  if (d.remise_titre) return { ok: false, erreur: 'La remise est déjà enregistrée (' + d.remise_titre.ref + ').' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(o.date || '') || o.date > fcAuj() || o.date < String(d.date_ouverture || '').slice(0, 10)) return { ok: false, erreur: 'Date de remise invalide (ni future, ni antérieure à l’ouverture du dossier).' };
+  if (!String(o.remis_a || '').trim()) return { ok: false, erreur: 'Indiquez à qui le titre est remis.' };
+  if (!String(o.piece_identite || '').trim()) return { ok: false, erreur: 'Indiquez la pièce d’identité présentée (type et numéro).' };
+  var a = fcActeur(), ref = fcReferenceDecharge();
+  d.remise_titre = { ref: ref, date: o.date, remis_a: String(o.remis_a).trim(), piece_identite: String(o.piece_identite).trim(), observations: String(o.observations || '').trim().slice(0, 1000), enregistre_par: a.nom, enregistre_le: new Date().toISOString() };
+  e.justificatifs.push({ id: uid(), reference: ref, date: o.date, source: 'promoteur', note: 'Décharge de remise signée par ' + d.remise_titre.remis_a, ajoute_par: a.nom, ajoute_le: new Date().toISOString() });
+  await fcSauver(d); await fcEvenement(d, 'ind_remise_titre', 'remise_titre', 'Remise du titre enregistrée (' + ref + ') à ' + d.remise_titre.remis_a + ' le ' + o.date, { source: 'promoteur', source_ref: ref });
+  return { ok: true, remise: d.remise_titre };
+}
+fcProtegerMutations(['fcEnregistrerRemiseTitre']);
+function fcHtmlDecharge(d, o, ref) {
+  var c = fcClient((d.client_ids || [d.client_id])[0]) || {}, p = (typeof attSoldeEntreprise === 'function') ? attSoldeEntreprise(c) : (DATA.params || {}), E = function(x){ return escHtml(x == null ? '' : String(x)); };
+  var lots = (d.lots_ids || [d.lot_id]).filter(Boolean).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ');
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Décharge ' + E(ref) + '</title><style>body{font-family:Georgia,serif;color:#1a1a1a;padding:38px 46px;max-width:760px;margin:0 auto;font-size:13px;line-height:1.7;}h1{text-align:center;font-size:19px;color:#1D3F7A;margin:18px 0 4px;}.sub{text-align:center;color:#555;font-size:12px;margin-bottom:18px;}.ref{display:flex;justify-content:space-between;font-size:12px;color:#444;border-bottom:2px solid #1D3F7A;padding-bottom:8px;}.art{margin:10px 0;text-align:justify;}.sig{display:flex;justify-content:space-between;margin-top:46px;}.sig div{width:46%;border-top:1px solid #000;padding-top:6px;text-align:center;font-size:12px;}' + (typeof ATT_PIED_CSS === 'string' ? ATT_PIED_CSS : '') + '</style></head><body>'
+    + '<div class="ref"><div><strong style="font-size:15px;">' + E(p.societe || '') + '</strong></div><div style="text-align:right;">Réf. <strong>' + E(ref) + '</strong></div></div><h1>DÉCHARGE DE REMISE DE TITRE FONCIER</h1><div class="sub">Dossier ' + E(d.reference) + '</div>'
+    + '<p class="art">Je soussigné(e) <strong>' + E(o.remis_a || '………………………') + '</strong>, titulaire de la pièce d’identité <strong>' + E(o.piece_identite || '………………………') + '</strong>, reconnais avoir reçu de <strong>' + E(p.societe || 'la société') + '</strong>, le <strong>' + E(o.date ? dateShort(o.date) : '………………') + '</strong>, le titre foncier relatif à <strong>' + E(lots ? 'lot ' + lots : 'mon bien') + '</strong> (' + E(fcLibelleParcelle(d.parcelle_id)) + '), établi au nom de ' + E(((c.prenoms || '') + ' ' + (c.nom || '')).trim() || '………………') + '.</p>'
+    + (o.observations ? '<p class="art">Observations : ' + E(o.observations) + '</p>' : '') + '<p class="art">Fait en deux exemplaires originaux, à ………………………, le ………………………</p>'
+    + '<div class="sig"><div>Le remettant<br>(nom, qualité, signature)</div><div>Le réceptionnaire<br>(nom, signature précédée de « Lu et approuvé »)</div></div>' + (typeof docPiedDePageEntreprise === 'function' ? docPiedDePageEntreprise(p) : '') + '</body></html>';
+}
+function fcPanneauRemise(d) {
+  if (!fcEstIndividuel(d) || d.statut === 'annule') return '';
+  var r = d.remise_titre, c = fcClient((d.client_ids || [d.client_id])[0]) || {}, gerer = fcPeutGererDossier(d);
+  if (r) return '<div class="card" style="margin:8px 0;"><div class="card-title">🔑 Remise du titre</div><div style="font-size:12px;">Titre remis le <b>' + escHtml(dateShort(r.date)) + '</b> à <b>' + escHtml(r.remis_a) + '</b> (' + escHtml(r.piece_identite) + ') — décharge <b>' + escHtml(r.ref) + '</b>, enregistrée par ' + escHtml(r.enregistre_par) + '. <button class="btn btn-secondary btn-sm" onclick="fcImprimerDechargeUI(\'' + d.id + '\')">🖨 Réimprimer la décharge</button></div><div style="font-size:11px;color:var(--dim);margin-top:4px;">Joignez le scan de la décharge signée à l’étape « Remise du titre » (bouton 📎).</div></div>';
+  return '<div class="card" style="margin:8px 0;"><details><summary class="card-title" style="cursor:pointer;">🔑 Remise du titre — décharge</summary><div class="filters-bar" style="align-items:end;flex-wrap:wrap;">'
+    + '<div class="form-group"><label>Date de remise</label><input type="date" class="form-control" id="fr-date" value="' + fcAuj() + '"></div><div class="form-group"><label>Remis à</label><input class="form-control" id="fr-nom" value="' + escHtml(((c.prenoms || '') + ' ' + (c.nom || '')).trim()) + '"></div>'
+    + '<div class="form-group"><label>Pièce d’identité (type et n°)</label><input class="form-control" id="fr-piece" placeholder="CNI n° …"></div><div class="form-group"><label>Observations</label><input class="form-control" id="fr-obs"></div></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-secondary btn-sm" onclick="fcImprimerDechargeUI(\'' + d.id + '\')">🖨 Imprimer la décharge à signer</button>' + (gerer ? ' <button class="btn btn-primary btn-sm" onclick="fcEnregistrerRemiseUI(\'' + d.id + '\')">✔ Enregistrer la remise</button>' : '') + '</div></details></div>';
+}
+function fcFormulaireRemise() { var g = function(i){ return (document.getElementById(i) || {}).value || ''; }; return { date: g('fr-date'), remis_a: g('fr-nom'), piece_identite: g('fr-piece'), observations: g('fr-obs') }; }
+function fcImprimerDechargeUI(id) {
+  var d = fcDossier(id); if (!d) return; var o = d.remise_titre ? d.remise_titre : fcFormulaireRemise();
+  if (typeof openPrintPreview === 'function') openPrintPreview(fcHtmlDecharge(d, o, d.remise_titre ? d.remise_titre.ref : 'à attribuer'), 'Décharge ' + d.reference, false);
+}
+async function fcEnregistrerRemiseUI(id) {
+  if (!confirm('Enregistrer la remise du titre ? Cette opération est définitive et journalisée.')) return;
+  var r = await fcEnregistrerRemiseTitre(id, fcFormulaireRemise()); if (fcMsg(r, 'Remise enregistrée (' + (r.remise || {}).ref + ').')) fcRenderDetail(id);
+}
+
+/* ── Recherche globale ── */
+function fcRechercheGlobale(q) {
+  var mots = fcNormaliser(q).split(/\s+/).filter(Boolean), r = { dossiers: [], souscripteurs: [], intervenants: [], missions: [], pieces: [], documents: [] }; if (!mots.length || fcNormaliser(q).length < 2) return r;
+  var ok = function(txt){ txt = fcNormaliser(txt); return mots.every(function(m){ return txt.indexOf(m) !== -1; }); }, max = 10;
+  (DATA.dossiers_fonciers || []).forEach(function(d){ if (r.dossiers.length < max && ok(fcTexteRecherche(d))) r.dossiers.push(d); });
+  (DATA.clients || []).forEach(function(c){ if (r.souscripteurs.length >= max) return; if (ok([c.nom, c.prenoms, c.tel, c.email, c.dossier].join(' '))) { var ds = (DATA.dossiers_fonciers || []).filter(function(d){ return (d.client_ids || [d.client_id]).indexOf(c.id) !== -1; }); if (ds.length) r.souscripteurs.push({ client: c, dossiers: ds }); } });
+  (DATA.intervenants_fonciers || []).forEach(function(i){ if (r.intervenants.length < max && ok([i.nom_organisation, i.contact_nom, i.email, i.telephone, i.reference_professionnelle, FC_TYPES_INTERVENANT[i.type]].join(' '))) r.intervenants.push(i); });
+  (DATA.missions_foncieres || []).forEach(function(m){ if (r.missions.length < max && ok([m.reference, m.titre, m.contrat_reference, fcNomIntervenant(m.intervenant_id)].join(' '))) r.missions.push(m); });
+  (DATA.pieces_foncieres || []).forEach(function(p){ if (r.pieces.length < max && !p.retire && p.confidentialite !== 'restreinte' && ok([p.nom, p.categorie, p.reference].join(' '))) r.pieces.push(p); });
+  (DATA.evenements_fonciers || []).forEach(function(e){ if (r.documents.length < max && e.courrier_ref && ok([e.courrier_ref, e.description].join(' '))) r.documents.push(e); });
+  (DATA.dossiers_fonciers || []).forEach(function(d){ fcNotesDebours(d).forEach(function(n){ if (r.documents.length < max && ok([n.numero, d.reference].join(' '))) r.documents.push({ description: 'Note de débours ' + n.numero + ' — ' + fcFmtF(n.montant), dossier_id: d.id }); }); if (d.remise_titre && r.documents.length < max && ok([d.remise_titre.ref, d.remise_titre.remis_a].join(' '))) r.documents.push({ description: 'Décharge ' + d.remise_titre.ref + ' — ' + d.remise_titre.remis_a, dossier_id: d.id }); });
+  return r;
+}
+function fcRenderRecherche() {
+  var host = document.getElementById('fr-root'); if (!host) return; var q = APP._frQ || '';
+  host.innerHTML = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">🔎 Recherche globale</div><div style="font-size:11px;color:var(--dim);margin-bottom:6px;">Dossiers, souscripteurs, intervenants, missions, pièces, courriers, notes de débours et décharges, en une seule recherche (2 caractères minimum).</div><input class="form-control" id="fr-q" value="' + escHtml(q) + '" placeholder="Nom, référence, n° de dossier, lot, document…" oninput="fcRechercheGlobaleUI(this.value)" autocomplete="off"><div id="fr-res"></div></div>';
+  fcRenderResultatsRecherche();
+}
+function fcRechercheGlobaleUI(v) { APP._frQ = v; clearTimeout(APP._frT); APP._frT = setTimeout(fcRenderResultatsRecherche, 250); }
+function fcRenderResultatsRecherche() {
+  var z = document.getElementById('fr-res'); if (!z) return; var q = APP._frQ || '', r = fcRechercheGlobale(q), total = Object.keys(r).reduce(function(s, k){ return s + r[k].length; }, 0);
+  if (fcNormaliser(q).length < 2) { z.innerHTML = ''; return; }
+  var bloc = function(titre, l, f){ return l.length ? '<div style="margin-top:10px;font-weight:700;font-size:13px;">' + titre + ' <span style="color:var(--or);">(' + l.length + ')</span></div>' + l.map(f).join('') : ''; }, ligne = function(txt, bouton){ return '<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--bord,#eee);font-size:12px;"><div>' + txt + '</div><div>' + bouton + '</div></div>'; };
+  var ouvrir = function(id){ return '<button class="btn btn-secondary btn-sm" onclick="fcAllerDossier(\'' + id + '\')">Ouvrir le dossier</button>'; };
+  z.innerHTML = !total ? '<div style="color:var(--dim);padding:10px;">Aucun résultat pour « ' + escHtml(q) + ' ».</div>'
+    : bloc('Dossiers', r.dossiers, function(d){ return ligne('<b>' + escHtml(d.reference) + '</b> · ' + escHtml(fcLibelleParcelle(d.parcelle_id)) + ' · ' + escHtml(d.statut), ouvrir(d.id)); })
+    + bloc('Souscripteurs', r.souscripteurs, function(x){ return ligne('<b>' + escHtml(((x.client.prenoms || '') + ' ' + (x.client.nom || '')).trim()) + '</b> · ' + x.dossiers.map(function(d){ return escHtml(d.reference); }).join(', '), ouvrir(x.dossiers[0].id)); })
+    + bloc('Intervenants', r.intervenants, function(i){ return ligne('<b>' + escHtml(i.nom_organisation) + '</b> · ' + escHtml(FC_TYPES_INTERVENANT[i.type] || i.type), '<button class="btn btn-secondary btn-sm" onclick="switchTab(\'foncier\',\'intervenants\')">Intervenants</button>'); })
+    + bloc('Missions', r.missions, function(m){ return ligne('<b>' + escHtml(m.reference) + '</b> · ' + escHtml(m.titre) + ' · ' + escHtml(fcNomIntervenant(m.intervenant_id)), '<button class="btn btn-secondary btn-sm" onclick="switchTab(\'foncier\',\'intervenants\');setTimeout(function(){fcMissionDetail(\'' + m.id + '\')},60)">Ouvrir</button>'); })
+    + bloc('Pièces', r.pieces, function(p){ var d = fcDossier(p.dossier_id); return ligne(escHtml(p.nom) + (d ? ' · ' + escHtml(d.reference) : ''), d ? ouvrir(d.id) : ''); })
+    + bloc('Courriers, notes et décharges', r.documents, function(e){ var d = fcDossier(e.dossier_id); return ligne(escHtml(e.description), d ? ouvrir(d.id) : ''); });
+}
+
+
+function fcPanneauArchive(d) {
+  if (['cloture', 'annule'].indexOf(d.statut) === -1) return '';
+  return '<div style="margin:8px 0;font-size:12px;">' + (d.archive ? '🗄 Dossier <b>archivé</b> le ' + escHtml(dateShort(String(d.archive_le).slice(0, 10))) + ' <button class="btn btn-secondary btn-sm" onclick="fcArchiverUI(\'' + d.id + '\',false)">Sortir des archives</button>' : '<button class="btn btn-secondary btn-sm" onclick="fcArchiverUI(\'' + d.id + '\',true)">🗄 Archiver ce dossier</button>') + '</div>';
+}
+async function fcArchiverUI(id, on) { var r = await fcArchiverDossier(id, on); fcMsg(r, on ? 'Dossier archivé.' : 'Dossier sorti des archives.'); fcRenderDetail(id); if (typeof fcRenderListeCorps === 'function') fcRenderListeCorps(); }
+function fcCarteBudgets(c) {
+  var b = c.budget || { dossiers_budgetes: 0, depassements: [] };
+  return '<div class="card"><div class="card-title">Budgets prévisionnels</div>' + (b.dossiers_budgetes ? '<div style="font-size:12px;">' + b.dossiers_budgetes + ' dossier(s) budgété(s) · prévu <b>' + fcFmtF(b.prevu) + '</b> · réel <b>' + fcFmtF(b.reel_budgete) + '</b></div>'
+    + (b.depassements.length ? b.depassements.map(function(x){ return '<div style="font-size:12px;color:#c0392b;">' + escHtml(x.dossier) + ' : dépassement de ' + fcFmtF(x.depassement) + ' (prévu ' + fcFmtF(x.prevu) + ')</div>'; }).join('') : '<div style="font-size:12px;color:#2e7d4f;">Aucun dépassement.</div>') : '<div style="color:var(--dim);">Aucun budget défini.</div>') + '</div>';
+}
+
+
+function fcEditeurReglagesFin() {
+  if (!fcPeutGererModeles()) return '';
+  var b = (DATA.params || {}).fc_budget_defaut || {};
+  return '<div class="card"><details><summary class="card-title" style="cursor:pointer;">⚙️ Archivage et budget type du titre</summary><div class="filters-bar" style="align-items:end;flex-wrap:wrap;margin-top:8px;"><div class="form-group"><label>Archiver les dossiers clos depuis plus de (mois)</label><input type="number" min="1" max="120" class="form-control" id="frg-arch" value="' + fcArchivageMois() + '" style="width:110px;"></div>'
+    + Object.keys(FC_FRAIS_TITRE).map(function(k){ return '<div class="form-group"><label>Budget type — ' + escHtml(FC_FRAIS_TITRE[k].lib) + ' (FCFA)</label><input type="number" min="0" class="form-control" id="frg-b-' + k + '" value="' + (b[k] || '') + '"></div>'; }).join('')
+    + '<button class="btn btn-primary btn-sm" onclick="fcSauverReglagesFinUI()">💾 Enregistrer</button></div><div style="font-size:11px;color:var(--dim);">Le budget type se propose sur chaque dossier de titre individuel (bouton « Appliquer le budget type »).</div></details></div>';
+}
+async function fcSauverReglagesFinUI() {
+  if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); return; }
+  var mois = parseInt((document.getElementById('frg-arch') || {}).value, 10); if (!(mois >= 1 && mois <= 120)) { toast('Durée d’archivage invalide (1 à 120 mois).', 'error'); return; }
+  var budget = {}; for (var k in FC_FRAIS_TITRE) { var v = (document.getElementById('frg-b-' + k) || {}).value; if (v !== '' && v != null) { var n = parseFloat(v); if (isNaN(n) || n < 0) { toast('Montant invalide pour « ' + FC_FRAIS_TITRE[k].lib + ' ».', 'error'); return; } if (n > 0) budget[k] = n; } }
+  DATA.params = DATA.params || {}; DATA.params.fc_archivage_mois = mois; DATA.params.fc_budget_defaut = budget; await fcEnregistrerParams(); toast('Réglages enregistrés.', 'success'); fcRenderModeles();
+}
+
+
 /* ═══ Listes volumineuses : pagination, recherche, historique progressif (PG1) ═══
    Les listes ne dessinent plus que la page affichée (25 lignes) : rapide avec des milliers de dossiers. Recherche multicritère et filtres, sans perdre la saisie. */
 var FC_TAILLE_PAGE = 25, FC_TAILLE_HISTORIQUE = 30;
@@ -61915,11 +62234,12 @@ function fcTexteRecherche(d) {
   var e = fcProchaineEtape(d);
   return fcNormaliser([d.reference, fcLibelleParcelle(d.parcelle_id), FC_PROCEDURES[d.type_procedure], d.statut, fcNomUtilisateur(d.responsable_id), cl, lots, d.idufci, d.numero_dossier_guf, e ? e.libelle : ''].join(' '));
 }
-function fcFiltreListe() { return Object.assign({ q: '', statut: '', responsable: '', risque: false }, APP._fcFiltreListe || {}); }
+function fcFiltreListe() { return Object.assign({ q: '', statut: '', responsable: '', risque: false, archives: false }, APP._fcFiltreListe || {}); }
 function fcDossiersListe(ctx) {
   var f = fcFiltreListe(), mots = fcNormaliser(f.q).split(/\s+/).filter(Boolean), t = fcAuj(), ctxR = ctx || fcContexteRisque();
   var tri = APP._fcTriRisque, sc = {}, score = function(d){ return sc[d.id] != null ? sc[d.id] : (sc[d.id] = fcScoreRisque(d, t, ctxR).score); };
   var l = (DATA.dossiers_fonciers || []).filter(function(d){
+    if (d.archive && !f.archives) return false;
     if (f.statut && d.statut !== f.statut) return false;
     if (f.responsable && d.responsable_id !== f.responsable) return false;
     if (f.risque && score(d) < 45) return false;
@@ -61930,7 +62250,7 @@ function fcDossiersListe(ctx) {
 }
 function fcLigneDossierHtml(d, ctxR) {
   var e = fcProchaineEtape(d), et = e ? fcEtatEcheance(e) : '';
-  return '<tr><td><strong>' + escHtml(d.reference) + '</strong>' + fcBadgeRisque(fcScoreRisque(d, fcAuj(), ctxR)) + (fcEstIndividuel(d) ? '<br><span style="font-size:10px;color:#B87333;">Titre individuel</span>' : '') + '</td><td>' + escHtml(fcLibelleParcelle(d.parcelle_id)) + (fcEstIndividuel(d) ? '<br><span style="font-size:11px;color:var(--dim);">lot ' + escHtml((d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ')) + ' · ' + escHtml((d.client_ids || [d.client_id]).map(function(id){ return (fcClient(id) || {}).nom || id; }).join(', ')) + '</span>' : '') + '</td><td>' + escHtml(FC_PROCEDURES[d.type_procedure] || d.type_procedure) + '</td><td>' + escHtml(d.statut) + '</td>'
+  return '<tr><td><input type="checkbox" class="fc-ck-d" value="' + d.id + '" ' + (APP._fcSelect && APP._fcSelect[d.id] ? 'checked ' : '') + 'onchange="fcCocherDossierUI(this.value,this.checked)"></td><td><strong>' + escHtml(d.reference) + '</strong>' + (d.archive ? ' <span style="font-size:10px;color:#6a5acd;">🗄 archivé</span>' : '') + fcBadgeRisque(fcScoreRisque(d, fcAuj(), ctxR)) + (fcEstIndividuel(d) ? '<br><span style="font-size:10px;color:#B87333;">Titre individuel</span>' : '') + '</td><td>' + escHtml(fcLibelleParcelle(d.parcelle_id)) + (fcEstIndividuel(d) ? '<br><span style="font-size:11px;color:var(--dim);">lot ' + escHtml((d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ')) + ' · ' + escHtml((d.client_ids || [d.client_id]).map(function(id){ return (fcClient(id) || {}).nom || id; }).join(', ')) + '</span>' : '') + '</td><td>' + escHtml(FC_PROCEDURES[d.type_procedure] || d.type_procedure) + '</td><td>' + escHtml(d.statut) + '</td>'
     + '<td>' + (e ? escHtml(e.libelle) + '<br>' + fcBadgeStatut(e.statut) : '—') + '</td><td>' + escHtml(fcNomUtilisateur((e && e.responsable_id) || d.responsable_id)) + '</td>'
     + '<td>' + escHtml((e && e.date_cible) || d.date_cible || '—') + (et ? '<br><span style="color:#c0392b;font-size:11px;">' + (et === 'retard_interne' ? 'Retard interne' : 'Délai administratif dépassé') + '</span>' : '') + '</td>'
     + '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="fcOuvrirDetail(\'' + d.id + '\')">Ouvrir</button> <button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer</button></td></tr>';
@@ -61940,12 +62260,13 @@ function fcRenderListeCorps() {
   var ctxR = fcContexteRisque(), l = fcDossiersListe(ctxR), tous = (DATA.dossiers_fonciers || []).length, pg = fcPaginer(l, 'dossiers');
   host.innerHTML = !tous ? '<div style="color:var(--dim);padding:10px;">Aucun dossier. Ouvrez-en un à partir d\'une parcelle.</div>'
     : (!l.length ? '<div style="color:var(--dim);padding:10px;">Aucun dossier ne correspond à la recherche (' + tous + ' dossier(s) au total).</div>'
-    : '<div class="table-wrap"><table><thead><tr><th>Référence</th><th>Parcelle</th><th>Procédure</th><th>Statut</th><th>Étape courante</th><th>Responsable</th><th>Échéance</th><th></th></tr></thead><tbody>' + pg.items.map(function(d){ return fcLigneDossierHtml(d, ctxR); }).join('') + '</tbody></table></div>'
+    : '<div class="table-wrap"><table><thead><tr><th><input type="checkbox" title="Sélectionner la page" onchange="fcCocherPageUI(this.checked)"></th><th>Référence</th><th>Parcelle</th><th>Procédure</th><th>Statut</th><th>Étape courante</th><th>Responsable</th><th>Échéance</th><th></th></tr></thead><tbody>' + pg.items.map(function(d){ return fcLigneDossierHtml(d, ctxR); }).join('') + '</tbody></table></div>'
     + fcHtmlPagination(pg, 'dossiers', 'fcRenderListeCorps'));
   var c = document.getElementById('fc-liste-compte'); if (c) c.textContent = l.length === tous ? tous + ' dossier(s)' : l.length + ' sur ' + tous + ' dossier(s)';
+  fcMajBarreGroupee();
 }
 function fcFiltrerListeUI(cle, valeur) {
-  APP._fcFiltreListe = Object.assign(fcFiltreListe(), {}); APP._fcFiltreListe[cle] = cle === 'risque' ? !!valeur : valeur; APP._fcPages = APP._fcPages || {}; APP._fcPages.dossiers = 1;
+  APP._fcFiltreListe = Object.assign(fcFiltreListe(), {}); APP._fcFiltreListe[cle] = (cle === 'risque' || cle === 'archives') ? !!valeur : valeur; APP._fcPages = APP._fcPages || {}; APP._fcPages.dossiers = 1;
   if (cle === 'q') { clearTimeout(APP._fcQT); APP._fcQT = setTimeout(fcRenderListeCorps, 250); } else fcRenderListeCorps();
 }
 function fcHtmlFiltresListe() {
@@ -61954,6 +62275,8 @@ function fcHtmlFiltresListe() {
     + '<div class="form-group"><label>Statut</label><select class="filter-select" onchange="fcFiltrerListeUI(\'statut\',this.value)"><option value="">Tous</option>' + [['ouvert', 'Ouvert'], ['en_cours', 'En cours'], ['bloque', 'Bloqué'], ['cloture', 'Clôturé'], ['annule', 'Annulé']].map(function(o){ return '<option value="' + o[0] + '"' + (o[0] === f.statut ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>'
     + '<div class="form-group"><label>Responsable</label><select class="filter-select" onchange="fcFiltrerListeUI(\'responsable\',this.value)"><option value="">Tous</option>' + users.map(function(u){ return '<option value="' + u.id + '"' + (u.id === f.responsable ? ' selected' : '') + '>' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select></div>'
     + '<label style="font-size:12px;"><input type="checkbox" ' + (f.risque ? 'checked ' : '') + 'onchange="fcFiltrerListeUI(\'risque\',this.checked)"> Risque élevé ou critique</label>'
+    + '<label style="font-size:12px;"><input type="checkbox" ' + (f.archives ? 'checked ' : '') + 'onchange="fcFiltrerListeUI(\'archives\',this.checked)"> Inclure les archivés</label>'
+    + (fcDossiersArchivables().length ? '<button class="btn btn-secondary btn-sm" onclick="fcArchiverAnciensUI()">🗄 Archiver les dossiers clos depuis plus de ' + fcArchivageMois() + ' mois (' + fcDossiersArchivables().length + ')</button>' : '')
     + '<button class="btn btn-secondary btn-sm" onclick="APP._fcFiltreListe={};APP._fcPages={};fcRender()">✖ Effacer</button> <span id="fc-liste-compte" style="font-size:11px;color:var(--dim);"></span></div>';
 }
 function fcPlusHistorique(id) { APP._fcHist = APP._fcHist || {}; APP._fcHist[id] = (APP._fcHist[id] || FC_TAILLE_HISTORIQUE) + FC_TAILLE_HISTORIQUE; fcRenderDetail(id); }
@@ -62191,7 +62514,7 @@ function fcRenderModeles() {
     + '<hr><label style="font-size:12px;"><input type="checkbox" ' + (fcDelaisAutoActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_delais_auto\',this.checked,\'Échéances estimées\')"> <b>Estimer les échéances d\'après vos dossiers</b> : pour les étapes sans durée dans le modèle, l\'échéance utilise la durée habituelle observée (75 % des dossiers terminés plus vite, au moins ' + FC_SEUIL_MESURE + ' dossiers), marquée « estimée ».</label>'
     + '<br><label style="font-size:12px;"><input type="checkbox" id="fm-deps" ' + (fcDependancesActives() ? 'checked ' : '') + ro + ' onchange="fcBasculerDependancesUI(this.checked)"> <b>Imposer l\'ordre des étapes</b> : une étape ne démarre ni ne se termine avant ses étapes préalables (dérogation motivée du responsable, journalisée).</label>'
     + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleClotureActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_cloture\',this.checked,\'Contrôle de clôture\')"> <b>Contrôler la complétude à la clôture</b> : pièces à contrôler, missions, demandes, anomalies, frais et notes du titre.</label>'
-    + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleConcurrenceActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_concurrence\',this.checked,\'Protection contre les modifications simultanées\')"> <b>Protéger contre les modifications simultanées</b> : refuser une modification si un collègue a enregistré le dossier entre-temps.</label></div>' + fcEditeurGabaritsCourrier();
+    + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleConcurrenceActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_concurrence\',this.checked,\'Protection contre les modifications simultanées\')"> <b>Protéger contre les modifications simultanées</b> : refuser une modification si un collègue a enregistré le dossier entre-temps.</label></div>' + fcEditeurGabaritsCourrier() + fcEditeurReglagesFin();
   host.innerHTML = h;
 }
 async function fcEnregistrerParams() {
@@ -62395,6 +62718,9 @@ function fcIndicateursCouts(aujourdhui) {
     if (d.statut === 'cloture' && tot > 0) remis.push(tot);
   });
   r.en_retard.liste.sort(function(a, b){ return b.jours - a.jours; });
+  r.budget = { dossiers_budgetes: 0, prevu: 0, reel_budgete: 0, depassements: [] };
+  ds.forEach(function(d){ var b = fcBudgetTitre(d); if (!b.defini) return; r.budget.dossiers_budgetes++; r.budget.prevu += b.prevu; r.budget.reel_budgete += b.reel; if (b.ecart < 0) r.budget.depassements.push({ dossier: d.reference, prevu: b.prevu, reel: b.reel, depassement: -b.ecart }); });
+  r.budget.depassements.sort(function(a, b){ return b.depassement - a.depassement; });
   r.cout_titre_remis = fcMoyenne(remis);
   ['total', 'promoteur', 'souscripteur', 'regle', 'a_regler', 'a_refacturer', 'refacture_en_attente', 'encaisse'].forEach(function(k){ r[k] = Math.round(r[k] * 100) / 100; });
   return r;
@@ -62411,7 +62737,7 @@ function fcHtmlCouts(t) {
     + '<div class="card"><div class="card-title">Coût moyen d\'un titre remis</div>' + fcMesureHtml(c.cout_titre_remis, 'FCFA') + '</div>'
     + '<div class="card"><div class="card-title">Par nature de frais</div>' + (nat.length ? nat.map(function(k){ return '<div style="font-size:12px;">' + escHtml(k) + ' : <b>' + fcFmtF(c.par_nature[k]) + '</b></div>'; }).join('') : '<div style="color:var(--dim);">Aucun frais saisi.</div>') + '</div>'
     + '<div class="card"><div class="card-title">Par opération</div>' + (ops.length ? ops.map(function(k){ var o = c.par_operation[k]; return '<div style="font-size:12px;">' + escHtml(k) + ' : <b>' + fcFmtF(o.total) + '</b> · ' + o.dossiers + ' dossier(s) · ' + o.clotures + ' remis · encaissé ' + fcFmtF(o.encaisse) + '</div>'; }).join('') : '<div style="color:var(--dim);">Aucun dossier individuel.</div>') + '</div>'
-    + '<div class="card"><div class="card-title">Notes de débours en retard</div>' + (c.en_retard.liste.length ? c.en_retard.liste.map(function(n){ return '<div style="font-size:12px;">' + escHtml(n.numero) + ' · ' + escHtml(n.client) + ' · <b>' + fcFmtF(n.montant) + '</b> · échue le ' + escHtml(dateShort(n.echeance)) + ' (<span style="color:#c0392b;">' + n.jours + ' j</span>)</div>'; }).join('') : '<div style="color:#2e7d4f;">Aucune note en retard.</div>') + '</div></div>';
+    + fcCarteBudgets(c) + '<div class="card"><div class="card-title">Notes de débours en retard</div>' + (c.en_retard.liste.length ? c.en_retard.liste.map(function(n){ return '<div style="font-size:12px;">' + escHtml(n.numero) + ' · ' + escHtml(n.client) + ' · <b>' + fcFmtF(n.montant) + '</b> · échue le ' + escHtml(dateShort(n.echeance)) + ' (<span style="color:#c0392b;">' + n.jours + ' j</span>)</div>'; }).join('') : '<div style="color:#2e7d4f;">Aucune note en retard.</div>') + '</div></div>';
 }
 function fcLignesCouts(t) {
   var c = fcIndicateursCouts(t), L = [['Indicateur', 'Valeur (FCFA)', 'Observations']];
@@ -62419,6 +62745,7 @@ function fcLignesCouts(t) {
     ['Coût moyen d\'un titre remis', c.cout_titre_remis.moyenne == null ? '' : c.cout_titre_remis.moyenne, c.cout_titre_remis.n + ' titre(s) — ' + (c.cout_titre_remis.fiable ? 'mesuré' : 'indicatif')]].forEach(function(x){ L.push(x); });
   Object.keys(c.par_nature).forEach(function(k){ L.push(['Nature : ' + k, c.par_nature[k], '']); });
   Object.keys(c.par_operation).forEach(function(k){ var o = c.par_operation[k]; L.push(['Opération : ' + k, o.total, o.dossiers + ' dossier(s), ' + o.clotures + ' remis, encaissé ' + o.encaisse]); });
+  L.push(['Budgets : dossiers budgétés', c.budget.dossiers_budgetes, 'prévu ' + c.budget.prevu + ' / réel ' + c.budget.reel_budgete]); c.budget.depassements.forEach(function(x){ L.push(['Dépassement de budget : ' + x.dossier, x.depassement, 'prévu ' + x.prevu + ', réel ' + x.reel]); });
   c.en_retard.liste.forEach(function(n){ L.push(['Note en retard : ' + n.numero, n.montant, n.client + ' — dossier ' + n.dossier + ' — échue le ' + n.echeance + ' (' + n.jours + ' j)']); });
   return L;
 }
