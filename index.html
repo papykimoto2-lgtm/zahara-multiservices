@@ -37499,11 +37499,19 @@ function loadEcheancier() {
   detail.innerHTML = html;
 }
 
+/* Îlot(s) et lot(s) du souscripteur pour les reçus : tous les lots rattachés (multi-lots terrain), îlots distincts ; à défaut, îlot saisi sur la fiche. */
+function recuBienLibelles(c){
+  var ids = c ? ((typeof _lotIdsDeClient === 'function') ? _lotIdsDeClient(c) : (c.lot_id ? [c.lot_id] : [])) : [];
+  var lots = ids.map(function(id){ return (DATA.lots||[]).find(function(l){ return l.id === id; }); }).filter(Boolean);
+  var ilots = []; lots.forEach(function(l){ var i = String(l.ilot||'').trim(); if (i && ilots.indexOf(i) === -1) ilots.push(i); });
+  if (!ilots.length && c && String(c.ilot||'').trim()) ilots.push(String(c.ilot).trim());
+  return { nbLots: lots.length, ilot: ilots.join(', '), lots: lots.map(function(l){ return 'Lot ' + (l.numero||'?') + (l.type ? ' – ' + l.type : ''); }).join(' ; ') };
+}
 function showRecu(versement) {
   if (!versement) return;
   var client = DATA.clients.find(function(c) { return c.id === versement.client_id; });
   var prog = client ? DATA.programmes.find(function(p) { return p.id === client.programme_id; }) : null;
-  var lot = client ? DATA.lots.find(function(l) { return l.id === client.lot_id; }) : null;
+  var bien = recuBienLibelles(client);
   var params = DATA.params;
 
   var html = '<div class="print-doc" style="font-family:Georgia,serif;">'
@@ -37518,7 +37526,8 @@ function showRecu(versement) {
     + '<tr><td style="padding:6px 0;color:var(--blanc-dim);width:40%;">Client :</td><td><strong>' + (client ? client.nom + ' ' + client.prenoms : '—') + '</strong></td></tr>'
     + '<tr><td style="padding:6px 0;color:var(--blanc-dim);">Téléphone :</td><td>' + (client ? client.tel : '—') + '</td></tr>'
     + '<tr><td style="padding:6px 0;color:var(--blanc-dim);">Programme :</td><td>' + (prog ? prog.nom : '—') + '</td></tr>'
-    + '<tr><td style="padding:6px 0;color:var(--blanc-dim);">Lot :</td><td>' + (lot ? 'Lot ' + lot.numero + (lot.type ? ' – ' + lot.type : '') : '—') + '</td></tr>'
+    + '<tr><td style="padding:6px 0;color:var(--blanc-dim);">Îlot :</td><td>' + escHtml(bien.ilot || '—') + '</td></tr>'
+    + '<tr><td style="padding:6px 0;color:var(--blanc-dim);">' + (bien.nbLots > 1 ? 'Lots' : 'Lot') + ' :</td><td>' + escHtml(bien.lots || '—') + '</td></tr>'
     + '</table>'
     + '<div style="background:rgba(184,115,51,0.1);border:1px solid var(--or);border-radius:8px;padding:20px;text-align:center;margin-bottom:20px;">'
     + '<div style="font-size:13px;color:var(--blanc-dim);margin-bottom:8px;">Montant reçu</div>'
@@ -95620,7 +95629,7 @@ function etatRecuVersement(versementId) {
   if (!v) { toast('Versement introuvable.', 'error'); return; }
   var c    = DATA.clients.find(function(x){ return x.id === v.client_id; });
   var prog = c ? DATA.programmes.find(function(p){ return p.id === c.programme_id; }) : null;
-  var lot  = c ? DATA.lots.find(function(l){ return l.id === c.lot_id; }) : null;
+  var bien = recuBienLibelles(c);
   var totalVerse = DATA.versements.filter(function(x){ return x.client_id === v.client_id && x.statut !== 'annule' && _versementSurPrix(x); })
     .reduce(function(a,x){ return a + (parseFloat(x.montant)||0); }, 0);
   var totalContrat = (c && parseFloat(c.montant_total)) || 0;
@@ -95632,7 +95641,8 @@ function etatRecuVersement(versementId) {
     +   '<tr><th style="width:35%;">Reçu de</th><td>' + escHtml(nomClient) + '</td></tr>'
     +   '<tr><th>Téléphone</th><td>' + escHtml((c && c.tel) || '—') + '</td></tr>'
     +   '<tr><th>Programme</th><td>' + escHtml(prog ? prog.nom : '—') + '</td></tr>'
-    +   '<tr><th>Lot</th><td>' + (lot ? 'Lot ' + escHtml(lot.numero) + (lot.type ? ' — ' + escHtml(lot.type) : '') : '—') + '</td></tr>'
+    +   '<tr><th>Îlot</th><td>' + escHtml(bien.ilot || '—') + '</td></tr>'
+    +   '<tr><th>' + (bien.nbLots > 1 ? 'Lots' : 'Lot') + '</th><td>' + escHtml(bien.lots || '—') + '</td></tr>'
     +   '<tr><th>Mode de règlement</th><td>' + escHtml(v.mode || '—') + '</td></tr>'
     +   '<tr><th>Date</th><td>' + dateShort(v.date) + '</td></tr>'
     + '</table>'
