@@ -32,6 +32,7 @@ Réservé à la direction et aux administrateurs.
 - À l'ouverture : échéance de chaque étape = date d'ouverture + cumul des durées. Les échéances restent modifiables dossier par dossier.
 - « Proposer les durées observées » : reprend les durées réelles des dossiers terminés (au moins 3 observations par étape).
 - Case « Imposer l'ordre des étapes » : voir §4.
+- **Échéances estimées** : pour une étape sans durée dans le modèle, l'échéance reprend la durée habituelle de vos dossiers terminés (3 sur 4 se sont terminés plus vite ; au moins 3 dossiers observés). Elle est marquée 📈 *estimée* ; la saisie d'une échéance propose cette suggestion. Réglage « Estimer les échéances d'après vos dossiers ».
 
 ## 4. Faire avancer un dossier
 
@@ -70,6 +71,7 @@ Chaque dossier ouvert porte un score de 0 à 100 (faible < 20, modéré, élevé
 ## 7. Intervenants et missions
 
 - Répertoire (notaire, géomètre, …) avec statut de relation. Accès au portail : code, expiration, révocation (fiche de l'intervenant).
+- **Créer une mission** : choisir le dossier et l'intervenant, puis cliquer une **mission type** (boutons propres à son métier : bornage, acte de mutation, dépôt et suivi…). Titre, consignes, livrables cochables, échéance et étape sont préremplis ; ajustez puis « Créer la mission » ou « Créer et envoyer ». La direction adapte les modèles dans « 🧩 Modèles de mission par type d'intervenant ».
 - Mission : acceptation, démarrage, livrables par versions, soumission, vérification, validation ou correction. Messagerie par mission.
 - Le notaire voit **uniquement** ce qui lui est transmis : identité, bien, avancement, pièces cochées « transmis au notaire », attestations. Chaque consultation est journalisée.
 

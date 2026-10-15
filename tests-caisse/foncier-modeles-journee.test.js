@@ -97,7 +97,7 @@ test('modèle : durées observées proposées à partir de dossiers terminés', 
     }
     return fcDureesSuggerees('acd');
   });
-  assert.equal(r.depot.n, 3); assert.equal(r.depot.jours, 11);
+  assert.equal(r.depot.n, 3); assert.equal(r.depot.jours, 12); assert.equal(r.depot.moyenne, 11); assert.equal(r.depot.mediane, 11);
 });
 
 test('modèle : écran d\'administration (droit requis, validation, enregistrement)', async () => {
