@@ -52,3 +52,23 @@ test('terrain : plusieurs lots sur une même souscription ; enregistrement d\'un
   assert.deepEqual(r.supp, ['t2', 't3']); assert.match(r.refus, /un seul lot par souscription/); assert.equal(r.clientInchange, 1);
   assert.deepEqual(app.etat.erreursPage, []);
 });
+
+test('rapprochement : un logement déjà doté d\'un lot refuse un second lot ; terrain et souscripteur sans lot acceptent', async () => {
+  const app = await ouvrirApp(); await preparer(app.page);
+  const r = await app.page.evaluate(async function () {
+    window.confirm = function () { return true; }; window.exigerDroit = function () { return true; }; window.majStatutLotClient = async function () {}; window.ajouterHistorique = async function () {};
+    window.rapprochementRender = function () {}; window.renderLotsDashboard = function () {};
+    var out = {}, set = function (id) { var s = document.createElement('select'); s.id = 'rapp-sel-' + id; document.body.appendChild(s); return s; };
+    DATA.clients.push({ id: 'N', nom: 'SANSLOT', tel: '0102030408', programme_id: 'g1', montant_total: 1 });
+    var sel = set('L'); sel.innerHTML = '<option value="a2">a2</option>'; sel.value = 'a2'; await rapprochementRattacher('L');
+    out.logement = DATA.clients.find(function (c) { return c.id === 'L'; }).lot_ids.slice(); out.msg = (window.__t || []).pop()[0];
+    sel = set('T'); sel.innerHTML = '<option value="t2">t2</option>'; sel.value = 't2'; await rapprochementRattacher('T');
+    out.terrain = DATA.clients.find(function (c) { return c.id === 'T'; }).lot_ids.slice();
+    sel = set('N'); sel.innerHTML = '<option value="a2">a2</option>'; sel.value = 'a2'; await rapprochementRattacher('N');
+    out.sansLot = DATA.clients.find(function (c) { return c.id === 'N'; }).lot_ids.slice();
+    return out;
+  });
+  assert.deepEqual(r.logement, ['a1']); assert.match(r.msg, /un seul lot par souscription/);
+  assert.deepEqual(r.terrain, ['t1', 't2']); assert.deepEqual(r.sansLot, ['a2']);
+  assert.deepEqual(app.etat.erreursPage, []);
+});

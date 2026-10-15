@@ -39935,6 +39935,12 @@ async function rapprochementRattacher(clientId) {
     rapprochementRender();
     return;
   }
+  /* Souscription au logement : un seul lot. Une souscription au terrain peut en regrouper plusieurs. */
+  if (_lotIdsDeClient(client).length && _lotIdsDeClient(client).indexOf(lotId) === -1 && clientNatureBien(client) === 'logement') {
+    toast('Souscription au logement : un seul lot par souscription. Créez une autre souscription pour le lot '+(lot.numero||lot.id)+'.', 'error');
+    rapprochementRender();
+    return;
+  }
   if (!confirm('Rattacher le lot '+(lot.numero||lot.id)+' à '+((client.prenoms||'')+' '+(client.nom||'')).trim()+' ?\n\nLe statut du lot (réservé/vendu) sera recalculé automatiquement selon le montant déjà payé.')) return;
 
   var ancienneValeur = { lot_id: client.lot_id||'', lot_ids: (client.lot_ids||[]).slice() };
