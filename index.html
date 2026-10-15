@@ -18778,6 +18778,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
       </div>
       <div class="form-group"><label>Montant à facturer (FCFA)</label><input type="number" class="form-control" id="ts2-montant" min="0" style="font-weight:700;color:var(--or,#B87333);"></div>
       <div class="form-group"><label style="display:flex;gap:8px;align-items:center;font-weight:400;"><input type="checkbox" id="ts2-deja"> Montant déjà inclus dans le montant du contrat (régularisation d'un dossier existant)</label></div>
+      <div id="ts2-historique" style="font-size:12px;margin-bottom:8px;"></div>
       <div class="form-group"><label>Motif / justification (obligatoire)</label><textarea class="form-control" id="ts2-motif" rows="2" placeholder="Ex. Acquisition d'une parcelle contiguë — demande du souscripteur du 12/09/2026."></textarea></div>
     </div>
     <div class="modal-footer">
@@ -52752,7 +52753,16 @@ function ouvrirTerrainSupplementaire(){
   var legacy = parseFloat(c.terrain_supplementaire)||0;
   document.getElementById('ts2-montant').value = legacy > 0 && !(c.terrains_supplementaires||[]).length ? legacy : '';
   document.getElementById('ts2-deja').checked = legacy > 0 && !(c.terrains_supplementaires||[]).length;
+  ts2Historique(c);
   openModal('modal-terrain-supp');
+}
+function ts2Historique(c){
+  var box = document.getElementById('ts2-historique'); if(!box) return;
+  var l = (c.terrains_supplementaires||[]);
+  box.innerHTML = l.length ? '<strong>Terrains supplémentaires déjà enregistrés</strong>' + l.map(function(t){
+    return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--bord);"><span>'+escHtml(dateShort(t.date))+' — '+escHtml(fcfa(t.montant))+(t.surface_m2?' · '+escHtml(String(t.surface_m2))+' m²':'')+(t.lot_libelle?' · lot '+escHtml(t.lot_libelle):'')+'</span>'
+      + '<button type="button" class="btn btn-secondary btn-sm" onclick="imprimerAvenantTerrainSupp(\''+escHtml(t.id)+'\',\''+escHtml(c.id)+'\')">🖨 Avenant</button></div>';
+  }).join('') : '';
 }
 function ts2Recalculer(){
   var sf = parseFloat(document.getElementById('ts2-surface').value) || 0, px = parseFloat(document.getElementById('ts2-prix-m2').value) || 0;
@@ -52784,6 +52794,41 @@ async function confirmerTerrainSupplementaire(){
   var set = function(id, v){ var e = document.getElementById(id); if (e) e.value = v; };
   set('c-montant-total', c.montant_total); set('c-superficie-supplementaire', c.superficie_supplementaire||''); set('c-superficie-totale', c.superficie_totale||'');
   toast('✅ Terrain supplémentaire enregistré'+(deja ? '' : ' — montant du contrat +'+fcfa(montant))+'.'+((c.attestation_solde_finale||c.attestation_solde) ? ' Les attestations déjà émises restent inchangées : régénérez-les si besoin.' : ''), 'success');
+  if (!deja) imprimerAvenantTerrainSupp(t.id, c.id);
+}
+/* Avenant signable : terrain supplémentaire acquis après la souscription (le lot principal et son prix initial ne changent pas). */
+function imprimerAvenantTerrainSupp(tid, clientId){
+  var c = (DATA.clients||[]).find(function(x){ return x.id===clientId; }), t = c && (c.terrains_supplementaires||[]).find(function(x){ return x.id===tid; });
+  if (!t) { toast('Terrain supplémentaire introuvable.','error'); return; }
+  var soc = (DATA.params&&(DATA.params.societe||DATA.params.nom))||'', E = escHtml;
+  var w = window.open('','_blank');
+  if (!w) { toast('Autorisez les fenêtres surgissantes.','error'); return; }
+  w.document.write('<html><head><title>Avenant — Terrain supplémentaire</title>'
+    +'<style>body{font-family:Georgia,serif;padding:38px;color:#111;font-size:13px;line-height:1.55;}'
+    +'h1{font-size:17px;margin:0 0 4px;}table{width:100%;border-collapse:collapse;margin:10px 0;}'
+    +'td{padding:5px 8px;border:1px solid #ccc;}td.k{width:45%;background:#f5f5f5;}'
+    +'.pied{margin-top:26px;font-size:11px;color:#555;}</style></head><body>'
+    +sanixQrHtml('Avenant terrain supplémentaire', c.dossier||c.id)
+    +'<h1>'+E(soc)+'</h1>'
+    +'<h1 style="margin-top:14px;">Avenant — Terrain supplémentaire</h1>'
+    +'<div style="color:#555;font-size:11.5px;">Réf. souscripteur : '+E(c.dossier||c.id)+' — '+E(dateShort(t.date))+'</div>'
+    +'<h2>Souscripteur</h2><table><tbody>'
+    +'<tr><td class="k">Nom</td><td>'+E(((c.nom||'')+' '+(c.prenoms||'')).trim())+'</td></tr>'
+    +'</tbody></table>'
+    +'<h2>Objet</h2><p>'+E(t.motif)+'</p>'
+    +'<table><tbody>'
+    +(t.lot_libelle?'<tr><td class="k">Lot concerné</td><td>'+E(t.lot_libelle)+'</td></tr>':'')
+    +(t.surface_m2?'<tr><td class="k">Surface supplémentaire</td><td>'+E(String(t.surface_m2))+' m²</td></tr>':'')
+    +(t.prix_m2?'<tr><td class="k">Prix au m²</td><td>'+E(fcfa(t.prix_m2))+'</td></tr>':'')
+    +'<tr><td class="k"><b>Montant du terrain supplémentaire</b></td><td><b>'+E(fcfa(t.montant))+'</b></td></tr>'
+    +'<tr><td class="k">Montant total du contrat'+(t.deja_inclus?' (terrain déjà inclus)':' après avenant')+'</td><td>'+E(fcfa(c.montant_total))+'</td></tr>'
+    +'</tbody></table>'
+    +'<div class="pied">Le présent avenant constate l\'acquisition d\'un terrain supplémentaire postérieurement à la souscription. Il complète le contrat initial à hauteur du montant ci-dessus, '
+    +'distinctement du prix initial du bien, et n\'emporte aucune autre modification des conditions convenues.<br><br>'
+    +'Fait à '+E((DATA.params&&DATA.params.ville)||'Abidjan')+', le '+E(dateShort(t.date))+'<br><br>'
+    +'Pour '+E(soc)+' : ___________________________<br><br>Le souscripteur (bon pour accord) : ___________________________</div>'
+    +'</body></html>');
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
 }
 function ouvrirRegularisationSurface(){
   var clientId = APP.editingId;

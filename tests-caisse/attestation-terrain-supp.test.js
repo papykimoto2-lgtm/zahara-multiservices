@@ -55,3 +55,23 @@ test('facturation : motif obligatoire, montant du contrat augmenté, audit ; « 
   assert.equal(r.totalApresDeja, 4600000); assert.equal(r.initialApresDeja, 3500000 - 100000 + 0);
   assert.deepEqual(app.etat.erreursPage, []);
 });
+
+test('avenant : généré à la facturation (pas pour « déjà inclus »), contenu complet, historique réimprimable', async () => {
+  const app = await ouvrirApp(); await preparer(app.page);
+  const r = await app.page.evaluate(async function () {
+    var docs = []; window.open = function () { var d = { html: '', document: { write: function (h) { d.html += h; }, close: function () {} }, print: function () {} }; docs.push(d); return d; };
+    window.sanixQrHtml = function () { return ''; };
+    var set = function (id, v) { document.getElementById(id).value = v; }, out = {};
+    APP.editingId = 'c2'; ouvrirTerrainSupplementaire();
+    set('ts2-surface', '20'); set('ts2-prix-m2', '30000'); ts2Recalculer(); set('ts2-motif', 'Parcelle <b>contiguë</b>'); await confirmerTerrainSupplementaire();
+    out.nb = docs.length; var h = docs[0] ? docs[0].html : '';
+    out.contenu = [/Avenant — Terrain supplémentaire/.test(h), /20 m²/.test(h), /600\s?000/.test(h), /4\s?600\s?000/.test(h), /&lt;b&gt;contiguë/.test(h), /bon pour accord/.test(h)];
+    ouvrirTerrainSupplementaire(); out.histo = document.getElementById('ts2-historique').textContent;
+    var tid = DATA.clients[1].terrains_supplementaires[1].id; imprimerAvenantTerrainSupp(tid, 'c2'); out.reimp = docs.length;
+    set('ts2-montant', '100000'); set('ts2-motif', 'Rattrapage'); document.getElementById('ts2-deja').checked = true; await confirmerTerrainSupplementaire(); out.apresDeja = docs.length;
+    return out;
+  });
+  assert.equal(r.nb, 1); assert.deepEqual(r.contenu, [true, true, true, true, true, true]);
+  assert.match(r.histo, /Terrains supplémentaires déjà enregistrés/); assert.equal(r.reimp, 2); assert.equal(r.apresDeja, 2);
+  assert.deepEqual(app.etat.erreursPage, []);
+});
