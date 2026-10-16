@@ -425,6 +425,28 @@
     .vt-voir:hover{ background:var(--pp-primary); }
     @media (max-width:640px){ .vt-mosaic{ grid-template-columns:repeat(2,1fr); grid-auto-rows:130px; gap:8px; } .vt-mosaic .photo-item{ border-radius:14px; } .vt-mosaic .photo-item:nth-child(6n+4){ grid-column:span 2; } .vt-mosaic .photo-item:not(:first-child) .photo-cap{ opacity:1; transform:none; padding-top:18px; font-size:.72rem; } }
     @media (prefers-reduced-motion:reduce){ .bandeau-contenu{ animation:none; padding-left:12px; } .vt-mosaic .photo-item img{ transition:none; } }
+    /* Catalogue : sections par type de bien, cartes illustrées */
+    .vt-cat-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:18px; }
+    .vt-bien{ background:#fff; border-radius:22px; overflow:hidden; box-shadow:var(--vt-ombre); display:flex; flex-direction:column; transition:transform .25s,box-shadow .25s; }
+    .vt-bien:hover{ transform:translateY(-4px); box-shadow:0 16px 36px rgba(11,27,58,.16); }
+    .vt-bien-img{ position:relative; aspect-ratio:4/3; background:#ffe9dc; overflow:hidden; }
+    .vt-bien-img img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .5s ease; }
+    .vt-bien:hover .vt-bien-img img{ transform:scale(1.06); }
+    .vt-bien-img .vt-chip-cat{ top:12px; left:12px; }
+    .vt-bien-pieces{ position:absolute; right:12px; top:12px; background:var(--vt-navy); color:#fff; font-size:.74rem; font-weight:800; padding:4px 11px; border-radius:99px; }
+    .vt-bien-corps{ padding:16px 18px 18px; display:flex; flex-direction:column; gap:8px; flex:1; }
+    .vt-bien-corps h5{ font-family:var(--pp-serif); font-weight:800; font-size:1.12rem; letter-spacing:-.01em; margin:0; color:var(--vt-navy); }
+    .vt-bien-surf{ font-size:.82rem; color:#4b5a78; }
+    .vt-prix{ margin-top:auto; display:grid; gap:4px; }
+    .vt-prix div{ display:flex; justify-content:space-between; gap:10px; font-size:.84rem; padding:6px 0; border-top:1px solid #f0e4d8; }
+    .vt-prix strong{ font-weight:800; }
+    .vt-prix .vt-fort strong{ color:var(--pp-primary); font-size:1.02rem; }
+    .vt-bien .highlight-btn{ width:100%; margin-top:6px; padding:12px 16px; }
+    .vt-outils{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin:14px 0 22px; }
+    .vt-outils .subnav{ margin:0; }
+    .vt-outils select{ border:1px solid #f0dfd2; border-radius:99px; padding:9px 14px; font:inherit; font-size:.85rem; background:#fff; color:var(--vt-navy); }
+    @media (max-width:640px){ .vt-cat-grid{ grid-template-columns:1fr; } }
+    @media (prefers-reduced-motion:reduce){ .vt-bien,.vt-bien-img img{ transition:none; } }
   </style>
 </head>
 <body>
@@ -618,7 +640,11 @@
       <strong style="color:#92400e;" id="catalogue-conditions-titre"></strong>
       <div style="font-size:.85rem; color:#4b6a8b; margin-top:4px;" id="catalogue-conditions-texte"></div>
     </div>
-    <div class="grid-3" id="villa-cards"></div>
+    <div class="vt-outils" id="catalogue-outils" style="display:none;">
+      <div class="subnav" id="catalogue-nav" role="group" aria-label="Types de biens"></div>
+      <label style="font-size:.82rem;color:#4b5a78;">Trier par <select id="catalogue-tri" aria-label="Tri du catalogue"><option value="">Ordre du catalogue</option><option value="asc">Prix croissant</option><option value="desc">Prix décroissant</option></select></label>
+    </div>
+    <div id="villa-cards" class="vt-sections"></div>
   </div>
 
   <div id="catalogue-photo-pane" class="tab-pane">
@@ -2577,17 +2603,69 @@
 
   /* ───── Catalogue des biens — publié par l'ERP mère (brand.catalogue) ───── */
   var VILLAS = [];
+  var CAT_TYPES=[
+    {k:'villa',       t:'Villas',              re:/villa|duplex|maison/i,                 c:['#ffe3c4','#ff8a5c']},
+    {k:'appartement', t:'Appartements',        re:/appart|studio|f[1-6]\b|résidence|residence/i, c:['#cfe3f3','#6fa3c9']},
+    {k:'terrain',     t:'Terrains',            re:/terrain|parcelle|lot de/i,              c:['#d9efc9','#7bbf5a']},
+    {k:'local',       t:'Locaux commerciaux',  re:/local|boutique|commerc|bureau/i,        c:['#e6d9f2','#8a6fc9']},
+    {k:'autre',       t:'Autres biens',        re:/./,                                     c:['#fde7a8','#e39a00']}
+  ];
+  var catFiltre='*', catTri='';
+  function typeBien(v){
+    var txt=(v.nom||'')+' '+(v.pieces||'');
+    for(var i=0;i<CAT_TYPES.length;i++){ if(CAT_TYPES[i].re.test(txt)) return CAT_TYPES[i]; }
+    return CAT_TYPES[CAT_TYPES.length-1];
+  }
+  function prixBien(v){ var n=[v.go,v.cle,v.prix].map(function(x){return +x||0;}).filter(function(x){return x>0;}); return n.length?Math.min.apply(null,n):0; }
+  /* Photo publiée dans l'ERP (catégorie « catalogue ») dont le titre contient le nom du bien ; à défaut, illustration du type. */
+  function photoBien(v,typ){
+    var nom=String(v.nom||'').toLowerCase().split(' · ')[0].trim();
+    var m=nom?(MEDIAS||[]).filter(function(x){ return x.type==='photo' && x.categorie==='catalogue' && (x.data||x.url) && String(x.titre||'').toLowerCase().indexOf(nom)!==-1; })[0]:null;
+    if(m) return m.data||m.url;
+    var h=44+((v.nom||'').length*13)%60, w=84+((v.nom||'').length*7)%50;
+    var t='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+typ.c[0]+'"/><stop offset="1" stop-color="'+typ.c[1]+'"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/><circle cx="310" cy="66" r="28" fill="#fff" opacity=".85"/><rect y="238" width="400" height="62" fill="#0b1b3a" opacity=".2"/><rect x="90" y="'+(238-h)+'" width="'+w+'" height="'+h+'" fill="#fff" opacity=".96"/><rect x="'+(100+w)+'" y="'+(238-h*.62)+'" width="74" height="'+(h*.62)+'" fill="#fff" opacity=".78"/><rect x="104" y="'+(252-h)+'" width="14" height="14" fill="#0b1b3a" opacity=".4"/><rect x="130" y="'+(252-h)+'" width="14" height="14" fill="#0b1b3a" opacity=".4"/></svg>';
+    return 'data:image/svg+xml;utf8,'+encodeURIComponent(t);
+  }
+  function carteBien(v,i){
+    var typ=typeBien(v);
+    var lig=function(lib,val,fort){ return '<div'+(fort?' class="vt-fort"':'')+'><span>'+lib+'</span><strong>'+fmt(val)+' F</strong></div>'; };
+    return '<article class="vt-bien"><div class="vt-bien-img"><img src="'+esc(photoBien(v,typ))+'" loading="lazy" alt="'+esc(v.nom||'Bien')+'"><span class="vt-chip-cat">'+esc(typ.t)+'</span>'+(v.pieces?'<span class="vt-bien-pieces">'+esc(v.pieces)+'</span>':'')+'</div>'
+      +'<div class="vt-bien-corps"><h5>'+esc(v.nom)+'</h5>'+(v.surf?'<div class="vt-bien-surf">Superficie : '+esc(v.surf)+'</div>':'')
+      +'<div class="vt-prix">'+(v.go?lig('Gros œuvre',v.go,false):'')+(v.cle?lig('Clé en main',v.cle,true):'')+(!v.go&&!v.cle&&v.prix?lig(esc(v.prix_label||'Prix'),v.prix,true):'')+'</div>'
+      +'<button type="button" class="highlight-btn" onclick="souscrireVilla('+i+')">Souscrire à ce bien</button></div></article>';
+  }
   function renderVillas(){
     var el = document.getElementById('villa-cards'); if(!el) return;
-    if(!VILLAS.length){ el.innerHTML = '<div style="color:#4b6a8b;">Catalogue en cours de publication — contactez-nous pour recevoir la grille tarifaire.</div>'; return; }
-    el.innerHTML = VILLAS.map(function(v){
-      return '<div class="card"><div style="display:flex; justify-content:space-between; align-items:baseline;"><h4 style="color:var(--pp-primary);">'+esc(v.nom)+'</h4>'+(v.pieces?'<span class="pill p-bleu">'+esc(v.pieces)+'</span>':'')+'</div>'
-        +(v.surf?'<div style="font-size:.78rem; color:#4b6a8b; margin:4px 0 10px;">Superficie : '+esc(v.surf)+'</div>':'')
-        +(v.go?'<div style="display:flex; justify-content:space-between; font-size:.85rem; padding:6px 0; border-top:1px solid #eef2f8;"><span>Gros œuvre</span><strong>'+fmt(v.go)+' F</strong></div>':'')
-        +(v.cle?'<div style="display:flex; justify-content:space-between; font-size:.85rem; padding:6px 0; border-top:1px solid #eef2f8;"><span>Clé en main</span><strong style="color:var(--pp-primary);">'+fmt(v.cle)+' F</strong></div>':'')
-        +(!v.go && !v.cle && v.prix?'<div style="display:flex; justify-content:space-between; font-size:.85rem; padding:6px 0; border-top:1px solid #eef2f8;"><span>'+esc(v.prix_label||'Prix')+'</span><strong style="color:var(--pp-primary);">'+fmt(v.prix)+' F</strong></div>':'')+'</div>';
+    var outils=document.getElementById('catalogue-outils');
+    if(!VILLAS.length){ el.innerHTML = '<div style="color:#4b6a8b;">Catalogue en cours de publication — contactez-nous pour recevoir la grille tarifaire.</div>'; if(outils) outils.style.display='none'; return; }
+    var groupes=[];
+    CAT_TYPES.forEach(function(t){ groupes.push({t:t, items:[]}); });
+    VILLAS.forEach(function(v,i){ var t=typeBien(v); groupes.filter(function(g){return g.t===t;})[0].items.push({v:v,i:i}); });
+    groupes=groupes.filter(function(g){ return g.items.length; });
+    if(catFiltre!=='*' && !groupes.some(function(g){return g.t.k===catFiltre;})) catFiltre='*';
+    groupes.forEach(function(g){
+      if(catTri) g.items.sort(function(a,b){ var pa=prixBien(a.v)||1e15, pb=prixBien(b.v)||1e15; return catTri==='asc'?pa-pb:(prixBien(b.v)-prixBien(a.v)); });
+    });
+    var nav=document.getElementById('catalogue-nav');
+    if(outils) outils.style.display='flex';
+    if(nav){
+      nav.style.display=groupes.length>1?'flex':'none';
+      nav.innerHTML='<button type="button" class="'+(catFiltre==='*'?'on':'')+'" data-cat="*">Tous ('+VILLAS.length+')</button>'+groupes.map(function(g){ return '<button type="button" class="'+(catFiltre===g.t.k?'on':'')+'" data-cat="'+g.t.k+'">'+esc(g.t.t)+' ('+g.items.length+')</button>'; }).join('');
+      nav.onclick=function(e){ var b=e.target.closest?e.target.closest('button[data-cat]'):null; if(!b) return; catFiltre=b.getAttribute('data-cat'); renderVillas(); };
+    }
+    var tri=document.getElementById('catalogue-tri'); if(tri){ tri.value=catTri; tri.onchange=function(){ catTri=tri.value; renderVillas(); }; }
+    el.innerHTML=groupes.filter(function(g){ return catFiltre==='*'||g.t.k===catFiltre; }).map(function(g){
+      return '<section class="vt-sec"><div class="vt-sec-tete"><h4>'+esc(g.t.t)+'</h4><span class="vt-nb">'+g.items.length+'</span></div><div class="vt-cat-grid">'+g.items.map(function(x){ return carteBien(x.v,x.i); }).join('')+'</div></section>';
     }).join('');
   }
+  /* « Souscrire à ce bien » : présélectionne le modèle dans le formulaire de souscription et ouvre l'onglet. */
+  function souscrireVilla(i){
+    var v=VILLAS[i]; if(!v) return;
+    var sel=document.getElementById('s_villa');
+    if(sel){ sel.value=v.nom; majPrixEstime(); }
+    var b=document.querySelector('.nav-tabs .tab-link[data-tab="souscrire"]'); if(b) b.click();
+  }
+  window.souscrireVilla=souscrireVilla;
 
   /* ───── Catalogue locatif — publié par l'ERP mère (brand.catalogue_location) ─────
      Format d'une ligne : Nom | Pièces | Surface | Loyer/mois FCFA | Caution FCFA | Adresse | Latitude | Longitude | Date disponible (AAAA-MM-JJ, vide = disponible maintenant) */
@@ -2677,6 +2755,7 @@
     }catch(e){ MEDIAS=[]; }
     rendreMediasEden();
     renderCataloguePhoto();
+    renderVillas();
     renderLocationPhotos();
     if(typeof majEspacesDivisions==='function') majEspacesDivisions();
   }

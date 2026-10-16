@@ -41,3 +41,9 @@ test('photos : sections et mosaïque d\'accueil', () => {
   ['photo-sections-nav','accueil-galerie-wrap','accueil-galerie','photo-catalogue-grid'].forEach(id => assert.ok(html.includes('id="' + id + '"'), id));
   ['photosParSection','renderAccueilGalerie','vignettePhoto'].forEach(f => assert.ok(html.includes('function ' + f + '('), f));
 });
+
+test('catalogue : types, filtres, tri et souscription directe', () => {
+  ['catalogue-nav','catalogue-tri','catalogue-outils','villa-cards'].forEach(id => assert.ok(html.includes('id="' + id + '"'), id));
+  ['typeBien','prixBien','photoBien','carteBien','souscrireVilla'].forEach(f => assert.ok(html.includes('function ' + f + '('), f));
+  assert.ok(html.includes('window.souscrireVilla'));
+});
