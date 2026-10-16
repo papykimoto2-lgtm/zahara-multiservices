@@ -26,9 +26,11 @@ test('clic sur un accès rapide ouvre le volet', async () => {
     const errs = []; p.on('pageerror', e => errs.push(String(e)));
     await p.goto('file://' + path.join(__dirname, '..', 'portail-unique.html')); await p.waitForTimeout(800);
     for (const e of ESPACES) {
+      await p.evaluate(() => allerAccueilPortail());
       await p.click('.esp-chip[data-tab="' + e + '"]');
       assert.ok(await p.evaluate(id => document.getElementById(id + '-pane').classList.contains('active-pane'), e), 'ouvre ' + e);
     }
+    await p.evaluate(() => allerAccueilPortail());
     await p.click('.hero-btn[data-tab="eden"]');
     assert.ok(await p.evaluate(() => document.getElementById('eden-pane').classList.contains('active-pane')));
     assert.deepStrictEqual(errs, []);
