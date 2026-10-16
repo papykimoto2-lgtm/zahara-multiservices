@@ -114861,11 +114861,16 @@ function attSoldeSolde(c, kind){
   var P = attSoldePrix(c), fin = (kind==='finale'), plafonne = !fin && P.modifs.length>0;
   var tous = (DATA.versements||[]).filter(function(v){ return v && v.client_id===c.id && v.statut!=='annule' && _versementSurPrix(v); })
     .sort(function(a,b){ return String(a.date||'').localeCompare(String(b.date||'')); });
-  var totalVerse = tous.reduce(function(s,v){ return s + (parseFloat(v.montant)||0); }, 0);
-  var prix = fin ? P.total : P.initial, vs = tous, verse = totalVerse;
+  /* Attestation du prix initial avec modifications : seuls les versements dont le motif est « Valeur initiale logement »
+     (ou sans motif) comptent ; ceux saisis « Modification » / « Terrain supplémentaire » sont réservés à la valeur finale
+     (sinon ils absorbaient la place de versements de valeur initiale, imputés à tort sur les modifications). */
+  var motifInitial = function(v){ var o = String(v.objet||'').trim(); return !o || o === 'Valeur initiale logement'; };
+  var pool = plafonne ? tous.filter(motifInitial) : tous;
+  var totalVerse = pool.reduce(function(s,v){ return s + (parseFloat(v.montant)||0); }, 0);
+  var prix = fin ? P.total : P.initial, vs = pool, verse = totalVerse;
   if(plafonne){   /* imputation sur le prix initial seulement */
     var reste = prix; vs = [];
-    tous.forEach(function(v){
+    pool.forEach(function(v){
       if(reste <= 0.5) return;
       var m = parseFloat(v.montant)||0, imp = Math.min(m, reste); reste -= imp;
       vs.push(Object.assign({}, v, { montant_impute:imp, partiel: imp < m - 0.5 }));
@@ -114874,7 +114879,7 @@ function attSoldeSolde(c, kind){
   }
   /* Date de solde = date du versement qui a fait atteindre le prix. */
   var cumul = 0, dateSolde = '';
-  tous.some(function(v){ cumul += (parseFloat(v.montant)||0); if(cumul >= prix - 0.5){ dateSolde = String(v.date||'').slice(0,10); return true; } return false; });
+  pool.some(function(v){ cumul += (parseFloat(v.montant)||0); if(cumul >= prix - 0.5){ dateSolde = String(v.date||'').slice(0,10); return true; } return false; });
   var frais = (DATA.versements||[]).filter(function(v){ return v && v.client_id===c.id && v.statut!=='annule' && v.type==='frais_souscription'; })
     .reduce(function(s,v){ return s + (parseFloat(v.montant)||0); }, 0);
   return { vs:vs, verse:verse, prix:prix, dateSolde:dateSolde, frais:frais, solde: prix > 0 && totalVerse >= prix - 0.5,
