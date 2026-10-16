@@ -403,7 +403,28 @@
     /* Pied de page */
     footer{ background:var(--vt-navy); color:#cfd8ee; border-radius:28px 28px 0 0; margin-top:20px; }
     .signature a,footer a{ color:#fff; }
-    @media (prefers-reduced-motion:reduce){ .bandeau-contenu{ animation:none; padding-left:12px; } }
+    /* Photos : sections et mosaïques expressives */
+    .vt-sections{ display:block; }
+    .vt-sec{ margin:6px 0 40px; }
+    .vt-sec-tete{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+    .vt-sec-tete h4{ font-family:var(--pp-serif); font-weight:800; font-size:clamp(1.25rem,2.8vw,1.7rem); letter-spacing:-.02em; margin:0; }
+    .vt-sec-tete .vt-nb{ background:var(--vt-navy); color:#fff; border-radius:99px; padding:3px 12px; font-size:.78rem; font-weight:800; }
+    .vt-sec-tete p{ flex:1 1 100%; color:#4b5a78; font-size:.9rem; margin:0; }
+    .vt-mosaic{ display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); grid-auto-rows:170px; grid-auto-flow:dense; gap:12px; margin:0; }
+    .vt-mosaic .photo-item{ aspect-ratio:auto; border:0; border-radius:20px; box-shadow:var(--vt-ombre); background:#ffe9dc; }
+    .vt-mosaic .photo-item:first-child{ grid-column:span 2; grid-row:span 2; }
+    .vt-mosaic .photo-item:nth-child(6n+4){ grid-column:span 2; }
+    .vt-mosaic .photo-item img{ transition:transform .5s ease; }
+    .vt-mosaic .photo-item:hover img{ transform:scale(1.08); }
+    .vt-mosaic .photo-cap{ position:absolute; inset:auto 0 0 0; padding:26px 14px 12px; font-size:.82rem; font-weight:700; line-height:1.25;
+        background:linear-gradient(to top,rgba(11,27,58,.82),rgba(11,27,58,0)); color:#fff; }
+    .vt-mosaic .photo-item:not(:first-child) .photo-cap{ transform:translateY(8px); opacity:0; transition:.25s; }
+    .vt-mosaic .photo-item:not(:first-child):hover .photo-cap,.vt-mosaic .photo-item:not(:first-child):focus-within .photo-cap{ transform:none; opacity:1; }
+    .vt-chip-cat{ position:absolute; top:10px; left:10px; background:#fff; color:var(--vt-navy); font-size:.7rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; padding:4px 10px; border-radius:99px; pointer-events:none; }
+    .vt-voir{ display:inline-flex; margin-top:16px; background:var(--vt-navy); color:#fff; border:0; border-radius:99px; padding:12px 22px; font-weight:800; cursor:pointer; font-size:.9rem; }
+    .vt-voir:hover{ background:var(--pp-primary); }
+    @media (max-width:640px){ .vt-mosaic{ grid-template-columns:repeat(2,1fr); grid-auto-rows:130px; gap:8px; } .vt-mosaic .photo-item{ border-radius:14px; } .vt-mosaic .photo-item:nth-child(6n+4){ grid-column:span 2; } .vt-mosaic .photo-item:not(:first-child) .photo-cap{ opacity:1; transform:none; padding-top:18px; font-size:.72rem; } }
+    @media (prefers-reduced-motion:reduce){ .bandeau-contenu{ animation:none; padding-left:12px; } .vt-mosaic .photo-item img{ transition:none; } }
   </style>
 </head>
 <body>
@@ -544,6 +565,13 @@
     </div>
     <div class="badge-list" id="societe-badges" style="display:none;"></div>
 
+    <div id="accueil-galerie-wrap" style="display:none;">
+      <h4 class="home-h">Nos réalisations en images</h4>
+      <p class="home-sub">Programmes, chantiers et villas : un aperçu de ce que nous bâtissons.</p>
+      <div id="accueil-galerie" class="photo-grid vt-mosaic"></div>
+      <button type="button" class="tab-link vt-voir" data-tab="catalogue-photo"><i class="fas fa-images"></i> Voir toutes les photos</button>
+    </div>
+
     <h4 class="home-h">Comment ça marche</h4>
     <p class="home-sub">De la réservation à votre titre, tout se suit en ligne.</p>
     <div class="how">
@@ -596,7 +624,8 @@
   <div id="catalogue-photo-pane" class="tab-pane">
     <h3><i class="fas fa-images"></i> Catalogue photo — nos réalisations</h3>
     <p style="margin-bottom:10px;">Une sélection d'images de nos villas, aménagements et chantiers. Mises à jour directement depuis l'ERP.</p>
-    <div id="photo-catalogue-grid" class="photo-grid"><div style="color:#4b6a8b;"><span class="spinner dark"></span> Chargement…</div></div>
+    <div class="subnav" id="photo-sections-nav" style="display:none;" role="group" aria-label="Sections photos"></div>
+    <div id="photo-catalogue-grid" class="vt-sections"><div style="color:#4b6a8b;"><span class="spinner dark"></span> Chargement…</div></div>
   </div>
 
   <div id="location-pane" class="tab-pane">
@@ -3288,10 +3317,61 @@
   chargerParamsBandeau();
 
   /* ───── Catalogue photo ───── */
+  var PHOTO_SECTIONS=[
+    {k:'eden',        t:'Nos programmes',      d:'Les programmes immobiliers en cours et livrés.'},
+    {k:'chantier',    t:'Nos chantiers',       d:'L\'avancement de nos réalisations, photos à l\'appui.'},
+    {k:'catalogue',   t:'Nos villas',          d:'Les modèles de villas et de logements du catalogue.'},
+    {k:'location',    t:'Nos locations',       d:'Les biens proposés à la location.'},
+    {k:'investir',    t:'Opérations à investir', d:'Les opérations ouvertes aux investisseurs.'}
+  ];
+  function photosParSection(){
+    var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo' && (m.data||m.url); });
+    var out=PHOTO_SECTIONS.map(function(sec){ return {k:sec.k, t:sec.t, d:sec.d, items:photos.filter(function(m){ return m.categorie===sec.k; })}; });
+    var connues=PHOTO_SECTIONS.map(function(x){return x.k;});
+    var autres=photos.filter(function(m){ return connues.indexOf(m.categorie)===-1; });
+    if(autres.length) out.push({k:'autres', t:'Autres photos', d:'', items:autres});
+    return out.filter(function(x){ return x.items.length; });
+  }
+  function vignettePhoto(p,etiquette){
+    return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="'+esc(p.titre||'Photo')+'">'
+      +(etiquette?'<span class="vt-chip-cat">'+esc(etiquette)+'</span>':'')
+      +(p.titre?'<div class="photo-cap">'+esc(p.titre)+'</div>':'')+'</div>';
+  }
   function renderCataloguePhoto(){
     var el=document.getElementById('photo-catalogue-grid'); if(!el) return;
-    var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo'; });
-    el.innerHTML = photos.length ? photos.map(function(p){ return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(p.titre?'<div class="photo-cap">'+esc(p.titre)+'</div>':'')+'</div>'; }).join('') : '<div style="color:#4b6a8b;">Aucune photo publiée pour le moment.</div>';
+    var nav=document.getElementById('photo-sections-nav');
+    var secs=photosParSection();
+    if(!secs.length){
+      el.innerHTML='<div style="color:#4b6a8b;">Aucune photo publiée pour le moment.</div>';
+      if(nav) nav.style.display='none';
+      renderAccueilGalerie(); return;
+    }
+    el.innerHTML=secs.map(function(sec){
+      return '<section class="vt-sec" data-sec="'+esc(sec.k)+'"><div class="vt-sec-tete"><h4>'+esc(sec.t)+'</h4><span class="vt-nb">'+sec.items.length+'</span>'+(sec.d?'<p>'+esc(sec.d)+'</p>':'')+'</div>'
+        +'<div class="photo-grid vt-mosaic">'+sec.items.map(function(p){ return vignettePhoto(p,''); }).join('')+'</div></section>';
+    }).join('');
+    if(nav){
+      nav.style.display=secs.length>1?'flex':'none';
+      nav.innerHTML='<button type="button" class="on" data-sec="*">Toutes</button>'+secs.map(function(sec){ return '<button type="button" data-sec="'+esc(sec.k)+'">'+esc(sec.t)+' ('+sec.items.length+')</button>'; }).join('');
+      nav.onclick=function(e){
+        var b=e.target.closest?e.target.closest('button[data-sec]'):null; if(!b) return;
+        var k=b.getAttribute('data-sec');
+        [].forEach.call(nav.querySelectorAll('button'),function(x){ x.classList.toggle('on',x===b); });
+        [].forEach.call(el.querySelectorAll('.vt-sec'),function(x){ x.style.display=(k==='*'||x.getAttribute('data-sec')===k)?'':'none'; });
+      };
+    }
+    renderAccueilGalerie();
+  }
+  /* Accueil : mosaïque d'au plus 7 photos, une par section à tour de rôle pour montrer toute l'activité. */
+  function renderAccueilGalerie(){
+    var wrap=document.getElementById('accueil-galerie-wrap'), g=document.getElementById('accueil-galerie'); if(!wrap||!g) return;
+    var secs=photosParSection(), pick=[], i=0;
+    while(pick.length<7 && secs.some(function(x){ return x.items.length>i; })){
+      secs.forEach(function(sec){ if(pick.length<7 && sec.items[i]) pick.push({p:sec.items[i], t:sec.t}); });
+      i++;
+    }
+    wrap.style.display=pick.length?'':'none';
+    g.innerHTML=pick.map(function(x){ return vignettePhoto(x.p,x.t); }).join('');
   }
 
   /* ───── Souscription en ligne → pi_leads ───── */
