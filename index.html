@@ -114975,20 +114975,18 @@ function attSoldeHtml(c, opts){
   motOrdre = motOrdre.filter(function(o){ return (motDu[o]||0) > 0.5 || (motVers[o]||[]).length; });
   var montV = function(v){ return v.montant_impute!=null ? v.montant_impute : (parseFloat(v.montant)||0); };
   var resteTxt = function(du, ve){ var r = du - ve; return r > 0.5 ? n(r) : (r < -0.5 ? '<span style="color:#b45309;">excédent '+n(-r)+'</span>' : '0'); };
-  var recapMotifs = '<h3>Amortissement par motif</h3><table><thead><tr><th>Motif (concerne)</th><th style="text-align:right;">Valeur due (FCFA)</th><th style="text-align:right;">Versé (FCFA)</th><th style="text-align:right;">Reste dû (FCFA)</th></tr></thead><tbody>'
-    + motOrdre.map(function(o){
-        var ve = (motVers[o]||[]).reduce(function(t,v){ return t + montV(v); }, 0), du = motDu[o]||0;
-        return '<tr><td>'+E(o)+'</td><td style="text-align:right;">'+(du?n(du):'—')+'</td><td style="text-align:right;">'+n(ve)+'</td><td style="text-align:right;">'+(du?resteTxt(du, ve):'—')+'</td></tr>';
-      }).join('')
-    + '<tr><td><strong>Total</strong></td><td style="text-align:right;"><strong>'+n(S.prix)+'</strong></td><td style="text-align:right;"><strong>'+n(S.verse)+'</strong></td><td style="text-align:right;"><strong>'+resteTxt(S.prix, S.verse)+'</strong></td></tr></tbody></table>'
-    + '<div class="art" style="font-size:11px;color:#555;">Les versements saisis sans motif précis sont rattachés à « '+MOT_INI+' ». Un excédent sur un motif est compensé par le reliquat d\'un autre motif : seul le total détermine le solde.</div>';
-  var detailMotifs = '<h3>Détail des versements par motif</h3>' + motOrdre.map(function(o){
-    var vs = motVers[o]||[], ve = vs.reduce(function(t,v){ return t + montV(v); }, 0);
-    if(!vs.length) return '<table><thead><tr><th colspan="4">'+E(o)+'</th></tr></thead><tbody><tr><td colspan="4">Aucun versement enregistré sur ce motif.</td></tr></tbody></table>';
-    return '<table><thead><tr><th colspan="4">'+E(o)+'</th></tr><tr><th>Date</th><th>Référence</th><th>Mode</th><th style="text-align:right;">Montant (FCFA)</th></tr></thead><tbody>'
-      + vs.map(function(v){ return '<tr><td>'+E(dateShort(v.date))+'</td><td>'+E(v.ref||v.id)+'</td><td>'+E(v.mode||'—')+'</td><td style="text-align:right;">'+n(montV(v))+(v.partiel?' <span style="font-size:10px;color:#555;">(sur '+n(parseFloat(v.montant)||0)+', le solde est imputé sur les modifications)</span>':'')+'</td></tr>'; }).join('')
-      + '<tr><td colspan="3"><strong>Sous-total — '+E(o)+'</strong></td><td style="text-align:right;"><strong>'+n(ve)+'</strong></td></tr></tbody></table>';
-  }).join('');
+  /* Seul le motif « Valeur initiale logement » est présenté (tableau d'amortissement) ; les versements des autres motifs
+     (modifications, terrains supplémentaires) ne sont pas détaillés ici. */
+  var viVs = (motVers[MOT_INI]||[]).slice().sort(function(x,y){ return String(x.date||'').localeCompare(String(y.date||'')); });
+  var viDu = motDu[MOT_INI]||0, viVe = viVs.reduce(function(t,v){ return t + montV(v); }, 0), cumulVi = 0;
+  var recapMotifs = '<h3>Tableau d\'amortissement — '+MOT_INI+'</h3>'
+    + '<table><thead><tr><th>Date</th><th>Référence</th><th>Mode</th><th style="text-align:right;">Versement (FCFA)</th><th style="text-align:right;">Cumul versé (FCFA)</th><th style="text-align:right;">Reste dû (FCFA)</th></tr></thead><tbody>'
+    + '<tr><td>—</td><td colspan="2">Valeur initiale du logement</td><td></td><td style="text-align:right;">0</td><td style="text-align:right;">'+n(viDu)+'</td></tr>'
+    + (viVs.length ? viVs.map(function(v){ var m = montV(v); cumulVi += m; return '<tr><td>'+E(dateShort(v.date))+'</td><td>'+E(v.ref||v.id)+'</td><td>'+E(v.mode||'—')+'</td><td style="text-align:right;">'+n(m)+(v.partiel?' <span style="font-size:10px;color:#555;">(sur '+n(parseFloat(v.montant)||0)+', le solde est imputé sur les modifications)</span>':'')+'</td><td style="text-align:right;">'+n(cumulVi)+'</td><td style="text-align:right;">'+resteTxt(viDu, cumulVi)+'</td></tr>'; }).join('')
+        : '<tr><td colspan="6">Aucun versement enregistré.</td></tr>')
+    + '<tr><td colspan="3"><strong>Total</strong></td><td style="text-align:right;"><strong>'+n(viVe)+'</strong></td><td style="text-align:right;"><strong>'+n(viVe)+'</strong></td><td style="text-align:right;"><strong>'+resteTxt(viDu, viVe)+'</strong></td></tr></tbody></table>'
+    + '<div class="art" style="font-size:11px;color:#555;">Les versements saisis sans motif précis sont rattachés à « '+MOT_INI+' ».</div>';
+  var detailMotifs = '';
   var ident = ov.piece || [c.piece_type, c.piece_num && ('N° '+c.piece_num)].filter(Boolean).join(' ');
   if(ov.bien) bien = E(ov.bien);
   var promoteur = attSoldePromoteurTexte(p);
@@ -115055,6 +115053,10 @@ function attSoldeAuto(clientId){
       toast('📜 '+(kind==='finale' ? 'Valeur finale soldée : attestation de solde (valeur finale) préparée en brouillon' : 'Souscripteur soldé : attestation de solde préparée en brouillon')+' (fiche du souscripteur → Documents).','success',7000);
     } else if(!ok && a && a.statut==='brouillon'){
       delete c[champ]; attSoldeSauver(c);
+    } else if(ok && a && ['brouillon','en_attente','rejete'].indexOf(a.statut)!==-1 && (Math.round(a.prix||0)!==Math.round(S.prix) || Math.round(a.verse||0)!==Math.round(S.verse) || (a.date_solde||'')!==(S.dateSolde||''))){
+      /* Données préenregistrées d'une attestation non encore validée : remises à jour (le document est regénéré à l'ouverture).
+         Une attestation validée reste figée telle que signée. */
+      a.prix = S.prix; a.verse = S.verse; a.date_solde = S.dateSolde; attSoldeSauver(c);
     }
   });
   attSoldeRafraichirUI(clientId);
