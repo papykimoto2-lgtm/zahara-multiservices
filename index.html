@@ -115025,7 +115025,11 @@ function attSoldeHtml(c, opts){
     + '.mont{border:2px solid #1D3F7A;text-align:center;padding:10px;margin:10px 0;font-size:15px;font-weight:bold;color:#1D3F7A;}'
     + '.sig{display:flex;justify-content:space-between;margin-top:34px;}.sig div{width:46%;text-align:center;font-size:12px;}'
     + '.projet{position:fixed;top:40%;left:8%;font-size:64px;color:rgba(200,0,0,.13);transform:rotate(-24deg);font-weight:bold;pointer-events:none;}'
-    + ATT_PIED_CSS + '</style></head><body>'
+    + ATT_PIED_CSS
+    /* Mise en page à l'impression : document resserré (tient sur une page quand c'est possible) ; la zone « Portée et réserves »
+       + signatures reste d'un seul tenant : la signature du DG n'est jamais seule sur une page. */
+    + '.fin-bloc{break-inside:avoid;page-break-inside:avoid;}h3{break-after:avoid;}table{break-inside:auto;}tr{break-inside:avoid;}@media print{body{font-size:9.6px !important;line-height:1.22 !important;}h1{font-size:15px !important;margin:4px 0 1px !important;}.sub{margin-bottom:4px !important;font-size:10px !important;}h3{margin:5px 0 2px !important;font-size:10.5px !important;}.art{margin:1px 0 !important;}table{margin:2px 0 3px !important;}td,th{padding:1px 6px !important;font-size:9.4px !important;}.mont{margin:3px 0 !important;padding:3px !important;font-size:12px !important;}.sig{margin-top:6px !important;}.sig div{font-size:10px !important;}.doc-logo-auto{margin:0 0 4px !important;}.doc-logo-auto img{max-height:38px !important;}}'
+    + '</style></head><body>'
     + (opts.projet ? '<div class="projet">PROJET — NON VALIDÉ</div>' : '')
     + (opts.indicatif ? '<div class="projet">À TITRE INDICATIF</div>' : '')
     + '<div class="ref"><div><strong style="font-size:15px;">'+E(p.societe||'')+'</strong></div><div style="text-align:right;">N° <strong>'+E(opts.numero||'—')+'</strong><br>Dossier : '+E(c.dossier||c.id)+'</div></div>'
@@ -115051,7 +115055,7 @@ function attSoldeHtml(c, opts){
     + recapMotifs + detailMotifs
     + '<div class="mont">Solde restant dû : 0 FCFA</div>'
     + (S.frais>0?'<div class="art" style="font-size:11.5px;color:#555;">Les frais de souscription ('+n(S.frais)+' FCFA) ne sont pas imputés sur le prix et ne figurent pas dans le tableau ci-dessus.</div>':'')
-    + '<h3>Portée et réserves</h3>'
+    + '<div class="fin-bloc"><h3>Portée et réserves</h3>'
     + '<div class="art">1. Le souscripteur est libéré de toute obligation de paiement au titre '+(fin?'de la valeur finale (prix de vente et modifications de construction)':(avecModifs?'du prix initial de vente':'du prix de vente'))+' du bien désigné ci-dessus.</div>'
     + '<div class="art">2. La présente attestation est établie sous réserve de l\'encaissement effectif des sommes versées et sur la foi de la comptabilité du promoteur à la date de son émission.</div>'
     + '<div class="art">3. Elle ne constitue ni un titre de propriété ni un acte de vente authentique. Le transfert de propriété est constaté par acte authentique établi par notaire et inscrit à la Conservation de la propriété foncière, conformément à la législation ivoirienne en vigueur en matière de promotion immobilière et de construction.</div>'
@@ -115060,7 +115064,7 @@ function attSoldeHtml(c, opts){
     + (ov.observations ? '<div class="art">6. '+E(ov.observations)+'</div>' : '')
     + '<div class="sig">'+(opts.sansVisa ? '<div></div>' : ATT_VISA_BLOC)
     + '<div>Fait à '+E(p.ville||'____________')+', le '+E(dateShort(opts.date||today()))+'<br><strong>'+E(opts.fonction||'Le Directeur Général / Le Gérant')+'</strong><br>'+E(opts.signataire||'')+'<br><br><br>Signature et cachet</div></div>'
-    + docPiedDePageEntreprise(p)
+    + '</div>' + docPiedDePageEntreprise(p)
     + '</body></html>';
   return h;
 }
