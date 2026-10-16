@@ -63,3 +63,9 @@ test('bannières : accueil seulement, une bannière par division', () => {
   assert.ok(html.includes('data-tab="nous-contacter">Nous contacter'));
   assert.ok(!html.includes("html+='<div class=\"div-intro\">'"));
 });
+
+test('menu Activités : divisions regroupées dans un déroulant', () => {
+  assert.ok(html.includes('id="nav-divisions-wrap"') && html.includes('id="activites-menu"'));
+  assert.ok(html.includes('function toggleActivitesMenu(') && html.includes('window.toggleActivitesMenu'));
+  assert.ok(html.indexOf('id="nav-divisions"') > html.indexOf('id="activites-menu"'));
+});

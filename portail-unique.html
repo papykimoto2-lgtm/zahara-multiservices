@@ -490,6 +490,14 @@
     .grid-3 > .card:hover,.temoi-card:hover{ transform:translateY(-4px); box-shadow:0 16px 34px rgba(11,27,58,.14); }
     .content-section{ margin-top:34px; }
     @media (prefers-reduced-motion:reduce){ .grid-3 > .card,.kpi,.temoi-card{ transition:none; } }
+    /* Menu « Nos activités » */
+    .p-activites{ position:static; }
+    .p-activites .nav-dropdown-trigger{ background:#fff; color:var(--vt-navy); border:2px solid var(--vt-navy); padding:6px 12px; font-size:.72rem; gap:6px; }
+    .p-activites .nav-dropdown-trigger:hover,.p-activites .nav-dropdown-trigger.open{ background:var(--vt-navy); color:#fff; }
+    .p-activites:has(.tab-link.active) .nav-dropdown-trigger{ background:var(--vt-navy); color:#fff; }
+    #activites-menu{ z-index:300; max-height:70vh; overflow-y:auto; }
+    #activites-menu li{ list-style:none; }
+    #activites-menu .tab-link{ width:100%; justify-content:flex-start; border-radius:12px; }
   </style>
   <style id="theme-bannieres">
     /* Bannière d'accueil : visible uniquement sur l'accueil. Les divisions ont leur propre bannière. */
@@ -564,7 +572,10 @@
           <li><button class="tab-link" data-tab="carte"><i class="fas fa-map-location-dot"></i> CARTE</button></li>
           <!-- Onglets des divisions publiées sur le portail, injectés depuis
                divisions_portail (Paramètres → Site / Portail de l'ERP). -->
-          <span id="nav-divisions" style="display:contents;"></span>
+          <li class="nav-dropdown p-activites" id="nav-divisions-wrap" style="display:none;">
+            <button type="button" class="nav-dropdown-trigger" aria-haspopup="true" onclick="toggleActivitesMenu(this)">ACTIVITÉS <i class="fas fa-chevron-down" style="font-size:.6rem;"></i></button>
+            <div class="nav-dropdown-menu" id="activites-menu"><span id="nav-divisions" style="display:contents;"></span></div>
+          </li>
       </ul></div>
     <div class="p-etape"><div class="p-hd"><b>2</b><span class="p-t">Comprendre</span></div>
       <ul class="p-liste">
@@ -2995,6 +3006,7 @@
     divs = divs.filter(function(d){ return d && d.id && String(d.nom||'').trim(); })
                .sort(function(a,b){ return (a.ordre||0)-(b.ordre||0); });
 
+    var wrapAct=document.getElementById('nav-divisions-wrap'); if(wrapAct) wrapAct.style.display=divs.length?'':'none';
     /* On mémorise l'onglet actif pour le restaurer après reconstruction : sans
        cela, l'arrivée asynchrone des médias renverrait le visiteur à l'accueil. */
     var actEl=document.querySelector('.tab-link.active');
@@ -6309,6 +6321,29 @@
     btn.classList.toggle('open', ouvrir);
   }
   window.toggleEspaceMenu = toggleEspaceMenu;
+
+  /* Menu « Nos activités » : regroupe les divisions publiées (nombre variable) pour garder le parcours sur une ligne. */
+  function fermerActivitesMenu(){
+    var m=document.getElementById('activites-menu'), t=document.querySelector('#nav-divisions-wrap .nav-dropdown-trigger');
+    if(m) m.classList.remove('open'); if(t){ t.classList.remove('open'); t.setAttribute('aria-expanded','false'); }
+  }
+  function toggleActivitesMenu(btn){
+    var menu=document.getElementById('activites-menu'); if(!menu) return;
+    var ouvrir=!menu.classList.contains('open');
+    fermerActivitesMenu();
+    if(!ouvrir) return;
+    var r=btn.getBoundingClientRect();
+    menu.style.position='fixed'; menu.style.top=(r.bottom+6)+'px'; menu.style.right='auto'; menu.style.minWidth='230px';
+    menu.style.left=Math.max(12,Math.min(r.left,window.innerWidth-250))+'px';
+    menu.classList.add('open'); btn.classList.add('open'); btn.setAttribute('aria-expanded','true');
+  }
+  window.toggleActivitesMenu=toggleActivitesMenu;
+  document.addEventListener('click', function(e){
+    var w=document.getElementById('nav-divisions-wrap'); if(!w) return;
+    var item=e.target.closest ? e.target.closest('#activites-menu .tab-link') : null;
+    if(item || !w.contains(e.target)) fermerActivitesMenu();
+  });
+  window.addEventListener('scroll', fermerActivitesMenu, {passive:true});
   document.addEventListener('click', function(e){
     var menu = document.getElementById('espace-menu');
     var trigger = document.querySelector('.nav-dropdown-trigger');
