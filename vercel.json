@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/portail/:slug(programmes|catalogue|photos|location|carte|investir|societe|avis|faq|souscrire|contact)", "destination": "/portail-unique.html" }
+  ],
   "headers": [
     {
       "source": "/",

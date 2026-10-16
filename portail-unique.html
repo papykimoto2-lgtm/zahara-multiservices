@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="Espace souscripteur et apporteur d’affaires : consultez nos biens et programmes, suivez votre dossier, faites une demande de souscription ou de réservation.">
   <title>Espace Souscripteur & Apporteur</title>
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="fr_CI">
+  <meta property="og:site_name" content="Portail">
+  <meta property="og:title" content="Espace Souscripteur & Apporteur">
+  <meta property="og:description" content="Consultez nos biens et programmes, suivez votre dossier, faites une demande de souscription ou de réservation.">
+  <meta name="twitter:card" content="summary">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1B4332">
   <link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
@@ -1362,7 +1368,7 @@
      après coup (depuis les paramètres) et doivent partager exactement le même
      comportement. querySelectorAll est relu à chaque bascule pour inclure les
      onglets ajoutés dynamiquement. */
-  function basculerVersOnglet(t){
+  function basculerVersOnglet(t,o){
     document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active-pane'); });
     var el=document.getElementById(t+'-pane'); if(el) el.classList.add('active-pane');
     document.querySelectorAll('.tab-link').forEach(function(x){ x.classList.remove('active'); });
@@ -1372,6 +1378,7 @@
     if(t==='eden' && typeof chargerListeProgrammes==='function') setTimeout(chargerListeProgrammes,60);
     if(t==='catalogue' && typeof chargerCatalogueLive==='function') setTimeout(chargerCatalogueLive,60);
     if(t==='location' && typeof chargerLocationLive==='function') setTimeout(chargerLocationLive,60);
+    if(typeof seoMajOnglet==='function') seoMajOnglet(t,o);
   }
   function brancherOnglet(btn){
     if(btn.__branche) return;
@@ -1412,6 +1419,85 @@
     if (v == null || v === '') return (dflt == null ? '' : dflt);
     return v;
   }
+
+  /* ───── Référencement et liens directs ─────
+     Chaque onglet public a une adresse propre (/portail/catalogue, /portail/faq…) servie par la réécriture de vercel.json,
+     un titre, une description et une adresse canonique. Les espaces connectés et les divisions n'ont pas d'adresse indexable
+     (balise noindex). Le bouton « précédent » du navigateur revient à l'onglet précédent. */
+  var SEO_ROUTES={ activites:'', eden:'programmes', catalogue:'catalogue', 'catalogue-photo':'photos', location:'location', carte:'carte', investir:'investir', 'nous-connaitre':'societe', temoignages:'avis', faq:'faq', souscrire:'souscrire', 'nous-contacter':'contact' };
+  var SEO_PAGES={
+    eden:{ t:'Nos programmes immobiliers', d:'Découvrez nos programmes de logements et de terrains : localisation, lots disponibles, avancement et date de livraison.' },
+    catalogue:{ t:'Catalogue des biens', d:'Villas, appartements, terrains et locaux : superficies, prix gros œuvre et clé en main, souscription en ligne.' },
+    'catalogue-photo':{ t:'Photos de nos réalisations', d:'Photos de nos programmes, chantiers, villas et biens en location.' },
+    location:{ t:'Biens en location', d:'Biens disponibles à la location : loyer, caution, localisation et réservation en ligne.' },
+    carte:{ t:'Carte de nos biens', d:'Localisez nos programmes, parcelles et biens sur la carte interactive.' },
+    investir:{ t:'Investir', d:'Opportunités d\'investissement immobilier : opérations ouvertes, conditions et contact.' },
+    'nous-connaitre':{ t:'Notre société', d:'Qui sommes-nous : notre histoire, nos activités et nos engagements.' },
+    temoignages:{ t:'Avis de nos clients', d:'Les témoignages de familles et d\'investisseurs que nous accompagnons.' },
+    faq:{ t:'Questions fréquentes', d:'Réponses aux questions sur la souscription, le paiement par étapes et le suivi du titre foncier.' },
+    souscrire:{ t:'Souscrire en ligne', d:'Faites votre demande de souscription en ligne : un commercial vous recontacte rapidement.' },
+    'nous-contacter':{ t:'Nous contacter', d:'Contactez notre équipe : téléphone, e-mail, adresse et formulaire de contact.' }
+  };
+  function seoChemin(t){
+    var s=SEO_ROUTES[t];
+    if(s===undefined) return '/portail-unique.html#'+t;
+    return s ? ('/portail/'+s) : '/portail-unique.html';
+  }
+  function seoOngletDepuisUrl(){
+    var m=/^\/portail\/([a-z-]+)\/?$/.exec(location.pathname||'');
+    if(m){ for(var k in SEO_ROUTES){ if(SEO_ROUTES[k]===m[1]) return k; } }
+    var h=(location.hash||'').replace('#','');
+    return (h && document.getElementById(h+'-pane')) ? h : '';
+  }
+  function seoMeta(sel,attr,val){
+    var el=document.head.querySelector(sel);
+    if(!el){ el=document.createElement(sel.indexOf('link')===0?'link':'meta'); var m=/\[(\w+)="([^"]+)"\]/.exec(sel); if(m) el.setAttribute(m[1],m[2]); document.head.appendChild(el); }
+    if(val===null){ el.parentNode.removeChild(el); return; }
+    el.setAttribute(attr,val);
+  }
+  function seoJsonLd(nom,desc){
+    var web=/^https?:$/.test(location.protocol);
+    var o={ '@context':'https://schema.org', '@type':'RealEstateAgent', name:nom, description:desc };
+    if(web) o.url=location.origin+'/portail-unique.html';
+    var logo=BR('logo_url',''); if(/^https?:\/\//i.test(logo)) o.logo=logo;
+    var tel=BR('tel',''); if(tel) o.telephone=tel;
+    var mail=BR('email',''); if(mail) o.email=mail;
+    o.areaServed='CI'; o.address={ '@type':'PostalAddress', addressCountry:'CI' };
+    var el=document.getElementById('seo-jsonld');
+    if(!el){ el=document.createElement('script'); el.type='application/ld+json'; el.id='seo-jsonld'; document.head.appendChild(el); }
+    el.textContent=JSON.stringify(o);
+  }
+  function seoMajOnglet(t,o){
+    o=o||{};
+    var nom=BR('nom','')||'Portail', pg=SEO_PAGES[t], indexable=(SEO_ROUTES[t]!==undefined);
+    var btn=document.querySelector('.site-header .tab-link[data-tab="'+t+'"]');
+    var titre, desc;
+    if(t==='activites'||!t){ titre=nom+' — '+(BR('slogan','')||'immobilier et activités en Côte d\'Ivoire'); desc=BR('description','')||'Programmes immobiliers, catalogue de biens, location, souscription en ligne et suivi de votre dossier.'; }
+    else if(pg){ titre=pg.t+' | '+nom; desc=pg.d; }
+    else { titre=((btn&&btn.textContent)||'Espace').replace(/\s+/g,' ').trim()+' | '+nom; desc=BR('description','')||titre; }
+    document.title=titre;
+    var web=/^https?:$/.test(location.protocol), chemin=seoChemin(t), url=web?(location.origin+chemin):'';
+    seoMeta('meta[name="description"]','content',desc);
+    seoMeta('meta[property="og:title"]','content',titre);
+    seoMeta('meta[property="og:description"]','content',desc);
+    seoMeta('meta[property="og:site_name"]','content',nom);
+    var img=BR('logo_url','')||BR('hero_image',''); if(/^https?:\/\//i.test(img)) seoMeta('meta[property="og:image"]','content',img);
+    if(web && indexable){ seoMeta('link[rel="canonical"]','href',url); seoMeta('meta[property="og:url"]','content',url); seoMeta('meta[name="robots"]','content',null); }
+    else { seoMeta('link[rel="canonical"]','href',null); seoMeta('meta[name="robots"]','content','noindex'); }
+    seoJsonLd(nom,desc);
+    if(web && !o.pop){
+      var cible=chemin; try{ var cur=location.pathname+location.hash; if(cur!==cible){ history[o.init?'replaceState':'pushState']({t:t},'',cible); } }catch(e){}
+    }
+  }
+  window.seoMajOnglet=seoMajOnglet;
+  window.addEventListener('popstate', function(){
+    var t=seoOngletDepuisUrl()||'activites';
+    if(t==='activites'){ allerAccueilPortail(); seoMajOnglet('activites',{pop:true}); } else basculerVersOnglet(t,{pop:true});
+  });
+  (function(){
+    var t=seoOngletDepuisUrl();
+    if(t && t!=='activites') basculerVersOnglet(t,{init:true}); else seoMajOnglet('activites',{init:true});
+  })();
   /* Logo de la société sur les documents imprimés depuis le portail (échéancier, attestations…), sauf s'ils en portent déjà un. */
   function docAjouterLogo(html){
     try{
@@ -3241,7 +3327,7 @@
     var hi=BR('hero_image',''); if(hi) root.style.setProperty('--pp-hero', "url('"+hi+"')");
 
     var nom = BR('nom','Espace client'), slogan = BR('slogan','');
-    document.title = nom + ' | Espace Souscripteur & Apporteur';
+    var _ta=document.querySelector('.p-liste .tab-link.active'); seoMajOnglet(_ta?_ta.getAttribute('data-tab'):'activites',{pop:true});   /* titre, description et adresse canonique de l'onglet courant */
     var la = document.querySelector('.logo-area');
     if(la){ var lg=BR('logo_url',''); la.innerHTML = (lg ? '<img src="'+esc(lg)+'" alt="'+esc(nom)+'" style="height:44px;max-width:200px;object-fit:contain;">' : '<h1>'+esc(nom)+'</h1>') + '<p>'+esc(slogan)+'</p>'; }
     var ht=document.querySelector('.hero h2'); if(ht) ht.textContent = BR('hero_titre', nom.toUpperCase());
@@ -6414,6 +6500,7 @@
     if (accueil) accueil.classList.add('active-pane');
     document.querySelectorAll('.tab-link').forEach(function(b){ b.classList.remove('active'); });
     window.scrollTo({ top:0, behavior:'smooth' });
+    if (typeof seoMajOnglet === 'function') seoMajOnglet('activites');
   }
   window.allerAccueilPortail = allerAccueilPortail;
 
