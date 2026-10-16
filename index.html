@@ -53122,7 +53122,7 @@ function tmaRenderListe(){
         + '<td style="max-width:220px;">'+escHtml((d.description||'').slice(0,60))+'</td>'
         + '<td style="font-size:11px;">'+({gros_oeuvre:'🧱 Gros œuvre',second_oeuvre:'🔧 Second œuvre',cle_en_main:'🔑 Clé en main'}[d.stade]||d.stade)+'</td>'
         + '<td style="font-size:11px;">'+(faisabiliteLabel[d.faisabilite]||d.faisabilite)+'</td>'
-        + '<td style="text-align:right;">'+(d.facture ? fmtF(d.cout_estime)+' F' : (d.cout_estime?fmtF(d.cout_estime)+' F (non facturé)':'—'))+'</td>'
+        + '<td style="text-align:right;">'+(d.facture ? fmtF(d.montant_facture || d.cout_estime)+' F' : (d.cout_estime?fmtF(d.cout_estime)+' F (non facturé)':'—'))+'</td>'
         + '<td><span class="badge '+(statutBadge[d.statut]||'badge-gris')+'">'+(statutLabel[d.statut]||d.statut)+'</span></td>'
         + '<td style="white-space:nowrap;">'
         + '<button class="btn btn-secondary btn-sm btn-icon" title="Modifier" onclick="ouvrirTmaFormulaire(\''+d.id+'\')">✏️</button> '
@@ -53143,7 +53143,7 @@ function ouvrirTmaFormulaire(tmaId){
   document.getElementById('tma-stade').value = d ? d.stade : ((lot && lot.mode_livraison) || 'gros_oeuvre');
   document.getElementById('tma-faisabilite').value = d ? d.faisabilite : 'a_evaluer';
   document.getElementById('tma-statut').value = d ? d.statut : 'demande';
-  document.getElementById('tma-cout-estime').value = d ? d.cout_estime : '';
+  document.getElementById('tma-cout-estime').value = d ? (d.facture ? (d.montant_facture || d.cout_estime) : d.cout_estime) : '';
   document.getElementById('tma-impact-delai').value = d ? (d.impact_delai||0) : 0;
   document.getElementById('tma-facturer').checked = d ? !!d.facture : false;
   document.getElementById('tma-facturer').disabled = !!(d && d.facture); // déjà facturé : ne plus pouvoir décocher (éviterait de fausser le montant sans repasser par une régularisation explicite)
@@ -53194,7 +53194,22 @@ async function confirmerTma(){
   /* Facturation : n'ajoute au montant total qu'UNE SEULE FOIS (idempotent) —
      éviter qu'un simple changement de statut sur une demande déjà facturée
      ne réaugmente le montant total à chaque enregistrement. */
-  if (facturer && !dejaFacture && coutEstime > 0) {
+  var montantAvant = dejaFacture ? (parseFloat(d.montant_facture) || parseFloat(d.cout_estime) || 0) : 0;
+  if (dejaFacture && facturer && Math.abs(coutEstime - montantAvant) > 0.5) {
+    /* Valeur d'une demande DÉJÀ FACTURÉE modifiée : le montant total du contrat est ajusté de l'écart (une seule fois),
+       l'écart est tracé dans le journal d'audit et le dossier juridique. */
+    if (coutEstime <= 0) { toast('Le montant d\'une demande facturée doit rester supérieur à 0 (pour l\'annuler, passez par une régularisation).','error'); return; }
+    var ecart = coutEstime - montantAvant;
+    var attValidee = ['attestation_solde','attestation_solde_finale'].some(function(k){ return c[k] && ['valide','emise','delivre'].indexOf(c[k].statut) !== -1; });
+    if (!confirm('Modifier le montant facturé de cette demande ?\n\n' + fmtF(montantAvant) + ' F → ' + fmtF(coutEstime) + ' F (écart ' + (ecart>0?'+':'') + fmtF(ecart) + ' F).\nLe montant total du contrat passera de ' + fmtF(c.montant_total) + ' F à ' + fmtF((parseFloat(c.montant_total)||0) + ecart) + ' F.'
+        + (attValidee ? '\n\n⚠️ Une attestation de solde déjà validée existe : elle reste figée, il faudra l\'annuler puis la refaire.' : ''))) return;
+    c.montant_total = (parseFloat(c.montant_total)||0) + ecart;
+    d.montant_facture = coutEstime;
+    d.historique_montant = (d.historique_montant || []).concat([{ le: new Date().toISOString(), par: (APP.currentUser&&APP.currentUser.nom)||'—', avant: montantAvant, apres: coutEstime }]);
+    await logAudit('clients', clientId, 'tma_modification_montant', { tma_id:d.id, montant:montantAvant }, { tma_id:d.id, montant:coutEstime, description:description });
+    try { await clientLierDossierJuridique(c, 'Travaux modificatifs acquéreur — montant facturé modifié : '+fcfa(montantAvant)+' → '+fcfa(coutEstime)+'. '+description, ecart); } catch(e) {}
+    try { if (typeof attSoldeAuto === 'function') attSoldeAuto(clientId); } catch(e) {}
+  } else if (facturer && !dejaFacture && coutEstime > 0) {
     c.montant_total = (parseFloat(c.montant_total)||0) + coutEstime;
     d.facture = true;
     d.montant_facture = coutEstime;
@@ -53220,7 +53235,7 @@ async function confirmerTma(){
     tmaAction.innerHTML = '<button type="button" class="btn btn-secondary btn-sm" onclick="ouvrirTmaListe(\''+clientId+'\')">📝 Demandes de modification (TMA)'
       + (nbTma ? ' <span class="badge badge-or" style="margin-left:4px;">'+nbTma+'</span>' : '') + '</button>';
   }
-  toast('✅ Demande enregistrée.'+(facturer && !dejaFacture && coutEstime>0 ? ' Montant total mis à jour (+'+fcfa(coutEstime)+'), avenant généré.' : ''), 'success');
+  toast('✅ Demande enregistrée.'+(dejaFacture && facturer && Math.abs(coutEstime - montantAvant) > 0.5 ? ' Montant facturé modifié ('+fcfa(montantAvant)+' → '+fcfa(coutEstime)+'), montant total du contrat mis à jour.' : '')+(facturer && !dejaFacture && coutEstime>0 ? ' Montant total mis à jour (+'+fcfa(coutEstime)+'), avenant généré.' : ''), 'success');
   ouvrirTmaListe(clientId);
 }
 async function supprimerTma(tmaId){
