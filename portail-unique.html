@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="Espace souscripteur et apporteur d’affaires : consultez nos biens et programmes, suivez votre dossier, faites une demande de souscription ou de réservation.">
   <title>Espace Souscripteur & Apporteur</title>
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="fr_CI">
+  <meta property="og:site_name" content="Portail">
+  <meta property="og:title" content="Espace Souscripteur & Apporteur">
+  <meta property="og:description" content="Consultez nos biens et programmes, suivez votre dossier, faites une demande de souscription ou de réservation.">
+  <meta name="twitter:card" content="summary">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1B4332">
   <link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
@@ -330,6 +336,208 @@
     .carte-etiquette{ background:var(--pp-charbon); color:#fff; border:none; border-radius:6px; padding:3px 8px; font-size:.68rem; font-weight:600; box-shadow:0 2px 6px rgba(0,0,0,.2); }
     .carte-etiquette::before{ border-top-color:var(--pp-charbon); }
   </style>
+  <style id="theme-vitrine">
+    /* ═══ Thème vitrine « Moderne dynamique » ═══
+       Couche de style seule : aucun identifiant ni script modifié, toutes les fonctions du portail restent intactes.
+       Polices du système (le portail n'appelle aucune police distante, par choix de confidentialité). */
+    :root{
+      --pp-primary:#D63A1B; --pp-primary-dark:#A92B12; --pp-secondary:#0B1B3A;
+      --pp-or:#E39A00; --pp-sable:#FFF6EF; --pp-charbon:#0B1B3A;
+      --pp-serif:"Avenir Next","Segoe UI","Helvetica Neue",Roboto,Arial,sans-serif;
+      --vt-coral:#FF5A3C; --vt-sun:#FFB627; --vt-mint:#18C29C; --vt-navy:#0B1B3A;
+      --vt-ombre:0 8px 24px rgba(11,27,58,.09);
+    }
+    body{ font-family:"Avenir Next","Segoe UI","Helvetica Neue",Roboto,Arial,sans-serif; background:var(--pp-sable); color:var(--vt-navy); }
+    h1,h2,h3,.logo-area h1,.motdg-titre,.hero h2,.hero-stat b,.content-section h3{ font-family:var(--pp-serif); font-weight:800; letter-spacing:-.02em; }
+    .content-section h3{ font-size:clamp(1.5rem,3.4vw,2.2rem); margin-bottom:6px; }
+    /* En-tête */
+    .site-header{ background:rgba(255,255,255,.94); backdrop-filter:saturate(1.4) blur(10px); border-bottom:1px solid #f0dfd2; }
+    .logo-area h1{ font-size:1.35rem; display:flex; align-items:center; gap:10px; }
+    .logo-area h1::before{ content:""; width:28px; height:28px; border-radius:9px; background:linear-gradient(135deg,var(--vt-coral),var(--vt-sun)); flex:0 0 auto; }
+    .tab-link{ border-radius:99px; color:var(--vt-navy); }
+    .tab-link:hover{ background:#ffe9dc; }
+    .tab-link.active{ background:var(--vt-navy); color:#fff; }
+    .nav-dropdown-trigger{ border:0; border-radius:99px; background:var(--vt-navy); color:#fff; padding:10px 16px; }
+    .nav-dropdown-trigger:hover,.nav-dropdown-trigger.open{ background:var(--pp-primary); color:#fff; }
+    .nav-dropdown-menu{ border-radius:20px; border:0; box-shadow:0 18px 44px rgba(11,27,58,.2); padding:10px; }
+    .nav-dropdown-menu .tab-link{ border-radius:12px; }
+    /* Bannière */
+    .hero{ background:linear-gradient(135deg,var(--vt-coral) 0%,var(--vt-sun) 100%); color:var(--vt-navy); text-align:left;
+           width:calc(100% - 32px); max-width:1280px; margin:16px auto 0; border-radius:28px; padding:clamp(28px,5vw,60px) 0; }
+    .hero::before{ opacity:.07; }
+    .hero::after{ display:none; }
+    .hero h2{ font-size:clamp(2rem,5.4vw,3.8rem); line-height:1.02; max-width:16ch; text-wrap:balance; margin-bottom:14px; }
+    .hero p{ margin:0; font-size:clamp(1rem,2vw,1.2rem); opacity:1; max-width:48ch; }
+    .hero-cta{ display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; }
+    .hero-btn{ border:0; border-radius:99px; padding:13px 22px; font-weight:800; font-size:.92rem; background:#fff; color:var(--vt-navy); cursor:pointer; letter-spacing:0; }
+    .hero-btn:hover,.hero-btn.active{ background:#fff; color:var(--vt-navy); box-shadow:0 6px 18px rgba(11,27,58,.22); }
+    .hero-btn.principal,.hero-btn.principal:hover,.hero-btn.principal.active{ background:var(--vt-navy); color:#fff; }
+    .hero-stats{ justify-content:flex-start; gap:12px; margin-top:28px; }
+    .hero-stat{ background:#fff; color:var(--vt-navy); border-radius:18px; padding:14px 20px; text-align:left; box-shadow:var(--vt-ombre); min-width:150px; }
+    .hero-stat b{ font-size:1.9rem; line-height:1; }
+    .hero-stat span{ opacity:.75; }
+    .hero-slides-viewport,.hero-flex .hero-video-half video{ border-radius:22px !important; }
+    @media (max-width:980px){ .hero-flex.has-video,.hero-flex.has-slides{ text-align:left; } .hero-flex.has-video .hero-text p,.hero-flex.has-slides .hero-text p{ margin:0; } }
+    /* Contenu */
+    .content-section{ border:0; border-radius:28px; box-shadow:var(--vt-ombre); margin:28px auto 40px; }
+    .card{ background:#fff; border:0; border-radius:22px; box-shadow:var(--vt-ombre); }
+    .card h4{ font-weight:800; letter-spacing:-.01em; }
+    .stat-card{ border-radius:22px; border:0; box-shadow:var(--vt-ombre); }
+    .kpi{ border-radius:18px; border:0; border-top:4px solid var(--vt-coral); box-shadow:var(--vt-ombre); }
+    .highlight-btn{ background:var(--vt-navy); border-radius:99px; padding:13px 30px; font-weight:800; }
+    .highlight-btn:hover{ background:var(--pp-primary); }
+    .subnav button{ border-radius:99px; border-color:#f0dfd2; color:var(--vt-navy); }
+    .subnav button.on{ background:var(--vt-navy); border-color:var(--vt-navy); }
+    .form-group input,.form-group select,.form-group textarea,.contact-form input,.contact-form textarea{ border-radius:14px; border-color:#e4d3c4; }
+    .badge{ background:#ffe9dc; }
+    .faq-item{ border:0; border-radius:18px; box-shadow:var(--vt-ombre); }
+    .temoi-card{ border:0; border-radius:22px; box-shadow:var(--vt-ombre); }
+    .photo-item{ border-radius:18px; }
+    .produit-prix{ color:var(--pp-primary); }
+    /* Accueil : parcours et accès rapides */
+    .home-h{ font-family:var(--pp-serif); font-weight:800; font-size:clamp(1.3rem,3vw,1.8rem); letter-spacing:-.02em; margin:38px 0 6px; }
+    .home-sub{ color:#4b5a78; max-width:60ch; margin-bottom:16px; font-size:.95rem; }
+    .how{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; }
+    .how > div{ background:var(--vt-navy); color:#fff; border-radius:22px; padding:20px; }
+    .how b{ display:block; font-size:1.1rem; color:var(--vt-sun); margin-bottom:6px; font-weight:800; }
+    .how span{ font-size:.9rem; opacity:.9; line-height:1.5; }
+    .espaces{ display:flex; flex-wrap:wrap; gap:10px; }
+    .esp-chip{ display:inline-flex; align-items:center; gap:8px; background:#fff; border:2px solid var(--vt-navy); border-radius:99px; padding:11px 18px; font-weight:800; font-size:.88rem; color:var(--vt-navy); cursor:pointer; }
+    .esp-chip:hover,.esp-chip.active{ background:var(--vt-navy); color:#fff; }
+    .esp-chip i{ color:var(--pp-primary); }
+    .esp-chip:hover i,.esp-chip.active i{ color:var(--vt-sun); }
+    /* Pied de page */
+    footer{ background:var(--vt-navy); color:#cfd8ee; border-radius:28px 28px 0 0; margin-top:20px; }
+    .signature a,footer a{ color:#fff; }
+    /* Photos : sections et mosaïques expressives */
+    .vt-sections{ display:block; }
+    .vt-sec{ margin:6px 0 40px; }
+    .vt-sec-tete{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+    .vt-sec-tete h4{ font-family:var(--pp-serif); font-weight:800; font-size:clamp(1.25rem,2.8vw,1.7rem); letter-spacing:-.02em; margin:0; }
+    .vt-sec-tete .vt-nb{ background:var(--vt-navy); color:#fff; border-radius:99px; padding:3px 12px; font-size:.78rem; font-weight:800; }
+    .vt-sec-tete p{ flex:1 1 100%; color:#4b5a78; font-size:.9rem; margin:0; }
+    .vt-mosaic{ display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); grid-auto-rows:170px; grid-auto-flow:dense; gap:12px; margin:0; }
+    .vt-mosaic .photo-item{ aspect-ratio:auto; border:0; border-radius:20px; box-shadow:var(--vt-ombre); background:#ffe9dc; }
+    .vt-mosaic .photo-item:first-child{ grid-column:span 2; grid-row:span 2; }
+    .vt-mosaic .photo-item:nth-child(6n+4){ grid-column:span 2; }
+    .vt-mosaic .photo-item img{ transition:transform .5s ease; }
+    .vt-mosaic .photo-item:hover img{ transform:scale(1.08); }
+    .vt-mosaic .photo-cap{ position:absolute; inset:auto 0 0 0; padding:26px 14px 12px; font-size:.82rem; font-weight:700; line-height:1.25;
+        background:linear-gradient(to top,rgba(11,27,58,.82),rgba(11,27,58,0)); color:#fff; }
+    .vt-mosaic .photo-item:not(:first-child) .photo-cap{ transform:translateY(8px); opacity:0; transition:.25s; }
+    .vt-mosaic .photo-item:not(:first-child):hover .photo-cap,.vt-mosaic .photo-item:not(:first-child):focus-within .photo-cap{ transform:none; opacity:1; }
+    .vt-chip-cat{ position:absolute; top:10px; left:10px; background:#fff; color:var(--vt-navy); font-size:.7rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; padding:4px 10px; border-radius:99px; pointer-events:none; }
+    .vt-voir{ display:inline-flex; margin-top:16px; background:var(--vt-navy); color:#fff; border:0; border-radius:99px; padding:12px 22px; font-weight:800; cursor:pointer; font-size:.9rem; }
+    .vt-voir:hover{ background:var(--pp-primary); }
+    @media (max-width:640px){ .vt-mosaic{ grid-template-columns:repeat(2,1fr); grid-auto-rows:130px; gap:8px; } .vt-mosaic .photo-item{ border-radius:14px; } .vt-mosaic .photo-item:nth-child(6n+4){ grid-column:span 2; } .vt-mosaic .photo-item:not(:first-child) .photo-cap{ opacity:1; transform:none; padding-top:18px; font-size:.72rem; } }
+    @media (prefers-reduced-motion:reduce){ .bandeau-contenu{ animation:none; padding-left:12px; } .vt-mosaic .photo-item img{ transition:none; } }
+    /* Catalogue : sections par type de bien, cartes illustrées */
+    .vt-cat-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:18px; }
+    .vt-bien{ background:#fff; border-radius:22px; overflow:hidden; box-shadow:var(--vt-ombre); display:flex; flex-direction:column; transition:transform .25s,box-shadow .25s; }
+    .vt-bien:hover{ transform:translateY(-4px); box-shadow:0 16px 36px rgba(11,27,58,.16); }
+    .vt-bien-img{ position:relative; aspect-ratio:4/3; background:#ffe9dc; overflow:hidden; }
+    .vt-bien-img img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .5s ease; }
+    .vt-bien:hover .vt-bien-img img{ transform:scale(1.06); }
+    .vt-bien-img .vt-chip-cat{ top:12px; left:12px; }
+    .vt-bien-pieces{ position:absolute; right:12px; top:12px; background:var(--vt-navy); color:#fff; font-size:.74rem; font-weight:800; padding:4px 11px; border-radius:99px; }
+    .vt-bien-corps{ padding:16px 18px 18px; display:flex; flex-direction:column; gap:8px; flex:1; }
+    .vt-bien-corps h5{ font-family:var(--pp-serif); font-weight:800; font-size:1.12rem; letter-spacing:-.01em; margin:0; color:var(--vt-navy); }
+    .vt-bien-surf{ font-size:.82rem; color:#4b5a78; }
+    .vt-prix{ margin-top:auto; display:grid; gap:4px; }
+    .vt-prix div{ display:flex; justify-content:space-between; gap:10px; font-size:.84rem; padding:6px 0; border-top:1px solid #f0e4d8; }
+    .vt-prix strong{ font-weight:800; }
+    .vt-prix .vt-fort strong{ color:var(--pp-primary); font-size:1.02rem; }
+    .vt-bien .highlight-btn{ width:100%; margin-top:6px; padding:12px 16px; }
+    .vt-outils{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin:14px 0 22px; }
+    .vt-outils .subnav{ margin:0; }
+    .vt-outils select{ border:1px solid #f0dfd2; border-radius:99px; padding:9px 14px; font:inherit; font-size:.85rem; background:#fff; color:var(--vt-navy); }
+    @media (max-width:640px){ .vt-cat-grid{ grid-template-columns:1fr; } }
+    @media (prefers-reduced-motion:reduce){ .vt-bien,.vt-bien-img img{ transition:none; } }
+  </style>
+  <style id="theme-parcours">
+    /* ═══ En-tête en parcours (marche en avant) et finitions visuelles ═══ */
+    .site-header{ backdrop-filter:none; background:#fff; box-shadow:0 2px 18px rgba(11,27,58,.06); }
+    .header-flex{ padding:12px 24px; }
+    .header-actions{ list-style:none; display:flex; align-items:center; gap:8px; position:relative; margin:0; padding:0; }
+    .p-num{ display:inline-grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--vt-sun); color:var(--vt-navy); font-size:.75rem; font-weight:800; }
+    .nav-dropdown-trigger{ gap:8px; }
+    .parcours{ background:linear-gradient(90deg,#fff1e6,#fff 60%); border-top:1px solid #f4e3d6; }
+    .parcours-in{ display:flex; align-items:center; gap:4px; overflow-x:auto; scrollbar-width:none; padding-block:8px; -webkit-overflow-scrolling:touch; }
+    .parcours-in::-webkit-scrollbar{ display:none; }
+    .p-liste{ display:flex; gap:2px; list-style:none; margin:0; padding:0; flex:none; align-items:center; }
+    .p-accueil{ padding-right:10px; margin-right:6px; border-right:1px solid #ecd9c9; }
+    .p-etape{ display:flex; align-items:center; gap:8px; flex:none; padding-right:6px; }
+    .p-etape:not(:last-of-type)::after{ content:"›"; color:var(--pp-primary); font-size:1.5rem; font-weight:800; line-height:1; margin-left:2px; }
+    .p-hd{ display:flex; align-items:center; gap:7px; font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#6b5a50; white-space:nowrap; }
+    .p-hd b{ width:24px; height:24px; border-radius:50%; background:var(--pp-primary); color:#fff; display:grid; place-items:center; font-size:.78rem; }
+    .p-etape:has(.tab-link.active) .p-hd b{ background:var(--vt-navy); }
+    .p-etape:has(.tab-link.active) .p-hd{ color:var(--vt-navy); }
+    @media (min-width:981px){ .parcours-in{ flex-wrap:wrap; row-gap:2px; overflow:visible; } }
+    @media (min-width:981px) and (max-width:1439px){ .parcours .tab-link i{ display:none; } .parcours .tab-link{ padding:9px 10px; } .p-t{ display:none; } }
+    @media (max-width:980px){ .header-flex{ flex-direction:row; flex-wrap:nowrap; align-items:center; } .logo-area h1{ font-size:1.15rem; } }
+    @media (max-width:640px){
+      .header-flex{ padding:12px 16px; }
+      .hero{ padding-bottom:46px; }
+      .parcours-in{ padding-inline:16px; }
+      .p-t{ display:none; }
+      .nav-dropdown-trigger{ padding:9px 13px; font-size:.74rem; }
+      #pwa-install-li{ display:none !important; }
+    }
+    /* Promesses sous la bannière */
+    .promesses{ list-style:none; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin:-22px auto 0; padding:0 clamp(12px,3vw,30px); position:relative; z-index:3; max-width:1280px; }
+    .promesses li{ background:#fff; border-radius:18px; padding:14px 16px; display:flex; gap:12px; align-items:center; box-shadow:var(--vt-ombre); }
+    .promesses i{ width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg,var(--vt-coral),var(--vt-sun)); color:#fff; display:grid; place-items:center; flex:0 0 auto; }
+    .promesses b{ display:block; font-weight:800; font-size:.92rem; }
+    .promesses span{ font-size:.8rem; color:#4b5a78; }
+    /* Finitions */
+    .hero::after{ display:block; opacity:1; background-image:radial-gradient(circle at 94% 10%,rgba(255,255,255,.30) 0 95px,transparent 96px),radial-gradient(circle at 82% 98%,rgba(11,27,58,.13) 0 150px,transparent 151px),radial-gradient(circle at 6% 100%,rgba(255,255,255,.18) 0 70px,transparent 71px); background-size:auto; }
+    .tab-pane > h3::after{ content:""; display:block; width:48px; height:5px; border-radius:9px; background:linear-gradient(90deg,var(--vt-coral),var(--vt-sun)); margin-top:8px; }
+    .grid-3 > .card,.kpi,.temoi-card{ transition:transform .22s ease, box-shadow .22s ease; }
+    .grid-3 > .card:hover,.temoi-card:hover{ transform:translateY(-4px); box-shadow:0 16px 34px rgba(11,27,58,.14); }
+    .content-section{ margin-top:34px; }
+    @media (prefers-reduced-motion:reduce){ .grid-3 > .card,.kpi,.temoi-card{ transition:none; } }
+    /* Menu « Nos activités » */
+    .p-activites{ position:static; }
+    .p-activites .nav-dropdown-trigger{ background:#fff; color:var(--vt-navy); border:2px solid var(--vt-navy); padding:6px 12px; font-size:.72rem; gap:6px; }
+    .p-activites .nav-dropdown-trigger:hover,.p-activites .nav-dropdown-trigger.open{ background:var(--vt-navy); color:#fff; }
+    .p-activites:has(.tab-link.active) .nav-dropdown-trigger{ background:var(--vt-navy); color:#fff; }
+    #activites-menu{ z-index:300; max-height:70vh; overflow-y:auto; }
+    #activites-menu li{ list-style:none; }
+    #activites-menu .tab-link{ width:100%; justify-content:flex-start; border-radius:12px; }
+  </style>
+  <style id="theme-bannieres">
+    /* Bannière d'accueil : visible uniquement sur l'accueil. Les divisions ont leur propre bannière. */
+    body:not(:has(#activites-pane.active-pane)) :is(.hero,.promesses){ display:none; }
+    .div-hero{ position:relative; overflow:hidden; isolation:isolate; color:#fff; width:calc(100% - 32px); max-width:1280px; margin:16px auto 0;
+               border-radius:28px; padding:clamp(28px,5vw,56px) clamp(20px,4vw,48px); background:var(--dg,linear-gradient(135deg,#0B1B3A,#1d4e89)); }
+    .div-hero-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.38; z-index:-2; }
+    .div-hero::before{ content:""; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,rgba(11,27,58,.55),rgba(11,27,58,0) 80%); }
+    .div-hero::after{ content:""; position:absolute; z-index:-1; right:-70px; top:-70px; width:300px; height:300px; border-radius:50%; background:rgba(255,255,255,.12); }
+    .div-hero-ico{ position:absolute; z-index:-1; right:clamp(16px,5vw,60px); bottom:-24px; font-size:clamp(120px,18vw,220px); opacity:.14; line-height:1; }
+    .div-hero-sur{ display:inline-flex; align-items:center; gap:8px; font-size:.74rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; background:rgba(255,255,255,.18); border-radius:99px; padding:6px 14px; }
+    .div-hero h2{ font-family:var(--pp-serif); font-weight:800; letter-spacing:-.02em; font-size:clamp(1.9rem,5vw,3.4rem); line-height:1.05; margin:14px 0 10px; max-width:20ch; text-wrap:balance; }
+    .div-hero p{ max-width:56ch; font-size:clamp(.98rem,1.8vw,1.15rem); line-height:1.6; opacity:.95; }
+    .div-hero-puces{ display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+    .div-hero-puces span{ background:#fff; color:var(--vt-navy); font-weight:800; font-size:.8rem; padding:6px 14px; border-radius:99px; }
+    .div-hero .hero-btn{ margin-top:18px; }
+    /* Dans la carte de contenu du portail : la bannière occupe le haut de la carte, bord à bord. */
+    .tab-pane > .div-hero{ width:auto; max-width:none; margin:-40px -32px 28px; border-radius:28px 28px 0 0; }
+    @media (max-width:640px){ .tab-pane > .div-hero{ margin:-40px -32px 24px; } }
+  </style>
+  <style id="theme-location">
+    /* Location et Programmes : mêmes cartes illustrées que le catalogue */
+    .vt-etat{ position:absolute; left:12px; bottom:12px; }
+    .vt-etat .pill{ box-shadow:0 2px 8px rgba(11,27,58,.2); background:#fff; color:var(--vt-navy); font-weight:800; }
+    .vt-actions{ display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; }
+    .vt-actions .highlight-btn{ flex:1 1 130px; margin-top:0; padding:11px 14px; }
+    .vt-lien{ flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; border:2px solid var(--vt-navy); color:var(--vt-navy); border-radius:99px; padding:9px 14px; font-weight:800; font-size:.82rem; text-decoration:none; }
+    .vt-lien:hover{ background:var(--vt-navy); color:#fff; }
+    .vt-meta{ font-size:.82rem; color:#4b5a78; display:flex; gap:6px; align-items:flex-start; }
+    .vt-desc{ font-size:.86rem; color:#3c4a66; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .vt-barre{ height:8px; border-radius:99px; background:#f0e4d8; overflow:hidden; margin:4px 0 2px; }
+    .vt-barre i{ display:block; height:100%; background:linear-gradient(90deg,var(--vt-coral),var(--vt-sun)); }
+    .vt-barre-lib{ font-size:.78rem; color:#4b5a78; display:flex; justify-content:space-between; gap:8px; }
+  </style>
 </head>
 <body>
 <noscript><p style="padding:16px;background:#fff3b0;color:#4d3b00;font-family:system-ui,sans-serif;">Ce site a besoin de JavaScript pour afficher les biens, programmes et votre espace. Informations légales : <a href="/mentions-legales.html">mentions légales</a>, <a href="/confidentialite.html">confidentialité</a>, <a href="/cookies.html">cookies</a>, <a href="/conditions.html">conditions d’utilisation</a>, <a href="/remboursement.html">résiliation et remboursement</a>.</p></noscript>
@@ -348,23 +556,10 @@
 <header class="site-header">
   <div class="container header-flex">
     <div class="logo-area" style="cursor:pointer;" onclick="allerAccueilPortail()"><h1>Espace client</h1><p></p></div>
-    <ul class="nav-tabs">
-      <li><button class="tab-link" data-tab="eden"><i class="fas fa-tree"></i> <span id="nav-programme">PROGRAMME</span></button></li>
-      <li><button class="tab-link" data-tab="catalogue"><i class="fas fa-house"></i> CATALOGUE</button></li>
-      <li><button class="tab-link" data-tab="catalogue-photo"><i class="fas fa-images"></i> PHOTOS</button></li>
-      <li><button class="tab-link" data-tab="location"><i class="fas fa-key"></i> LOCATION</button></li>
-      <li><button class="tab-link" data-tab="carte"><i class="fas fa-map-location-dot"></i> CARTE</button></li>
-      <li><button class="tab-link" data-tab="investir"><i class="fas fa-handshake-angle"></i> INVESTIR</button></li>
-      <li><button class="tab-link" data-tab="souscrire"><i class="fas fa-pen-alt"></i> SOUSCRIRE</button></li>
-      <li><button class="tab-link" data-tab="faq"><i class="fas fa-circle-question"></i> FAQ</button></li>
-      <li><button class="tab-link" data-tab="temoignages"><i class="fas fa-star"></i> AVIS</button></li>
-      <li><button class="tab-link" data-tab="nous-connaitre"><i class="fas fa-building"></i> SOCIÉTÉ</button></li>
-      <li><button class="tab-link" data-tab="nous-contacter"><i class="fas fa-envelope"></i> CONTACT</button></li>
-      <!-- Onglets des divisions publiées sur le portail, injectés depuis
-           divisions_portail (Paramètres → Site / Portail de l'ERP). -->
-      <span id="nav-divisions" style="display:contents;"></span>
+    <!-- Étape 4 du parcours (suivre son dossier) : accès aux espaces connectés. -->
+    <ul class="header-actions">
       <li class="nav-dropdown">
-        <button class="nav-dropdown-trigger" type="button" onclick="toggleEspaceMenu(this)"><i class="fas fa-user-lock"></i> MON ESPACE <i class="fas fa-chevron-down" style="font-size:.65rem;"></i></button>
+        <button class="nav-dropdown-trigger" type="button" onclick="toggleEspaceMenu(this)"><span class="p-num">4</span> MON ESPACE <i class="fas fa-chevron-down" style="font-size:.65rem;"></i></button>
         <div class="nav-dropdown-menu" id="espace-menu">
           <button class="tab-link" data-tab="souscripteur"><i class="fas fa-chart-line"></i> Souscripteur</button>
           <button class="tab-link" data-tab="intervenant"><i class="fas fa-user-tie"></i> Intervenant</button>
@@ -385,12 +580,47 @@
       </li>
     </ul>
   </div>
+  <!-- Parcours en marche en avant : découvrir → comprendre → passer à l'action → suivre son dossier (menu « Mon espace »). -->
+  <nav class="parcours" aria-label="Parcours du visiteur"><div class="container parcours-in">
+    <ul class="p-liste p-accueil"><li><button class="tab-link" data-tab="activites"><i class="fas fa-house-chimney"></i> ACCUEIL</button></li></ul>
+    <div class="p-etape"><div class="p-hd"><b>1</b><span class="p-t">Découvrir</span></div>
+      <ul class="p-liste">
+          <li><button class="tab-link" data-tab="eden"><i class="fas fa-tree"></i> <span id="nav-programme">PROGRAMME</span></button></li>
+          <li><button class="tab-link" data-tab="catalogue"><i class="fas fa-house"></i> CATALOGUE</button></li>
+          <li><button class="tab-link" data-tab="catalogue-photo"><i class="fas fa-images"></i> PHOTOS</button></li>
+          <li><button class="tab-link" data-tab="location"><i class="fas fa-key"></i> LOCATION</button></li>
+          <li><button class="tab-link" data-tab="carte"><i class="fas fa-map-location-dot"></i> CARTE</button></li>
+          <!-- Onglets des divisions publiées sur le portail, injectés depuis
+               divisions_portail (Paramètres → Site / Portail de l'ERP). -->
+          <li class="nav-dropdown p-activites" id="nav-divisions-wrap" style="display:none;">
+            <button type="button" class="nav-dropdown-trigger" aria-haspopup="true" onclick="toggleActivitesMenu(this)">ACTIVITÉS <i class="fas fa-chevron-down" style="font-size:.6rem;"></i></button>
+            <div class="nav-dropdown-menu" id="activites-menu"><span id="nav-divisions" style="display:contents;"></span></div>
+          </li>
+      </ul></div>
+    <div class="p-etape"><div class="p-hd"><b>2</b><span class="p-t">Comprendre</span></div>
+      <ul class="p-liste">
+          <li><button class="tab-link" data-tab="investir"><i class="fas fa-handshake-angle"></i> INVESTIR</button></li>
+          <li><button class="tab-link" data-tab="nous-connaitre"><i class="fas fa-building"></i> SOCIÉTÉ</button></li>
+          <li><button class="tab-link" data-tab="temoignages"><i class="fas fa-star"></i> AVIS</button></li>
+          <li><button class="tab-link" data-tab="faq"><i class="fas fa-circle-question"></i> FAQ</button></li>
+      </ul></div>
+    <div class="p-etape"><div class="p-hd"><b>3</b><span class="p-t">Passer à l'action</span></div>
+      <ul class="p-liste">
+          <li><button class="tab-link" data-tab="souscrire"><i class="fas fa-pen-alt"></i> SOUSCRIRE</button></li>
+          <li><button class="tab-link" data-tab="nous-contacter"><i class="fas fa-envelope"></i> CONTACT</button></li>
+      </ul></div>
+  </div></nav>
 </header>
 
 <section class="hero"><div class="hero-content container">
   <div class="hero-flex" id="hero-flex">
     <div class="hero-text">
       <h2>BIENVENUE</h2><p></p>
+      <div class="hero-cta">
+        <button type="button" class="tab-link hero-btn principal" data-tab="eden">Voir les programmes</button>
+        <button type="button" class="tab-link hero-btn" data-tab="souscrire">Souscrire en ligne</button>
+        <button type="button" class="tab-link hero-btn" data-tab="nous-contacter">Parler à un conseiller</button>
+      </div>
       <div class="hero-stats" id="hero-stats" style="display:none;">
         <div class="hero-stat"><b id="hs-familles">—</b><span>Familles accompagnées</span></div>
         <div class="hero-stat"><b id="hs-programmes">—</b><span>Programmes livrés/actifs</span></div>
@@ -416,6 +646,12 @@
     </div>
   </div>
 </div></section>
+
+<div class="container"><ul class="promesses" aria-label="Nos engagements">
+  <li><i class="fas fa-file-signature"></i><div><b>Titre foncier suivi</b><span>Chaque étape visible dans votre espace</span></div></li>
+  <li><i class="fas fa-coins"></i><div><b>Paiement par étapes</b><span>Versements et reçus en ligne</span></div></li>
+  <li><i class="fas fa-shield-halved"></i><div><b>Espace sécurisé</b><span>Un accès selon votre profil</span></div></li>
+</ul></div>
 
 <div class="container"><div class="content-section">
   <div id="activites-pane" class="tab-pane active-pane">
@@ -463,6 +699,39 @@
       <div class="card"><i class="fas fa-mobile-screen" style="color:var(--pp-secondary); font-size:1.4rem;"></i><h4>Innovation & technologie</h4><p>Portail souscripteur en ligne : suivi des versements, échéancier et photos de chantier.</p></div>
     </div>
     <div class="badge-list" id="societe-badges" style="display:none;"></div>
+
+    <div id="accueil-galerie-wrap" style="display:none;">
+      <h4 class="home-h">Nos réalisations en images</h4>
+      <p class="home-sub">Programmes, chantiers et villas : un aperçu de ce que nous bâtissons.</p>
+      <div id="accueil-galerie" class="photo-grid vt-mosaic"></div>
+      <button type="button" class="tab-link vt-voir" data-tab="catalogue-photo"><i class="fas fa-images"></i> Voir toutes les photos</button>
+    </div>
+
+    <h4 class="home-h">Comment ça marche</h4>
+    <p class="home-sub">De la réservation à votre titre, tout se suit en ligne.</p>
+    <div class="how">
+      <div><b>1. Choisissez</b><span>Un logement ou un terrain dans nos programmes et notre catalogue.</span></div>
+      <div><b>2. Souscrivez</b><span>Faites votre demande en ligne, nos équipes vous rappellent.</span></div>
+      <div><b>3. Payez par étapes</b><span>Versements, échéancier et reçus consultables dans votre espace.</span></div>
+      <div><b>4. Suivez votre titre</b><span>Les étapes de sécurisation foncière sont publiées au fil de l'avancement.</span></div>
+    </div>
+
+    <h4 class="home-h">Connectez-vous à votre espace</h4>
+    <p class="home-sub">Un accès sécurisé selon votre profil.</p>
+    <div class="espaces">
+        <button type="button" class="tab-link esp-chip" data-tab="souscripteur"><i class="fas fa-chart-line"></i> Souscripteur</button>
+        <button type="button" class="tab-link esp-chip" data-tab="intervenant"><i class="fas fa-user-tie"></i> Intervenant</button>
+        <button type="button" class="tab-link esp-chip" data-tab="apporteurs"><i class="fas fa-handshake"></i> Apporteur d'affaires</button>
+        <button type="button" class="tab-link esp-chip" data-tab="diaspo"><i class="fas fa-globe-africa"></i> Investisseur diaspora</button>
+        <button type="button" class="tab-link esp-chip" data-tab="foncier"><i class="fas fa-map-marked-alt"></i> Acquéreur foncier</button>
+        <button type="button" class="tab-link esp-chip" data-tab="mandant"><i class="fas fa-handshake"></i> Propriétaire mandant</button>
+        <button type="button" class="tab-link esp-chip" data-tab="propfoncier"><i class="fas fa-seedling"></i> Propriétaire terrien</button>
+        <button type="button" class="tab-link esp-chip" data-tab="partlot"><i class="fas fa-handshake-simple"></i> Partenaire lotissement</button>
+        <button type="button" class="tab-link esp-chip" data-tab="financier"><i class="fas fa-piggy-bank"></i> Partenaire financier</button>
+        <button type="button" class="tab-link esp-chip" data-tab="amenageur"><i class="fas fa-helmet-safety"></i> Aménageur</button>
+        <button type="button" class="tab-link esp-chip" data-tab="locataire"><i class="fas fa-house-user"></i> Locataire</button>
+        <button type="button" class="tab-link esp-chip" data-tab="copropriete"><i class="fas fa-building"></i> Copropriétaire</button>
+    </div>
   </div>
 
   <div id="eden-pane" class="tab-pane">
@@ -472,7 +741,8 @@
     <div class="grid-3" id="programme-cards" style="margin-top:8px; display:none;"></div>
     <p style="margin-top:14px; display:none;" id="programme-composition"></p>
     <h4 style="margin-top:24px;" id="programme-liste-titre"><i class="fas fa-building"></i> Tous nos programmes</h4>
-    <div class="grid-3" id="programme-liste-cards" style="margin-top:10px;"><div style="color:#6b6150;"><span class="spinner dark"></span> Chargement…</div></div>
+    <div class="vt-outils" id="programme-outils" style="display:none;"><div class="subnav" id="programme-nav" role="group" aria-label="Statut des programmes"></div></div>
+    <div class="vt-cat-grid" id="programme-liste-cards" style="margin-top:10px;"><div style="color:#6b6150;"><span class="spinner dark"></span> Chargement…</div></div>
     <div id="eden-videos-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-video"></i> Vidéos</h4><div id="eden-videos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:10px;"></div></div>
     <div id="eden-gallery-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-images"></i> Galerie photos</h4><div id="eden-gallery" class="photo-grid"></div></div>
     <div id="eden-docs-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-folder-open"></i> Documents à télécharger</h4><div id="eden-docs" style="display:flex;flex-direction:column;gap:8px;margin-top:10px;"></div></div>
@@ -484,22 +754,31 @@
       <strong style="color:#92400e;" id="catalogue-conditions-titre"></strong>
       <div style="font-size:.85rem; color:#4b6a8b; margin-top:4px;" id="catalogue-conditions-texte"></div>
     </div>
-    <div class="grid-3" id="villa-cards"></div>
+    <div class="vt-outils" id="catalogue-outils" style="display:none;">
+      <div class="subnav" id="catalogue-nav" role="group" aria-label="Types de biens"></div>
+      <label style="font-size:.82rem;color:#4b5a78;">Trier par <select id="catalogue-tri" aria-label="Tri du catalogue"><option value="">Ordre du catalogue</option><option value="asc">Prix croissant</option><option value="desc">Prix décroissant</option></select></label>
+    </div>
+    <div id="villa-cards" class="vt-sections"></div>
   </div>
 
   <div id="catalogue-photo-pane" class="tab-pane">
     <h3><i class="fas fa-images"></i> Catalogue photo — nos réalisations</h3>
     <p style="margin-bottom:10px;">Une sélection d'images de nos villas, aménagements et chantiers. Mises à jour directement depuis l'ERP.</p>
-    <div id="photo-catalogue-grid" class="photo-grid"><div style="color:#4b6a8b;"><span class="spinner dark"></span> Chargement…</div></div>
+    <div class="subnav" id="photo-sections-nav" style="display:none;" role="group" aria-label="Sections photos"></div>
+    <div id="photo-catalogue-grid" class="vt-sections"><div style="color:#4b6a8b;"><span class="spinner dark"></span> Chargement…</div></div>
   </div>
 
   <div id="location-pane" class="tab-pane">
     <h3><i class="fas fa-key"></i> Nos biens en location</h3>
     <p style="margin-bottom:14px;">Consultez nos biens disponibles à la location : disponibilité, localisation et photos. Réservez en ligne, un commercial confirme votre dossier sous 48 h.</p>
-    <div id="location-cards" class="grid-3"><div style="color:#4b6a8b;">Chargement du catalogue locatif…</div></div>
+    <div class="vt-outils" id="location-outils" style="display:none;">
+      <div class="subnav" id="location-nav" role="group" aria-label="Disponibilité"></div>
+      <label style="font-size:.82rem;color:#4b5a78;">Trier par <select id="location-tri" aria-label="Tri des locations"><option value="">Ordre du catalogue</option><option value="asc">Loyer croissant</option><option value="desc">Loyer décroissant</option></select></label>
+    </div>
+    <div id="location-cards" class="vt-cat-grid"><div style="color:#4b6a8b;">Chargement du catalogue locatif…</div></div>
     <div id="location-gallery-wrap" style="display:none; margin-top:24px;">
       <h4><i class="fas fa-images"></i> Photos des biens en location</h4>
-      <div id="location-gallery" class="photo-grid" style="margin-top:10px;"></div>
+      <div id="location-gallery" class="photo-grid vt-mosaic" style="margin-top:10px;"></div>
     </div>
     <div id="location-resa-result" style="display:none; margin-top:20px;"></div>
     <div class="card" id="location-form-card" style="margin-top:20px; max-width:640px;">
@@ -1089,7 +1368,7 @@
      après coup (depuis les paramètres) et doivent partager exactement le même
      comportement. querySelectorAll est relu à chaque bascule pour inclure les
      onglets ajoutés dynamiquement. */
-  function basculerVersOnglet(t){
+  function basculerVersOnglet(t,o){
     document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active-pane'); });
     var el=document.getElementById(t+'-pane'); if(el) el.classList.add('active-pane');
     document.querySelectorAll('.tab-link').forEach(function(x){ x.classList.remove('active'); });
@@ -1099,6 +1378,7 @@
     if(t==='eden' && typeof chargerListeProgrammes==='function') setTimeout(chargerListeProgrammes,60);
     if(t==='catalogue' && typeof chargerCatalogueLive==='function') setTimeout(chargerCatalogueLive,60);
     if(t==='location' && typeof chargerLocationLive==='function') setTimeout(chargerLocationLive,60);
+    if(typeof seoMajOnglet==='function') seoMajOnglet(t,o);
   }
   function brancherOnglet(btn){
     if(btn.__branche) return;
@@ -1139,6 +1419,85 @@
     if (v == null || v === '') return (dflt == null ? '' : dflt);
     return v;
   }
+
+  /* ───── Référencement et liens directs ─────
+     Chaque onglet public a une adresse propre (/portail/catalogue, /portail/faq…) servie par la réécriture de vercel.json,
+     un titre, une description et une adresse canonique. Les espaces connectés et les divisions n'ont pas d'adresse indexable
+     (balise noindex). Le bouton « précédent » du navigateur revient à l'onglet précédent. */
+  var SEO_ROUTES={ activites:'', eden:'programmes', catalogue:'catalogue', 'catalogue-photo':'photos', location:'location', carte:'carte', investir:'investir', 'nous-connaitre':'societe', temoignages:'avis', faq:'faq', souscrire:'souscrire', 'nous-contacter':'contact' };
+  var SEO_PAGES={
+    eden:{ t:'Nos programmes immobiliers', d:'Découvrez nos programmes de logements et de terrains : localisation, lots disponibles, avancement et date de livraison.' },
+    catalogue:{ t:'Catalogue des biens', d:'Villas, appartements, terrains et locaux : superficies, prix gros œuvre et clé en main, souscription en ligne.' },
+    'catalogue-photo':{ t:'Photos de nos réalisations', d:'Photos de nos programmes, chantiers, villas et biens en location.' },
+    location:{ t:'Biens en location', d:'Biens disponibles à la location : loyer, caution, localisation et réservation en ligne.' },
+    carte:{ t:'Carte de nos biens', d:'Localisez nos programmes, parcelles et biens sur la carte interactive.' },
+    investir:{ t:'Investir', d:'Opportunités d\'investissement immobilier : opérations ouvertes, conditions et contact.' },
+    'nous-connaitre':{ t:'Notre société', d:'Qui sommes-nous : notre histoire, nos activités et nos engagements.' },
+    temoignages:{ t:'Avis de nos clients', d:'Les témoignages de familles et d\'investisseurs que nous accompagnons.' },
+    faq:{ t:'Questions fréquentes', d:'Réponses aux questions sur la souscription, le paiement par étapes et le suivi du titre foncier.' },
+    souscrire:{ t:'Souscrire en ligne', d:'Faites votre demande de souscription en ligne : un commercial vous recontacte rapidement.' },
+    'nous-contacter':{ t:'Nous contacter', d:'Contactez notre équipe : téléphone, e-mail, adresse et formulaire de contact.' }
+  };
+  function seoChemin(t){
+    var s=SEO_ROUTES[t];
+    if(s===undefined) return '/portail-unique.html#'+t;
+    return s ? ('/portail/'+s) : '/portail-unique.html';
+  }
+  function seoOngletDepuisUrl(){
+    var m=/^\/portail\/([a-z-]+)\/?$/.exec(location.pathname||'');
+    if(m){ for(var k in SEO_ROUTES){ if(SEO_ROUTES[k]===m[1]) return k; } }
+    var h=(location.hash||'').replace('#','');
+    return (h && document.getElementById(h+'-pane')) ? h : '';
+  }
+  function seoMeta(sel,attr,val){
+    var el=document.head.querySelector(sel);
+    if(!el){ el=document.createElement(sel.indexOf('link')===0?'link':'meta'); var m=/\[(\w+)="([^"]+)"\]/.exec(sel); if(m) el.setAttribute(m[1],m[2]); document.head.appendChild(el); }
+    if(val===null){ el.parentNode.removeChild(el); return; }
+    el.setAttribute(attr,val);
+  }
+  function seoJsonLd(nom,desc){
+    var web=/^https?:$/.test(location.protocol);
+    var o={ '@context':'https://schema.org', '@type':'RealEstateAgent', name:nom, description:desc };
+    if(web) o.url=location.origin+'/portail-unique.html';
+    var logo=BR('logo_url',''); if(/^https?:\/\//i.test(logo)) o.logo=logo;
+    var tel=BR('tel',''); if(tel) o.telephone=tel;
+    var mail=BR('email',''); if(mail) o.email=mail;
+    o.areaServed='CI'; o.address={ '@type':'PostalAddress', addressCountry:'CI' };
+    var el=document.getElementById('seo-jsonld');
+    if(!el){ el=document.createElement('script'); el.type='application/ld+json'; el.id='seo-jsonld'; document.head.appendChild(el); }
+    el.textContent=JSON.stringify(o);
+  }
+  function seoMajOnglet(t,o){
+    o=o||{};
+    var nom=BR('nom','')||'Portail', pg=SEO_PAGES[t], indexable=(SEO_ROUTES[t]!==undefined);
+    var btn=document.querySelector('.site-header .tab-link[data-tab="'+t+'"]');
+    var titre, desc;
+    if(t==='activites'||!t){ titre=nom+' — '+(BR('slogan','')||'immobilier et activités en Côte d\'Ivoire'); desc=BR('description','')||'Programmes immobiliers, catalogue de biens, location, souscription en ligne et suivi de votre dossier.'; }
+    else if(pg){ titre=pg.t+' | '+nom; desc=pg.d; }
+    else { titre=((btn&&btn.textContent)||'Espace').replace(/\s+/g,' ').trim()+' | '+nom; desc=BR('description','')||titre; }
+    document.title=titre;
+    var web=/^https?:$/.test(location.protocol), chemin=seoChemin(t), url=web?(location.origin+chemin):'';
+    seoMeta('meta[name="description"]','content',desc);
+    seoMeta('meta[property="og:title"]','content',titre);
+    seoMeta('meta[property="og:description"]','content',desc);
+    seoMeta('meta[property="og:site_name"]','content',nom);
+    var img=BR('logo_url','')||BR('hero_image',''); if(/^https?:\/\//i.test(img)) seoMeta('meta[property="og:image"]','content',img);
+    if(web && indexable){ seoMeta('link[rel="canonical"]','href',url); seoMeta('meta[property="og:url"]','content',url); seoMeta('meta[name="robots"]','content',null); }
+    else { seoMeta('link[rel="canonical"]','href',null); seoMeta('meta[name="robots"]','content','noindex'); }
+    seoJsonLd(nom,desc);
+    if(web && !o.pop){
+      var cible=chemin; try{ var cur=location.pathname+location.hash; if(cur!==cible){ history[o.init?'replaceState':'pushState']({t:t},'',cible); } }catch(e){}
+    }
+  }
+  window.seoMajOnglet=seoMajOnglet;
+  window.addEventListener('popstate', function(){
+    var t=seoOngletDepuisUrl()||'activites';
+    if(t==='activites'){ allerAccueilPortail(); seoMajOnglet('activites',{pop:true}); } else basculerVersOnglet(t,{pop:true});
+  });
+  (function(){
+    var t=seoOngletDepuisUrl();
+    if(t && t!=='activites') basculerVersOnglet(t,{init:true}); else seoMajOnglet('activites',{init:true});
+  })();
   /* Logo de la société sur les documents imprimés depuis le portail (échéancier, attestations…), sauf s'ils en portent déjà un. */
   function docAjouterLogo(html){
     try{
@@ -2442,17 +2801,69 @@
 
   /* ───── Catalogue des biens — publié par l'ERP mère (brand.catalogue) ───── */
   var VILLAS = [];
+  var CAT_TYPES=[
+    {k:'villa',       t:'Villas',              re:/villa|duplex|maison/i,                 c:['#ffe3c4','#ff8a5c']},
+    {k:'appartement', t:'Appartements',        re:/appart|studio|f[1-6]\b|résidence|residence/i, c:['#cfe3f3','#6fa3c9']},
+    {k:'terrain',     t:'Terrains',            re:/terrain|parcelle|lot de/i,              c:['#d9efc9','#7bbf5a']},
+    {k:'local',       t:'Locaux commerciaux',  re:/local|boutique|commerc|bureau/i,        c:['#e6d9f2','#8a6fc9']},
+    {k:'autre',       t:'Autres biens',        re:/./,                                     c:['#fde7a8','#e39a00']}
+  ];
+  var catFiltre='*', catTri='';
+  function typeBien(v){
+    var txt=(v.nom||'')+' '+(v.pieces||'');
+    for(var i=0;i<CAT_TYPES.length;i++){ if(CAT_TYPES[i].re.test(txt)) return CAT_TYPES[i]; }
+    return CAT_TYPES[CAT_TYPES.length-1];
+  }
+  function prixBien(v){ var n=[v.go,v.cle,v.prix].map(function(x){return +x||0;}).filter(function(x){return x>0;}); return n.length?Math.min.apply(null,n):0; }
+  /* Photo publiée dans l'ERP (catégorie « catalogue ») dont le titre contient le nom du bien ; à défaut, illustration du type. */
+  function photoBien(v,typ,cat){
+    var nom=String(v.nom||'').toLowerCase().split(' · ')[0].trim();
+    var m=nom?(MEDIAS||[]).filter(function(x){ return x.type==='photo' && x.categorie===(cat||'catalogue') && (x.data||x.url) && String(x.titre||'').toLowerCase().indexOf(nom)!==-1; })[0]:null;
+    if(m) return m.data||m.url;
+    var h=44+((v.nom||'').length*13)%60, w=84+((v.nom||'').length*7)%50;
+    var t='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+typ.c[0]+'"/><stop offset="1" stop-color="'+typ.c[1]+'"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/><circle cx="310" cy="66" r="28" fill="#fff" opacity=".85"/><rect y="238" width="400" height="62" fill="#0b1b3a" opacity=".2"/><rect x="90" y="'+(238-h)+'" width="'+w+'" height="'+h+'" fill="#fff" opacity=".96"/><rect x="'+(100+w)+'" y="'+(238-h*.62)+'" width="74" height="'+(h*.62)+'" fill="#fff" opacity=".78"/><rect x="104" y="'+(252-h)+'" width="14" height="14" fill="#0b1b3a" opacity=".4"/><rect x="130" y="'+(252-h)+'" width="14" height="14" fill="#0b1b3a" opacity=".4"/></svg>';
+    return 'data:image/svg+xml;utf8,'+encodeURIComponent(t);
+  }
+  function carteBien(v,i){
+    var typ=typeBien(v);
+    var lig=function(lib,val,fort){ return '<div'+(fort?' class="vt-fort"':'')+'><span>'+lib+'</span><strong>'+fmt(val)+' F</strong></div>'; };
+    return '<article class="vt-bien"><div class="vt-bien-img"><img src="'+esc(photoBien(v,typ))+'" loading="lazy" alt="'+esc(v.nom||'Bien')+'"><span class="vt-chip-cat">'+esc(typ.t)+'</span>'+(v.pieces?'<span class="vt-bien-pieces">'+esc(v.pieces)+'</span>':'')+'</div>'
+      +'<div class="vt-bien-corps"><h5>'+esc(v.nom)+'</h5>'+(v.surf?'<div class="vt-bien-surf">Superficie : '+esc(v.surf)+'</div>':'')
+      +'<div class="vt-prix">'+(v.go?lig('Gros œuvre',v.go,false):'')+(v.cle?lig('Clé en main',v.cle,true):'')+(!v.go&&!v.cle&&v.prix?lig(esc(v.prix_label||'Prix'),v.prix,true):'')+'</div>'
+      +'<button type="button" class="highlight-btn" onclick="souscrireVilla('+i+')">Souscrire à ce bien</button></div></article>';
+  }
   function renderVillas(){
     var el = document.getElementById('villa-cards'); if(!el) return;
-    if(!VILLAS.length){ el.innerHTML = '<div style="color:#4b6a8b;">Catalogue en cours de publication — contactez-nous pour recevoir la grille tarifaire.</div>'; return; }
-    el.innerHTML = VILLAS.map(function(v){
-      return '<div class="card"><div style="display:flex; justify-content:space-between; align-items:baseline;"><h4 style="color:var(--pp-primary);">'+esc(v.nom)+'</h4>'+(v.pieces?'<span class="pill p-bleu">'+esc(v.pieces)+'</span>':'')+'</div>'
-        +(v.surf?'<div style="font-size:.78rem; color:#4b6a8b; margin:4px 0 10px;">Superficie : '+esc(v.surf)+'</div>':'')
-        +(v.go?'<div style="display:flex; justify-content:space-between; font-size:.85rem; padding:6px 0; border-top:1px solid #eef2f8;"><span>Gros œuvre</span><strong>'+fmt(v.go)+' F</strong></div>':'')
-        +(v.cle?'<div style="display:flex; justify-content:space-between; font-size:.85rem; padding:6px 0; border-top:1px solid #eef2f8;"><span>Clé en main</span><strong style="color:var(--pp-primary);">'+fmt(v.cle)+' F</strong></div>':'')
-        +(!v.go && !v.cle && v.prix?'<div style="display:flex; justify-content:space-between; font-size:.85rem; padding:6px 0; border-top:1px solid #eef2f8;"><span>'+esc(v.prix_label||'Prix')+'</span><strong style="color:var(--pp-primary);">'+fmt(v.prix)+' F</strong></div>':'')+'</div>';
+    var outils=document.getElementById('catalogue-outils');
+    if(!VILLAS.length){ el.innerHTML = '<div style="color:#4b6a8b;">Catalogue en cours de publication — contactez-nous pour recevoir la grille tarifaire.</div>'; if(outils) outils.style.display='none'; return; }
+    var groupes=[];
+    CAT_TYPES.forEach(function(t){ groupes.push({t:t, items:[]}); });
+    VILLAS.forEach(function(v,i){ var t=typeBien(v); groupes.filter(function(g){return g.t===t;})[0].items.push({v:v,i:i}); });
+    groupes=groupes.filter(function(g){ return g.items.length; });
+    if(catFiltre!=='*' && !groupes.some(function(g){return g.t.k===catFiltre;})) catFiltre='*';
+    groupes.forEach(function(g){
+      if(catTri) g.items.sort(function(a,b){ var pa=prixBien(a.v)||1e15, pb=prixBien(b.v)||1e15; return catTri==='asc'?pa-pb:(prixBien(b.v)-prixBien(a.v)); });
+    });
+    var nav=document.getElementById('catalogue-nav');
+    if(outils) outils.style.display='flex';
+    if(nav){
+      nav.style.display=groupes.length>1?'flex':'none';
+      nav.innerHTML='<button type="button" class="'+(catFiltre==='*'?'on':'')+'" data-cat="*">Tous ('+VILLAS.length+')</button>'+groupes.map(function(g){ return '<button type="button" class="'+(catFiltre===g.t.k?'on':'')+'" data-cat="'+g.t.k+'">'+esc(g.t.t)+' ('+g.items.length+')</button>'; }).join('');
+      nav.onclick=function(e){ var b=e.target.closest?e.target.closest('button[data-cat]'):null; if(!b) return; catFiltre=b.getAttribute('data-cat'); renderVillas(); };
+    }
+    var tri=document.getElementById('catalogue-tri'); if(tri){ tri.value=catTri; tri.onchange=function(){ catTri=tri.value; renderVillas(); }; }
+    el.innerHTML=groupes.filter(function(g){ return catFiltre==='*'||g.t.k===catFiltre; }).map(function(g){
+      return '<section class="vt-sec"><div class="vt-sec-tete"><h4>'+esc(g.t.t)+'</h4><span class="vt-nb">'+g.items.length+'</span></div><div class="vt-cat-grid">'+g.items.map(function(x){ return carteBien(x.v,x.i); }).join('')+'</div></section>';
     }).join('');
   }
+  /* « Souscrire à ce bien » : présélectionne le modèle dans le formulaire de souscription et ouvre l'onglet. */
+  function souscrireVilla(i){
+    var v=VILLAS[i]; if(!v) return;
+    var sel=document.getElementById('s_villa');
+    if(sel){ sel.value=v.nom; majPrixEstime(); }
+    var b=document.querySelector('.site-header .tab-link[data-tab="souscrire"]'); if(b) b.click();
+  }
+  window.souscrireVilla=souscrireVilla;
 
   /* ───── Catalogue locatif — publié par l'ERP mère (brand.catalogue_location) ─────
      Format d'une ligne : Nom | Pièces | Surface | Loyer/mois FCFA | Caution FCFA | Adresse | Latitude | Longitude | Date disponible (AAAA-MM-JJ, vide = disponible maintenant) */
@@ -2468,23 +2879,36 @@
     var d = new Date(l.dispo);
     return '<span class="pill p-or">🟠 Disponible à partir du '+d.toLocaleDateString('fr-FR')+'</span>';
   }
+  var locFiltre='*', locTri='';
+  function _locDispoMaintenant(l){ var today=new Date().toISOString().slice(0,10); return !l.dispo || l.dispo<=today; }
+  function carteLocation(l,i){
+    var map=_locMapUrl(l), typ=CAT_TYPES[3];
+    var lig=function(lib,val,fort){ return '<div'+(fort?' class="vt-fort"':'')+'><span>'+lib+'</span><strong>'+fmt(val)+' F</strong></div>'; };
+    return '<article class="vt-bien"><div class="vt-bien-img"><img src="'+esc(photoBien(l,typ,'location'))+'" loading="lazy" alt="'+esc(l.nom||'Bien')+'"><span class="vt-chip-cat">Location</span>'+(l.pieces?'<span class="vt-bien-pieces">'+esc(l.pieces)+'</span>':'')+'<span class="vt-etat">'+_locDispoBadge(l)+'</span></div>'
+      +'<div class="vt-bien-corps"><h5>'+esc(l.nom)+'</h5>'+(l.surf?'<div class="vt-bien-surf">Superficie : '+esc(l.surf)+'</div>':'')
+      +(l.adresse?'<div class="vt-meta"><i class="fas fa-location-dot"></i><span>'+esc(l.adresse)+'</span></div>':'')
+      +'<div class="vt-prix">'+(l.loyer?lig('Loyer / mois',l.loyer,true):'')+(l.caution?lig('Caution',l.caution,false):'')+'</div>'
+      +'<div class="vt-actions">'+(map?'<a class="vt-lien" href="'+esc(map)+'" target="_blank" rel="noopener"><i class="fas fa-map-location-dot"></i> Localisation</a>':'')
+      +'<button type="button" class="highlight-btn" onclick="choisirLocationPourReservation('+i+')"><i class="fas fa-calendar-check"></i> Réserver</button></div></div></article>';
+  }
   function renderLocations(){
     var el = document.getElementById('location-cards'); if(!el) return;
-    if(!LOCATIONS.length){ el.innerHTML = '<div style="color:#4b6a8b;">Aucun bien en location publié pour le moment — contactez-nous.</div>'; return; }
-    el.innerHTML = LOCATIONS.map(function(l,i){
-      var map = _locMapUrl(l);
-      return '<div class="card">'
-        + '<div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;"><h4 style="color:var(--pp-primary);">'+esc(l.nom)+'</h4>'+(l.pieces?'<span class="pill p-bleu">'+esc(l.pieces)+'</span>':'')+'</div>'
-        + (l.surf?'<div style="font-size:.78rem; color:#4b6a8b; margin:4px 0 8px;">Superficie : '+esc(l.surf)+'</div>':'')
-        + '<div style="margin:8px 0;">'+_locDispoBadge(l)+'</div>'
-        + (l.loyer?'<div style="display:flex; justify-content:space-between; font-size:.85rem; padding:6px 0; border-top:1px solid #eef2f8;"><span>Loyer / mois</span><strong style="color:var(--pp-primary);">'+fmt(l.loyer)+' F</strong></div>':'')
-        + (l.caution?'<div style="display:flex; justify-content:space-between; font-size:.85rem; padding:6px 0; border-top:1px solid #eef2f8;"><span>Caution</span><strong>'+fmt(l.caution)+' F</strong></div>':'')
-        + (l.adresse?'<div style="font-size:.78rem; color:#4b6a8b; margin-top:8px;"><i class="fas fa-location-dot"></i> '+esc(l.adresse)+'</div>':'')
-        + '<div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">'
-        + (map?'<a href="'+esc(map)+'" target="_blank" rel="noopener" class="highlight-btn" style="background:#0077b6; text-decoration:none; padding:8px 14px; font-size:.8rem;"><i class="fas fa-map-location-dot"></i> Localisation</a>':'')
-        + '<button class="highlight-btn" style="padding:8px 14px; font-size:.8rem;" onclick="choisirLocationPourReservation('+i+')"><i class="fas fa-calendar-check"></i> Réserver</button>'
-        + '</div></div>';
-    }).join('');
+    var outils=document.getElementById('location-outils');
+    if(!LOCATIONS.length){ el.innerHTML = '<div style="color:#4b6a8b;">Aucun bien en location publié pour le moment — contactez-nous.</div>'; if(outils) outils.style.display='none'; return; }
+    var nbDispo=LOCATIONS.filter(_locDispoMaintenant).length, nbBientot=LOCATIONS.length-nbDispo;
+    if(locFiltre==='dispo' && !nbDispo) locFiltre='*'; if(locFiltre==='bientot' && !nbBientot) locFiltre='*';
+    var items=LOCATIONS.map(function(l,i){ return {l:l,i:i}; }).filter(function(x){
+      return locFiltre==='*' || (locFiltre==='dispo'?_locDispoMaintenant(x.l):!_locDispoMaintenant(x.l)); });
+    if(locTri) items.sort(function(a,b){ var pa=a.l.loyer||1e15, pb=b.l.loyer||1e15; return locTri==='asc'?pa-pb:((b.l.loyer||0)-(a.l.loyer||0)); });
+    if(outils) outils.style.display='flex';
+    var nav=document.getElementById('location-nav');
+    if(nav){
+      nav.style.display=(nbDispo&&nbBientot)?'flex':'none';
+      nav.innerHTML='<button type="button" class="'+(locFiltre==='*'?'on':'')+'" data-loc="*">Tous ('+LOCATIONS.length+')</button><button type="button" class="'+(locFiltre==='dispo'?'on':'')+'" data-loc="dispo">Disponibles ('+nbDispo+')</button><button type="button" class="'+(locFiltre==='bientot'?'on':'')+'" data-loc="bientot">Bientôt ('+nbBientot+')</button>';
+      nav.onclick=function(e){ var b=e.target.closest?e.target.closest('button[data-loc]'):null; if(!b) return; locFiltre=b.getAttribute('data-loc'); renderLocations(); };
+    }
+    var tri=document.getElementById('location-tri'); if(tri){ tri.value=locTri; tri.onchange=function(){ locTri=tri.value; renderLocations(); }; }
+    el.innerHTML=items.map(function(x){ return carteLocation(x.l,x.i); }).join('');
   }
   function peuplerLocationsSelect(){
     var sel=document.getElementById('rl_bien'); if(!sel) return;
@@ -2498,10 +2922,10 @@
   }
   function renderLocationPhotos(){
     var w=document.getElementById('location-gallery-wrap'), g=document.getElementById('location-gallery'); if(!g) return;
-    var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='location'; });
+    var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='location' && (m.data||m.url); });
     if(!photos.length){ if(w) w.style.display='none'; return; }
     if(w) w.style.display='block';
-    g.innerHTML = photos.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('');
+    g.innerHTML = photos.map(function(p){ return vignettePhoto(p,''); }).join('');
   }
   window.choisirLocationPourReservation = choisirLocationPourReservation;
 
@@ -2542,6 +2966,9 @@
     }catch(e){ MEDIAS=[]; }
     rendreMediasEden();
     renderCataloguePhoto();
+    renderVillas();
+    renderLocations();
+    renderProgrammesListe();
     renderLocationPhotos();
     if(typeof majEspacesDivisions==='function') majEspacesDivisions();
   }
@@ -2606,7 +3033,7 @@
       g.className='';
       g.innerHTML=_grouperParRef(photos).map(function(gp){
         return (gp.label?'<div style="font-weight:700;margin:14px 0 8px;color:var(--pp-primary);">'+esc(gp.label)+'</div>':'')
-          + '<div class="photo-grid">'+gp.items.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('')+'</div>';
+          + '<div class="photo-grid vt-mosaic">'+gp.items.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('')+'</div>';
       }).join('');
     }
     /* Documents : ceux rattachés à un programme restent ici, au plus près de
@@ -2699,6 +3126,7 @@
     divs = divs.filter(function(d){ return d && d.id && String(d.nom||'').trim(); })
                .sort(function(a,b){ return (a.ordre||0)-(b.ordre||0); });
 
+    var wrapAct=document.getElementById('nav-divisions-wrap'); if(wrapAct) wrapAct.style.display=divs.length?'':'none';
     /* On mémorise l'onglet actif pour le restaurer après reconstruction : sans
        cela, l'arrivée asynchrone des médias renverrait le visiteur à l'accueil. */
     var actEl=document.querySelector('.tab-link.active');
@@ -2721,12 +3149,20 @@
       var mine=function(m){ return String(m.division_id||'')===String(d.id); };
       var pl=prods.filter(mine), gl=photos.filter(mine), dl=docs.filter(mine);
 
-      var html='<div class="container"><div class="content-section">';
-      html+='<div class="div-intro">';
-      html+= d.slogan ? '<div class="slogan">'+esc(d.slogan)+'</div>' : '';
-      html+='<h3 style="margin-top:6px;"><i class="fas '+esc(ico)+'"></i> '+esc(d.nom)+'</h3>';
-      html+= d.description ? '<p style="margin-top:6px;color:#4a4336;line-height:1.7;">'+esc(d.description)+'</p>' : '';
-      html+='</div>';
+      var DIV_DEGRADES=['linear-gradient(135deg,#0B1B3A,#1d4e89)','linear-gradient(135deg,#0b4f45,#12806b)','linear-gradient(135deg,#7a2410,#d63a1b)','linear-gradient(135deg,#5a3a00,#b36b00)','linear-gradient(135deg,#0B1B3A,#0e5c4a)'];
+      var degrade=DIV_DEGRADES[divs.indexOf(d)%DIV_DEGRADES.length];
+      var imgBan=''; for(var q=0;q<gl.length && !imgBan;q++){ imgBan=_imgSur(gl[q].data||gl[q].url)||''; }
+      var puces=[]; if(pl.length) puces.push(pl.length+' produit'+(pl.length>1?'s':'')); if(gl.length) puces.push(gl.length+' photo'+(gl.length>1?'s':'')); if(dl.length) puces.push(dl.length+' document'+(dl.length>1?'s':''));
+      var html='<section class="div-hero" style="--dg:'+degrade+'">'
+        + (imgBan?'<img class="div-hero-img" src="'+esc(imgBan)+'" alt="" loading="lazy">':'')
+        + '<i class="fas '+esc(ico)+' div-hero-ico" aria-hidden="true"></i>'
+        + '<span class="div-hero-sur"><i class="fas '+esc(ico)+'"></i> Nos activités'+(d.slogan?(' · '+esc(d.slogan)):'')+'</span>'
+        + '<h2>'+esc(d.nom)+'</h2>'
+        + (d.description?'<p>'+esc(d.description)+'</p>':'')
+        + (puces.length?'<div class="div-hero-puces">'+puces.map(function(x){ return '<span>'+x+'</span>'; }).join('')+'</div>':'')
+        + '<button type="button" class="tab-link hero-btn principal" data-tab="nous-contacter">Nous contacter</button>'
+        + '</section>';
+      html+='<div class="div-corps">';
 
       if(pl.length){
         html+='<div class="produit-grid">'+pl.map(function(m){
@@ -2759,12 +3195,13 @@
       if(!pl.length && !gl.length && !dl.length){
         html+='<div class="div-vide">Contenu en cours de publication.</div>';
       }
-      html+='</div></div>';
+      html+='</div>';
 
       var pane=document.createElement('div');
       pane.id=tab+'-pane'; pane.className='tab-pane';
       pane.innerHTML=html;
       zone.appendChild(pane);
+      [].forEach.call(pane.querySelectorAll('.tab-link'), brancherOnglet);
     });
 
     /* Restaure l'onglet division actif s'il existe toujours. */
@@ -2890,7 +3327,7 @@
     var hi=BR('hero_image',''); if(hi) root.style.setProperty('--pp-hero', "url('"+hi+"')");
 
     var nom = BR('nom','Espace client'), slogan = BR('slogan','');
-    document.title = nom + ' | Espace Souscripteur & Apporteur';
+    var _ta=document.querySelector('.p-liste .tab-link.active'); seoMajOnglet(_ta?_ta.getAttribute('data-tab'):'activites',{pop:true});   /* titre, description et adresse canonique de l'onglet courant */
     var la = document.querySelector('.logo-area');
     if(la){ var lg=BR('logo_url',''); la.innerHTML = (lg ? '<img src="'+esc(lg)+'" alt="'+esc(nom)+'" style="height:44px;max-width:200px;object-fit:contain;">' : '<h1>'+esc(nom)+'</h1>') + '<p>'+esc(slogan)+'</p>'; }
     var ht=document.querySelector('.hero h2'); if(ht) ht.textContent = BR('hero_titre', nom.toUpperCase());
@@ -3182,10 +3619,61 @@
   chargerParamsBandeau();
 
   /* ───── Catalogue photo ───── */
+  var PHOTO_SECTIONS=[
+    {k:'eden',        t:'Nos programmes',      d:'Les programmes immobiliers en cours et livrés.'},
+    {k:'chantier',    t:'Nos chantiers',       d:'L\'avancement de nos réalisations, photos à l\'appui.'},
+    {k:'catalogue',   t:'Nos villas',          d:'Les modèles de villas et de logements du catalogue.'},
+    {k:'location',    t:'Nos locations',       d:'Les biens proposés à la location.'},
+    {k:'investir',    t:'Opérations à investir', d:'Les opérations ouvertes aux investisseurs.'}
+  ];
+  function photosParSection(){
+    var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo' && (m.data||m.url); });
+    var out=PHOTO_SECTIONS.map(function(sec){ return {k:sec.k, t:sec.t, d:sec.d, items:photos.filter(function(m){ return m.categorie===sec.k; })}; });
+    var connues=PHOTO_SECTIONS.map(function(x){return x.k;});
+    var autres=photos.filter(function(m){ return connues.indexOf(m.categorie)===-1; });
+    if(autres.length) out.push({k:'autres', t:'Autres photos', d:'', items:autres});
+    return out.filter(function(x){ return x.items.length; });
+  }
+  function vignettePhoto(p,etiquette){
+    return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="'+esc(p.titre||'Photo')+'">'
+      +(etiquette?'<span class="vt-chip-cat">'+esc(etiquette)+'</span>':'')
+      +(p.titre?'<div class="photo-cap">'+esc(p.titre)+'</div>':'')+'</div>';
+  }
   function renderCataloguePhoto(){
     var el=document.getElementById('photo-catalogue-grid'); if(!el) return;
-    var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo'; });
-    el.innerHTML = photos.length ? photos.map(function(p){ return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(p.titre?'<div class="photo-cap">'+esc(p.titre)+'</div>':'')+'</div>'; }).join('') : '<div style="color:#4b6a8b;">Aucune photo publiée pour le moment.</div>';
+    var nav=document.getElementById('photo-sections-nav');
+    var secs=photosParSection();
+    if(!secs.length){
+      el.innerHTML='<div style="color:#4b6a8b;">Aucune photo publiée pour le moment.</div>';
+      if(nav) nav.style.display='none';
+      renderAccueilGalerie(); return;
+    }
+    el.innerHTML=secs.map(function(sec){
+      return '<section class="vt-sec" data-sec="'+esc(sec.k)+'"><div class="vt-sec-tete"><h4>'+esc(sec.t)+'</h4><span class="vt-nb">'+sec.items.length+'</span>'+(sec.d?'<p>'+esc(sec.d)+'</p>':'')+'</div>'
+        +'<div class="photo-grid vt-mosaic">'+sec.items.map(function(p){ return vignettePhoto(p,''); }).join('')+'</div></section>';
+    }).join('');
+    if(nav){
+      nav.style.display=secs.length>1?'flex':'none';
+      nav.innerHTML='<button type="button" class="on" data-sec="*">Toutes</button>'+secs.map(function(sec){ return '<button type="button" data-sec="'+esc(sec.k)+'">'+esc(sec.t)+' ('+sec.items.length+')</button>'; }).join('');
+      nav.onclick=function(e){
+        var b=e.target.closest?e.target.closest('button[data-sec]'):null; if(!b) return;
+        var k=b.getAttribute('data-sec');
+        [].forEach.call(nav.querySelectorAll('button'),function(x){ x.classList.toggle('on',x===b); });
+        [].forEach.call(el.querySelectorAll('.vt-sec'),function(x){ x.style.display=(k==='*'||x.getAttribute('data-sec')===k)?'':'none'; });
+      };
+    }
+    renderAccueilGalerie();
+  }
+  /* Accueil : mosaïque d'au plus 7 photos, une par section à tour de rôle pour montrer toute l'activité. */
+  function renderAccueilGalerie(){
+    var wrap=document.getElementById('accueil-galerie-wrap'), g=document.getElementById('accueil-galerie'); if(!wrap||!g) return;
+    var secs=photosParSection(), pick=[], i=0;
+    while(pick.length<7 && secs.some(function(x){ return x.items.length>i; })){
+      secs.forEach(function(sec){ if(pick.length<7 && sec.items[i]) pick.push({p:sec.items[i], t:sec.t}); });
+      i++;
+    }
+    wrap.style.display=pick.length?'':'none';
+    g.innerHTML=pick.map(function(x){ return vignettePhoto(x.p,x.t); }).join('');
   }
 
   /* ───── Souscription en ligne → pi_leads ───── */
@@ -4513,6 +5001,40 @@
   }
 
   var _programmesCharges = false;
+  var _progsData=null, progFiltre='*';
+  var PROG_STATUTS={ en_cours:'En commercialisation', prospection:'À venir', livre:'Livré' };
+  var PROG_TYPES={ en_cours:CAT_TYPES[0], prospection:CAT_TYPES[1], livre:CAT_TYPES[2] };
+  function photoProgramme(p,typ){
+    var m=(MEDIAS||[]).filter(function(x){ return x.type==='photo' && (x.categorie==='eden'||x.categorie==='catalogue') && (x.data||x.url) && x.ref_type==='programme' && String(x.ref_id)===String(p.id); })[0];
+    return m ? (m.data||m.url) : photoBien({nom:p.nom||'Programme'},typ,'eden');
+  }
+  function carteProgramme(p){
+    var typ=PROG_TYPES[p.statut]||CAT_TYPES[0];
+    var dispo = p.lots_disponibles != null ? +p.lots_disponibles : null;
+    var total = p.lots_prevus != null ? +p.lots_prevus : (p.lots_morceles != null ? +p.lots_morceles : null);
+    var pct = (dispo!=null && total) ? Math.max(0,Math.min(100,Math.round((1-dispo/total)*100))) : null;
+    return '<article class="vt-bien"><div class="vt-bien-img"><img src="'+esc(photoProgramme(p,typ))+'" loading="lazy" alt="'+esc(p.nom||'Programme')+'"><span class="vt-chip-cat">'+esc(PROG_STATUTS[p.statut]||'Programme')+'</span></div>'
+      +'<div class="vt-bien-corps"><h5>'+esc(p.nom||'Programme')+'</h5>'
+      +(p.commune?'<div class="vt-meta"><i class="fas fa-location-dot"></i><span>'+esc(p.commune)+'</span></div>':'')
+      +(p.description?'<p class="vt-desc">'+esc(p.description)+'</p>':'')
+      +(pct!=null?'<div><div class="vt-barre" role="img" aria-label="'+pct+' % des lots réservés"><i style="width:'+pct+'%"></i></div><div class="vt-barre-lib"><span>'+dispo+' lot'+(dispo>1?'s':'')+' disponible'+(dispo>1?'s':'')+'</span><span>sur '+total+'</span></div></div>'
+        :(dispo!=null?'<span class="badge">'+dispo+' lot'+(dispo>1?'s':'')+' disponible'+(dispo>1?'s':'')+'</span>':''))
+      +(p.date_livraison?'<div class="vt-meta"><i class="fas fa-calendar-check"></i><span>Livraison prévue : '+dshort(p.date_livraison)+'</span></div>':'')
+      +'<div class="vt-actions"><button type="button" class="highlight-btn" onclick="basculerVersOnglet(\'catalogue\')">Voir les biens</button></div></div></article>';
+  }
+  function renderProgrammesListe(){
+    var box=document.getElementById('programme-liste-cards'); if(!box || !_progsData) return;
+    var outils=document.getElementById('programme-outils'), nav=document.getElementById('programme-nav');
+    if(!_progsData.length){ box.innerHTML='<div style="color:#6b6150;grid-column:1/-1;">Aucun programme publié pour le moment.</div>'; if(outils) outils.style.display='none'; return; }
+    var cles=Object.keys(PROG_STATUTS).filter(function(k){ return _progsData.some(function(p){ return p.statut===k; }); });
+    if(progFiltre!=='*' && cles.indexOf(progFiltre)===-1) progFiltre='*';
+    if(outils) outils.style.display=cles.length>1?'flex':'none';
+    if(nav){
+      nav.innerHTML='<button type="button" class="'+(progFiltre==='*'?'on':'')+'" data-prog="*">Tous ('+_progsData.length+')</button>'+cles.map(function(k){ return '<button type="button" class="'+(progFiltre===k?'on':'')+'" data-prog="'+k+'">'+PROG_STATUTS[k]+' ('+_progsData.filter(function(p){return p.statut===k;}).length+')</button>'; }).join('');
+      nav.onclick=function(e){ var b=e.target.closest?e.target.closest('button[data-prog]'):null; if(!b) return; progFiltre=b.getAttribute('data-prog'); renderProgrammesListe(); };
+    }
+    box.innerHTML=_progsData.filter(function(p){ return progFiltre==='*'||p.statut===progFiltre; }).map(carteProgramme).join('');
+  }
   async function chargerListeProgrammes(){
     var box = document.getElementById('programme-liste-cards');
     if (!box) return;
@@ -4520,26 +5042,8 @@
     try {
       var progs = await sb('pi_programmes_public?select=*&order=nom.asc&limit=200');
       _programmesCharges = true;
-      if (!progs || !progs.length) {
-        box.innerHTML = '<div style="color:#6b6150;grid-column:1/-1;">Aucun programme publié pour le moment.</div>';
-        return;
-      }
-      var statutLbl = { en_cours:'En commercialisation', livre:'Livré', prospection:'À venir' };
-      box.innerHTML = progs.map(function(p){
-        var dispo = p.lots_disponibles != null ? p.lots_disponibles : null;
-        var total = p.lots_prevus != null ? p.lots_prevus : (p.lots_morceles != null ? p.lots_morceles : null);
-        return '<div class="card">'
-          + '<h4 style="margin-bottom:4px;"><i class="fas fa-building"></i> ' + esc(p.nom || 'Programme') + '</h4>'
-          + (p.commune ? '<div style="font-size:.8rem;color:#6b6150;margin-bottom:6px;"><i class="fas fa-location-dot"></i> ' + esc(p.commune) + '</div>' : '')
-          + (p.description ? '<p style="font-size:.85rem;margin-bottom:8px;">' + esc(p.description) + '</p>' : '')
-          + '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.78rem;">'
-          + (dispo != null ? '<span class="badge">' + dispo + ' lot' + (dispo>1?'s':'') + ' disponible' + (dispo>1?'s':'') + '</span>' : '')
-          + (total != null ? '<span class="badge">' + total + ' au total</span>' : '')
-          + (statutLbl[p.statut] ? '<span class="badge">' + statutLbl[p.statut] + '</span>' : '')
-          + '</div>'
-          + (p.date_livraison ? '<div style="font-size:.74rem;color:#6b6150;margin-top:6px;">Livraison prévue : ' + dshort(p.date_livraison) + '</div>' : '')
-          + '</div>';
-      }).join('');
+      _progsData = progs || [];
+      renderProgrammesListe();
     } catch(e) {
       box.innerHTML = '<div style="color:#6b6150;grid-column:1/-1;">Impossible de charger la liste des programmes pour le moment.</div>';
     }
@@ -5953,6 +6457,29 @@
     btn.classList.toggle('open', ouvrir);
   }
   window.toggleEspaceMenu = toggleEspaceMenu;
+
+  /* Menu « Nos activités » : regroupe les divisions publiées (nombre variable) pour garder le parcours sur une ligne. */
+  function fermerActivitesMenu(){
+    var m=document.getElementById('activites-menu'), t=document.querySelector('#nav-divisions-wrap .nav-dropdown-trigger');
+    if(m) m.classList.remove('open'); if(t){ t.classList.remove('open'); t.setAttribute('aria-expanded','false'); }
+  }
+  function toggleActivitesMenu(btn){
+    var menu=document.getElementById('activites-menu'); if(!menu) return;
+    var ouvrir=!menu.classList.contains('open');
+    fermerActivitesMenu();
+    if(!ouvrir) return;
+    var r=btn.getBoundingClientRect();
+    menu.style.position='fixed'; menu.style.top=(r.bottom+6)+'px'; menu.style.right='auto'; menu.style.minWidth='230px';
+    menu.style.left=Math.max(12,Math.min(r.left,window.innerWidth-250))+'px';
+    menu.classList.add('open'); btn.classList.add('open'); btn.setAttribute('aria-expanded','true');
+  }
+  window.toggleActivitesMenu=toggleActivitesMenu;
+  document.addEventListener('click', function(e){
+    var w=document.getElementById('nav-divisions-wrap'); if(!w) return;
+    var item=e.target.closest ? e.target.closest('#activites-menu .tab-link') : null;
+    if(item || !w.contains(e.target)) fermerActivitesMenu();
+  });
+  window.addEventListener('scroll', fermerActivitesMenu, {passive:true});
   document.addEventListener('click', function(e){
     var menu = document.getElementById('espace-menu');
     var trigger = document.querySelector('.nav-dropdown-trigger');
@@ -5973,6 +6500,7 @@
     if (accueil) accueil.classList.add('active-pane');
     document.querySelectorAll('.tab-link').forEach(function(b){ b.classList.remove('active'); });
     window.scrollTo({ top:0, behavior:'smooth' });
+    if (typeof seoMajOnglet === 'function') seoMajOnglet('activites');
   }
   window.allerAccueilPortail = allerAccueilPortail;
 

@@ -3,6 +3,7 @@
 # elle exige une connexion et porte la balise « noindex ».
 User-agent: *
 Allow: /portail-unique.html
+Allow: /portail/
 Allow: /mentions-legales.html
 Allow: /confidentialite.html
 Allow: /cookies.html
