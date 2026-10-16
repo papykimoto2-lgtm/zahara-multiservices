@@ -47,3 +47,12 @@ test('catalogue : types, filtres, tri et souscription directe', () => {
   ['typeBien','prixBien','photoBien','carteBien','souscrireVilla'].forEach(f => assert.ok(html.includes('function ' + f + '('), f));
   assert.ok(html.includes('window.souscrireVilla'));
 });
+
+test('parcours : ordre des onglets en marche en avant', () => {
+  const nav = html.slice(html.indexOf('<nav class="parcours"'), html.indexOf('</nav>', html.indexOf('<nav class="parcours"')));
+  const ordre = [...nav.matchAll(/data-tab="([^"]+)"/g)].map(m => m[1]);
+  assert.deepStrictEqual(ordre, ['activites','eden','catalogue','catalogue-photo','location','carte','investir','nous-connaitre','temoignages','faq','souscrire','nous-contacter']);
+  assert.ok(html.indexOf('class="header-actions"') < html.indexOf('<nav class="parcours"'));
+  assert.ok(html.includes('data-tab="souscripteur"') && html.includes('id="espace-menu"'));
+  assert.ok(html.includes('id="nav-divisions"'));
+});

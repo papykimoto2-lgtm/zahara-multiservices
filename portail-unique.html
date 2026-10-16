@@ -448,6 +448,49 @@
     @media (max-width:640px){ .vt-cat-grid{ grid-template-columns:1fr; } }
     @media (prefers-reduced-motion:reduce){ .vt-bien,.vt-bien-img img{ transition:none; } }
   </style>
+  <style id="theme-parcours">
+    /* ═══ En-tête en parcours (marche en avant) et finitions visuelles ═══ */
+    .site-header{ backdrop-filter:none; background:#fff; box-shadow:0 2px 18px rgba(11,27,58,.06); }
+    .header-flex{ padding:12px 24px; }
+    .header-actions{ list-style:none; display:flex; align-items:center; gap:8px; position:relative; margin:0; padding:0; }
+    .p-num{ display:inline-grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--vt-sun); color:var(--vt-navy); font-size:.75rem; font-weight:800; }
+    .nav-dropdown-trigger{ gap:8px; }
+    .parcours{ background:linear-gradient(90deg,#fff1e6,#fff 60%); border-top:1px solid #f4e3d6; }
+    .parcours-in{ display:flex; align-items:center; gap:4px; overflow-x:auto; scrollbar-width:none; padding-block:8px; -webkit-overflow-scrolling:touch; }
+    .parcours-in::-webkit-scrollbar{ display:none; }
+    .p-liste{ display:flex; gap:2px; list-style:none; margin:0; padding:0; flex:none; align-items:center; }
+    .p-accueil{ padding-right:10px; margin-right:6px; border-right:1px solid #ecd9c9; }
+    .p-etape{ display:flex; align-items:center; gap:8px; flex:none; padding-right:6px; }
+    .p-etape:not(:last-of-type)::after{ content:"›"; color:var(--pp-primary); font-size:1.5rem; font-weight:800; line-height:1; margin-left:2px; }
+    .p-hd{ display:flex; align-items:center; gap:7px; font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#6b5a50; white-space:nowrap; }
+    .p-hd b{ width:24px; height:24px; border-radius:50%; background:var(--pp-primary); color:#fff; display:grid; place-items:center; font-size:.78rem; }
+    .p-etape:has(.tab-link.active) .p-hd b{ background:var(--vt-navy); }
+    .p-etape:has(.tab-link.active) .p-hd{ color:var(--vt-navy); }
+    @media (min-width:981px){ .parcours-in{ flex-wrap:wrap; row-gap:2px; overflow:visible; } }
+    @media (min-width:981px) and (max-width:1439px){ .parcours .tab-link i{ display:none; } .parcours .tab-link{ padding:9px 10px; } .p-t{ display:none; } }
+    @media (max-width:980px){ .header-flex{ flex-direction:row; flex-wrap:nowrap; align-items:center; } .logo-area h1{ font-size:1.15rem; } }
+    @media (max-width:640px){
+      .header-flex{ padding:12px 16px; }
+      .hero{ padding-bottom:46px; }
+      .parcours-in{ padding-inline:16px; }
+      .p-t{ display:none; }
+      .nav-dropdown-trigger{ padding:9px 13px; font-size:.74rem; }
+      #pwa-install-li{ display:none !important; }
+    }
+    /* Promesses sous la bannière */
+    .promesses{ list-style:none; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin:-22px auto 0; padding:0 clamp(12px,3vw,30px); position:relative; z-index:3; max-width:1280px; }
+    .promesses li{ background:#fff; border-radius:18px; padding:14px 16px; display:flex; gap:12px; align-items:center; box-shadow:var(--vt-ombre); }
+    .promesses i{ width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg,var(--vt-coral),var(--vt-sun)); color:#fff; display:grid; place-items:center; flex:0 0 auto; }
+    .promesses b{ display:block; font-weight:800; font-size:.92rem; }
+    .promesses span{ font-size:.8rem; color:#4b5a78; }
+    /* Finitions */
+    .hero::after{ display:block; opacity:1; background-image:radial-gradient(circle at 94% 10%,rgba(255,255,255,.30) 0 95px,transparent 96px),radial-gradient(circle at 82% 98%,rgba(11,27,58,.13) 0 150px,transparent 151px),radial-gradient(circle at 6% 100%,rgba(255,255,255,.18) 0 70px,transparent 71px); background-size:auto; }
+    .tab-pane > h3::after{ content:""; display:block; width:48px; height:5px; border-radius:9px; background:linear-gradient(90deg,var(--vt-coral),var(--vt-sun)); margin-top:8px; }
+    .grid-3 > .card,.kpi,.temoi-card{ transition:transform .22s ease, box-shadow .22s ease; }
+    .grid-3 > .card:hover,.temoi-card:hover{ transform:translateY(-4px); box-shadow:0 16px 34px rgba(11,27,58,.14); }
+    .content-section{ margin-top:34px; }
+    @media (prefers-reduced-motion:reduce){ .grid-3 > .card,.kpi,.temoi-card{ transition:none; } }
+  </style>
 </head>
 <body>
 <noscript><p style="padding:16px;background:#fff3b0;color:#4d3b00;font-family:system-ui,sans-serif;">Ce site a besoin de JavaScript pour afficher les biens, programmes et votre espace. Informations légales : <a href="/mentions-legales.html">mentions légales</a>, <a href="/confidentialite.html">confidentialité</a>, <a href="/cookies.html">cookies</a>, <a href="/conditions.html">conditions d’utilisation</a>, <a href="/remboursement.html">résiliation et remboursement</a>.</p></noscript>
@@ -466,23 +509,10 @@
 <header class="site-header">
   <div class="container header-flex">
     <div class="logo-area" style="cursor:pointer;" onclick="allerAccueilPortail()"><h1>Espace client</h1><p></p></div>
-    <ul class="nav-tabs">
-      <li><button class="tab-link" data-tab="eden"><i class="fas fa-tree"></i> <span id="nav-programme">PROGRAMME</span></button></li>
-      <li><button class="tab-link" data-tab="catalogue"><i class="fas fa-house"></i> CATALOGUE</button></li>
-      <li><button class="tab-link" data-tab="catalogue-photo"><i class="fas fa-images"></i> PHOTOS</button></li>
-      <li><button class="tab-link" data-tab="location"><i class="fas fa-key"></i> LOCATION</button></li>
-      <li><button class="tab-link" data-tab="carte"><i class="fas fa-map-location-dot"></i> CARTE</button></li>
-      <li><button class="tab-link" data-tab="investir"><i class="fas fa-handshake-angle"></i> INVESTIR</button></li>
-      <li><button class="tab-link" data-tab="souscrire"><i class="fas fa-pen-alt"></i> SOUSCRIRE</button></li>
-      <li><button class="tab-link" data-tab="faq"><i class="fas fa-circle-question"></i> FAQ</button></li>
-      <li><button class="tab-link" data-tab="temoignages"><i class="fas fa-star"></i> AVIS</button></li>
-      <li><button class="tab-link" data-tab="nous-connaitre"><i class="fas fa-building"></i> SOCIÉTÉ</button></li>
-      <li><button class="tab-link" data-tab="nous-contacter"><i class="fas fa-envelope"></i> CONTACT</button></li>
-      <!-- Onglets des divisions publiées sur le portail, injectés depuis
-           divisions_portail (Paramètres → Site / Portail de l'ERP). -->
-      <span id="nav-divisions" style="display:contents;"></span>
+    <!-- Étape 4 du parcours (suivre son dossier) : accès aux espaces connectés. -->
+    <ul class="header-actions">
       <li class="nav-dropdown">
-        <button class="nav-dropdown-trigger" type="button" onclick="toggleEspaceMenu(this)"><i class="fas fa-user-lock"></i> MON ESPACE <i class="fas fa-chevron-down" style="font-size:.65rem;"></i></button>
+        <button class="nav-dropdown-trigger" type="button" onclick="toggleEspaceMenu(this)"><span class="p-num">4</span> MON ESPACE <i class="fas fa-chevron-down" style="font-size:.65rem;"></i></button>
         <div class="nav-dropdown-menu" id="espace-menu">
           <button class="tab-link" data-tab="souscripteur"><i class="fas fa-chart-line"></i> Souscripteur</button>
           <button class="tab-link" data-tab="intervenant"><i class="fas fa-user-tie"></i> Intervenant</button>
@@ -503,6 +533,33 @@
       </li>
     </ul>
   </div>
+  <!-- Parcours en marche en avant : découvrir → comprendre → passer à l'action → suivre son dossier (menu « Mon espace »). -->
+  <nav class="parcours" aria-label="Parcours du visiteur"><div class="container parcours-in">
+    <ul class="p-liste p-accueil"><li><button class="tab-link" data-tab="activites"><i class="fas fa-house-chimney"></i> ACCUEIL</button></li></ul>
+    <div class="p-etape"><div class="p-hd"><b>1</b><span class="p-t">Découvrir</span></div>
+      <ul class="p-liste">
+          <li><button class="tab-link" data-tab="eden"><i class="fas fa-tree"></i> <span id="nav-programme">PROGRAMME</span></button></li>
+          <li><button class="tab-link" data-tab="catalogue"><i class="fas fa-house"></i> CATALOGUE</button></li>
+          <li><button class="tab-link" data-tab="catalogue-photo"><i class="fas fa-images"></i> PHOTOS</button></li>
+          <li><button class="tab-link" data-tab="location"><i class="fas fa-key"></i> LOCATION</button></li>
+          <li><button class="tab-link" data-tab="carte"><i class="fas fa-map-location-dot"></i> CARTE</button></li>
+          <!-- Onglets des divisions publiées sur le portail, injectés depuis
+               divisions_portail (Paramètres → Site / Portail de l'ERP). -->
+          <span id="nav-divisions" style="display:contents;"></span>
+      </ul></div>
+    <div class="p-etape"><div class="p-hd"><b>2</b><span class="p-t">Comprendre</span></div>
+      <ul class="p-liste">
+          <li><button class="tab-link" data-tab="investir"><i class="fas fa-handshake-angle"></i> INVESTIR</button></li>
+          <li><button class="tab-link" data-tab="nous-connaitre"><i class="fas fa-building"></i> SOCIÉTÉ</button></li>
+          <li><button class="tab-link" data-tab="temoignages"><i class="fas fa-star"></i> AVIS</button></li>
+          <li><button class="tab-link" data-tab="faq"><i class="fas fa-circle-question"></i> FAQ</button></li>
+      </ul></div>
+    <div class="p-etape"><div class="p-hd"><b>3</b><span class="p-t">Passer à l'action</span></div>
+      <ul class="p-liste">
+          <li><button class="tab-link" data-tab="souscrire"><i class="fas fa-pen-alt"></i> SOUSCRIRE</button></li>
+          <li><button class="tab-link" data-tab="nous-contacter"><i class="fas fa-envelope"></i> CONTACT</button></li>
+      </ul></div>
+  </div></nav>
 </header>
 
 <section class="hero"><div class="hero-content container">
@@ -539,6 +596,12 @@
     </div>
   </div>
 </div></section>
+
+<div class="container"><ul class="promesses" aria-label="Nos engagements">
+  <li><i class="fas fa-file-signature"></i><div><b>Titre foncier suivi</b><span>Chaque étape visible dans votre espace</span></div></li>
+  <li><i class="fas fa-coins"></i><div><b>Paiement par étapes</b><span>Versements et reçus en ligne</span></div></li>
+  <li><i class="fas fa-shield-halved"></i><div><b>Espace sécurisé</b><span>Un accès selon votre profil</span></div></li>
+</ul></div>
 
 <div class="container"><div class="content-section">
   <div id="activites-pane" class="tab-pane active-pane">
@@ -2663,7 +2726,7 @@
     var v=VILLAS[i]; if(!v) return;
     var sel=document.getElementById('s_villa');
     if(sel){ sel.value=v.nom; majPrixEstime(); }
-    var b=document.querySelector('.nav-tabs .tab-link[data-tab="souscrire"]'); if(b) b.click();
+    var b=document.querySelector('.site-header .tab-link[data-tab="souscrire"]'); if(b) b.click();
   }
   window.souscrireVilla=souscrireVilla;
 
