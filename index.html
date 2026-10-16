@@ -49438,6 +49438,36 @@ function renderDivisionsPubliees(ids, contenu){
   }).join('');
 }
 
+/* Logo de l'entreprise (Paramètres → Société) pour le portail public : version réduite (360 px max, transparence conservée),
+   car l'original peut peser plusieurs Mo et le portail le téléchargerait chez chaque visiteur. */
+function _logoReduirePortail(src, cb){
+  if (!src) return cb('');
+  if (/^https?:\/\//i.test(src)) return cb(src);
+  if (/^data:image\/svg/i.test(src)) return cb(src.length < 150000 ? src : '');
+  try {
+    var img = new Image();
+    img.onload = function(){
+      try {
+        var r = Math.min(1, 360 / Math.max(img.width, img.height, 1));
+        var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * r)); c.height = Math.max(1, Math.round(img.height * r));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        cb(c.toDataURL('image/png'));
+      } catch (e) { cb(''); }
+    };
+    img.onerror = function(){ cb(''); };
+    img.src = src;
+  } catch (e) { cb(''); }
+}
+async function _logoPortailPrepare(){
+  var p = DATA.params = DATA.params || {};
+  if (p.portail_logo_url || !p.logo) return;
+  var cle = String(p.logo.length) + ':' + String(p.logo).slice(-24);
+  if (p.logo_portail && p.logo_portail_cle === cle) return;
+  var out = await new Promise(function(ok){ _logoReduirePortail(p.logo, ok); });
+  if (!out) return;
+  p.logo_portail = out; p.logo_portail_cle = cle;
+  try { if (typeof dbPut === 'function') await dbPut('params', p); } catch (e) {}
+}
 function buildPortailBrand(){
   var p = DATA.params || {};
   var catParse = function(txt){
@@ -49458,7 +49488,7 @@ function buildPortailBrand(){
   return {
     nom:                    p.portail_nom || p.societe || '',
     slogan:                 p.portail_slogan || '',
-    logo_url:               p.portail_logo_url || '',
+    logo_url:               p.portail_logo_url || p.logo_portail || '',   /* à défaut d'URL dédiée : le logo de l'entreprise (Paramètres → Société), réduit */
     couleur_primaire:       p.portail_couleur_primaire || '#003366',
     couleur_secondaire:     p.portail_couleur_secondaire || '#0077b6',
     couleur_primaire_dark:  p.portail_couleur_primaire_dark || '#001f4f',
@@ -49551,6 +49581,7 @@ async function publierParamsPortail(opts){
   if (typeof syncToSupabase !== 'function') return [];
   var ecraser = !!(opts && opts.ecraser);
   if (!ecraser && window._portailPubliManuelEnCours) return [];   /* le bouton manuel publie lui-même */
+  await _logoPortailPrepare();
   var brand = buildPortailBrand();
   var conserves = [];
   if (!ecraser) {

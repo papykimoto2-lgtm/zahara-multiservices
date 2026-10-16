@@ -506,6 +506,11 @@
     #activites-menu .tab-link{ width:100%; justify-content:flex-start; border-radius:12px; }
   </style>
   <style id="theme-bannieres">
+    .logo-img{ display:block; height:44px; width:auto; max-width:220px; object-fit:contain; }
+    .logo-area .sr-seul{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+    .logo-area .sr-seul::before{ display:none; }
+    .logo-pied{ height:44px; width:auto; max-width:200px; object-fit:contain; background:#fff; border-radius:10px; padding:6px 10px; margin-bottom:8px; }
+    @media (max-width:640px){ .logo-img{ height:36px; max-width:150px; } }
     /* Bannière d'accueil : visible uniquement sur l'accueil. Les divisions ont leur propre bannière. */
     body:not(:has(#activites-pane.active-pane)) :is(.hero,.promesses){ display:none; }
     .div-hero{ position:relative; overflow:hidden; isolation:isolate; color:#fff; width:calc(100% - 32px); max-width:1280px; margin:16px auto 0;
@@ -3345,7 +3350,9 @@
     var nom = BR('nom','Espace client'), slogan = BR('slogan','');
     var _ta=document.querySelector('.p-liste .tab-link.active'); seoMajOnglet(_ta?_ta.getAttribute('data-tab'):'activites',{pop:true});   /* titre, description et adresse canonique de l'onglet courant */
     var la = document.querySelector('.logo-area');
-    if(la){ var lg=BR('logo_url',''); la.innerHTML = (lg ? '<img src="'+esc(lg)+'" alt="'+esc(nom)+'" style="height:44px;max-width:200px;object-fit:contain;">' : '<h1>'+esc(nom)+'</h1>') + '<p>'+esc(slogan)+'</p>'; }
+    var lg0=BR('logo_url','');
+    if(lg0 && /^(https?:|data:image\/)/i.test(lg0)){ var ic=document.querySelector('link[rel="icon"]'); if(ic){ ic.removeAttribute('sizes'); ic.setAttribute('href',lg0); } }
+    if(la){ var lg=BR('logo_url',''); la.innerHTML = (lg ? '<img class="logo-img" src="'+esc(lg)+'" alt="'+esc(nom)+'"><h1 class="sr-seul">'+esc(nom)+'</h1>' : '<h1>'+esc(nom)+'</h1>') + '<p>'+esc(slogan)+'</p>'; }
     var ht=document.querySelector('.hero h2'); if(ht) ht.textContent = BR('hero_titre', nom.toUpperCase());
     var hp=document.querySelector('.hero-content p'); if(hp) hp.textContent = BR('hero_texte', nom + " — votre partenaire immobilier en Côte d'Ivoire.");
     /* Vidéo institutionnelle : n'active la mise en page deux colonnes, et ne
@@ -3552,7 +3559,7 @@
     var e7=document.getElementById('cp-login-aide'); if(e7) e7.innerHTML = aide('votre syndic');
 
     /* Pied de page */
-    var fb=document.getElementById('footer-brand'); if(fb) fb.innerHTML = '<strong>'+esc(nom.toUpperCase())+'</strong>'+(slogan?(' — '+esc(slogan)):'');
+    var fb=document.getElementById('footer-brand'); if(fb) fb.innerHTML = (BR('logo_url','') ? '<img class="logo-pied" src="'+esc(BR('logo_url',''))+'" alt=""><br>' : '') + '<strong>'+esc(nom.toUpperCase())+'</strong>'+(slogan?(' — '+esc(slogan)):'');
     var fc=document.getElementById('footer-contact'); if(fc){ var fcl=_joinDot([siege, tel, email, site]); fc.textContent = fcl; fc.style.display = fcl ? 'block' : 'none'; }
     var fl=document.getElementById('footer-legal');
     if(fl){
