@@ -114959,12 +114959,36 @@ function attSoldeHtml(c, opts){
   var bien = lots.length ? lots.map(function(l){ return 'Lot ' + E(l.numero||l.nom||'?') + (l.ilot?(', îlot '+E(l.ilot)):'') + (l.surface?(' — '+E(l.surface)+' m²'):'') + (l.type?(' ('+E(l.type)+')'):''); }).join(' ; ') : '—';
   var n = function(x){ return new Intl.NumberFormat('fr-FR').format(Math.round(x)); };
   var lettres = (typeof _montantEnLettres==='function') ? _montantEnLettres(S.prix) : '';
-  var lignes = S.vs.map(function(v){ return '<tr><td>'+E(dateShort(v.date))+'</td><td>'+E(v.ref||v.id)+'</td><td>'+E(v.objet||'Valeur initiale logement')+'</td><td>'+E(v.mode||'—')+'</td><td style="text-align:right;">'+n(v.montant_impute!=null ? v.montant_impute : (parseFloat(v.montant)||0))+(v.partiel?' <span style="font-size:10px;color:#555;">(sur '+n(parseFloat(v.montant)||0)+', le solde est imputé sur les modifications)</span>':'')+'</td></tr>'; }).join('');
-  /* Récapitulatif par nature de versement (champ « Concerne » du versement). */
-  var parObjet = {}, ordreObjet = [];
-  S.vs.forEach(function(v){ var o = v.objet || 'Valeur initiale logement'; if(!(o in parObjet)){ parObjet[o] = 0; ordreObjet.push(o); } parObjet[o] += (v.montant_impute!=null ? v.montant_impute : (parseFloat(v.montant)||0)); });
-  var recapObjet = ordreObjet.length>1 ? '<h3>Répartition des versements par nature</h3><table><thead><tr><th>Concerne</th><th style="text-align:right;">Montant (FCFA)</th></tr></thead><tbody>'
-    + ordreObjet.map(function(o){ return '<tr><td>'+E(o)+'</td><td style="text-align:right;">'+n(parObjet[o])+'</td></tr>'; }).join('') + '</tbody></table>' : '';
+  /* Tableau des versements PRÉSENTÉ PAR MOTIF (champ « Concerne ») : permet de suivre l'amortissement de la valeur
+     initiale du logement et le solde des modifications / terrains supplémentaires acquis. */
+  var MOT_INI = 'Valeur initiale logement', MOT_MOD = 'Modification', MOT_TER = 'Terrain supplémentaire';
+  var motDu = {}; motDu[MOT_INI] = fin ? PX.initial : S.prix;
+  if(fin){
+    PX.modifs.forEach(function(m){ var k = (m.nature==='Terrain supplémentaire') ? MOT_TER : MOT_MOD; motDu[k] = (motDu[k]||0) + m.montant; });
+  }
+  var motVers = {}, motOrdre = [MOT_INI, MOT_MOD, MOT_TER];
+  S.vs.forEach(function(v){
+    var o = (v.objet||'').trim() || MOT_INI;
+    (motVers[o] = motVers[o] || []).push(v);
+    if(motOrdre.indexOf(o) === -1) motOrdre.push(o);
+  });
+  motOrdre = motOrdre.filter(function(o){ return (motDu[o]||0) > 0.5 || (motVers[o]||[]).length; });
+  var montV = function(v){ return v.montant_impute!=null ? v.montant_impute : (parseFloat(v.montant)||0); };
+  var resteTxt = function(du, ve){ var r = du - ve; return r > 0.5 ? n(r) : (r < -0.5 ? '<span style="color:#b45309;">excédent '+n(-r)+'</span>' : '0'); };
+  var recapMotifs = '<h3>Amortissement par motif</h3><table><thead><tr><th>Motif (concerne)</th><th style="text-align:right;">Valeur due (FCFA)</th><th style="text-align:right;">Versé (FCFA)</th><th style="text-align:right;">Reste dû (FCFA)</th></tr></thead><tbody>'
+    + motOrdre.map(function(o){
+        var ve = (motVers[o]||[]).reduce(function(t,v){ return t + montV(v); }, 0), du = motDu[o]||0;
+        return '<tr><td>'+E(o)+'</td><td style="text-align:right;">'+(du?n(du):'—')+'</td><td style="text-align:right;">'+n(ve)+'</td><td style="text-align:right;">'+(du?resteTxt(du, ve):'—')+'</td></tr>';
+      }).join('')
+    + '<tr><td><strong>Total</strong></td><td style="text-align:right;"><strong>'+n(S.prix)+'</strong></td><td style="text-align:right;"><strong>'+n(S.verse)+'</strong></td><td style="text-align:right;"><strong>'+resteTxt(S.prix, S.verse)+'</strong></td></tr></tbody></table>'
+    + '<div class="art" style="font-size:11px;color:#555;">Les versements saisis sans motif précis sont rattachés à « '+MOT_INI+' ». Un excédent sur un motif est compensé par le reliquat d\'un autre motif : seul le total détermine le solde.</div>';
+  var detailMotifs = '<h3>Détail des versements par motif</h3>' + motOrdre.map(function(o){
+    var vs = motVers[o]||[], ve = vs.reduce(function(t,v){ return t + montV(v); }, 0);
+    if(!vs.length) return '<table><thead><tr><th colspan="4">'+E(o)+'</th></tr></thead><tbody><tr><td colspan="4">Aucun versement enregistré sur ce motif.</td></tr></tbody></table>';
+    return '<table><thead><tr><th colspan="4">'+E(o)+'</th></tr><tr><th>Date</th><th>Référence</th><th>Mode</th><th style="text-align:right;">Montant (FCFA)</th></tr></thead><tbody>'
+      + vs.map(function(v){ return '<tr><td>'+E(dateShort(v.date))+'</td><td>'+E(v.ref||v.id)+'</td><td>'+E(v.mode||'—')+'</td><td style="text-align:right;">'+n(montV(v))+(v.partiel?' <span style="font-size:10px;color:#555;">(sur '+n(parseFloat(v.montant)||0)+', le solde est imputé sur les modifications)</span>':'')+'</td></tr>'; }).join('')
+      + '<tr><td colspan="3"><strong>Sous-total — '+E(o)+'</strong></td><td style="text-align:right;"><strong>'+n(ve)+'</strong></td></tr></tbody></table>';
+  }).join('');
   var ident = ov.piece || [c.piece_type, c.piece_num && ('N° '+c.piece_num)].filter(Boolean).join(' ');
   if(ov.bien) bien = E(ov.bien);
   var promoteur = attSoldePromoteurTexte(p);
@@ -115001,9 +115025,7 @@ function attSoldeHtml(c, opts){
         + PX.modifs.map(function(m){ return '<tr><td>'+E(dateShort(m.date))+'</td><td>'+E(m.nature)+' : '+E(m.libelle)+'</td><td style="text-align:right;">'+n(m.montant)+'</td></tr>'; }).join('')
         + '<tr><td colspan="2"><strong>Valeur finale du bien</strong></td><td style="text-align:right;"><strong>'+n(PX.total)+'</strong></td></tr></tbody></table>' : '')
     + (!fin && avecModifs ? '<div class="art" style="font-size:11.5px;color:#444;">La présente attestation porte uniquement sur le <strong>prix initial</strong> du bien. Les modifications de construction demandées par le souscripteur, d\'un montant de <strong>'+n(PX.sommeModifs)+' FCFA</strong>, font l\'objet d\'une attestation de solde distincte (valeur finale du bien).</div>' : '')
-    + '<table><thead><tr><th>Date</th><th>Référence</th><th>Concerne</th><th>Mode</th><th style="text-align:right;">Montant (FCFA)</th></tr></thead><tbody>'+lignes
-    + '<tr><td colspan="4"><strong>'+(fin?'Total versé (prix initial et modifications)':(avecModifs?'Total imputé sur le prix initial':'Total versé sur le prix'))+'</strong></td><td style="text-align:right;"><strong>'+n(S.verse)+'</strong></td></tr></tbody></table>'
-    + recapObjet
+    + recapMotifs + detailMotifs
     + '<div class="mont">Solde restant dû : 0 FCFA</div>'
     + (S.frais>0?'<div class="art" style="font-size:11.5px;color:#555;">Les frais de souscription ('+n(S.frais)+' FCFA) ne sont pas imputés sur le prix et ne figurent pas dans le tableau ci-dessus.</div>':'')
     + '<h3>Portée et réserves</h3>'
