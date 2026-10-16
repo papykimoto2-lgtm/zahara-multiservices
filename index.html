@@ -114952,6 +114952,25 @@ function attSoldePromoteurTexte(p){
   var E = function(x){ return escHtml(x==null?'':String(x)); };
   return E(p.societe||'La société') + (p.rccm?(', RCCM '+E(p.rccm)):'') + (p.dgi?(', N° CC '+E(p.dgi)):'') + (p.agrement?(', agréée en qualité de promoteur immobilier sous le N° '+E(p.agrement)):', promoteur immobilier') + (p.adresse?(', siège : '+E(String(p.adresse).replace(/\s*\n\s*/g,', '))):'');
 }
+/* Mise en page à l'impression (saut de page avant « Portée et réserves », pied de page répété) — constante partagée. */
+var ATT_MEP_CSS = '.pg{width:100%;margin:0;border-collapse:collapse;}.pg>tbody>tr>td,.pg>tfoot>tr>td{border:0 !important;padding:0 !important;}.fin-bloc{break-inside:avoid;page-break-inside:avoid;}@media print{body{min-height:0 !important;padding-bottom:0 !important;}.pg{height:268mm;}.pg>tfoot{display:table-footer-group;}.pied{position:static !important;margin:8px 0 0 !important;font-size:9.5px !important;}.fin-bloc{break-before:page;page-break-before:always;font-size:12px;min-height:238mm;}}h3{break-after:avoid;}table{break-inside:auto;}tr{break-inside:avoid;}@media print{.dense{font-size:10px;line-height:1.25;}.dense h1{font-size:16px !important;margin:5px 0 2px !important;}.dense .sub{margin-bottom:5px !important;font-size:10.5px !important;}.dense h3{margin:6px 0 2px !important;font-size:11px !important;}.dense .art{margin:2px 0 !important;}.dense table{margin:3px 0 4px !important;}.dense td,.dense th{padding:1.5px 6px !important;font-size:9.8px !important;}.dense .mont{margin:4px 0 !important;padding:4px !important;font-size:12.5px !important;}.cmf{font-size:11.6px;line-height:1.42;}.cmf h1{font-size:19px !important;margin:12px 0 3px !important;}.cmf .sub{margin-bottom:12px !important;font-size:12px !important;}.cmf h3{margin:16px 0 5px !important;font-size:12.5px !important;}.cmf .art{margin:4px 0 !important;}.cmf table{margin:5px 0 8px !important;}.cmf td,.cmf th{padding:3.5px 8px !important;font-size:11.4px !important;}.cmf .mont{margin:14px 0 !important;padding:9px !important;font-size:15px !important;}.doc-logo-auto{margin:0 0 6px !important;}.doc-logo-auto img{max-height:44px !important;}.fin-bloc h3{margin:12px 0 8px !important;font-size:14px !important;}.fin-bloc .art{margin:9px 0 !important;font-size:13px !important;line-height:1.5 !important;}.fin-bloc .sig{margin-top:46px !important;}.fin-bloc .sig div{font-size:13px !important;min-height:78mm;}}';
+function attBlocFermant(h, i){ var re = /<div\b|<\/div>/g, depth = 0, m; re.lastIndex = i; while((m = re.exec(h))){ if(m[0].charAt(1) === '/'){ depth--; if(!depth) return re.lastIndex; } else depth++; } return -1; }
+/* Attestation DÉJÀ VALIDÉE (html figé) : le texte, les montants et le document enregistré ne changent pas ; seule la présentation
+   à l'écran / à l'impression est mise à niveau (saut de page avant « Portée et réserves », pied de page sur chaque page). */
+function attSoldeMiseEnPage(h){
+  if(!h || h.indexOf('fin-bloc') !== -1) return h;
+  var iB = h.indexOf('<body>'), jB = h.lastIndexOf('</body>'), T = '<h3>Portée et réserves</h3>';
+  if(iB < 0 || jB < 0 || h.indexOf(T) < 0) return h;
+  var inner = h.slice(iB + 6, jB), pied = '', ip = inner.indexOf('<div class="pied"');
+  if(ip >= 0){ var ep = attBlocFermant(inner, ip); if(ep > 0){ pied = inner.slice(ip, ep); inner = inner.slice(0, ip) + inner.slice(ep); } }
+  var is = inner.indexOf('<div class="sig">'), ih = inner.indexOf(T); if(is < 0 || ih < 0 || ih > is) return h;
+  var es = attBlocFermant(inner, is); if(es < 0) return h;
+  var qr = ''; try{ if(typeof printQrFooter === 'function' && inner.indexOf('doc-qr') < 0) qr = printQrFooter(docRefFromHtml(h)); }catch(e){}
+  inner = inner.slice(0, ih) + '<div class="fin-bloc">' + inner.slice(ih, es) + qr + '</div>' + inner.slice(es);
+  var dense = (inner.split('<tr').length - 1) > 24;
+  return h.slice(0, iB).replace('</head>', '<style>' + ATT_MEP_CSS + '</style></head>')
+    + '<body><table class="pg ' + (dense ? 'dense' : 'cmf') + '"><tbody><tr><td>' + inner + '</td></tr></tbody><tfoot><tr><td>' + pied + '</td></tr></tfoot></table></body></html>';
+}
 function attSoldeHtmlFinal(a, c){
   var h = (a && a.html) || '';
   /* Document validé AVEC le nom par défaut « ImmoSuite ERP » (identité du promoteur jamais renseignée à l'époque) : on corrige
@@ -114963,9 +114982,12 @@ function attSoldeHtmlFinal(a, c){
     h = h.replace('<strong style="font-size:15px;">ImmoSuite ERP</strong>', '<strong style="font-size:15px;">' + escHtml(ent.societe || '') + '</strong>');
     h = h.split('ImmoSuite ERP').join(nom);
   }
-  if (!h || h.indexOf('class="pied"') !== -1) return h;
-  var pied = docPiedDePageEntreprise(c ? attSoldeEntreprise(c) : null); if (!pied) return h;
-  return h.replace('</head>', '<style>'+ATT_PIED_CSS+'</style></head>').replace('</body>', pied+'</body>');
+  if (!h) return h;
+  if (h.indexOf('class="pied"') === -1) {
+    var pied = docPiedDePageEntreprise(c ? attSoldeEntreprise(c) : null);
+    if (pied) h = h.replace('</head>', '<style>'+ATT_PIED_CSS+'</style></head>').replace('</body>', pied+'</body>');
+  }
+  return attSoldeMiseEnPage(h);
 }
 function attSoldeHtml(c, opts){
   opts = opts || {};
@@ -115028,7 +115050,7 @@ function attSoldeHtml(c, opts){
     + ATT_PIED_CSS
     /* Mise en page à l'impression : document resserré (tient sur une page quand c'est possible) ; la zone « Portée et réserves »
        + signatures reste d'un seul tenant : la signature du DG n'est jamais seule sur une page. */
-    + '.pg{width:100%;margin:0;border-collapse:collapse;}.pg>tbody>tr>td,.pg>tfoot>tr>td{border:0 !important;padding:0 !important;}.fin-bloc{break-inside:avoid;page-break-inside:avoid;}@media print{body{min-height:0 !important;padding-bottom:0 !important;}.pg{height:268mm;}.pg>tfoot{display:table-footer-group;}.pied{position:static !important;margin:8px 0 0 !important;font-size:9.5px !important;}.fin-bloc{break-before:page;page-break-before:always;font-size:12px;min-height:238mm;}}h3{break-after:avoid;}table{break-inside:auto;}tr{break-inside:avoid;}@media print{.dense{font-size:10px;line-height:1.25;}.dense h1{font-size:16px !important;margin:5px 0 2px !important;}.dense .sub{margin-bottom:5px !important;font-size:10.5px !important;}.dense h3{margin:6px 0 2px !important;font-size:11px !important;}.dense .art{margin:2px 0 !important;}.dense table{margin:3px 0 4px !important;}.dense td,.dense th{padding:1.5px 6px !important;font-size:9.8px !important;}.dense .mont{margin:4px 0 !important;padding:4px !important;font-size:12.5px !important;}.cmf{font-size:11.6px;line-height:1.42;}.cmf h1{font-size:19px !important;margin:12px 0 3px !important;}.cmf .sub{margin-bottom:12px !important;font-size:12px !important;}.cmf h3{margin:16px 0 5px !important;font-size:12.5px !important;}.cmf .art{margin:4px 0 !important;}.cmf table{margin:5px 0 8px !important;}.cmf td,.cmf th{padding:3.5px 8px !important;font-size:11.4px !important;}.cmf .mont{margin:14px 0 !important;padding:9px !important;font-size:15px !important;}.doc-logo-auto{margin:0 0 6px !important;}.doc-logo-auto img{max-height:44px !important;}.fin-bloc h3{margin:12px 0 8px !important;font-size:14px !important;}.fin-bloc .art{margin:9px 0 !important;font-size:13px !important;line-height:1.5 !important;}.fin-bloc .sig{margin-top:46px !important;}.fin-bloc .sig div{font-size:13px !important;min-height:78mm;}}'
+    + ATT_MEP_CSS
     + '</style></head><body><table class="pg '+((fin || S.vs.length > 12) ? 'dense' : 'cmf')+'"><tbody><tr><td>'
     + (opts.projet ? '<div class="projet">PROJET — NON VALIDÉ</div>' : '')
     + (opts.indicatif ? '<div class="projet">À TITRE INDICATIF</div>' : '')
@@ -115064,7 +115086,7 @@ function attSoldeHtml(c, opts){
     + (ov.observations ? '<div class="art">6. '+E(ov.observations)+'</div>' : '')
     + '<div class="sig">'+(opts.sansVisa ? '<div></div>' : ATT_VISA_BLOC)
     + '<div>Fait à '+E(p.ville||'____________')+', le '+E(dateShort(opts.date||today()))+'<br><strong>'+E(opts.fonction||'Le Directeur Général / Le Gérant')+'</strong><br>'+E(opts.signataire||'')+'<br><br><br>Signature et cachet</div></div>'
-    + '</div></td></tr></tbody><tfoot><tr><td>' + docPiedDePageEntreprise(p) + '</td></tr></tfoot></table>'
+    + (typeof printQrFooter === 'function' ? printQrFooter('Attestation de solde ' + (opts.numero||'')) : '') + '</div></td></tr></tbody><tfoot><tr><td>' + docPiedDePageEntreprise(p) + '</td></tr></tfoot></table>'
     + '</body></html>';
   return h;
 }
