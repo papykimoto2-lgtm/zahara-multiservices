@@ -506,6 +506,11 @@
     #activites-menu .tab-link{ width:100%; justify-content:flex-start; border-radius:12px; }
   </style>
   <style id="theme-bannieres">
+    .logo-img{ display:block; height:44px; width:auto; max-width:220px; object-fit:contain; }
+    .logo-area .sr-seul{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+    .logo-area .sr-seul::before{ display:none; }
+    .logo-pied{ height:44px; width:auto; max-width:200px; object-fit:contain; background:#fff; border-radius:10px; padding:6px 10px; margin-bottom:8px; }
+    @media (max-width:640px){ .logo-img{ height:36px; max-width:150px; } }
     /* Bannière d'accueil : visible uniquement sur l'accueil. Les divisions ont leur propre bannière. */
     body:not(:has(#activites-pane.active-pane)) :is(.hero,.promesses){ display:none; }
     .div-hero{ position:relative; overflow:hidden; isolation:isolate; color:#fff; width:calc(100% - 32px); max-width:1280px; margin:16px auto 0;
@@ -520,6 +525,14 @@
     .div-hero-puces{ display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
     .div-hero-puces span{ background:#fff; color:var(--vt-navy); font-weight:800; font-size:.8rem; padding:6px 14px; border-radius:99px; }
     .div-hero .hero-btn{ margin-top:18px; }
+    .div-apropos{ display:grid; grid-template-columns:1.3fr 1fr; gap:24px; margin:4px 0 26px; align-items:start; }
+    .div-apropos.seul{ grid-template-columns:1fr; }
+    .div-apropos-txt h3{ font-family:var(--pp-serif); font-weight:800; letter-spacing:-.02em; margin:0 0 8px; }
+    .div-apropos-txt p{ line-height:1.75; color:#2c3a58; margin:0 0 10px; max-width:70ch; }
+    .div-points{ list-style:none; margin:0; padding:18px; background:#fff1e6; border-radius:20px; display:grid; gap:10px; }
+    .div-points li{ display:flex; gap:10px; align-items:flex-start; font-weight:600; font-size:.92rem; }
+    .div-points i{ color:var(--pp-primary); margin-top:3px; }
+    @media (max-width:820px){ .div-apropos{ grid-template-columns:1fr; } }
     /* Dans la carte de contenu du portail : la bannière occupe le haut de la carte, bord à bord. */
     .tab-pane > .div-hero{ width:auto; max-width:none; margin:-40px -32px 28px; border-radius:28px 28px 0 0; }
     @media (max-width:640px){ .tab-pane > .div-hero{ margin:-40px -32px 24px; } }
@@ -3151,7 +3164,7 @@
 
       var DIV_DEGRADES=['linear-gradient(135deg,#0B1B3A,#1d4e89)','linear-gradient(135deg,#0b4f45,#12806b)','linear-gradient(135deg,#7a2410,#d63a1b)','linear-gradient(135deg,#5a3a00,#b36b00)','linear-gradient(135deg,#0B1B3A,#0e5c4a)'];
       var degrade=DIV_DEGRADES[divs.indexOf(d)%DIV_DEGRADES.length];
-      var imgBan=''; for(var q=0;q<gl.length && !imgBan;q++){ imgBan=_imgSur(gl[q].data||gl[q].url)||''; }
+      var imgBan=_imgSur(d.banniere||'')||''; for(var q=0;q<gl.length && !imgBan;q++){ imgBan=_imgSur(gl[q].data||gl[q].url)||''; }   /* bannière saisie dans l'ERP, sinon première photo de la division */
       var puces=[]; if(pl.length) puces.push(pl.length+' produit'+(pl.length>1?'s':'')); if(gl.length) puces.push(gl.length+' photo'+(gl.length>1?'s':'')); if(dl.length) puces.push(dl.length+' document'+(dl.length>1?'s':''));
       var html='<section class="div-hero" style="--dg:'+degrade+'">'
         + (imgBan?'<img class="div-hero-img" src="'+esc(imgBan)+'" alt="" loading="lazy">':'')
@@ -3163,6 +3176,14 @@
         + '<button type="button" class="tab-link hero-btn principal" data-tab="nous-contacter">Nous contacter</button>'
         + '</section>';
       html+='<div class="div-corps">';
+      var apropos=String(d.apropos||'').split(/\n\s*\n|\n/).map(function(x){ return x.trim(); }).filter(Boolean);
+      var points=Array.isArray(d.points)?d.points.filter(Boolean):[];
+      if(apropos.length||points.length){
+        html+='<section class="div-apropos'+(apropos.length&&points.length?'':' seul')+'">';
+        if(apropos.length) html+='<div class="div-apropos-txt"><h3>À propos</h3>'+apropos.map(function(x){ return '<p>'+esc(x)+'</p>'; }).join('')+'</div>';
+        if(points.length) html+='<ul class="div-points">'+points.map(function(x){ return '<li><i class="fas fa-circle-check"></i><span>'+esc(x)+'</span></li>'; }).join('')+'</ul>';
+        html+='</section>';
+      }
 
       if(pl.length){
         html+='<div class="produit-grid">'+pl.map(function(m){
@@ -3329,7 +3350,9 @@
     var nom = BR('nom','Espace client'), slogan = BR('slogan','');
     var _ta=document.querySelector('.p-liste .tab-link.active'); seoMajOnglet(_ta?_ta.getAttribute('data-tab'):'activites',{pop:true});   /* titre, description et adresse canonique de l'onglet courant */
     var la = document.querySelector('.logo-area');
-    if(la){ var lg=BR('logo_url',''); la.innerHTML = (lg ? '<img src="'+esc(lg)+'" alt="'+esc(nom)+'" style="height:44px;max-width:200px;object-fit:contain;">' : '<h1>'+esc(nom)+'</h1>') + '<p>'+esc(slogan)+'</p>'; }
+    var lg0=BR('logo_url','');
+    if(lg0 && /^(https?:|data:image\/)/i.test(lg0)){ var ic=document.querySelector('link[rel="icon"]'); if(ic){ ic.removeAttribute('sizes'); ic.setAttribute('href',lg0); } }
+    if(la){ var lg=BR('logo_url',''); la.innerHTML = (lg ? '<img class="logo-img" src="'+esc(lg)+'" alt="'+esc(nom)+'"><h1 class="sr-seul">'+esc(nom)+'</h1>' : '<h1>'+esc(nom)+'</h1>') + '<p>'+esc(slogan)+'</p>'; }
     var ht=document.querySelector('.hero h2'); if(ht) ht.textContent = BR('hero_titre', nom.toUpperCase());
     var hp=document.querySelector('.hero-content p'); if(hp) hp.textContent = BR('hero_texte', nom + " — votre partenaire immobilier en Côte d'Ivoire.");
     /* Vidéo institutionnelle : n'active la mise en page deux colonnes, et ne
@@ -3536,7 +3559,7 @@
     var e7=document.getElementById('cp-login-aide'); if(e7) e7.innerHTML = aide('votre syndic');
 
     /* Pied de page */
-    var fb=document.getElementById('footer-brand'); if(fb) fb.innerHTML = '<strong>'+esc(nom.toUpperCase())+'</strong>'+(slogan?(' — '+esc(slogan)):'');
+    var fb=document.getElementById('footer-brand'); if(fb) fb.innerHTML = (BR('logo_url','') ? '<img class="logo-pied" src="'+esc(BR('logo_url',''))+'" alt=""><br>' : '') + '<strong>'+esc(nom.toUpperCase())+'</strong>'+(slogan?(' — '+esc(slogan)):'');
     var fc=document.getElementById('footer-contact'); if(fc){ var fcl=_joinDot([siege, tel, email, site]); fc.textContent = fcl; fc.style.display = fcl ? 'block' : 'none'; }
     var fl=document.getElementById('footer-legal');
     if(fl){
