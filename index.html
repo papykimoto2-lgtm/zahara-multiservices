@@ -114997,15 +114997,21 @@ function attSoldeHtml(c, opts){
   var resteTxt = function(du, ve){ var r = du - ve; return r > 0.5 ? n(r) : (r < -0.5 ? '<span style="color:#b45309;">excédent '+n(-r)+'</span>' : '0'); };
   /* Seul le motif « Valeur initiale logement » est présenté (tableau d'amortissement) ; les versements des autres motifs
      (modifications, terrains supplémentaires) ne sont pas détaillés ici. */
-  var viVs = (motVers[MOT_INI]||[]).slice().sort(function(x,y){ return String(x.date||'').localeCompare(String(y.date||'')); });
-  var viDu = motDu[MOT_INI]||0, viVe = viVs.reduce(function(t,v){ return t + montV(v); }, 0), cumulVi = 0;
-  var recapMotifs = '<h3>Tableau d\'amortissement — '+MOT_INI+'</h3>'
-    + '<table><thead><tr><th>Date</th><th>Référence</th><th>Mode</th><th style="text-align:right;">Versement (FCFA)</th><th style="text-align:right;">Cumul versé (FCFA)</th><th style="text-align:right;">Reste dû (FCFA)</th></tr></thead><tbody>'
-    + '<tr><td>—</td><td colspan="2">Valeur initiale du logement</td><td></td><td style="text-align:right;">0</td><td style="text-align:right;">'+n(viDu)+'</td></tr>'
-    + (viVs.length ? viVs.map(function(v){ var m = montV(v); cumulVi += m; return '<tr><td>'+E(dateShort(v.date))+'</td><td>'+E(v.ref||v.id)+'</td><td>'+E(v.mode||'—')+'</td><td style="text-align:right;">'+n(m)+(v.partiel?' <span style="font-size:10px;color:#555;">(sur '+n(parseFloat(v.montant)||0)+', le solde est imputé sur les modifications)</span>':'')+'</td><td style="text-align:right;">'+n(cumulVi)+'</td><td style="text-align:right;">'+resteTxt(viDu, cumulVi)+'</td></tr>'; }).join('')
-        : '<tr><td colspan="6">Aucun versement enregistré.</td></tr>')
-    + '<tr><td colspan="3"><strong>Total</strong></td><td style="text-align:right;"><strong>'+n(viVe)+'</strong></td><td style="text-align:right;"><strong>'+n(viVe)+'</strong></td><td style="text-align:right;"><strong>'+resteTxt(viDu, viVe)+'</strong></td></tr></tbody></table>'
-    + '<div class="art" style="font-size:11px;color:#555;">Les versements saisis sans motif précis sont rattachés à « '+MOT_INI+' ».</div>';
+  var amortTable = function(motif, libelleDu, du){
+    var vs = (motVers[motif]||[]).slice().sort(function(x,y){ return String(x.date||'').localeCompare(String(y.date||'')); });
+    var ve = vs.reduce(function(t,v){ return t + montV(v); }, 0), cumul = 0;
+    return '<h3>Tableau d\'amortissement — '+E(motif)+'</h3>'
+      + '<table><thead><tr><th>Date</th><th>Référence</th><th>Mode</th><th style="text-align:right;">Versement (FCFA)</th><th style="text-align:right;">Cumul versé (FCFA)</th><th style="text-align:right;">Reste dû (FCFA)</th></tr></thead><tbody>'
+      + '<tr><td>—</td><td colspan="2">'+E(libelleDu)+'</td><td></td><td style="text-align:right;">0</td><td style="text-align:right;">'+n(du)+'</td></tr>'
+      + (vs.length ? vs.map(function(v){ var m = montV(v); cumul += m; return '<tr><td>'+E(dateShort(v.date))+'</td><td>'+E(v.ref||v.id)+'</td><td>'+E(v.mode||'—')+'</td><td style="text-align:right;">'+n(m)+(v.partiel?' <span style="font-size:10px;color:#555;">(sur '+n(parseFloat(v.montant)||0)+', le solde est imputé sur les modifications)</span>':'')+'</td><td style="text-align:right;">'+n(cumul)+'</td><td style="text-align:right;">'+resteTxt(du, cumul)+'</td></tr>'; }).join('')
+          : '<tr><td colspan="6">Aucun versement enregistré.</td></tr>')
+      + '<tr><td colspan="3"><strong>Total</strong></td><td style="text-align:right;"><strong>'+n(ve)+'</strong></td><td style="text-align:right;"><strong>'+n(ve)+'</strong></td><td style="text-align:right;"><strong>'+resteTxt(du, ve)+'</strong></td></tr></tbody></table>';
+  };
+  var recapMotifs = amortTable(MOT_INI, 'Valeur initiale du logement', motDu[MOT_INI]||0)
+    + (fin ? [[MOT_MOD, 'Modifications de construction facturées'], [MOT_TER, 'Terrains supplémentaires acquis']].map(function(x){
+        return ((motDu[x[0]]||0) > 0.5 || (motVers[x[0]]||[]).length) ? amortTable(x[0], x[1], motDu[x[0]]||0) : '';
+      }).join('') : '')
+    + '<div class="art" style="font-size:11px;color:#555;">Les versements saisis sans motif précis sont rattachés à « '+MOT_INI+' ».'+(fin?' Un excédent sur un motif est compensé par le reliquat d\'un autre : seul le total de la valeur finale détermine le solde.':'')+'</div>';
   var detailMotifs = '';
   var ident = ov.piece || [c.piece_type, c.piece_num && ('N° '+c.piece_num)].filter(Boolean).join(' ');
   if(ov.bien) bien = E(ov.bien);
