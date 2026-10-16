@@ -491,6 +491,25 @@
     .content-section{ margin-top:34px; }
     @media (prefers-reduced-motion:reduce){ .grid-3 > .card,.kpi,.temoi-card{ transition:none; } }
   </style>
+  <style id="theme-bannieres">
+    /* Bannière d'accueil : visible uniquement sur l'accueil. Les divisions ont leur propre bannière. */
+    body:not(:has(#activites-pane.active-pane)) :is(.hero,.promesses){ display:none; }
+    .div-hero{ position:relative; overflow:hidden; isolation:isolate; color:#fff; width:calc(100% - 32px); max-width:1280px; margin:16px auto 0;
+               border-radius:28px; padding:clamp(28px,5vw,56px) clamp(20px,4vw,48px); background:var(--dg,linear-gradient(135deg,#0B1B3A,#1d4e89)); }
+    .div-hero-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.38; z-index:-2; }
+    .div-hero::before{ content:""; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,rgba(11,27,58,.55),rgba(11,27,58,0) 80%); }
+    .div-hero::after{ content:""; position:absolute; z-index:-1; right:-70px; top:-70px; width:300px; height:300px; border-radius:50%; background:rgba(255,255,255,.12); }
+    .div-hero-ico{ position:absolute; z-index:-1; right:clamp(16px,5vw,60px); bottom:-24px; font-size:clamp(120px,18vw,220px); opacity:.14; line-height:1; }
+    .div-hero-sur{ display:inline-flex; align-items:center; gap:8px; font-size:.74rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; background:rgba(255,255,255,.18); border-radius:99px; padding:6px 14px; }
+    .div-hero h2{ font-family:var(--pp-serif); font-weight:800; letter-spacing:-.02em; font-size:clamp(1.9rem,5vw,3.4rem); line-height:1.05; margin:14px 0 10px; max-width:20ch; text-wrap:balance; }
+    .div-hero p{ max-width:56ch; font-size:clamp(.98rem,1.8vw,1.15rem); line-height:1.6; opacity:.95; }
+    .div-hero-puces{ display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+    .div-hero-puces span{ background:#fff; color:var(--vt-navy); font-weight:800; font-size:.8rem; padding:6px 14px; border-radius:99px; }
+    .div-hero .hero-btn{ margin-top:18px; }
+    /* Dans la carte de contenu du portail : la bannière occupe le haut de la carte, bord à bord. */
+    .tab-pane > .div-hero{ width:auto; max-width:none; margin:-40px -32px 28px; border-radius:28px 28px 0 0; }
+    @media (max-width:640px){ .tab-pane > .div-hero{ margin:-40px -32px 24px; } }
+  </style>
 </head>
 <body>
 <noscript><p style="padding:16px;background:#fff3b0;color:#4d3b00;font-family:system-ui,sans-serif;">Ce site a besoin de JavaScript pour afficher les biens, programmes et votre espace. Informations légales : <a href="/mentions-legales.html">mentions légales</a>, <a href="/confidentialite.html">confidentialité</a>, <a href="/cookies.html">cookies</a>, <a href="/conditions.html">conditions d’utilisation</a>, <a href="/remboursement.html">résiliation et remboursement</a>.</p></noscript>
@@ -2998,12 +3017,20 @@
       var mine=function(m){ return String(m.division_id||'')===String(d.id); };
       var pl=prods.filter(mine), gl=photos.filter(mine), dl=docs.filter(mine);
 
-      var html='<div class="container"><div class="content-section">';
-      html+='<div class="div-intro">';
-      html+= d.slogan ? '<div class="slogan">'+esc(d.slogan)+'</div>' : '';
-      html+='<h3 style="margin-top:6px;"><i class="fas '+esc(ico)+'"></i> '+esc(d.nom)+'</h3>';
-      html+= d.description ? '<p style="margin-top:6px;color:#4a4336;line-height:1.7;">'+esc(d.description)+'</p>' : '';
-      html+='</div>';
+      var DIV_DEGRADES=['linear-gradient(135deg,#0B1B3A,#1d4e89)','linear-gradient(135deg,#0b4f45,#12806b)','linear-gradient(135deg,#7a2410,#d63a1b)','linear-gradient(135deg,#5a3a00,#b36b00)','linear-gradient(135deg,#0B1B3A,#0e5c4a)'];
+      var degrade=DIV_DEGRADES[divs.indexOf(d)%DIV_DEGRADES.length];
+      var imgBan=''; for(var q=0;q<gl.length && !imgBan;q++){ imgBan=_imgSur(gl[q].data||gl[q].url)||''; }
+      var puces=[]; if(pl.length) puces.push(pl.length+' produit'+(pl.length>1?'s':'')); if(gl.length) puces.push(gl.length+' photo'+(gl.length>1?'s':'')); if(dl.length) puces.push(dl.length+' document'+(dl.length>1?'s':''));
+      var html='<section class="div-hero" style="--dg:'+degrade+'">'
+        + (imgBan?'<img class="div-hero-img" src="'+esc(imgBan)+'" alt="" loading="lazy">':'')
+        + '<i class="fas '+esc(ico)+' div-hero-ico" aria-hidden="true"></i>'
+        + '<span class="div-hero-sur"><i class="fas '+esc(ico)+'"></i> Nos activités'+(d.slogan?(' · '+esc(d.slogan)):'')+'</span>'
+        + '<h2>'+esc(d.nom)+'</h2>'
+        + (d.description?'<p>'+esc(d.description)+'</p>':'')
+        + (puces.length?'<div class="div-hero-puces">'+puces.map(function(x){ return '<span>'+x+'</span>'; }).join('')+'</div>':'')
+        + '<button type="button" class="tab-link hero-btn principal" data-tab="nous-contacter">Nous contacter</button>'
+        + '</section>';
+      html+='<div class="div-corps">';
 
       if(pl.length){
         html+='<div class="produit-grid">'+pl.map(function(m){
@@ -3036,12 +3063,13 @@
       if(!pl.length && !gl.length && !dl.length){
         html+='<div class="div-vide">Contenu en cours de publication.</div>';
       }
-      html+='</div></div>';
+      html+='</div>';
 
       var pane=document.createElement('div');
       pane.id=tab+'-pane'; pane.className='tab-pane';
       pane.innerHTML=html;
       zone.appendChild(pane);
+      [].forEach.call(pane.querySelectorAll('.tab-link'), brancherOnglet);
     });
 
     /* Restaure l'onglet division actif s'il existe toujours. */

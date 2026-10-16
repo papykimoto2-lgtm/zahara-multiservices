@@ -56,3 +56,10 @@ test('parcours : ordre des onglets en marche en avant', () => {
   assert.ok(html.includes('data-tab="souscripteur"') && html.includes('id="espace-menu"'));
   assert.ok(html.includes('id="nav-divisions"'));
 });
+
+test('bannières : accueil seulement, une bannière par division', () => {
+  assert.ok(html.includes('body:not(:has(#activites-pane.active-pane)) :is(.hero,.promesses)'));
+  assert.ok(html.includes("class=\"div-hero\""));
+  assert.ok(html.includes('data-tab="nous-contacter">Nous contacter'));
+  assert.ok(!html.includes("html+='<div class=\"div-intro\">'"));
+});
