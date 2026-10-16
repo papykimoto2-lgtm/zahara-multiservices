@@ -2403,7 +2403,7 @@
     html+='<div class="sub on" id="s-fin"><div class="card"><strong>📈 Avancement du programme</strong><div class="prog"><div style="width:'+av+'%;"></div></div><div style="display:flex; justify-content:space-between; font-size:.85rem;"><span>'+esc(sProgNom())+'</span><strong>'+av+'%</strong></div></div>'
       +'<div class="card"><strong>📋 Derniers versements</strong>'+derniersVers(vs)+'</div></div>';
     html+='<div class="sub" id="s-ech"><div class="card"><strong>📅 Échéancier</strong><div style="overflow-x:auto;"><table><thead><tr><th>N°</th><th>Échéance</th><th>Montant</th><th>Statut</th></tr></thead><tbody>'+echeancier()+'</tbody></table></div><div style="font-size:.72rem; color:#4b6a8b; margin-top:8px;">Mensualité = (Prix − Apport) ÷ Durée. Frais exclus.</div></div></div>';
-    html+='<div class="sub" id="s-ver"><div class="card"><strong>💳 Historique des versements</strong><div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Mode</th></tr></thead><tbody>'+tableVers(vs)+'</tbody></table></div></div></div>';
+    html+='<div class="sub" id="s-ver"><div class="card"><strong>💳 Historique des versements</strong><div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Type</th><th>Concerne</th><th>Montant</th><th>Mode</th></tr></thead><tbody>'+tableVers(vs)+'</tbody></table></div></div></div>';
     html+='<div class="sub" id="s-tra">'+blocTravaux()+'</div>';
     html+='<div class="sub" id="s-rec">'+blocReception()+'</div>';
     if(S.suivi) html+='<div class="sub" id="s-tit">'+blocSuiviTitre()+blocPiecesTitre()+blocDeboursTitre()+'</div>';
@@ -2471,7 +2471,7 @@
   function derniersVers(vs){
     var r=vs.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).slice(0,5);
     if(!r.length) return '<p style="color:#4b6a8b; margin-top:8px;">Aucun versement.</p>';
-    return r.map(function(v){ return '<div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #eef2f8;"><span>'+dshort(v.date)+' · '+esc(labelType(v.type))+'</span><strong style="color:#16a34a;">+'+fmt(v.montant)+' F</strong></div>'; }).join('');
+    return r.map(function(v){ return '<div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #eef2f8;"><span>'+dshort(v.date)+' · '+esc(labelType(v.type))+(v.objet?' · '+esc(v.objet):'')+'</span><strong style="color:#16a34a;">+'+fmt(v.montant)+' F</strong></div>'; }).join('');
   }
   function echeancier(){
     var c=S.client, total=parseFloat(c.montant_total)||0, apport=parseFloat(c.apport)||0, duree=parseInt(c.duree)||0;
@@ -2488,8 +2488,8 @@
   }
   function tableVers(vs){
     var s=vs.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
-    if(!s.length) return '<tr><td colspan="4">Aucun versement.</td></tr>';
-    return s.map(function(v){ var b=v.type==='frais_souscription'?'<span class="pill p-or">Frais</span>':'<span class="pill p-gris">'+esc(labelType(v.type))+'</span>'; return '<tr><td>'+dshort(v.date)+'</td><td>'+b+'</td><td>'+fmt(v.montant)+' F</td><td>'+esc(v.mode||'—')+'</td></tr>'; }).join('');
+    if(!s.length) return '<tr><td colspan="5">Aucun versement.</td></tr>';
+    return s.map(function(v){ var b=v.type==='frais_souscription'?'<span class="pill p-or">Frais</span>':'<span class="pill p-gris">'+esc(labelType(v.type))+'</span>'; return '<tr><td>'+dshort(v.date)+'</td><td>'+b+'</td><td>'+esc(v.objet||'Valeur initiale logement')+'</td><td>'+fmt(v.montant)+' F</td><td>'+esc(v.mode||'—')+'</td></tr>'; }).join('');
   }
   function sRapportsLies(){
     /* [FIX] Ne filtrait jamais par visibilite : un rapport marqué "Interne
@@ -2579,8 +2579,8 @@
     var c=S.client, vs=sVers();
     var vp=vs.filter(surPrix).reduce(function(s,v){return s+(parseFloat(v.montant)||0);},0);
     var fr=vs.filter(function(v){return v.type==='frais_souscription';}).reduce(function(s,v){return s+(parseFloat(v.montant)||0);},0);
-    var lg=vs.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).map(function(v){return '<tr><td>'+dshort(v.date)+'</td><td>'+esc(labelType(v.type))+'</td><td>'+fmt(v.montant)+' FCFA</td></tr>';}).join('');
-    imprimer('Attestation '+(c.dossier||''),'<h2>Attestation de versements</h2><p>Je soussigné(e) '+esc((c.prenoms||'')+' '+(c.nom||''))+' (dossier '+esc(c.dossier||'')+') atteste des versements suivants :</p><table><thead><tr><th>Date</th><th>Type</th><th>Montant</th></tr></thead><tbody>'+lg+'</tbody></table><p style="margin-top:10px;"><strong>Total versé sur le prix : '+fmt(vp)+' FCFA</strong>'+(fr>0?'<br>Frais de souscription (non remboursables) : '+fmt(fr)+' FCFA':'')+'</p><p>Fait le '+new Date().toLocaleDateString('fr-FR')+'</p>');
+    var lg=vs.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).map(function(v){return '<tr><td>'+dshort(v.date)+'</td><td>'+esc(labelType(v.type))+'</td><td>'+esc(v.objet||'Valeur initiale logement')+'</td><td>'+fmt(v.montant)+' FCFA</td></tr>';}).join('');
+    imprimer('Attestation '+(c.dossier||''),'<h2>Attestation de versements</h2><p>Je soussigné(e) '+esc((c.prenoms||'')+' '+(c.nom||''))+' (dossier '+esc(c.dossier||'')+') atteste des versements suivants :</p><table><thead><tr><th>Date</th><th>Type</th><th>Concerne</th><th>Montant</th></tr></thead><tbody>'+lg+'</tbody></table><p style="margin-top:10px;"><strong>Total versé sur le prix : '+fmt(vp)+' FCFA</strong>'+(fr>0?'<br>Frais de souscription (non remboursables) : '+fmt(fr)+' FCFA':'')+'</p><p>Fait le '+new Date().toLocaleDateString('fr-FR')+'</p>');
   }
 
   /* ═══════════════════════════════════
