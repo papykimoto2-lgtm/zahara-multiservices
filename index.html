@@ -115028,8 +115028,8 @@ function attSoldeHtml(c, opts){
     + ATT_PIED_CSS
     /* Mise en page à l'impression : document resserré (tient sur une page quand c'est possible) ; la zone « Portée et réserves »
        + signatures reste d'un seul tenant : la signature du DG n'est jamais seule sur une page. */
-    + '.fin-bloc{break-inside:avoid;page-break-inside:avoid;}@media print{.fin-bloc{break-before:page;page-break-before:always;font-size:12px;}.fin-bloc .art{margin:6px 0 !important;font-size:12px;line-height:1.45;}.fin-bloc h3{margin:10px 0 6px !important;font-size:13px !important;}.fin-bloc .sig{margin-top:40px !important;}.fin-bloc .sig div{font-size:12px !important;}}h3{break-after:avoid;}table{break-inside:auto;}tr{break-inside:avoid;}@media print{body{font-size:9.6px !important;line-height:1.22 !important;}h1{font-size:15px !important;margin:4px 0 1px !important;}.sub{margin-bottom:4px !important;font-size:10px !important;}h3{margin:5px 0 2px !important;font-size:10.5px !important;}.art{margin:1px 0 !important;}table{margin:2px 0 3px !important;}td,th{padding:1px 6px !important;font-size:9.4px !important;}.mont{margin:3px 0 !important;padding:3px !important;font-size:12px !important;}.sig{margin-top:6px !important;}.sig div{font-size:10px !important;}.doc-logo-auto{margin:0 0 4px !important;}.doc-logo-auto img{max-height:38px !important;}}'
-    + '</style></head><body>'
+    + '.pg{width:100%;margin:0;border-collapse:collapse;}.pg>tbody>tr>td,.pg>tfoot>tr>td{border:0 !important;padding:0 !important;}.fin-bloc{break-inside:avoid;page-break-inside:avoid;}@media print{body{min-height:0 !important;padding-bottom:0 !important;}.pg{height:268mm;}.pg>tfoot{display:table-footer-group;}.pied{position:static !important;margin:8px 0 0 !important;font-size:9.5px !important;}.fin-bloc{break-before:page;page-break-before:always;font-size:12px;min-height:238mm;}.fin-bloc .art{margin:6px 0 !important;font-size:12px;line-height:1.45;}.fin-bloc h3{margin:10px 0 6px !important;font-size:13px !important;}.fin-bloc .sig{margin-top:40px !important;}.fin-bloc .sig div{font-size:12px !important;}}h3{break-after:avoid;}table{break-inside:auto;}tr{break-inside:avoid;}@media print{body{font-size:9.6px !important;line-height:1.22 !important;}h1{font-size:15px !important;margin:4px 0 1px !important;}.sub{margin-bottom:4px !important;font-size:10px !important;}h3{margin:5px 0 2px !important;font-size:10.5px !important;}.art{margin:1px 0 !important;}table{margin:2px 0 3px !important;}td,th{padding:1px 6px !important;font-size:9.4px !important;}.mont{margin:3px 0 !important;padding:3px !important;font-size:12px !important;}.sig{margin-top:6px !important;}.sig div{font-size:10px !important;}.doc-logo-auto{margin:0 0 4px !important;}.doc-logo-auto img{max-height:38px !important;}}'
+    + '</style></head><body><table class="pg"><tbody><tr><td>'
     + (opts.projet ? '<div class="projet">PROJET — NON VALIDÉ</div>' : '')
     + (opts.indicatif ? '<div class="projet">À TITRE INDICATIF</div>' : '')
     + '<div class="ref"><div><strong style="font-size:15px;">'+E(p.societe||'')+'</strong></div><div style="text-align:right;">N° <strong>'+E(opts.numero||'—')+'</strong><br>Dossier : '+E(c.dossier||c.id)+'</div></div>'
@@ -115064,7 +115064,7 @@ function attSoldeHtml(c, opts){
     + (ov.observations ? '<div class="art">6. '+E(ov.observations)+'</div>' : '')
     + '<div class="sig">'+(opts.sansVisa ? '<div></div>' : ATT_VISA_BLOC)
     + '<div>Fait à '+E(p.ville||'____________')+', le '+E(dateShort(opts.date||today()))+'<br><strong>'+E(opts.fonction||'Le Directeur Général / Le Gérant')+'</strong><br>'+E(opts.signataire||'')+'<br><br><br>Signature et cachet</div></div>'
-    + '</div>' + docPiedDePageEntreprise(p)
+    + '</div></td></tr></tbody><tfoot><tr><td>' + docPiedDePageEntreprise(p) + '</td></tr></tfoot></table>'
     + '</body></html>';
   return h;
 }
