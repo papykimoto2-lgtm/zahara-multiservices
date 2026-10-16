@@ -115048,7 +115048,6 @@ function attSoldeHtml(c, opts){
         + '<tr><td>—</td><td>Prix initial du bien</td><td style="text-align:right;">'+n(PX.initial)+'</td></tr>'
         + PX.modifs.map(function(m){ return '<tr><td>'+E(dateShort(m.date))+'</td><td>'+E(m.nature)+' : '+E(m.libelle)+'</td><td style="text-align:right;">'+n(m.montant)+'</td></tr>'; }).join('')
         + '<tr><td colspan="2"><strong>Valeur finale du bien</strong></td><td style="text-align:right;"><strong>'+n(PX.total)+'</strong></td></tr></tbody></table>' : '')
-    + (!fin && avecModifs ? '<div class="art" style="font-size:11.5px;color:#444;">La présente attestation porte uniquement sur le <strong>prix initial</strong> du bien. Les modifications de construction demandées par le souscripteur, d\'un montant de <strong>'+n(PX.sommeModifs)+' FCFA</strong>, font l\'objet d\'une attestation de solde distincte (valeur finale du bien).</div>' : '')
     + recapMotifs + detailMotifs
     + '<div class="mont">Solde restant dû : 0 FCFA</div>'
     + (S.frais>0?'<div class="art" style="font-size:11.5px;color:#555;">Les frais de souscription ('+n(S.frais)+' FCFA) ne sont pas imputés sur le prix et ne figurent pas dans le tableau ci-dessus.</div>':'')
