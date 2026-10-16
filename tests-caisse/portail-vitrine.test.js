@@ -69,3 +69,9 @@ test('menu Activités : divisions regroupées dans un déroulant', () => {
   assert.ok(html.includes('function toggleActivitesMenu(') && html.includes('window.toggleActivitesMenu'));
   assert.ok(html.indexOf('id="nav-divisions"') > html.indexOf('id="activites-menu"'));
 });
+
+test('location et programmes : cartes illustrées, filtres et tri', () => {
+  ['location-outils','location-nav','location-tri','programme-outils','programme-nav'].forEach(id => assert.ok(html.includes('id="' + id + '"'), id));
+  ['carteLocation','renderLocations','carteProgramme','renderProgrammesListe','photoProgramme'].forEach(f => assert.ok(html.includes('function ' + f + '('), f));
+  assert.ok(html.includes('function peuplerLocationsSelect(') && html.includes('choisirLocationPourReservation'));
+});

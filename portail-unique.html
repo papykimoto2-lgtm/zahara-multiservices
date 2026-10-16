@@ -518,6 +518,20 @@
     .tab-pane > .div-hero{ width:auto; max-width:none; margin:-40px -32px 28px; border-radius:28px 28px 0 0; }
     @media (max-width:640px){ .tab-pane > .div-hero{ margin:-40px -32px 24px; } }
   </style>
+  <style id="theme-location">
+    /* Location et Programmes : mêmes cartes illustrées que le catalogue */
+    .vt-etat{ position:absolute; left:12px; bottom:12px; }
+    .vt-etat .pill{ box-shadow:0 2px 8px rgba(11,27,58,.2); background:#fff; color:var(--vt-navy); font-weight:800; }
+    .vt-actions{ display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; }
+    .vt-actions .highlight-btn{ flex:1 1 130px; margin-top:0; padding:11px 14px; }
+    .vt-lien{ flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; border:2px solid var(--vt-navy); color:var(--vt-navy); border-radius:99px; padding:9px 14px; font-weight:800; font-size:.82rem; text-decoration:none; }
+    .vt-lien:hover{ background:var(--vt-navy); color:#fff; }
+    .vt-meta{ font-size:.82rem; color:#4b5a78; display:flex; gap:6px; align-items:flex-start; }
+    .vt-desc{ font-size:.86rem; color:#3c4a66; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .vt-barre{ height:8px; border-radius:99px; background:#f0e4d8; overflow:hidden; margin:4px 0 2px; }
+    .vt-barre i{ display:block; height:100%; background:linear-gradient(90deg,var(--vt-coral),var(--vt-sun)); }
+    .vt-barre-lib{ font-size:.78rem; color:#4b5a78; display:flex; justify-content:space-between; gap:8px; }
+  </style>
 </head>
 <body>
 <noscript><p style="padding:16px;background:#fff3b0;color:#4d3b00;font-family:system-ui,sans-serif;">Ce site a besoin de JavaScript pour afficher les biens, programmes et votre espace. Informations légales : <a href="/mentions-legales.html">mentions légales</a>, <a href="/confidentialite.html">confidentialité</a>, <a href="/cookies.html">cookies</a>, <a href="/conditions.html">conditions d’utilisation</a>, <a href="/remboursement.html">résiliation et remboursement</a>.</p></noscript>
@@ -721,7 +735,8 @@
     <div class="grid-3" id="programme-cards" style="margin-top:8px; display:none;"></div>
     <p style="margin-top:14px; display:none;" id="programme-composition"></p>
     <h4 style="margin-top:24px;" id="programme-liste-titre"><i class="fas fa-building"></i> Tous nos programmes</h4>
-    <div class="grid-3" id="programme-liste-cards" style="margin-top:10px;"><div style="color:#6b6150;"><span class="spinner dark"></span> Chargement…</div></div>
+    <div class="vt-outils" id="programme-outils" style="display:none;"><div class="subnav" id="programme-nav" role="group" aria-label="Statut des programmes"></div></div>
+    <div class="vt-cat-grid" id="programme-liste-cards" style="margin-top:10px;"><div style="color:#6b6150;"><span class="spinner dark"></span> Chargement…</div></div>
     <div id="eden-videos-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-video"></i> Vidéos</h4><div id="eden-videos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:10px;"></div></div>
     <div id="eden-gallery-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-images"></i> Galerie photos</h4><div id="eden-gallery" class="photo-grid"></div></div>
     <div id="eden-docs-wrap" style="display:none;"><h4 style="margin-top:18px;"><i class="fas fa-folder-open"></i> Documents à télécharger</h4><div id="eden-docs" style="display:flex;flex-direction:column;gap:8px;margin-top:10px;"></div></div>
@@ -750,10 +765,14 @@
   <div id="location-pane" class="tab-pane">
     <h3><i class="fas fa-key"></i> Nos biens en location</h3>
     <p style="margin-bottom:14px;">Consultez nos biens disponibles à la location : disponibilité, localisation et photos. Réservez en ligne, un commercial confirme votre dossier sous 48 h.</p>
-    <div id="location-cards" class="grid-3"><div style="color:#4b6a8b;">Chargement du catalogue locatif…</div></div>
+    <div class="vt-outils" id="location-outils" style="display:none;">
+      <div class="subnav" id="location-nav" role="group" aria-label="Disponibilité"></div>
+      <label style="font-size:.82rem;color:#4b5a78;">Trier par <select id="location-tri" aria-label="Tri des locations"><option value="">Ordre du catalogue</option><option value="asc">Loyer croissant</option><option value="desc">Loyer décroissant</option></select></label>
+    </div>
+    <div id="location-cards" class="vt-cat-grid"><div style="color:#4b6a8b;">Chargement du catalogue locatif…</div></div>
     <div id="location-gallery-wrap" style="display:none; margin-top:24px;">
       <h4><i class="fas fa-images"></i> Photos des biens en location</h4>
-      <div id="location-gallery" class="photo-grid" style="margin-top:10px;"></div>
+      <div id="location-gallery" class="photo-grid vt-mosaic" style="margin-top:10px;"></div>
     </div>
     <div id="location-resa-result" style="display:none; margin-top:20px;"></div>
     <div class="card" id="location-form-card" style="margin-top:20px; max-width:640px;">
@@ -2711,9 +2730,9 @@
   }
   function prixBien(v){ var n=[v.go,v.cle,v.prix].map(function(x){return +x||0;}).filter(function(x){return x>0;}); return n.length?Math.min.apply(null,n):0; }
   /* Photo publiée dans l'ERP (catégorie « catalogue ») dont le titre contient le nom du bien ; à défaut, illustration du type. */
-  function photoBien(v,typ){
+  function photoBien(v,typ,cat){
     var nom=String(v.nom||'').toLowerCase().split(' · ')[0].trim();
-    var m=nom?(MEDIAS||[]).filter(function(x){ return x.type==='photo' && x.categorie==='catalogue' && (x.data||x.url) && String(x.titre||'').toLowerCase().indexOf(nom)!==-1; })[0]:null;
+    var m=nom?(MEDIAS||[]).filter(function(x){ return x.type==='photo' && x.categorie===(cat||'catalogue') && (x.data||x.url) && String(x.titre||'').toLowerCase().indexOf(nom)!==-1; })[0]:null;
     if(m) return m.data||m.url;
     var h=44+((v.nom||'').length*13)%60, w=84+((v.nom||'').length*7)%50;
     var t='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+typ.c[0]+'"/><stop offset="1" stop-color="'+typ.c[1]+'"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/><circle cx="310" cy="66" r="28" fill="#fff" opacity=".85"/><rect y="238" width="400" height="62" fill="#0b1b3a" opacity=".2"/><rect x="90" y="'+(238-h)+'" width="'+w+'" height="'+h+'" fill="#fff" opacity=".96"/><rect x="'+(100+w)+'" y="'+(238-h*.62)+'" width="74" height="'+(h*.62)+'" fill="#fff" opacity=".78"/><rect x="104" y="'+(252-h)+'" width="14" height="14" fill="#0b1b3a" opacity=".4"/><rect x="130" y="'+(252-h)+'" width="14" height="14" fill="#0b1b3a" opacity=".4"/></svg>';
@@ -2774,23 +2793,36 @@
     var d = new Date(l.dispo);
     return '<span class="pill p-or">🟠 Disponible à partir du '+d.toLocaleDateString('fr-FR')+'</span>';
   }
+  var locFiltre='*', locTri='';
+  function _locDispoMaintenant(l){ var today=new Date().toISOString().slice(0,10); return !l.dispo || l.dispo<=today; }
+  function carteLocation(l,i){
+    var map=_locMapUrl(l), typ=CAT_TYPES[3];
+    var lig=function(lib,val,fort){ return '<div'+(fort?' class="vt-fort"':'')+'><span>'+lib+'</span><strong>'+fmt(val)+' F</strong></div>'; };
+    return '<article class="vt-bien"><div class="vt-bien-img"><img src="'+esc(photoBien(l,typ,'location'))+'" loading="lazy" alt="'+esc(l.nom||'Bien')+'"><span class="vt-chip-cat">Location</span>'+(l.pieces?'<span class="vt-bien-pieces">'+esc(l.pieces)+'</span>':'')+'<span class="vt-etat">'+_locDispoBadge(l)+'</span></div>'
+      +'<div class="vt-bien-corps"><h5>'+esc(l.nom)+'</h5>'+(l.surf?'<div class="vt-bien-surf">Superficie : '+esc(l.surf)+'</div>':'')
+      +(l.adresse?'<div class="vt-meta"><i class="fas fa-location-dot"></i><span>'+esc(l.adresse)+'</span></div>':'')
+      +'<div class="vt-prix">'+(l.loyer?lig('Loyer / mois',l.loyer,true):'')+(l.caution?lig('Caution',l.caution,false):'')+'</div>'
+      +'<div class="vt-actions">'+(map?'<a class="vt-lien" href="'+esc(map)+'" target="_blank" rel="noopener"><i class="fas fa-map-location-dot"></i> Localisation</a>':'')
+      +'<button type="button" class="highlight-btn" onclick="choisirLocationPourReservation('+i+')"><i class="fas fa-calendar-check"></i> Réserver</button></div></div></article>';
+  }
   function renderLocations(){
     var el = document.getElementById('location-cards'); if(!el) return;
-    if(!LOCATIONS.length){ el.innerHTML = '<div style="color:#4b6a8b;">Aucun bien en location publié pour le moment — contactez-nous.</div>'; return; }
-    el.innerHTML = LOCATIONS.map(function(l,i){
-      var map = _locMapUrl(l);
-      return '<div class="card">'
-        + '<div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;"><h4 style="color:var(--pp-primary);">'+esc(l.nom)+'</h4>'+(l.pieces?'<span class="pill p-bleu">'+esc(l.pieces)+'</span>':'')+'</div>'
-        + (l.surf?'<div style="font-size:.78rem; color:#4b6a8b; margin:4px 0 8px;">Superficie : '+esc(l.surf)+'</div>':'')
-        + '<div style="margin:8px 0;">'+_locDispoBadge(l)+'</div>'
-        + (l.loyer?'<div style="display:flex; justify-content:space-between; font-size:.85rem; padding:6px 0; border-top:1px solid #eef2f8;"><span>Loyer / mois</span><strong style="color:var(--pp-primary);">'+fmt(l.loyer)+' F</strong></div>':'')
-        + (l.caution?'<div style="display:flex; justify-content:space-between; font-size:.85rem; padding:6px 0; border-top:1px solid #eef2f8;"><span>Caution</span><strong>'+fmt(l.caution)+' F</strong></div>':'')
-        + (l.adresse?'<div style="font-size:.78rem; color:#4b6a8b; margin-top:8px;"><i class="fas fa-location-dot"></i> '+esc(l.adresse)+'</div>':'')
-        + '<div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">'
-        + (map?'<a href="'+esc(map)+'" target="_blank" rel="noopener" class="highlight-btn" style="background:#0077b6; text-decoration:none; padding:8px 14px; font-size:.8rem;"><i class="fas fa-map-location-dot"></i> Localisation</a>':'')
-        + '<button class="highlight-btn" style="padding:8px 14px; font-size:.8rem;" onclick="choisirLocationPourReservation('+i+')"><i class="fas fa-calendar-check"></i> Réserver</button>'
-        + '</div></div>';
-    }).join('');
+    var outils=document.getElementById('location-outils');
+    if(!LOCATIONS.length){ el.innerHTML = '<div style="color:#4b6a8b;">Aucun bien en location publié pour le moment — contactez-nous.</div>'; if(outils) outils.style.display='none'; return; }
+    var nbDispo=LOCATIONS.filter(_locDispoMaintenant).length, nbBientot=LOCATIONS.length-nbDispo;
+    if(locFiltre==='dispo' && !nbDispo) locFiltre='*'; if(locFiltre==='bientot' && !nbBientot) locFiltre='*';
+    var items=LOCATIONS.map(function(l,i){ return {l:l,i:i}; }).filter(function(x){
+      return locFiltre==='*' || (locFiltre==='dispo'?_locDispoMaintenant(x.l):!_locDispoMaintenant(x.l)); });
+    if(locTri) items.sort(function(a,b){ var pa=a.l.loyer||1e15, pb=b.l.loyer||1e15; return locTri==='asc'?pa-pb:((b.l.loyer||0)-(a.l.loyer||0)); });
+    if(outils) outils.style.display='flex';
+    var nav=document.getElementById('location-nav');
+    if(nav){
+      nav.style.display=(nbDispo&&nbBientot)?'flex':'none';
+      nav.innerHTML='<button type="button" class="'+(locFiltre==='*'?'on':'')+'" data-loc="*">Tous ('+LOCATIONS.length+')</button><button type="button" class="'+(locFiltre==='dispo'?'on':'')+'" data-loc="dispo">Disponibles ('+nbDispo+')</button><button type="button" class="'+(locFiltre==='bientot'?'on':'')+'" data-loc="bientot">Bientôt ('+nbBientot+')</button>';
+      nav.onclick=function(e){ var b=e.target.closest?e.target.closest('button[data-loc]'):null; if(!b) return; locFiltre=b.getAttribute('data-loc'); renderLocations(); };
+    }
+    var tri=document.getElementById('location-tri'); if(tri){ tri.value=locTri; tri.onchange=function(){ locTri=tri.value; renderLocations(); }; }
+    el.innerHTML=items.map(function(x){ return carteLocation(x.l,x.i); }).join('');
   }
   function peuplerLocationsSelect(){
     var sel=document.getElementById('rl_bien'); if(!sel) return;
@@ -2804,10 +2836,10 @@
   }
   function renderLocationPhotos(){
     var w=document.getElementById('location-gallery-wrap'), g=document.getElementById('location-gallery'); if(!g) return;
-    var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='location'; });
+    var photos=(MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='location' && (m.data||m.url); });
     if(!photos.length){ if(w) w.style.display='none'; return; }
     if(w) w.style.display='block';
-    g.innerHTML = photos.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('');
+    g.innerHTML = photos.map(function(p){ return vignettePhoto(p,''); }).join('');
   }
   window.choisirLocationPourReservation = choisirLocationPourReservation;
 
@@ -2849,6 +2881,8 @@
     rendreMediasEden();
     renderCataloguePhoto();
     renderVillas();
+    renderLocations();
+    renderProgrammesListe();
     renderLocationPhotos();
     if(typeof majEspacesDivisions==='function') majEspacesDivisions();
   }
@@ -2913,7 +2947,7 @@
       g.className='';
       g.innerHTML=_grouperParRef(photos).map(function(gp){
         return (gp.label?'<div style="font-weight:700;margin:14px 0 8px;color:var(--pp-primary);">'+esc(gp.label)+'</div>':'')
-          + '<div class="photo-grid">'+gp.items.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('')+'</div>';
+          + '<div class="photo-grid vt-mosaic">'+gp.items.map(function(p){ var cap=(p.titre?'<strong>'+esc(p.titre)+'</strong>':'')+(p.commentaire?((p.titre?' — ':'')+esc(p.commentaire)):''); return '<div class="photo-item"><img src="'+esc(p.data||p.url||'')+'" loading="lazy" alt="Photo">'+(cap?'<div class="photo-cap">'+cap+'</div>':'')+'</div>'; }).join('')+'</div>';
       }).join('');
     }
     /* Documents : ceux rattachés à un programme restent ici, au plus près de
@@ -4881,6 +4915,40 @@
   }
 
   var _programmesCharges = false;
+  var _progsData=null, progFiltre='*';
+  var PROG_STATUTS={ en_cours:'En commercialisation', prospection:'À venir', livre:'Livré' };
+  var PROG_TYPES={ en_cours:CAT_TYPES[0], prospection:CAT_TYPES[1], livre:CAT_TYPES[2] };
+  function photoProgramme(p,typ){
+    var m=(MEDIAS||[]).filter(function(x){ return x.type==='photo' && (x.categorie==='eden'||x.categorie==='catalogue') && (x.data||x.url) && x.ref_type==='programme' && String(x.ref_id)===String(p.id); })[0];
+    return m ? (m.data||m.url) : photoBien({nom:p.nom||'Programme'},typ,'eden');
+  }
+  function carteProgramme(p){
+    var typ=PROG_TYPES[p.statut]||CAT_TYPES[0];
+    var dispo = p.lots_disponibles != null ? +p.lots_disponibles : null;
+    var total = p.lots_prevus != null ? +p.lots_prevus : (p.lots_morceles != null ? +p.lots_morceles : null);
+    var pct = (dispo!=null && total) ? Math.max(0,Math.min(100,Math.round((1-dispo/total)*100))) : null;
+    return '<article class="vt-bien"><div class="vt-bien-img"><img src="'+esc(photoProgramme(p,typ))+'" loading="lazy" alt="'+esc(p.nom||'Programme')+'"><span class="vt-chip-cat">'+esc(PROG_STATUTS[p.statut]||'Programme')+'</span></div>'
+      +'<div class="vt-bien-corps"><h5>'+esc(p.nom||'Programme')+'</h5>'
+      +(p.commune?'<div class="vt-meta"><i class="fas fa-location-dot"></i><span>'+esc(p.commune)+'</span></div>':'')
+      +(p.description?'<p class="vt-desc">'+esc(p.description)+'</p>':'')
+      +(pct!=null?'<div><div class="vt-barre" role="img" aria-label="'+pct+' % des lots réservés"><i style="width:'+pct+'%"></i></div><div class="vt-barre-lib"><span>'+dispo+' lot'+(dispo>1?'s':'')+' disponible'+(dispo>1?'s':'')+'</span><span>sur '+total+'</span></div></div>'
+        :(dispo!=null?'<span class="badge">'+dispo+' lot'+(dispo>1?'s':'')+' disponible'+(dispo>1?'s':'')+'</span>':''))
+      +(p.date_livraison?'<div class="vt-meta"><i class="fas fa-calendar-check"></i><span>Livraison prévue : '+dshort(p.date_livraison)+'</span></div>':'')
+      +'<div class="vt-actions"><button type="button" class="highlight-btn" onclick="basculerVersOnglet(\'catalogue\')">Voir les biens</button></div></div></article>';
+  }
+  function renderProgrammesListe(){
+    var box=document.getElementById('programme-liste-cards'); if(!box || !_progsData) return;
+    var outils=document.getElementById('programme-outils'), nav=document.getElementById('programme-nav');
+    if(!_progsData.length){ box.innerHTML='<div style="color:#6b6150;grid-column:1/-1;">Aucun programme publié pour le moment.</div>'; if(outils) outils.style.display='none'; return; }
+    var cles=Object.keys(PROG_STATUTS).filter(function(k){ return _progsData.some(function(p){ return p.statut===k; }); });
+    if(progFiltre!=='*' && cles.indexOf(progFiltre)===-1) progFiltre='*';
+    if(outils) outils.style.display=cles.length>1?'flex':'none';
+    if(nav){
+      nav.innerHTML='<button type="button" class="'+(progFiltre==='*'?'on':'')+'" data-prog="*">Tous ('+_progsData.length+')</button>'+cles.map(function(k){ return '<button type="button" class="'+(progFiltre===k?'on':'')+'" data-prog="'+k+'">'+PROG_STATUTS[k]+' ('+_progsData.filter(function(p){return p.statut===k;}).length+')</button>'; }).join('');
+      nav.onclick=function(e){ var b=e.target.closest?e.target.closest('button[data-prog]'):null; if(!b) return; progFiltre=b.getAttribute('data-prog'); renderProgrammesListe(); };
+    }
+    box.innerHTML=_progsData.filter(function(p){ return progFiltre==='*'||p.statut===progFiltre; }).map(carteProgramme).join('');
+  }
   async function chargerListeProgrammes(){
     var box = document.getElementById('programme-liste-cards');
     if (!box) return;
@@ -4888,26 +4956,8 @@
     try {
       var progs = await sb('pi_programmes_public?select=*&order=nom.asc&limit=200');
       _programmesCharges = true;
-      if (!progs || !progs.length) {
-        box.innerHTML = '<div style="color:#6b6150;grid-column:1/-1;">Aucun programme publié pour le moment.</div>';
-        return;
-      }
-      var statutLbl = { en_cours:'En commercialisation', livre:'Livré', prospection:'À venir' };
-      box.innerHTML = progs.map(function(p){
-        var dispo = p.lots_disponibles != null ? p.lots_disponibles : null;
-        var total = p.lots_prevus != null ? p.lots_prevus : (p.lots_morceles != null ? p.lots_morceles : null);
-        return '<div class="card">'
-          + '<h4 style="margin-bottom:4px;"><i class="fas fa-building"></i> ' + esc(p.nom || 'Programme') + '</h4>'
-          + (p.commune ? '<div style="font-size:.8rem;color:#6b6150;margin-bottom:6px;"><i class="fas fa-location-dot"></i> ' + esc(p.commune) + '</div>' : '')
-          + (p.description ? '<p style="font-size:.85rem;margin-bottom:8px;">' + esc(p.description) + '</p>' : '')
-          + '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.78rem;">'
-          + (dispo != null ? '<span class="badge">' + dispo + ' lot' + (dispo>1?'s':'') + ' disponible' + (dispo>1?'s':'') + '</span>' : '')
-          + (total != null ? '<span class="badge">' + total + ' au total</span>' : '')
-          + (statutLbl[p.statut] ? '<span class="badge">' + statutLbl[p.statut] + '</span>' : '')
-          + '</div>'
-          + (p.date_livraison ? '<div style="font-size:.74rem;color:#6b6150;margin-top:6px;">Livraison prévue : ' + dshort(p.date_livraison) + '</div>' : '')
-          + '</div>';
-      }).join('');
+      _progsData = progs || [];
+      renderProgrammesListe();
     } catch(e) {
       box.innerHTML = '<div style="color:#6b6150;grid-column:1/-1;">Impossible de charger la liste des programmes pour le moment.</div>';
     }
