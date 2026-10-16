@@ -330,6 +330,81 @@
     .carte-etiquette{ background:var(--pp-charbon); color:#fff; border:none; border-radius:6px; padding:3px 8px; font-size:.68rem; font-weight:600; box-shadow:0 2px 6px rgba(0,0,0,.2); }
     .carte-etiquette::before{ border-top-color:var(--pp-charbon); }
   </style>
+  <style id="theme-vitrine">
+    /* ═══ Thème vitrine « Moderne dynamique » ═══
+       Couche de style seule : aucun identifiant ni script modifié, toutes les fonctions du portail restent intactes.
+       Polices du système (le portail n'appelle aucune police distante, par choix de confidentialité). */
+    :root{
+      --pp-primary:#D63A1B; --pp-primary-dark:#A92B12; --pp-secondary:#0B1B3A;
+      --pp-or:#E39A00; --pp-sable:#FFF6EF; --pp-charbon:#0B1B3A;
+      --pp-serif:"Avenir Next","Segoe UI","Helvetica Neue",Roboto,Arial,sans-serif;
+      --vt-coral:#FF5A3C; --vt-sun:#FFB627; --vt-mint:#18C29C; --vt-navy:#0B1B3A;
+      --vt-ombre:0 8px 24px rgba(11,27,58,.09);
+    }
+    body{ font-family:"Avenir Next","Segoe UI","Helvetica Neue",Roboto,Arial,sans-serif; background:var(--pp-sable); color:var(--vt-navy); }
+    h1,h2,h3,.logo-area h1,.motdg-titre,.hero h2,.hero-stat b,.content-section h3{ font-family:var(--pp-serif); font-weight:800; letter-spacing:-.02em; }
+    .content-section h3{ font-size:clamp(1.5rem,3.4vw,2.2rem); margin-bottom:6px; }
+    /* En-tête */
+    .site-header{ background:rgba(255,255,255,.94); backdrop-filter:saturate(1.4) blur(10px); border-bottom:1px solid #f0dfd2; }
+    .logo-area h1{ font-size:1.35rem; display:flex; align-items:center; gap:10px; }
+    .logo-area h1::before{ content:""; width:28px; height:28px; border-radius:9px; background:linear-gradient(135deg,var(--vt-coral),var(--vt-sun)); flex:0 0 auto; }
+    .tab-link{ border-radius:99px; color:var(--vt-navy); }
+    .tab-link:hover{ background:#ffe9dc; }
+    .tab-link.active{ background:var(--vt-navy); color:#fff; }
+    .nav-dropdown-trigger{ border:0; border-radius:99px; background:var(--vt-navy); color:#fff; padding:10px 16px; }
+    .nav-dropdown-trigger:hover,.nav-dropdown-trigger.open{ background:var(--pp-primary); color:#fff; }
+    .nav-dropdown-menu{ border-radius:20px; border:0; box-shadow:0 18px 44px rgba(11,27,58,.2); padding:10px; }
+    .nav-dropdown-menu .tab-link{ border-radius:12px; }
+    /* Bannière */
+    .hero{ background:linear-gradient(135deg,var(--vt-coral) 0%,var(--vt-sun) 100%); color:var(--vt-navy); text-align:left;
+           width:calc(100% - 32px); max-width:1280px; margin:16px auto 0; border-radius:28px; padding:clamp(28px,5vw,60px) 0; }
+    .hero::before{ opacity:.07; }
+    .hero::after{ display:none; }
+    .hero h2{ font-size:clamp(2rem,5.4vw,3.8rem); line-height:1.02; max-width:16ch; text-wrap:balance; margin-bottom:14px; }
+    .hero p{ margin:0; font-size:clamp(1rem,2vw,1.2rem); opacity:1; max-width:48ch; }
+    .hero-cta{ display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; }
+    .hero-btn{ border:0; border-radius:99px; padding:13px 22px; font-weight:800; font-size:.92rem; background:#fff; color:var(--vt-navy); cursor:pointer; letter-spacing:0; }
+    .hero-btn:hover,.hero-btn.active{ background:#fff; color:var(--vt-navy); box-shadow:0 6px 18px rgba(11,27,58,.22); }
+    .hero-btn.principal,.hero-btn.principal:hover,.hero-btn.principal.active{ background:var(--vt-navy); color:#fff; }
+    .hero-stats{ justify-content:flex-start; gap:12px; margin-top:28px; }
+    .hero-stat{ background:#fff; color:var(--vt-navy); border-radius:18px; padding:14px 20px; text-align:left; box-shadow:var(--vt-ombre); min-width:150px; }
+    .hero-stat b{ font-size:1.9rem; line-height:1; }
+    .hero-stat span{ opacity:.75; }
+    .hero-slides-viewport,.hero-flex .hero-video-half video{ border-radius:22px !important; }
+    @media (max-width:980px){ .hero-flex.has-video,.hero-flex.has-slides{ text-align:left; } .hero-flex.has-video .hero-text p,.hero-flex.has-slides .hero-text p{ margin:0; } }
+    /* Contenu */
+    .content-section{ border:0; border-radius:28px; box-shadow:var(--vt-ombre); margin:28px auto 40px; }
+    .card{ background:#fff; border:0; border-radius:22px; box-shadow:var(--vt-ombre); }
+    .card h4{ font-weight:800; letter-spacing:-.01em; }
+    .stat-card{ border-radius:22px; border:0; box-shadow:var(--vt-ombre); }
+    .kpi{ border-radius:18px; border:0; border-top:4px solid var(--vt-coral); box-shadow:var(--vt-ombre); }
+    .highlight-btn{ background:var(--vt-navy); border-radius:99px; padding:13px 30px; font-weight:800; }
+    .highlight-btn:hover{ background:var(--pp-primary); }
+    .subnav button{ border-radius:99px; border-color:#f0dfd2; color:var(--vt-navy); }
+    .subnav button.on{ background:var(--vt-navy); border-color:var(--vt-navy); }
+    .form-group input,.form-group select,.form-group textarea,.contact-form input,.contact-form textarea{ border-radius:14px; border-color:#e4d3c4; }
+    .badge{ background:#ffe9dc; }
+    .faq-item{ border:0; border-radius:18px; box-shadow:var(--vt-ombre); }
+    .temoi-card{ border:0; border-radius:22px; box-shadow:var(--vt-ombre); }
+    .photo-item{ border-radius:18px; }
+    .produit-prix{ color:var(--pp-primary); }
+    /* Accueil : parcours et accès rapides */
+    .home-h{ font-family:var(--pp-serif); font-weight:800; font-size:clamp(1.3rem,3vw,1.8rem); letter-spacing:-.02em; margin:38px 0 6px; }
+    .home-sub{ color:#4b5a78; max-width:60ch; margin-bottom:16px; font-size:.95rem; }
+    .how{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; }
+    .how > div{ background:var(--vt-navy); color:#fff; border-radius:22px; padding:20px; }
+    .how b{ display:block; font-size:1.1rem; color:var(--vt-sun); margin-bottom:6px; font-weight:800; }
+    .how span{ font-size:.9rem; opacity:.9; line-height:1.5; }
+    .espaces{ display:flex; flex-wrap:wrap; gap:10px; }
+    .esp-chip{ display:inline-flex; align-items:center; gap:8px; background:#fff; border:2px solid var(--vt-navy); border-radius:99px; padding:11px 18px; font-weight:800; font-size:.88rem; color:var(--vt-navy); cursor:pointer; }
+    .esp-chip:hover,.esp-chip.active{ background:var(--vt-navy); color:#fff; }
+    .esp-chip i{ color:var(--pp-primary); }
+    .esp-chip:hover i,.esp-chip.active i{ color:var(--vt-sun); }
+    /* Pied de page */
+    footer{ background:var(--vt-navy); color:#cfd8ee; border-radius:28px 28px 0 0; margin-top:20px; }
+    .signature a,footer a{ color:#fff; }
+    @media (prefers-reduced-motion:reduce){ .bandeau-contenu{ animation:none; padding-left:12px; } }
+  </style>
 </head>
 <body>
 <noscript><p style="padding:16px;background:#fff3b0;color:#4d3b00;font-family:system-ui,sans-serif;">Ce site a besoin de JavaScript pour afficher les biens, programmes et votre espace. Informations légales : <a href="/mentions-legales.html">mentions légales</a>, <a href="/confidentialite.html">confidentialité</a>, <a href="/cookies.html">cookies</a>, <a href="/conditions.html">conditions d’utilisation</a>, <a href="/remboursement.html">résiliation et remboursement</a>.</p></noscript>
@@ -391,6 +466,11 @@
   <div class="hero-flex" id="hero-flex">
     <div class="hero-text">
       <h2>BIENVENUE</h2><p></p>
+      <div class="hero-cta">
+        <button type="button" class="tab-link hero-btn principal" data-tab="eden">Voir les programmes</button>
+        <button type="button" class="tab-link hero-btn" data-tab="souscrire">Souscrire en ligne</button>
+        <button type="button" class="tab-link hero-btn" data-tab="nous-contacter">Parler à un conseiller</button>
+      </div>
       <div class="hero-stats" id="hero-stats" style="display:none;">
         <div class="hero-stat"><b id="hs-familles">—</b><span>Familles accompagnées</span></div>
         <div class="hero-stat"><b id="hs-programmes">—</b><span>Programmes livrés/actifs</span></div>
@@ -463,6 +543,32 @@
       <div class="card"><i class="fas fa-mobile-screen" style="color:var(--pp-secondary); font-size:1.4rem;"></i><h4>Innovation & technologie</h4><p>Portail souscripteur en ligne : suivi des versements, échéancier et photos de chantier.</p></div>
     </div>
     <div class="badge-list" id="societe-badges" style="display:none;"></div>
+
+    <h4 class="home-h">Comment ça marche</h4>
+    <p class="home-sub">De la réservation à votre titre, tout se suit en ligne.</p>
+    <div class="how">
+      <div><b>1. Choisissez</b><span>Un logement ou un terrain dans nos programmes et notre catalogue.</span></div>
+      <div><b>2. Souscrivez</b><span>Faites votre demande en ligne, nos équipes vous rappellent.</span></div>
+      <div><b>3. Payez par étapes</b><span>Versements, échéancier et reçus consultables dans votre espace.</span></div>
+      <div><b>4. Suivez votre titre</b><span>Les étapes de sécurisation foncière sont publiées au fil de l'avancement.</span></div>
+    </div>
+
+    <h4 class="home-h">Connectez-vous à votre espace</h4>
+    <p class="home-sub">Un accès sécurisé selon votre profil.</p>
+    <div class="espaces">
+        <button type="button" class="tab-link esp-chip" data-tab="souscripteur"><i class="fas fa-chart-line"></i> Souscripteur</button>
+        <button type="button" class="tab-link esp-chip" data-tab="intervenant"><i class="fas fa-user-tie"></i> Intervenant</button>
+        <button type="button" class="tab-link esp-chip" data-tab="apporteurs"><i class="fas fa-handshake"></i> Apporteur d'affaires</button>
+        <button type="button" class="tab-link esp-chip" data-tab="diaspo"><i class="fas fa-globe-africa"></i> Investisseur diaspora</button>
+        <button type="button" class="tab-link esp-chip" data-tab="foncier"><i class="fas fa-map-marked-alt"></i> Acquéreur foncier</button>
+        <button type="button" class="tab-link esp-chip" data-tab="mandant"><i class="fas fa-handshake"></i> Propriétaire mandant</button>
+        <button type="button" class="tab-link esp-chip" data-tab="propfoncier"><i class="fas fa-seedling"></i> Propriétaire terrien</button>
+        <button type="button" class="tab-link esp-chip" data-tab="partlot"><i class="fas fa-handshake-simple"></i> Partenaire lotissement</button>
+        <button type="button" class="tab-link esp-chip" data-tab="financier"><i class="fas fa-piggy-bank"></i> Partenaire financier</button>
+        <button type="button" class="tab-link esp-chip" data-tab="amenageur"><i class="fas fa-helmet-safety"></i> Aménageur</button>
+        <button type="button" class="tab-link esp-chip" data-tab="locataire"><i class="fas fa-house-user"></i> Locataire</button>
+        <button type="button" class="tab-link esp-chip" data-tab="copropriete"><i class="fas fa-building"></i> Copropriétaire</button>
+    </div>
   </div>
 
   <div id="eden-pane" class="tab-pane">
