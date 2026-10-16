@@ -551,6 +551,35 @@
     .vt-barre i{ display:block; height:100%; background:linear-gradient(90deg,var(--vt-coral),var(--vt-sun)); }
     .vt-barre-lib{ font-size:.78rem; color:#4b5a78; display:flex; justify-content:space-between; gap:8px; }
   </style>
+  <style id="theme-detail">
+    /* Fiche détaillée d'un bien : galerie + simulateur de paiement */
+    .bien-voile{ position:fixed; inset:0; z-index:1500; background:rgba(11,27,58,.62); display:flex; align-items:flex-start; justify-content:center; padding:max(16px,env(safe-area-inset-top,0px)) 16px 16px; overflow-y:auto; }
+    .bien-voile[hidden]{ display:none; }
+    .bien-fiche{ background:#fff; border-radius:26px; width:100%; max-width:1000px; margin:auto 0; box-shadow:0 30px 70px rgba(11,27,58,.35); position:relative; overflow:hidden; }
+    .bien-fermer{ position:absolute; top:12px; right:12px; z-index:3; width:42px; height:42px; border-radius:50%; border:0; background:#fff; color:var(--vt-navy); font-size:1.3rem; font-weight:800; cursor:pointer; box-shadow:0 4px 14px rgba(11,27,58,.25); }
+    .bien-grille{ display:grid; grid-template-columns:1.15fr 1fr; }
+    .bien-galerie{ background:#fff1e6; padding:16px; display:flex; flex-direction:column; gap:10px; }
+    .bien-principale{ width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:18px; display:block; background:#ffe9dc; cursor:zoom-in; }
+    .bien-vignettes{ display:grid; grid-template-columns:repeat(auto-fill,minmax(78px,1fr)); gap:8px; margin:0; }
+    .bien-vignettes .photo-item{ aspect-ratio:1; border-radius:12px; border:2px solid transparent; }
+    .bien-vignettes .photo-item.on{ border-color:var(--pp-primary); }
+    .bien-corps{ padding:22px 22px 24px; display:flex; flex-direction:column; gap:12px; }
+    .bien-corps h3{ font-family:var(--pp-serif); font-weight:800; letter-spacing:-.02em; font-size:clamp(1.3rem,3vw,1.8rem); margin:0; padding-right:44px; }
+    .bien-meta{ display:flex; flex-wrap:wrap; gap:8px; }
+    .bien-meta span{ background:#ffe9dc; border-radius:99px; padding:5px 12px; font-size:.8rem; font-weight:700; }
+    .sim{ background:#fff7f0; border-radius:20px; padding:16px; display:grid; gap:12px; }
+    .sim h4{ margin:0; font-family:var(--pp-serif); font-weight:800; }
+    .sim label{ display:grid; gap:4px; font-size:.82rem; font-weight:700; color:#33415f; }
+    .sim label b{ font-weight:800; color:var(--vt-navy); }
+    .sim input[type=range]{ width:100%; accent-color:var(--pp-primary); }
+    .sim select{ border:1px solid #f0dfd2; border-radius:12px; padding:9px 12px; font:inherit; background:#fff; }
+    .sim-res{ background:var(--vt-navy); color:#fff; border-radius:16px; padding:14px 16px; display:grid; gap:6px; }
+    .sim-res div{ display:flex; justify-content:space-between; gap:10px; font-size:.86rem; }
+    .sim-res .gros{ font-size:1.25rem; font-weight:800; color:var(--vt-sun); padding-top:6px; border-top:1px solid rgba(255,255,255,.2); }
+    .sim-note{ font-size:.74rem; color:#4b5a78; line-height:1.5; }
+    .bien-corps .highlight-btn{ width:100%; padding:14px; }
+    @media (max-width:820px){ .bien-grille{ grid-template-columns:1fr; } .bien-voile{ padding:0; } .bien-fiche{ border-radius:0; min-height:100%; } }
+  </style>
 </head>
 <body>
 <noscript><p style="padding:16px;background:#fff3b0;color:#4d3b00;font-family:system-ui,sans-serif;">Ce site a besoin de JavaScript pour afficher les biens, programmes et votre espace. Informations légales : <a href="/mentions-legales.html">mentions légales</a>, <a href="/confidentialite.html">confidentialité</a>, <a href="/cookies.html">cookies</a>, <a href="/conditions.html">conditions d’utilisation</a>, <a href="/remboursement.html">résiliation et remboursement</a>.</p></noscript>
@@ -2840,10 +2869,11 @@
   function carteBien(v,i){
     var typ=typeBien(v);
     var lig=function(lib,val,fort){ return '<div'+(fort?' class="vt-fort"':'')+'><span>'+lib+'</span><strong>'+fmt(val)+' F</strong></div>'; };
-    return '<article class="vt-bien"><div class="vt-bien-img"><img src="'+esc(photoBien(v,typ))+'" loading="lazy" alt="'+esc(v.nom||'Bien')+'"><span class="vt-chip-cat">'+esc(typ.t)+'</span>'+(v.pieces?'<span class="vt-bien-pieces">'+esc(v.pieces)+'</span>':'')+'</div>'
+    return '<article class="vt-bien"><div class="vt-bien-img" style="cursor:pointer;" onclick="ouvrirFicheBien('+i+')"><img src="'+esc(photoBien(v,typ))+'" loading="lazy" alt="'+esc(v.nom||'Bien')+'"><span class="vt-chip-cat">'+esc(typ.t)+'</span>'+(v.pieces?'<span class="vt-bien-pieces">'+esc(v.pieces)+'</span>':'')+'</div>'
       +'<div class="vt-bien-corps"><h5>'+esc(v.nom)+'</h5>'+(v.surf?'<div class="vt-bien-surf">Superficie : '+esc(v.surf)+'</div>':'')
       +'<div class="vt-prix">'+(v.go?lig('Gros œuvre',v.go,false):'')+(v.cle?lig('Clé en main',v.cle,true):'')+(!v.go&&!v.cle&&v.prix?lig(esc(v.prix_label||'Prix'),v.prix,true):'')+'</div>'
-      +'<button type="button" class="highlight-btn" onclick="souscrireVilla('+i+')">Souscrire à ce bien</button></div></article>';
+      +'<div class="vt-actions"><button type="button" class="vt-lien" onclick="ouvrirFicheBien('+i+')"><i class="fas fa-circle-info"></i> Détails et simulation</button>'
+      +'<button type="button" class="highlight-btn" onclick="souscrireVilla('+i+')">Souscrire</button></div></div></article>';
   }
   function renderVillas(){
     var el = document.getElementById('villa-cards'); if(!el) return;
@@ -2877,6 +2907,77 @@
     var b=document.querySelector('.site-header .tab-link[data-tab="souscrire"]'); if(b) b.click();
   }
   window.souscrireVilla=souscrireVilla;
+
+  /* ───── Fiche détaillée d'un bien : galerie photos et simulateur de paiement ─────
+     Le simulateur reprend le principe du programme : prix étalé sur N mois (paramètres « duree » et « jouissance » de l'ERP),
+     sans intérêt. Les frais de souscription sont hors prix. Estimation indicative, non contractuelle. */
+  function photosBien(v){
+    var nom=String(v.nom||'').toLowerCase().split(' · ')[0].trim();
+    var l=nom?(MEDIAS||[]).filter(function(x){ return x.type==='photo' && x.categorie==='catalogue' && (x.data||x.url) && String(x.titre||'').toLowerCase().indexOf(nom)!==-1; }):[];
+    return l.map(function(x){ return {src:x.data||x.url, titre:x.titre||''}; });
+  }
+  var _ficheDeclencheur=null;
+  function fermerFicheBien(){
+    var vo=document.getElementById('bien-voile'); if(!vo) return;
+    vo.hidden=true; document.body.style.overflow='';
+    if(_ficheDeclencheur && _ficheDeclencheur.focus){ try{ _ficheDeclencheur.focus(); }catch(e){} }
+  }
+  function simulerBien(i){
+    var v=VILLAS[i]; if(!v) return;
+    var g=function(id){ return document.getElementById(id); };
+    var modeSel=g('sim-mode'), prix=0;
+    if(modeSel){ prix=parseFloat(modeSel.value)||0; } else { prix=prixBien(v); }
+    var ap=parseFloat(g('sim-apport').value)||0, du=parseInt(g('sim-duree').value,10)||1;
+    var frais=parseFloat(BR('frais_souscription','')||0)||0;
+    var apport=Math.round(prix*ap/100), reste=Math.max(0,prix-apport), mens=Math.round(reste/du);
+    g('sim-apport-v').textContent=ap+' % ('+fmt(apport)+' F)';
+    g('sim-duree-v').textContent=du+' mois';
+    g('sim-prix').textContent=fmt(prix)+' F';
+    g('sim-reste').textContent=fmt(reste)+' F';
+    g('sim-mens').textContent=fmt(mens)+' F / mois';
+    var fr=g('sim-frais'); if(fr){ fr.textContent=frais?(fmt(frais)+' F'):'—'; fr.parentNode.style.display=frais?'':'none'; }
+  }
+  function ouvrirFicheBien(i){
+    var v=VILLAS[i]; if(!v) return;
+    _ficheDeclencheur=document.activeElement;
+    var typ=typeBien(v), photos=photosBien(v);
+    if(!photos.length) photos=[{src:photoBien(v,typ), titre:v.nom||''}];
+    var duree=parseInt(BR('duree','')||0,10)||0, jou=parseFloat(BR('jouissance','')||0)||0;
+    var dMax=Math.max(12,duree||60), dDef=duree||Math.min(36,dMax), aDef=jou>0&&jou<=100?Math.round(jou):30;
+    var modes=[]; if(v.go) modes.push(['Gros œuvre',v.go]); if(v.cle) modes.push(['Clé en main',v.cle]); if(!modes.length&&v.prix) modes.push([v.prix_label||'Prix',v.prix]);
+    var vo=document.getElementById('bien-voile');
+    if(!vo){
+      vo=document.createElement('div'); vo.id='bien-voile'; vo.className='bien-voile'; vo.hidden=true; document.body.appendChild(vo);
+      vo.addEventListener('click',function(e){ if(e.target===vo) fermerFicheBien(); });
+      document.addEventListener('keydown',function(e){ var o=document.getElementById('bien-voile'); if(e.key==='Escape' && o && !o.hidden){ var lb=document.getElementById('pp-lb-overlay'); if(lb && lb.classList.contains('active')) return; fermerFicheBien(); } });
+    }
+    vo.innerHTML='<div class="bien-fiche" role="dialog" aria-modal="true" aria-label="'+esc(v.nom||'Fiche du bien')+'">'
+      +'<button type="button" class="bien-fermer" id="bien-fermer" aria-label="Fermer" onclick="fermerFicheBien()">✕</button>'
+      +'<div class="bien-grille"><div class="bien-galerie">'
+      +'<img class="bien-principale" id="bien-principale" src="'+esc(photos[0].src)+'" alt="'+esc(v.nom||'Bien')+'" onclick="ppLbOpenImage(this)">'
+      +(photos.length>1?'<div class="photo-grid bien-vignettes">'+photos.map(function(ph,k){ return '<div class="photo-item'+(k===0?' on':'')+'" data-k="'+k+'"><img src="'+esc(ph.src)+'" alt="'+esc(ph.titre||'Photo')+'" loading="lazy">'+(ph.titre?'<div class="photo-cap">'+esc(ph.titre)+'</div>':'')+'</div>'; }).join('')+'</div>':'')
+      +'</div><div class="bien-corps"><h3>'+esc(v.nom||'Bien')+'</h3>'
+      +'<div class="bien-meta"><span>'+esc(typ.t)+'</span>'+(v.pieces?'<span>'+esc(v.pieces)+'</span>':'')+(v.surf?'<span>'+esc(v.surf)+'</span>':'')+'</div>'
+      +'<div class="sim"><h4>Simulez votre paiement</h4>'
+      +(modes.length>1?'<label>Formule<select id="sim-mode" onchange="simulerBien('+i+')">'+modes.map(function(m,k){ return '<option value="'+m[1]+'"'+(k===modes.length-1?' selected':'')+'>'+esc(m[0])+' — '+fmt(m[1])+' F</option>'; }).join('')+'</select></label>':'')
+      +'<label>Apport initial <b id="sim-apport-v"></b><input type="range" id="sim-apport" min="10" max="100" step="5" value="'+aDef+'" oninput="simulerBien('+i+')"></label>'
+      +'<label>Durée de paiement <b id="sim-duree-v"></b><input type="range" id="sim-duree" min="3" max="'+dMax+'" step="1" value="'+Math.min(dDef,dMax)+'" oninput="simulerBien('+i+')"></label>'
+      +'<div class="sim-res"><div><span>Prix du bien</span><strong id="sim-prix"></strong></div><div><span>Reste à payer après apport</span><strong id="sim-reste"></strong></div><div style="display:none;"><span>Frais de souscription (hors prix)</span><strong id="sim-frais"></strong></div><div class="gros"><span>Mensualité</span><strong id="sim-mens"></strong></div></div>'
+      +'<p class="sim-note">Estimation indicative, non contractuelle, sans intérêt. Les conditions définitives figurent dans votre contrat de souscription.</p></div>'
+      +'<button type="button" class="highlight-btn" onclick="fermerFicheBien();souscrireVilla('+i+')">Souscrire à ce bien</button>'
+      +'</div></div></div>';
+    vo.hidden=false; document.body.style.overflow='hidden'; vo.scrollTop=0;
+    var vig=vo.querySelector('.bien-vignettes');
+    if(vig) vig.addEventListener('click',function(e){
+      var it=e.target.closest?e.target.closest('.photo-item'):null; if(!it) return;
+      e.stopPropagation();
+      var im=it.querySelector('img'); document.getElementById('bien-principale').src=im.getAttribute('src');
+      [].forEach.call(vig.querySelectorAll('.photo-item'),function(x){ x.classList.toggle('on',x===it); });
+    },true);
+    simulerBien(i);
+    var f=document.getElementById('bien-fermer'); if(f) f.focus();
+  }
+  window.ouvrirFicheBien=ouvrirFicheBien; window.fermerFicheBien=fermerFicheBien; window.simulerBien=simulerBien;
 
   /* ───── Catalogue locatif — publié par l'ERP mère (brand.catalogue_location) ─────
      Format d'une ligne : Nom | Pièces | Surface | Loyer/mois FCFA | Caution FCFA | Adresse | Latitude | Longitude | Date disponible (AAAA-MM-JJ, vide = disponible maintenant) */
