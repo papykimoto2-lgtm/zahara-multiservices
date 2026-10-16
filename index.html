@@ -49293,6 +49293,7 @@ async function saveParams() {
     portail_catalogue_location:      gv('param-portail-catalogue-location'),
     portail_programmes_geo:          gv('param-portail-programmes-geo'),
     portail_divisions:               _lireDivisionsPubliees(),
+    portail_divisions_contenu:       _lireContenuDivisions(),
     auto_compta_commissions: document.getElementById('param-auto-compta-comm') ? document.getElementById('param-auto-compta-comm').checked : true,
     penalites_pct: parseFloat(gv('param-penalites'))||0.5,
     resil_motifs: _resilEdLire(),
@@ -49361,17 +49362,79 @@ function calculerDisponibilitesLocation(silencieux){
 function _lireDivisionsPubliees(){
   return Array.prototype.slice.call(document.querySelectorAll('.param-div-pub:checked')).map(function(cb){ return cb.value; });
 }
-function renderDivisionsPubliees(ids){
+/* Contenu propre à chaque division (slogan, présentation, points forts, photo de bannière) — publié avec l'onglet de la division.
+   Stocké dans params.portail_divisions_contenu = { <id division> : { slogan, description, apropos, points, banniere } }. */
+var PDIV_CHAMPS = ['slogan','description','apropos','points','banniere'];
+function _lireContenuDivisions(){
+  var out = {};
+  Array.prototype.slice.call(document.querySelectorAll('.param-div-ct')).forEach(function(el){
+    var id = el.getAttribute('data-div'), ch = el.getAttribute('data-champ'), v = String(el.value||'').trim();
+    if(!id || !ch || !v) return;
+    (out[id] = out[id] || {})[ch] = v;
+  });
+  return out;
+}
+function pdivBanniereMaj(id, src){
+  var img = document.getElementById('pdiv-prev-'+id), clr = document.getElementById('pdiv-clr-'+id);
+  if(img){ if(src){ img.src = src; img.style.display = 'block'; } else { img.removeAttribute('src'); img.style.display = 'none'; } }
+  if(clr) clr.style.display = src ? '' : 'none';
+}
+function pdivBanniereFichier(event, id){
+  var f = event.target.files[0]; if(!f) return;
+  if(f.size > 8*1024*1024){ toast('Image trop lourde (max 8 Mo à l\'import).', 'error'); event.target.value=''; return; }
+  var r = new FileReader();
+  r.onload = function(e){
+    _portailMotDgReduire(e.target.result, 1400, function(reduit, octets){
+      var i = document.getElementById('pdiv-ban-'+id); if(i) i.value = reduit;
+      pdivBanniereMaj(id, reduit);
+      toast('Bannière importée (' + Math.round(octets/1024) + ' Ko) — pensez à « Enregistrer » puis « Publier ».', 'success');
+    });
+  };
+  r.readAsDataURL(f);
+  event.target.value = '';
+}
+function pdivBanniereEffacer(id){
+  var i = document.getElementById('pdiv-ban-'+id); if(i) i.value = '';
+  pdivBanniereMaj(id, '');
+}
+function renderDivisionsPubliees(ids, contenu){
   var zone = document.getElementById('param-portail-divisions-list');
   if(!zone) return;
-  var coch = (ids||[]).map(String);
+  var coch = (ids||[]).map(String), ct = contenu || {};
   var divs = (DATA.divisions||[]).filter(function(d){ return d && String(d._deleted)!=='true'; });
-  if(!divs.length){ zone.innerHTML = '<div style="font-size:12px;color:#6B6B9A;">Aucune division enregistrée. Créez-les via « 🏢 Gérer les divisions » ci-dessus.</div>'; return; }
+  if(!divs.length){
+    zone.innerHTML = '<div style="font-size:12px;color:#6B6B9A;">Aucune division enregistrée. Créez-les via « 🏢 Gérer les divisions » ci-dessus.</div>';
+    return;
+  }
+  var champ = function(id, c, lbl, aide, rows, valeur){
+    var base = 'class="form-control param-div-ct" data-div="'+escHtml(id)+'" data-champ="'+c+'"';
+    return '<div class="form-group" style="margin:8px 0 0;"><label style="font-size:12px;">'+lbl+'</label>'
+      + (rows ? '<textarea '+base+' rows="'+rows+'" placeholder="'+escHtml(aide)+'">'+escHtml(valeur||'')+'</textarea>'
+              : '<input type="text" '+base+' placeholder="'+escHtml(aide)+'" value="'+escHtml(valeur||'')+'">')
+      + '</div>';
+  };
   zone.innerHTML = divs.map(function(d){
-    var on = coch.indexOf(String(d.id))!==-1;
-    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;">'
+    var id = String(d.id), on = coch.indexOf(id)!==-1, c = ct[id] || {}, ban = c.banniere || '';
+    return '<div style="border-bottom:1px solid #E0E0EA;padding:4px 0;">'
+      + '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;">'
       + '<input type="checkbox" class="param-div-pub" value="'+escHtml(d.id)+'"'+(on?' checked':'')+'>'
-      + '<span>'+escHtml(d.nom||d.raison_sociale||d.id)+(d.secteur?' <span style="color:#6B6B9A;">— '+escHtml(d.secteur)+'</span>':'')+'</span></label>';
+      + '<span>'+escHtml(d.nom||d.raison_sociale||d.id)+(d.secteur?' <span style="color:#6B6B9A;">— '+escHtml(d.secteur)+'</span>':'')+'</span>'
+      + '</label>'
+      + '<details style="margin:0 0 6px 26px;"><summary style="cursor:pointer;font-size:12px;color:#3B5BDB;">✏️ Contenu et photo de bannière de cette division'+((c.slogan||c.description||c.apropos||c.points||ban)?' ✓':'')+'</summary>'
+      + champ(id,'slogan','Slogan','Ex. : Du champ à l\'assiette',0,c.slogan)
+      + champ(id,'description','Présentation courte (sous le titre)','Vide = description de la fiche division',3,c.description)
+      + champ(id,'apropos','À propos (texte détaillé)','Un paragraphe par ligne vide. Vide = section non affichée.',5,c.apropos)
+      + champ(id,'points','Points forts','Un point fort par ligne. Vide = section non affichée.',4,c.points)
+      + '<div class="form-group" style="margin:8px 0 0;"><label style="font-size:12px;">Photo de bannière</label>'
+      +   '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      +   '<input type="text" id="pdiv-ban-'+escHtml(id)+'" class="form-control param-div-ct" data-div="'+escHtml(id)+'" data-champ="banniere" value="'+escHtml(ban)+'" placeholder="URL d\'image, ou importez un fichier →" oninput="pdivBanniereMaj(\''+escHtml(id)+'\',this.value)" style="flex:1;min-width:180px;">'
+      +   '<label class="btn btn-secondary btn-sm" style="margin:0;cursor:pointer;">📁 Importer<input type="file" accept="image/*" style="display:none;" onchange="pdivBanniereFichier(event,\''+escHtml(id)+'\')"></label>'
+      +   '<button type="button" class="btn btn-secondary btn-sm" id="pdiv-clr-'+escHtml(id)+'" onclick="pdivBanniereEffacer(\''+escHtml(id)+'\')" style="'+(ban?'':'display:none;')+'">✕ Retirer</button>'
+      +   '</div>'
+      +   '<img id="pdiv-prev-'+escHtml(id)+'" alt="" style="margin-top:6px;max-width:260px;max-height:110px;border-radius:8px;object-fit:cover;'+(ban?'':'display:none;')+'"'+(ban?' src="'+escHtml(ban)+'"':'')+'>'
+      + '</div>'
+      + '<div style="font-size:11px;color:#6B6B9A;margin-top:6px;">Produits, galerie photos et documents de la division : « Médias du portail », en choisissant cette division.</div>'
+      + '</details></div>';
   }).join('');
 }
 
@@ -49444,9 +49507,13 @@ function buildPortailBrand(){
       var ids = Array.isArray(p.portail_divisions) ? p.portail_divisions.map(String) : [];
       return (DATA.divisions||[])
         .filter(function(d){ return d && String(d._deleted)!=='true' && ids.indexOf(String(d.id))!==-1; })
-        .map(function(d,i){ return {
+        .map(function(d,i){ var ct = (p.portail_divisions_contenu || {})[String(d.id)]; return {
           id: d.id, nom: d.nom || d.raison_sociale || '', secteur: d.secteur || '',
-          description: d.description || '', slogan: '', icone: '', ordre: ids.indexOf(String(d.id))
+          description: (ct && ct.description) || d.description || '', slogan: (ct && ct.slogan) || '', icone: '',
+          apropos: (ct && ct.apropos) || '',
+          points: String((ct && ct.points) || '').split('\n').map(function(x){ return x.trim(); }).filter(Boolean),
+          banniere: (ct && ct.banniere) || '',
+          ordre: ids.indexOf(String(d.id))
         }; });
     })()
   };
@@ -49665,7 +49732,7 @@ function loadParamFields() {
   sv('param-portail-catalogue', p.portail_catalogue||'');
   sv('param-portail-catalogue-location', p.portail_catalogue_location||'');
   sv('param-portail-programmes-geo', p.portail_programmes_geo||'');
-  if (typeof renderDivisionsPubliees==='function') renderDivisionsPubliees(p.portail_divisions||[]);
+  if (typeof renderDivisionsPubliees==='function') renderDivisionsPubliees(p.portail_divisions||[], p.portail_divisions_contenu||{});
   var autoComptaEl = document.getElementById('param-auto-compta-comm');
   if (autoComptaEl) autoComptaEl.checked = p.auto_compta_commissions !== false; sv('param-penalites',p.penalites_pct||0.5);
   _resilEdCharger(p);
