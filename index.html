@@ -59963,6 +59963,66 @@ function fcPhasesTout(did, ouvert) {
   if (!ouvert) d.etapes.forEach(function(e){ APP._fcPh[did][e.phase] = true; });
   fcPhasesAppliquer(did);
 }
+/* ── Actions en un clic par étape : mission et courrier ── */
+var FC_COURRIER_ETAPE = { completude_documents: 'complement_souscripteur', ind_pieces_souscripteur: 'complement_souscripteur', depot: 'suivi_administration', suivi_instruction: 'suivi_administration', urb_depot_guf: 'suivi_administration', urb_courriers_avis: 'suivi_administration', ind_acte_mutation: 'transmission_notaire', ind_titre_individuel: 'remise_titre', documents_finaux: 'remise_titre', retrait_acd: 'remise_titre' };
+function fcCourrierPourEtape(e) { return e.statut === 'attente_document' ? 'complement_souscripteur' : (FC_COURRIER_ETAPE[e.code] || ''); }
+function fcMissionsPourEtape(e) {
+  var r = []; Object.keys(FC_TYPES_INTERVENANT).forEach(function(t){ fcModelesMission(t).forEach(function(m){ if (m.etape === e.code) r.push({ type: t, modele: m }); }); }); return r;
+}
+function fcMissionEtape(d, code) { return (DATA.missions_foncieres || []).find(function(m){ return m.dossier_id === d.id && m.etape_code === code && m.statut !== 'annulee' && m.statut !== 'cloturee'; }) || null; }
+function fcMeilleurIntervenant(type) {
+  var charge = function(i){ return (DATA.missions_foncieres || []).filter(function(m){ return m.intervenant_id === i.id && FC_MISSIONS_ACTIVES.indexOf(m.statut) !== -1; }).length; };
+  return (DATA.intervenants_fonciers || []).filter(function(i){ return i.type === type && i.statut_relation === 'actif'; }).sort(function(a, b){ return charge(a) - charge(b); })[0] || null;
+}
+/* Propose la mission type liée à l'étape, avec l'intervenant actif le moins chargé ; l'échéance ne dépasse pas celle de l'étape. */
+function fcPropositionMission(dossierId, etapeCode, o) {
+  o = o || {}; var d = fcDossier(dossierId), e = d && fcEtape(d, etapeCode);
+  if (!d || !e) return { ok: false, erreur: 'Étape introuvable.' };
+  if (FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return { ok: false, erreur: 'Cette étape est terminée.' };
+  var sg = fcMissionsPourEtape(e); if (!sg.length) return { ok: false, erreur: 'Aucune mission type pour cette étape.' };
+  var ex = fcMissionEtape(d, etapeCode); if (ex && !o.forcer) return { ok: false, erreur: 'Une mission existe déjà pour cette étape (' + ex.reference + ').' };
+  var iv = o.intervenant_id ? fcIntervenant(o.intervenant_id) : null, s = null;
+  if (iv) s = sg.find(function(x){ return x.type === iv.type; });
+  else sg.some(function(x){ var i = fcMeilleurIntervenant(x.type); if (i) { iv = i; s = x; return true; } return false; });
+  if (!iv || !s) return { ok: false, erreur: 'Aucun intervenant actif de type « ' + sg.map(function(x){ return FC_TYPES_INTERVENANT[x.type] || x.type; }).join(' / ') + ' » : enregistrez-le dans Intervenants & missions.' };
+  var p = fcPreRemplirMission(d.id, iv.id, s.modele.code); if (!p) return { ok: false, erreur: 'Modèle de mission introuvable.' };
+  if (e.date_cible && e.date_cible >= fcAuj() && e.date_cible < p.echeance) p.echeance = e.date_cible;
+  p.etape_code = etapeCode;
+  return { ok: true, dossier: d, etape: e, intervenant: iv, modele: s.modele, prefill: p };
+}
+async function fcMissionEnUnClic(dossierId, etapeCode, o) {
+  o = o || {}; var pr = fcPropositionMission(dossierId, etapeCode, o); if (!pr.ok) return pr;
+  var p = pr.prefill, r = await fcCreerMission({ dossier_id: dossierId, intervenant_id: pr.intervenant.id, titre: p.titre, description: p.description, livrables: p.livrables, echeance: p.echeance, etape_code: etapeCode, modele: pr.modele.code });
+  if (!r.ok) return r;
+  if (o.envoyer) { var s = await fcChangerStatutMission(r.mission.id, 'envoyee', {}); if (!s.ok) return { ok: true, mission: r.mission, envoyee: false, avertissement: s.erreur }; }
+  return { ok: true, mission: r.mission, envoyee: !!o.envoyer, intervenant: pr.intervenant };
+}
+fcProtegerMutations(['fcMissionEnUnClic']);
+async function fcMissionUnClicUI(dossierId, etapeCode) {
+  if (!fcDroitEcriture()) { toast('Votre profil ne permet pas de modifier le module Foncier.', 'error'); return; }
+  var pr = fcPropositionMission(dossierId, etapeCode); if (!pr.ok) { toast(pr.erreur, 'error'); return; }
+  var p = pr.prefill, ok = confirm('Créer et envoyer cette mission ?\n\n' + p.titre + '\nIntervenant : ' + pr.intervenant.nom_organisation + '\nÉchéance : ' + p.echeance + '\nLivrables : ' + p.livrables.join(' ; ') + '\n\n(OK = envoyer à l\'intervenant ; Annuler = ne rien créer)');
+  if (!ok) return;
+  var r = await fcMissionEnUnClic(dossierId, etapeCode, { envoyer: true });
+  if (fcMsg(r, 'Mission ' + (r.mission ? r.mission.reference : '') + ' envoyée à ' + (r.intervenant ? r.intervenant.nom_organisation : '') + '.')) { if (r.avertissement) toast('Mission créée en brouillon : ' + r.avertissement, 'info'); fcRender(); }
+}
+function fcCourrierEtapeUI(dossierId, etapeCode) {
+  var d = fcDossier(dossierId), e = d && fcEtape(d, etapeCode), code = e && fcCourrierPourEtape(e); if (!code) return;
+  fcOnglet('pieces'); var host = document.getElementById('fc-detail'), sel = document.getElementById('fcc-g'); if (!host || !sel) return;
+  sel.value = code; var det = sel.closest('details'); if (det) det.open = true;
+  fcMajCourrierUI(dossierId);
+  var z = document.getElementById('fcc-pour'); if (z && !z.value) { var mi = fcMissionEtape(d, etapeCode); if (mi) z.value = mi.id; }
+  fcPreparerCourrierUI(dossierId); if (det && det.scrollIntoView) det.scrollIntoView({ behavior: 'smooth' });
+}
+function fcActionsEtapeHtml(d, e) {
+  if (FC_STATUTS_FINAUX.indexOf(e.statut) !== -1 || d.statut === 'annule' || d.statut === 'cloture') return '';
+  var h = '', mi = fcMissionEtape(d, e.code);
+  if (mi) h += ' <button class="btn btn-secondary btn-sm" title="Mission ' + escHtml(mi.reference) + ' — ' + escHtml(FC_STATUTS_MISSION[mi.statut] || mi.statut) + '" onclick="switchTab(\'foncier\',\'intervenants\');setTimeout(function(){fcMissionDetail(\'' + mi.id + '\')},60)">📌 ' + escHtml(mi.reference) + '</button>';
+  else if (fcMissionsPourEtape(e).length) h += ' <button class="btn btn-secondary btn-sm" title="Crée la mission type liée à cette étape et l\'envoie à l\'intervenant le moins chargé" onclick="fcMissionUnClicUI(\'' + d.id + '\',\'' + e.code + '\')">⚡ Missionner</button>';
+  if (fcCourrierPourEtape(e)) h += ' <button class="btn btn-secondary btn-sm" title="Prépare le courrier type correspondant à cette étape" onclick="fcCourrierEtapeUI(\'' + d.id + '\',\'' + e.code + '\')">✉️ Courrier</button>';
+  return h;
+}
+
 /* Onglets du dossier foncier : toutes les sections restent dans le DOM (les identifiants des panneaux et les mises à jour ciblées continuent de fonctionner), une seule est visible. */
 function fcOngletsHtml(sections) {
   var liste = sections.filter(function(x){ return String(x.h || '').replace(/<[^>]*>/g, '').trim() !== '' || x.k === 'synthese' || x.k === 'etapes'; });
@@ -60011,7 +60071,7 @@ function fcRenderDetail(id) {
       + '<td>' + e.justificatifs.length + ' <button class="btn btn-secondary btn-sm" onclick="fcJustifUI(\'' + d.id + '\',\'' + e.code + '\')">+</button> <button class="btn btn-secondary btn-sm" title="Fichiers joints à cette étape" onclick="fcPiecesUI(\'' + d.id + '\',\'' + e.code + '\')">📎 ' + fcPiecesEtape(d.id, e.code).length + (fcPiecesEtape(d.id, e.code).some(function(x){ return x.statut === 'a_verifier'; }) ? ' ⚠' : '') + '</button>'
       + e.justificatifs.map(function(j){ return '<div style="font-size:11px;color:var(--dim);">' + escHtml(j.reference || j.note) + ' · ' + escHtml(FC_SOURCES[j.source] || j.source) + '</div>'; }).join('') + '</td>'
       + '<td style="font-size:11px;">' + escHtml(e.visibilite) + '</td>'
-      + '<td>' + (figee ? '<button class="btn btn-secondary btn-sm" onclick="fcCorrigerUI(\'' + d.id + '\',\'' + e.code + '\')">Corriger</button>' : '<button class="btn btn-secondary btn-sm" onclick="fcEcheanceUI(\'' + d.id + '\',\'' + e.code + '\')">Échéance</button>') + (e.visibilite === 'souscripteur' ? ' <button class="btn btn-secondary btn-sm" title="Publier une information au souscripteur" onclick="fcPublierUI(\'' + d.id + '\',\'' + e.code + '\')">Publier</button>' : '') + '</td></tr>';
+      + '<td>' + (figee ? '<button class="btn btn-secondary btn-sm" onclick="fcCorrigerUI(\'' + d.id + '\',\'' + e.code + '\')">Corriger</button>' : '<button class="btn btn-secondary btn-sm" onclick="fcEcheanceUI(\'' + d.id + '\',\'' + e.code + '\')">Échéance</button>') + (e.visibilite === 'souscripteur' ? ' <button class="btn btn-secondary btn-sm" title="Publier une information au souscripteur" onclick="fcPublierUI(\'' + d.id + '\',\'' + e.code + '\')">Publier</button>' : '') + fcActionsEtapeHtml(d, e) + '</td></tr>';
   });
   h += '</tbody></table></div>';
   var _nbFait = d.etapes.filter(function(e){ return e.statut === 'termine'; }).length;
