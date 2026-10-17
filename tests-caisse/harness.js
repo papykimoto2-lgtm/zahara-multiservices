@@ -77,6 +77,7 @@ function preparer() {
   window._caisseAjouterRegle = async function () {};
   window.requireCompteDefaut = function (k) { return k === 'ecart_caisse_manquant' ? '658' : '758'; };
   DATA.params = DATA.params || {};
+  DATA.params.fc_validation_fonctions = false;   /* les anciens tests terminent des étapes sans circuit de validation ; le test dédié le réactive */
   DATA.params.fc_titre_solde_requis = false;   /* les anciens tests ouvrent des titres sans versements ; le test dédié le réactive */
   DATA.params.fc_dependances = false;   /* Foncier : ordre des étapes libre par défaut dans les tests historiques ; foncier-modeles-journee.test.js l'active */
   DATA.params.comptes_defaut = { virement_interne: '585' };

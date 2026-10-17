@@ -59794,6 +59794,11 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
     if (!motif) return { ok: false, erreur: 'Une dérogation exige un motif.' };
     derogation = true;
   }
+  var valF = (statut === 'termine') ? fcValidationRequise(d, e) : '';
+  if (valF && !(e.validation && e.validation.statut === 'validee')) {
+    if (!fcPeutValiderEtape(valF)) return { ok: false, validation_requise: true, fonction: valF, erreur: 'Cette étape doit être validée par la fonction « ' + fcLibFonction(valF) + ' » avant d\'être terminée.' };
+    var av = fcActeur(); e.validation = { statut: 'validee', fonction: valF, par: av.nom, par_id: av.id, le: new Date().toISOString(), motif: '' };
+  }
   var ancien = e.statut, a = fcActeur();
   e.statut = statut;
   e.motif = ['rejete', 'annule', 'bloque'].indexOf(statut) !== -1 ? motif : (statut === 'termine' ? e.motif : '');
@@ -59898,7 +59903,7 @@ function fcRender() {
     + kpi('Dossiers', s.total) + kpi('En cours', s.en_cours, '#1565c0') + kpi('Clôturés', s.clotures, '#2e7d4f') + kpi('Bloqués', s.bloques, '#c0392b')
     + kpi('Documents manquants', s.incomplets) + kpi('Chez un prestataire', s.attente_prestataire) + kpi('Chez une administration', s.attente_administration)
     + kpi('Retard interne', s.retard_interne, '#c0392b') + kpi('Délai administratif dépassé', s.delai_administratif_depasse) + '</div>' + fcHtmlParBloc() + '</div>';
-  h += '<details class="card"><summary style="cursor:pointer;font-weight:700;">➕ Ouvrir un dossier</summary><div class="filters-bar" style="align-items:end;flex-wrap:wrap;margin-top:10px;">'
+  h += '<details class="card"><summary style="cursor:pointer;font-weight:700;">➕ Ouvrir un dossier</summary>' + fcAssistantHtml() + '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;margin-top:10px;">'
     + '<div class="form-group"><label>Parcelle</label><select class="filter-select" id="fc-n-parcelle">' + (DATA.parcelles || []).map(function(p){ return '<option value="' + p.id + '">' + escHtml(fcLibelleParcelle(p.id)) + '</option>'; }).join('') + '</select></div>'
     + '<div class="form-group"><label>Situation initiale</label><select class="filter-select" id="fc-n-situation" onchange="fcSituationChange(this)"><option value="">— non précisée —</option>' + Object.keys(FC_SITUATIONS).map(function(k){ return '<option value="' + k + '">' + escHtml(FC_SITUATIONS[k].libelle) + '</option>'; }).join('') + '</select></div>'
     + '<div class="form-group"><label>Procédure</label><select class="filter-select" id="fc-n-type" onchange="fcTypeChange(this)">' + fcOptions(FC_PROCEDURES, 'acd') + '</select></div>'
@@ -59991,13 +59996,14 @@ function fcRenderDetail(id) {
   _sec.push({ k: 'synthese', t: '📌 Synthèse', h: h }); h = '';
   var phase = '', _q = "'" + d.id + "'", _tot = {}, _ok = {};
   d.etapes.forEach(function(e){ _tot[e.phase] = (_tot[e.phase] || 0) + 1; if (e.statut === 'termine') _ok[e.phase] = (_ok[e.phase] || 0) + 1; });
+  h += fcPanneauSuggestionsEtapes(d);
   h += fcPanneauEquipe(d);
   h += '<div style="margin-bottom:6px;display:flex;gap:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="fcPhasesTout(' + _q + ',true)">▾ Tout déployer</button><button type="button" class="btn btn-secondary btn-sm" onclick="fcPhasesTout(' + _q + ',false)">▸ Tout réduire</button></div>';
   h += '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Statut</th><th>Responsable</th><th>Échéance</th><th>Justificatifs</th><th>Visibilité</th><th></th></tr></thead><tbody>';
   d.etapes.forEach(function(e){
     if (e.phase !== phase) { phase = e.phase; h += '<tr data-fcphh="' + e.phase + '" role="button" tabindex="0" aria-expanded="' + (fcPhaseReduite(d.id, e.phase) ? 'false' : 'true') + '" onclick="fcPhaseBascule(' + _q + ',\'' + e.phase + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}" style="cursor:pointer;"><td colspan="8" style="background:' + (/^U/.test(e.phase) ? 'rgba(192,57,43,.14)' : 'var(--card2,#f5f1ea)') + ';font-weight:700;font-size:12px;"><span class="fc-ph-fl">' + (fcPhaseReduite(d.id, e.phase) ? '▸' : '▾') + '</span> ' + (/^U/.test(e.phase) ? fcRouge(escHtml(fcLibPhase(phase))) : escHtml(fcLibPhase(phase))) + ' <span class="fc-nb" style="background:rgba(0,0,0,.1);border-radius:9px;padding:0 6px;font-weight:400;">' + (_ok[e.phase] || 0) + '/' + _tot[e.phase] + '</span></td></tr>'; }
     var figee = FC_STATUTS_FINAUX.indexOf(e.statut) !== -1, et = fcEtatEcheance(e);
-    h += '<tr data-fcph="' + e.phase + '"' + (fcPhaseReduite(d.id, e.phase) ? ' style="display:none"' : '') + (fcEtapeProcedure(e) ? ' class="fc-proc"' : '') + '><td>' + e.ordre + '</td><td>' + (fcEtapeProcedure(e) ? fcRouge(escHtml(e.libelle), fcTitreEtapeProc(e)) : escHtml(e.libelle)) + (e.justificatif_requis ? ' <span title="Justificatif requis" style="color:#B87333;">📎</span>' : '') + fcInfoEtapeHtml(d, e) + fcHintDependance(d, e) + fcEquipeLigneHtml(e.code)
+    h += '<tr data-fcph="' + e.phase + '"' + (fcPhaseReduite(d.id, e.phase) ? ' style="display:none"' : '') + (fcEtapeProcedure(e) ? ' class="fc-proc"' : '') + '><td>' + e.ordre + '</td><td>' + (fcEtapeProcedure(e) ? fcRouge(escHtml(e.libelle), fcTitreEtapeProc(e)) : escHtml(e.libelle)) + (e.justificatif_requis ? ' <span title="Justificatif requis" style="color:#B87333;">📎</span>' : '') + fcInfoEtapeHtml(d, e) + fcHintDependance(d, e) + fcEquipeLigneHtml(e.code) + fcValidationHtml(d, e)
       + (e.issue ? '<br><span style="font-size:11px;color:#2e7d4f;">Issue officielle enregistrée : ' + escHtml(e.issue) + '</span>' : '') + (e.motif ? '<br><span style="font-size:11px;color:#c0392b;">Motif : ' + escHtml(e.motif) + '</span>' : '') + '</td>'
       + '<td>' + (figee ? fcBadgeStatut(e.statut) : '<select class="filter-select" onchange="fcStatutUI(\'' + d.id + '\',\'' + e.code + '\',this)">' + Object.keys(FC_STATUTS).map(function(k){ return '<option value="' + k + '"' + (k === e.statut ? ' selected' : '') + '>' + escHtml(FC_STATUTS[k]) + '</option>'; }).join('') + '</select>') + '</td>'
       + '<td>' + escHtml(fcNomUtilisateur(e.responsable_id || d.responsable_id)) + '</td>'
@@ -60022,7 +60028,7 @@ function fcRenderDetail(id) {
     + (evs.length ? evs.slice(0, nbHist).map(function(x){ return '<div style="padding:4px 0;border-bottom:1px solid var(--bord,#eee);"><b>' + escHtml(x.date.slice(0, 16).replace('T', ' ')) + '</b> · ' + escHtml(x.acteur || '—') + ' · ' + escHtml(x.description) + (x.motif ? ' <i>(motif : ' + escHtml(x.motif) + ')</i>' : '') + '</div>'; }).join('') : '<div style="color:var(--dim);">Aucun événement.</div>')
     + '</div>' + (evs.length > nbHist ? '<button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="fcPlusHistorique(\'' + d.id + '\')">Afficher ' + FC_TAILLE_HISTORIQUE + ' événements de plus (' + (evs.length - nbHist) + ' restants)</button>' : '');
   _sec.push({ k: 'suivi', t: '📣 Souscripteur &amp; historique', h: h });
-  host.innerHTML = _s0 + fcOngletsHtml(_sec) + '</div>';
+  host.innerHTML = _s0 + fcPanneauProchaineAction(d) + fcOngletsHtml(_sec) + '</div>';
   fcMajCourrierUI(d.id);
 }
 async function fcStatutUI(id, code, sel) {
@@ -60045,6 +60051,7 @@ async function fcStatutUI(id, code, sel) {
     var m = prompt('Motif de la dérogation :') || '';
     r = await fcChangerStatutEtape(id, code, statut, { motif: m, derogation: true });
   }
+  if (!r.ok && r.validation_requise && confirm(r.erreur + '\n\nDemander la validation maintenant ?')) { r = await fcDemanderValidationEtape(id, code); if (r.ok) { toast('Validation demandée.', 'success'); fcRender(); return; } }
   fcMsg(r, 'Étape mise à jour.'); fcRender();
 }
 async function fcJustifUI(id, code) {
@@ -63207,9 +63214,10 @@ function fcChargeUtilisateur(uid) {
 }
 function fcLibFonction(f) { return (FC_FONCTIONS[f] || {}).lib || f; }
 /* Répartit les étapes non personnalisées entre les personnes de la fonction concernée, en équilibrant la charge. Les étapes déjà confiées à quelqu'un d'autre que le responsable du dossier ne sont pas touchées. */
-function fcRepartirEquipe(d) {
+function fcRepartirEquipe(d, codes) {
   var charge = {}, parPersonne = {}, sans = {}, n = 0, chargeDe = function(u){ if (charge[u.id] == null) charge[u.id] = fcChargeUtilisateur(u.id); return charge[u.id]; };
   d.etapes.slice().sort(function(a, b){ return a.ordre - b.ordre; }).forEach(function(e){
+    if (codes && codes.indexOf(e.code) === -1) return;
     if (FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return;
     if (e.responsable_id && e.responsable_id !== d.responsable_id) return;
     var f = fcEquipeEtape(e.code).exec, pool = fcUsersFonction(f);
@@ -63275,6 +63283,228 @@ async function fcSauverEquipeUI() {
   DATA.params = DATA.params || {}; DATA.params.fc_fonctions_roles = m;
   try { await fcEnregistrerParams(); toast('Équipe interne enregistrée.', 'success'); } catch (e) { toast('Enregistrement impossible : ' + (e.message || e), 'error'); }
   fcRenderModeles();
+}
+/* ── Assistant d'étapes : propose les étapes concernées par la procédure et le contexte, et permet d'en ajouter au dossier ──
+   Règle A : étapes que la procédure prévoit aujourd'hui mais absentes du dossier (ouvert avant une mise à jour, étape manquante).
+   Règle B : dossier d'une procédure standard en situation coutumière (terrain brut, attestation villageoise) → étapes de la phase coutumière et technique.
+   Ajout manuel : tout le catalogue des étapes connues. Chaque ajout est journalisé, confié à la fonction concernée et inséré à sa place logique. */
+function fcDefEtape(code) { var l = FC_ETAPES_REF.concat(FC_ETAPES_URBAIN); for (var i = 0; i < l.length; i++) if (l[i][0] === code) return l[i]; return null; }
+function fcCreerEtape(code, type, d) {
+  var s = fcDefEtape(code); if (!s) return null; var m = fcMetaEtape(code);
+  return { code: s[0], libelle: fcLibelleEtape(s[0], type, s[1]), phase: s[2], ordre: 0, statut: 'a_venir', responsable_id: d.responsable_id || '', date_debut: '', date_cible: '', date_fin: '', justificatif_requis: !!s[3], justificatifs: [],
+           motif: '', observations: '', visibilite: s[4], valide_par: '', valide_le: '', issue: '', acteurs: m.acteurs.slice(), bloc: m.bloc, pieces: m.pieces.slice(), ajoutee: true };
+}
+/* Insère l'étape après l'ancre (ou avant la clôture), puis renumérote. */
+function fcInsererEtape(d, etape, ancreCode) {
+  var i = d.etapes.findIndex(function(e){ return e.code === ancreCode; });
+  if (i === -1) { var c = d.etapes.findIndex(function(e){ return e.code === 'cloture'; }); i = c === -1 ? d.etapes.length - 1 : c - 1; }
+  d.etapes.splice(i + 1, 0, etape); d.etapes.forEach(function(e, k){ e.ordre = k + 1; });
+}
+function fcAncreEtape(d, code) {
+  var ref = fcEtapesPour(d.type_procedure, d.situation_initiale || '').map(function(e){ return e.code; }), k = ref.indexOf(code);
+  if (k === -1) { var s = fcDefEtape(code), memePhase = d.etapes.filter(function(e){ return s && e.phase === s[2]; }); return memePhase.length ? memePhase[memePhase.length - 1].code : 'identification_procedure'; }
+  for (var j = k - 1; j >= 0; j--) if (d.etapes.some(function(e){ return e.code === ref[j]; })) return ref[j];
+  return 'creation_dossier';
+}
+function fcSuggestionsEtapes(d) {
+  var out = [], ont = {}; d.etapes.forEach(function(e){ ont[e.code] = 1; });
+  var ref = fcEtapesPour(d.type_procedure, d.situation_initiale || ''), manq = ref.filter(function(e){ return !ont[e.code]; });
+  if (manq.length) out.push({ id: 'ref', titre: 'Étapes prévues par la procédure et absentes de ce dossier', raison: 'La procédure « ' + (FC_PROCEDURES[d.type_procedure] || d.type_procedure) + ' » prévoit ces étapes : le dossier a été ouvert avant une mise à jour ou une étape manque.', codes: manq.map(function(e){ return e.code; }) });
+  if (d.type_procedure !== 'immatriculation_urbaine' && ['terrain_coutumier', 'attestation_villageoise'].indexOf(d.situation_initiale) !== -1) {
+    var u1 = FC_ETAPES_URBAIN.filter(function(s){ return s[2] === 'U1'; }).map(function(s){ return s[0]; }).filter(function(c){ return !ont[c]; });
+    if (u1.length) out.push({ id: 'coutumier', titre: 'Phase coutumière et technique (terrain sans titre)', raison: 'La situation « ' + ((FC_SITUATIONS[d.situation_initiale] || {}).libelle || d.situation_initiale) + ' » suppose les étapes coutumières : civilité villageoise, procès-verbaux de famille, attestations de propriété coutumière, levé topographique, convention chez le notaire…', codes: u1, apres: 'identification_procedure' });
+  }
+  return out;
+}
+async function fcAjouterEtapes(dossierId, codes, o) {
+  o = o || {}; var d = fcDossier(dossierId);
+  if (!d) return { ok: false, erreur: 'Dossier introuvable.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) ajoute des étapes.' };
+  if (['cloture', 'annule'].indexOf(d.statut) !== -1) return { ok: false, erreur: 'Dossier ' + d.statut + ' : aucune étape ne peut être ajoutée.' };
+  var nouv = [], deja = {}; d.etapes.forEach(function(e){ deja[e.code] = 1; });
+  (codes || []).forEach(function(c){ if (deja[c] || !fcDefEtape(c)) return; deja[c] = 1; nouv.push(c); });
+  if (!nouv.length) return { ok: false, erreur: 'Aucune étape à ajouter (déjà présentes ou inconnues).' };
+  var ancre = o.apres || null, ajoutees = [];
+  nouv.forEach(function(c){ var e = fcCreerEtape(c, d.type_procedure, d); fcInsererEtape(d, e, ancre || fcAncreEtape(d, c)); ancre = e.code; ajoutees.push(e); });
+  var rep = fcRepartirEquipe(d, nouv);
+  fcRecalculerStatut(d); await fcSauver(d);
+  await fcEvenement(d, '', 'etapes_ajoutees', nouv.length + ' étape(s) ajoutée(s) : ' + ajoutees.map(function(e){ return e.libelle; }).slice(0, 4).join(' ; ') + (nouv.length > 4 ? ' (+' + (nouv.length - 4) + ')' : '') + (o.raison ? ' — ' + o.raison : ''), { source: 'promoteur', motif: o.raison || '' });
+  return { ok: true, ajoutees: nouv.length, codes: nouv, assignees: rep.assignees };
+}
+fcProtegerMutations(['fcAjouterEtapes']);
+function fcPanneauSuggestionsEtapes(d) {
+  if (['cloture', 'annule'].indexOf(d.statut) !== -1) return '';
+  var sug = fcSuggestionsEtapes(d); APP._fcSug = APP._fcSug || {}; APP._fcSug[d.id] = sug;
+  var ont = {}; d.etapes.forEach(function(e){ ont[e.code] = 1; });
+  var libres = FC_ETAPES_REF.concat(FC_ETAPES_URBAIN).filter(function(s, i, a){ return !ont[s[0]] && a.findIndex(function(x){ return x[0] === s[0]; }) === i; });
+  var cartes = sug.map(function(x, i){
+    return '<div style="border-left:4px solid #2e7d4f;background:#f1f8f3;padding:8px 10px;margin:6px 0;font-size:12px;"><b>' + escHtml(x.titre) + '</b> <span class="fc-nb">' + x.codes.length + '</span><div style="color:var(--dim);margin:3px 0;">' + escHtml(x.raison) + '</div>'
+      + '<div style="font-size:11px;">' + x.codes.slice(0, 5).map(function(c){ return escHtml(fcLibelleEtape(c, d.type_procedure, (fcDefEtape(c) || [])[1] || c)); }).join(' · ') + (x.codes.length > 5 ? ' …(+' + (x.codes.length - 5) + ')' : '') + '</div>'
+      + '<button class="btn btn-primary btn-sm" style="margin-top:4px;" onclick="fcAjouterSuggestionUI(\'' + d.id + '\',' + i + ')">➕ Ajouter ces ' + x.codes.length + ' étape(s)</button></div>';
+  }).join('');
+  var opts = libres.map(function(s){ return '<option value="' + s[0] + '">' + escHtml((FC_PHASES[s[2]] ? s[2] + ' · ' : '') + s[1]) + '</option>'; }).join('');
+  return '<details class="card" style="margin-bottom:8px;"' + (sug.length ? ' open' : '') + '><summary style="cursor:pointer;font-weight:700;">🧭 Étapes suggérées pour ce dossier' + (sug.length ? ' <span class="fc-nb" style="background:#2e7d4f;color:#fff;">' + sug.length + '</span>' : '') + '</summary>'
+    + (cartes || '<div style="font-size:12px;color:var(--dim);margin:6px 0;">Aucune étape manquante au regard de la procédure et du contexte.</div>')
+    + (libres.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:12px;">Ajouter une étape du catalogue : <select class="filter-select" id="fc-add-etape" style="max-width:420px;">' + opts + '</select><button class="btn btn-secondary btn-sm" onclick="fcAjouterCatalogueUI(\'' + d.id + '\')">➕ Ajouter</button></div>' : '') + '</details>';
+}
+async function fcAjouterSuggestionUI(id, i) {
+  var x = ((APP._fcSug || {})[id] || [])[i]; if (!x) return;
+  var r = await fcAjouterEtapes(id, x.codes, { apres: x.apres, raison: x.titre });
+  if (fcMsg(r, r.ok ? r.ajoutees + ' étape(s) ajoutée(s).' : '')) fcRenderDetail(id);
+}
+async function fcAjouterCatalogueUI(id) {
+  var c = (document.getElementById('fc-add-etape') || {}).value; if (!c) return;
+  var r = await fcAjouterEtapes(id, [c], { raison: 'ajout manuel' });
+  if (fcMsg(r, 'Étape ajoutée.')) fcRenderDetail(id);
+}
+/* ── Validation par fonction : une étape qui exige un contrôle ne se termine que si une personne de la fonction concernée (ou un administrateur) la valide ──
+   Ne s'applique que si au moins une personne porte un rôle de cette fonction (sinon rien ne bloquerait jamais). Réglage : DATA.params.fc_validation_fonctions (actif par défaut). */
+function fcValidationFonctionsActive() { return ((DATA.params || {}).fc_validation_fonctions) !== false; }
+function fcRoleActeur() { return (APP.currentUser && APP.currentUser.role) || ''; }
+function fcValidationRequise(d, e) {
+  if (!fcValidationFonctionsActive() || !e || FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return '';
+  var f = fcEquipeEtape(e.code).valide; if (!f) return '';
+  return fcUsersFonction(f).length ? f : '';
+}
+function fcPeutValiderEtape(f) { return fcEstAdmin() || fcRolesFonction(f).indexOf(fcRoleActeur()) !== -1; }
+async function fcDemanderValidationEtape(dossierId, code) {
+  var d = fcDossier(dossierId), e = d && fcEtape(d, code);
+  if (!d || !e) return { ok: false, erreur: 'Dossier ou étape introuvable.' };
+  if (['cloture', 'annule'].indexOf(d.statut) !== -1) return { ok: false, erreur: 'Dossier ' + d.statut + '.' };
+  var f = fcValidationRequise(d, e); if (!f) return { ok: false, erreur: 'Cette étape ne nécessite pas de validation.' };
+  if (e.validation && e.validation.statut === 'demandee') return { ok: false, erreur: 'Une validation est déjà demandée.' };
+  var a = fcActeur();
+  if (!fcPeutGererDossier(d) && fcResponsableEtape(d, e) !== a.id) return { ok: false, erreur: "Seul le responsable de l'étape ou du dossier demande la validation." };
+  e.validation = { statut: 'demandee', fonction: f, demande_par: a.nom, demande_par_id: a.id, demande_le: new Date().toISOString() };
+  await fcSauver(d);
+  await fcEvenement(d, code, 'validation_demandee', 'Validation demandée à la fonction « ' + fcLibFonction(f) + ' » : ' + e.libelle, { source: 'promoteur' });
+  await fcNotifierUsers(fcUsersFonction(f).map(function(u){ return u.id; }), { dedup: 'valid:' + d.id + ':' + code + ':' + e.validation.demande_le, titre: 'Validation demandée', message: d.reference + '\n' + e.libelle + ' — demandée par ' + a.nom, template_code: 'validation_etape', dossier_id: d.id, urgent: false }, { acteur_id: a.id });
+  return { ok: true, demande: true };
+}
+async function fcDecisionValidationEtape(dossierId, code, decision, motif) {
+  var d = fcDossier(dossierId), e = d && fcEtape(d, code);
+  if (!d || !e) return { ok: false, erreur: 'Dossier ou étape introuvable.' };
+  var f = (e.validation && e.validation.statut === 'demandee') ? e.validation.fonction : fcValidationRequise(d, e);
+  if (!f) return { ok: false, erreur: 'Aucune validation à rendre pour cette étape.' };
+  if (!fcPeutValiderEtape(f)) return { ok: false, erreur: 'Validation réservée à la fonction « ' + fcLibFonction(f) + ' » (ou à un administrateur).' };
+  var a = fcActeur(), maintenant = new Date().toISOString(); motif = String(motif || '').trim();
+  if (decision !== 'validee') {
+    if (!motif) return { ok: false, erreur: 'Un motif est obligatoire pour refuser une validation.' };
+    e.validation = Object.assign({}, e.validation || {}, { statut: 'refusee', fonction: f, decide_par: a.nom, decide_par_id: a.id, decide_le: maintenant, motif: motif });
+    await fcSauver(d);
+    await fcEvenement(d, code, 'validation_refusee', 'Validation refusée par ' + a.nom + ' (' + fcLibFonction(f) + ') : ' + e.libelle, { source: 'promoteur', motif: motif });
+    await fcNotifierUsers([fcResponsableEtape(d, e)], { dedup: 'validref:' + d.id + ':' + code + ':' + maintenant, titre: 'Validation refusée', message: d.reference + '\n' + e.libelle + '\nMotif : ' + motif, template_code: 'validation_etape', dossier_id: d.id, urgent: true }, { acteur_id: a.id });
+    return { ok: true, refusee: true };
+  }
+  e.validation = Object.assign({}, e.validation || {}, { statut: 'validee', fonction: f, par: a.nom, par_id: a.id, le: maintenant, motif: '' });
+  await fcSauver(d);
+  await fcEvenement(d, code, 'validation_accordee', 'Validation accordée par ' + a.nom + ' (' + fcLibFonction(f) + ') : ' + e.libelle, { source: 'promoteur' });
+  var r = await fcChangerStatutEtape(d.id, code, 'termine', { source: 'promoteur' });
+  return r.ok ? { ok: true, validee: true, terminee: true } : { ok: true, validee: true, terminee: false, avertissement: r.erreur };
+}
+fcProtegerMutations(['fcDemanderValidationEtape', 'fcDecisionValidationEtape']);
+function fcValidationHtml(d, e) {
+  var f = fcValidationRequise(d, e), v = e.validation || {};
+  if (!f) return v.statut === 'validee' ? '<br><span style="font-size:11px;color:#2e7d4f;" title="Validation par fonction">🔏 Validée par ' + escHtml(v.par || '') + ' (' + escHtml(fcLibFonction(v.fonction)) + ')</span>' : '';
+  var q = "'" + d.id + "','" + e.code + "'", lib = escHtml(fcLibFonction(f)), actif = FC_STATUTS_ACTIFS.indexOf(e.statut) !== -1, peut = fcPeutValiderEtape(f);
+  if (v.statut === 'demandee') return '<br><span style="font-size:11px;color:#8a5a00;">⏳ Validation en attente — ' + lib + (peut ? ' <button class="btn btn-primary btn-sm" onclick="fcValiderEtapeUI(' + q + ',true)">✅ Valider</button> <button class="btn btn-secondary btn-sm" onclick="fcValiderEtapeUI(' + q + ',false)">⛔ Refuser</button>' : '') + '</span>';
+  if (v.statut === 'refusee') return '<br><span style="font-size:11px;color:#c0392b;">⛔ Validation refusée par ' + escHtml(v.decide_par || '') + ' : ' + escHtml(v.motif || '') + (actif ? ' <button class="btn btn-secondary btn-sm" onclick="fcDemanderValidationUI(' + q + ')">Redemander</button>' : '') + '</span>';
+  return '<br><span style="font-size:11px;color:#5b6b7a;">🔏 À valider par ' + lib + ' avant d\'être terminée' + (actif ? ' <button class="btn btn-secondary btn-sm" onclick="fcDemanderValidationUI(' + q + ')">Demander la validation</button>' : '') + '</span>';
+}
+async function fcDemanderValidationUI(id, code) { if (fcMsg(await fcDemanderValidationEtape(id, code), 'Validation demandée.')) { fcRender(); fcRenderDetail(id); } }
+async function fcValiderEtapeUI(id, code, ok) {
+  var motif = ok ? '' : (prompt('Motif du refus (obligatoire) :') || '');
+  var r = await fcDecisionValidationEtape(id, code, ok ? 'validee' : 'refusee', motif);
+  if (fcMsg(r, ok ? 'Validée : étape terminée.' : 'Validation refusée.')) { if (r.avertissement) toast('Validation enregistrée, mais l\'étape n\'est pas terminée : ' + r.avertissement, 'warning'); fcRender(); fcRenderDetail(id); }
+}
+
+/* ── Prochaine action : une seule carte « quoi faire maintenant, par qui, avec quoi » ── */
+function fcProchaineAction(d) {
+  if (['cloture', 'annule'].indexOf(d.statut) !== -1) return null;
+  var ouvertes = d.etapes.slice().sort(function(a, b){ return a.ordre - b.ordre; }).filter(function(e){ return FC_STATUTS_FINAUX.indexOf(e.statut) === -1; });
+  if (!ouvertes.length) return null;
+  var pretes = ouvertes.filter(function(e){ return !fcDependancesActives() || !fcPrerequisManquants(d, e.code).length; });
+  if (!pretes.length) return { bloque: true, attend: ouvertes[0] };
+  var actives = pretes.filter(function(e){ return FC_STATUTS_ACTIFS.indexOf(e.statut) !== -1; }), e = actives[0] || pretes[0], q = fcEquipeEtape(e.code), v = fcValidationRequise(d, e), val = e.validation || {};
+  var pieces = (e.justificatif_requis && !(e.justificatifs || []).length && !fcPiecesEtape(d.id, e.code).length) ? ['un justificatif'] : [];
+  return { etape: e, exec: q.exec, appui: q.appui, personne: e.responsable_id ? fcNomUtilisateur(e.responsable_id) : '', valide: v, validation: val.statut || '', pieces_manquantes: pieces,
+           etat: fcEtatEcheance(e), parallele: pretes.filter(function(x){ return x !== e; }).slice(0, 3), active: FC_STATUTS_ACTIFS.indexOf(e.statut) !== -1 };
+}
+function fcPanneauProchaineAction(d) {
+  var a = fcProchaineAction(d); if (!a) return '';
+  var cadre = function(h, c){ return '<div style="border:2px solid ' + c + ';background:#f7fbf8;border-radius:10px;padding:10px 14px;margin:10px 0;"><div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:' + c + ';font-weight:700;">🎯 Prochaine action</div>' + h + '</div>'; };
+  if (a.bloque) return cadre('<div style="margin-top:4px;">Aucune étape n\'est prête : « <b>' + escHtml(a.attend.libelle) + '</b> » attend ses étapes préalables. Ouvrez l\'onglet Étapes pour voir ce qui bloque.</div>', '#c0392b');
+  var e = a.etape, q = "'" + d.id + "','" + e.code + "'", btn = '', note = '';
+  if (a.valide && a.validation === 'demandee') {
+    note = '⏳ En attente de la validation de la fonction « ' + escHtml(fcLibFonction(a.valide)) + ' ».';
+    if (fcPeutValiderEtape(a.valide)) btn = '<button class="btn btn-primary btn-sm" onclick="fcValiderEtapeUI(' + q + ',true)">✅ Valider et terminer</button> <button class="btn btn-secondary btn-sm" onclick="fcValiderEtapeUI(' + q + ',false)">⛔ Refuser</button>';
+  } else if (!a.active) btn = '<button class="btn btn-primary btn-sm" onclick="fcActionEtapeUI(' + q + ',\'en_cours\')">▶️ Démarrer</button>';
+  else if (a.valide && a.validation !== 'validee' && !fcPeutValiderEtape(a.valide)) btn = '<button class="btn btn-primary btn-sm" onclick="fcDemanderValidationUI(' + q + ')">🔏 Demander la validation (' + escHtml(fcLibFonction(a.valide)) + ')</button>';
+  else btn = '<button class="btn btn-primary btn-sm" onclick="fcActionEtapeUI(' + q + ',\'termine\')">✅ Terminer cette étape</button>';
+  if (a.pieces_manquantes.length) btn += ' <button class="btn btn-secondary btn-sm" onclick="fcJustifUI(' + q + ')">📎 Joindre ' + a.pieces_manquantes[0] + '</button>';
+  var l = '<div style="font-size:15px;font-weight:700;margin:4px 0;">' + escHtml(e.libelle) + '</div><div style="font-size:12px;color:#33475b;">'
+    + '👤 <b>' + escHtml(a.personne || 'responsable du dossier') + '</b> · fonction : ' + escHtml(fcLibFonction(a.exec)) + (a.appui.length ? ' · appui : ' + a.appui.map(fcLibFonction).map(escHtml).join(', ') : '')
+    + (e.date_cible ? ' · échéance <b' + (a.etat ? ' style="color:#c0392b;"' : '') + '>' + escHtml(e.date_cible) + '</b>' + (a.etat ? ' (en retard)' : '') : '') + '</div>'
+    + (a.pieces_manquantes.length ? '<div style="font-size:12px;color:#8a5a00;margin-top:3px;">📎 Manque : ' + a.pieces_manquantes.join(', ') + ' avant de terminer.</div>' : '')
+    + (note ? '<div style="font-size:12px;color:#8a5a00;margin-top:3px;">' + note + '</div>' : '')
+    + '<div style="margin-top:8px;">' + btn + '</div>'
+    + (a.parallele.length ? '<div style="font-size:11px;color:var(--dim);margin-top:6px;">En parallèle, prêtes : ' + a.parallele.map(function(x){ return escHtml(x.libelle); }).join(' · ') + '</div>' : '');
+  return cadre(l, '#2e7d4f');
+}
+async function fcActionEtapeUI(id, code, statut) { await fcStatutUI(id, code, { value: statut }); fcRenderDetail(id); }
+
+/* ── Assistant d'ouverture : 4 questions → procédure, étapes, équipe et délais ── */
+function fcAssistantPropose(r) {
+  r = r || {}; var sit = FC_SITUATIONS[r.situation] || null, type = sit ? sit.procedure : 'acd', urbain = type === 'immatriculation_urbaine';
+  var tmp = { type_procedure: type, situation_initiale: r.situation || '', etapes: fcEtapesPour(type, r.situation || '') }, total = tmp.etapes.length;
+  if (urbain) fcUrbainInit(tmp, { plusieurs_proprietaires: r.proprietaires !== 'un', voie: r.voie || '' });
+  var actives = tmp.etapes.filter(function(e){ return e.statut !== 'annule'; }), fonctions = {};
+  actives.forEach(function(e){ var f = fcEquipeEtape(e.code).exec; fonctions[f] = (fonctions[f] || 0) + 1; });
+  var sans = Object.keys(fonctions).filter(function(f){ return !fcUsersFonction(f).length; }), ap = fcApercuModele(type), expl = [], av = [];
+  if (sit && sit.demarche) expl.push(sit.demarche);
+  if (urbain) { if (r.proprietaires === 'un') expl.push('Propriétaire unique : parcellaire et polygonale d\'ensemble sans objet.'); if (r.voie) expl.push('Voie « ' + (FC_URB_VOIES[r.voie] || r.voie) + ' » : les étapes de l\'autre voie sont écartées.'); }
+  if (sit && sit.a_determiner) av.push('Procédure à déterminer avec les services compétents ou un professionnel habilité avant d\'engager les démarches.');
+  if (sans.length) av.push('Aucun utilisateur pour : ' + sans.map(fcLibFonction).join(', ') + ' — ces étapes resteront à votre charge (Modèles de dossier › Équipe interne).');
+  if (r.pour === 'souscripteur') av.push('Un titre individuel s\'ouvre depuis le dossier de l\'opération, onglet « Titres individuels » (souscripteurs ayant soldé le prix).');
+  return { type: type, situation: r.situation || '', urbain: urbain, nb: actives.length, ecartees: total - actives.length, fonctions: fonctions, sans_equipe: sans, jours: ap.jours, echeance: ap.echeance, source_delais: ap.source, explications: expl, avertissements: av };
+}
+function fcAssistantReponses() {
+  var g = function(i){ return (document.getElementById(i) || {}).value || ''; };
+  return { situation: g('fc-q1'), proprietaires: g('fc-q2') || 'plusieurs', voie: g('fc-q3'), pour: g('fc-q4') || 'operation' };
+}
+function fcAssistantHtml() {
+  var sel = function(id, opts, ch){ return '<select class="filter-select" id="' + id + '" onchange="fcAssistantMaj()">' + opts.map(function(o){ return '<option value="' + o[0] + '">' + escHtml(o[1]) + '</option>'; }).join('') + '</select>'; };
+  var q1 = [['', '— Je ne sais pas / autre —']].concat(Object.keys(FC_SITUATIONS).map(function(k){ return [k, FC_SITUATIONS[k].libelle]; }));
+  return '<div id="fc-assistant" style="border:1px solid #2e7d4f;background:#f1f8f3;border-radius:8px;padding:10px 12px;margin:10px 0;"><div style="font-weight:700;">🧙 Assistant d\'ouverture — 4 questions, je choisis la procédure et les étapes</div>'
+    + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-top:8px;font-size:12px;">'
+    + '<div class="form-group"><label>1. Quelle est la situation du terrain ?</label>' + sel('fc-q1', q1) + '</div>'
+    + '<div class="form-group fc-q-urb" style="display:none;"><label>2. Combien de propriétaires terriens ?</label>' + sel('fc-q2', [['plusieurs', 'Plusieurs propriétaires'], ['un', 'Un seul propriétaire']]) + '</div>'
+    + '<div class="form-group fc-q-urb" style="display:none;"><label>3. Voie envisagée ?</label>' + sel('fc-q3', [['', 'À choisir plus tard'], ['acd', 'ACD'], ['approbation', 'Approbation']]) + '</div>'
+    + '<div class="form-group"><label>4. Pour qui ?</label>' + sel('fc-q4', [['operation', "L'opération (la parcelle)"], ['souscripteur', 'Un souscripteur (titre individuel)']]) + '</div></div>'
+    + '<div id="fc-assistant-recap" style="margin-top:8px;font-size:12px;"></div>'
+    + '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-secondary btn-sm" onclick="fcAssistantAppliquer()">✅ Appliquer au formulaire</button><button class="btn btn-primary btn-sm" onclick="fcAssistantOuvrir()">🚀 Ouvrir avec cette proposition</button></div></div>';
+}
+function fcAssistantMaj() {
+  var r = fcAssistantReponses(), p = fcAssistantPropose(r), zone = document.getElementById('fc-assistant-recap'); if (!zone) return p;
+  [].forEach.call(document.querySelectorAll('.fc-q-urb'), function(z){ z.style.display = p.urbain ? '' : 'none'; });
+  var fonc = Object.keys(p.fonctions).map(function(f){ return fcLibFonction(f) + ' (' + p.fonctions[f] + ')'; }).join(' · ');
+  zone.innerHTML = '<div>👉 <b>' + escHtml(FC_PROCEDURES[p.type] || p.type) + '</b> — <b>' + p.nb + ' étape(s)</b>' + (p.ecartees ? ' (' + p.ecartees + ' écartée(s))' : '') + (p.jours ? ' · échéance finale estimée au <b>' + escHtml(p.echeance) + '</b> (' + p.jours + ' jours, ' + (p.source_delais === 'enregistre' ? 'modèle enregistré' : 'délais indicatifs') + ')' : '') + '</div>'
+    + '<div style="color:var(--dim);margin-top:3px;">Équipe : ' + escHtml(fonc) + '</div>'
+    + p.explications.map(function(x){ return '<div style="margin-top:3px;">ℹ️ ' + escHtml(x) + '</div>'; }).join('')
+    + p.avertissements.map(function(x){ return '<div style="margin-top:3px;color:#8a5a00;">⚠️ ' + escHtml(x) + '</div>'; }).join('');
+  return p;
+}
+function fcAssistantAppliquer() {
+  var r = fcAssistantReponses(), p = fcAssistantMaj(), set = function(i, v){ var el = document.getElementById(i); if (el) el.value = v; };
+  set('fc-n-situation', r.situation); set('fc-n-type', p.type); set('fc-n-prop', r.proprietaires); set('fc-n-voie', r.voie);
+  fcTypeChange(document.getElementById('fc-n-type'));
+  toast('Formulaire prérempli : choisissez la parcelle et le responsable, puis ouvrez le dossier.', 'info');
+  return p;
+}
+async function fcAssistantOuvrir() {
+  fcAssistantAppliquer();
+  if (!(document.getElementById('fc-n-resp') || {}).value) { toast('Choisissez le responsable du dossier dans le formulaire ci-dessous.', 'warning'); return; }
+  await fcOuvrirUI();
 }
 /* ── Modèles préremplis : délais indicatifs et responsables par défaut ──
    Estimations de départ en jours calendaires, À VALIDER par la direction (elles ne sont pas des délais légaux). Elles sont proposées à l'ouverture d'un dossier
