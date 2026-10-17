@@ -62429,26 +62429,52 @@ function fcAppliquerModeleMissionUI(code) {
 }
 
 /* Éditeur des modèles de mission (direction / administrateurs) */
+function fcResumeModeleHtml(m) {
+  var et = m.etape ? (FC_ETAPES_REF.find(function(s){ return s[0] === m.etape; }) || [])[1] : '', nl = (m.livrables || []).length;
+  return '<b class="fmm-t">' + escHtml(m.libelle || 'Nouveau modèle') + '</b> <span class="fmm-b" style="font-size:11px;background:#f1e7d3;border-radius:9px;padding:1px 8px;">⏱ ' + (parseInt(m.delai, 10) || 14) + ' j</span>'
+    + (et ? ' <span class="fmm-b" style="font-size:11px;color:var(--dim);">→ ' + escHtml(et.length > 48 ? et.slice(0, 47) + '…' : et) + '</span>' : '')
+    + ' <span class="fmm-b" style="font-size:11px;color:var(--dim);">· ' + nl + ' livrable' + (nl > 1 ? 's' : '') + '</span>';
+}
+function fcMajResumeModele(det) {
+  var q = function(c){ return (det.querySelector(c) || {}).value || ''; }, r = det.querySelector('.fmm-r'); if (!r) return;
+  r.innerHTML = fcResumeModeleHtml({ libelle: q('.f-lib').trim(), delai: q('.f-delai'), etape: q('.f-etape'), livrables: q('.f-liv').split('\n').filter(function(x){ return x.trim(); }) });
+}
 function fcLigneModeleMissionHtml(m) {
   var etapes = '<option value="">— aucune —</option>' + FC_ETAPES_REF.map(function(s){ return '<option value="' + s[0] + '"' + (s[0] === m.etape ? ' selected' : '') + '>' + escHtml(s[1]) + '</option>'; }).join('');
-  return '<tr class="fmm-l" data-code="' + escHtml(m.code || '') + '"><td><input class="form-control f-lib" value="' + escHtml(m.libelle || '') + '" placeholder="Nom court (bouton)"></td><td><input class="form-control f-titre" value="' + escHtml(m.titre || '') + '"></td>'
-    + '<td><input type="number" min="1" max="365" class="form-control f-delai" style="width:70px;" value="' + (parseInt(m.delai, 10) || 14) + '"></td><td><select class="filter-select f-etape">' + etapes + '</select></td>'
-    + '<td><textarea class="form-control f-liv" rows="3" placeholder="Un livrable par ligne">' + escHtml((m.livrables || []).join('\n')) + '</textarea></td><td><textarea class="form-control f-desc" rows="3">' + escHtml(m.description || '') + '</textarea></td>'
-    + '<td><button type="button" class="btn btn-secondary btn-sm" onclick="this.closest(\'tr\').remove()">✖</button></td></tr>';
+  var f = function(lib, corps, large){ return '<div class="form-group" style="margin:0;' + (large ? 'grid-column:1/-1;' : '') + '"><label style="font-size:11px;">' + lib + '</label>' + corps + '</div>'; };
+  return '<details class="fmm-l" data-code="' + escHtml(m.code || '') + '"' + (m.code ? '' : ' open') + ' oninput="fcMajResumeModele(this)" onchange="fcMajResumeModele(this)" style="border:1px solid var(--bord,#ddd);border-radius:10px;margin:6px 0;background:var(--card,#fff);">'
+    + '<summary style="cursor:pointer;padding:8px 12px;display:flex;align-items:center;gap:8px;list-style:none;"><span class="fmm-r" style="flex:1;min-width:0;">' + fcResumeModeleHtml(m) + '</span>'
+    + '<button type="button" class="btn btn-secondary btn-sm" title="Supprimer ce modèle" aria-label="Supprimer ce modèle" onclick="event.preventDefault();event.stopPropagation();this.closest(\'.fmm-l\').remove()">✖</button></summary>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:4px 12px 12px;">'
+    + f('Nom court (bouton)', '<input class="form-control f-lib" value="' + escHtml(m.libelle || '') + '" placeholder="Ex : Bornage">')
+    + f('Délai (jours)', '<input type="number" min="1" max="365" class="form-control f-delai" value="' + (parseInt(m.delai, 10) || 14) + '">')
+    + f('Étape liée', '<select class="filter-select f-etape" style="width:100%;">' + etapes + '</select>')
+    + f('Titre de la mission', '<input class="form-control f-titre" value="' + escHtml(m.titre || '') + '">', true)
+    + f('Livrables (un par ligne)', '<textarea class="form-control f-liv" rows="4" placeholder="Un livrable par ligne">' + escHtml((m.livrables || []).join('\n')) + '</textarea>')
+    + f('Consignes à l\'intervenant', '<textarea class="form-control f-desc" rows="4">' + escHtml(m.description || '') + '</textarea>')
+    + '</div></details>';
 }
+function fcModeleMissionType(k) { APP._fmmType = k; fcRenderIntervenants(); var d = document.querySelector('#fi-root details'); if (d) d.open = true; }
+function fcModelesMissionTout(ouvert) { document.querySelectorAll('#fmm-corps .fmm-l').forEach(function(d){ d.open = ouvert; }); }
 function fcEditeurModelesMission() {
   if (!fcPeutGererModeles()) return '';
   var type = APP._fmmType || 'geometre', l = fcModelesMission(type), perso = Array.isArray(((DATA.params || {}).fc_modeles_mission || {})[type]);
+  var pastilles = Object.keys(FC_TYPES_INTERVENANT).map(function(k){
+    var p = Array.isArray(((DATA.params || {}).fc_modeles_mission || {})[k]), n = fcModelesMission(k).length;
+    return '<button type="button" class="btn btn-sm ' + (k === type ? 'btn-primary' : 'btn-secondary') + '" aria-pressed="' + (k === type) + '" onclick="fcModeleMissionType(\'' + k + '\')">' + escHtml(FC_TYPES_INTERVENANT[k]) + ' <span style="opacity:.75;font-size:10px;">' + n + (p ? ' ●' : '') + '</span></button>';
+  }).join('');
   return '<div class="card"><details><summary class="card-title" style="cursor:pointer;">🧩 Modèles de mission par type d\'intervenant' + (perso ? ' <span style="font-size:11px;color:#B87333;">(personnalisés)</span>' : '') + '</summary>'
-    + '<div style="font-size:11px;color:var(--dim);margin:6px 0;">Ces modèles préremplissent la création d\'une mission (titre, consignes, livrables, délai, étape). Adaptez-les à vos pratiques : ils ne s\'appliquent qu\'aux nouvelles missions.</div>'
-    + '<div class="filters-bar" style="align-items:end;"><div class="form-group"><label>Type d\'intervenant</label><select class="filter-select" onchange="APP._fmmType=this.value;fcRenderIntervenants();var d=document.querySelector(\'#fi-root details\');if(d)d.open=true;">' + Object.keys(FC_TYPES_INTERVENANT).map(function(k){ return '<option value="' + k + '"' + (k === type ? ' selected' : '') + '>' + escHtml(FC_TYPES_INTERVENANT[k]) + '</option>'; }).join('') + '</select></div></div>'
-    + '<div class="table-wrap"><table><thead><tr><th>Nom court</th><th>Titre de la mission</th><th>Délai (j)</th><th>Étape liée</th><th>Livrables (un par ligne)</th><th>Consignes</th><th></th></tr></thead><tbody id="fmm-corps">' + l.map(fcLigneModeleMissionHtml).join('') + '</tbody></table></div>'
+    + '<div style="font-size:11px;color:var(--dim);margin:6px 0;">Ces modèles préremplissent la création d\'une mission (titre, consignes, livrables, délai, étape). Ils ne s\'appliquent qu\'aux nouvelles missions. ● = personnalisé.</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">' + pastilles + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px;"><b style="font-size:12px;">' + escHtml(FC_TYPES_INTERVENANT[type] || type) + ' — ' + l.length + ' modèle' + (l.length > 1 ? 's' : '') + '</b><span style="flex:1;"></span>'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="fcModelesMissionTout(true)">▾ Tout déployer</button><button type="button" class="btn btn-secondary btn-sm" onclick="fcModelesMissionTout(false)">▸ Tout réduire</button></div>'
+    + '<div id="fmm-corps">' + l.map(fcLigneModeleMissionHtml).join('') + '</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById(\'fmm-corps\').insertAdjacentHTML(\'beforeend\',fcLigneModeleMissionHtml({}))">➕ Ajouter un modèle</button> <button type="button" class="btn btn-primary btn-sm" onclick="fcSauverModelesMissionUI()">💾 Enregistrer pour ce type</button> <button type="button" class="btn btn-secondary btn-sm" onclick="fcRetablirModelesMissionUI()">↺ Rétablir les modèles par défaut</button></div></details></div>';
 }
 async function fcSauverModelesMissionUI() {
   if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); return; }
   var type = APP._fmmType || 'geometre', liste = [], vus = {}, erreur = '';
-  document.querySelectorAll('#fmm-corps tr.fmm-l').forEach(function(tr){
+  document.querySelectorAll('#fmm-corps .fmm-l').forEach(function(tr){
     var q = function(c){ return (tr.querySelector(c) || {}).value || ''; }, lib = q('.f-lib').trim(), delai = parseInt(q('.f-delai'), 10), liv = q('.f-liv').split('\n').map(function(x){ return x.trim(); }).filter(Boolean);
     if (!lib) { erreur = 'Chaque modèle a besoin d\'un nom court.'; return; }
     if (!(delai >= 1 && delai <= 365)) { erreur = 'Délai invalide pour « ' + lib + ' » (1 à 365 jours).'; return; }
