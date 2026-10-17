@@ -202,7 +202,14 @@
     th { color:#4b6a8b; font-size:.72rem; text-transform:uppercase; }
     .pill { padding:4px 10px; border-radius:20px; font-size:.72rem; font-weight:600; }
     .p-vert{ background:#dcfce7; color:#166534;} .p-rouge{ background:#fee2e2; color:#991b1b;} .p-bleu{ background:#dbeafe; color:#1e40af;} .p-or{ background:#fef3c7; color:#92400e;} .p-gris{ background:#eef2f8; color:#4b6a8b;}
-    .prog { height:8px; background:#eef2f8; border-radius:4px; overflow:hidden; margin:8px 0; }.frise{margin-top:12px}.frise .fr-ph{margin-top:10px}.frise .fr-pt{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#6b7f95;font-weight:700}
+    .prog { height:8px; background:#eef2f8; border-radius:4px; overflow:hidden; margin:8px 0; }
+    .att-circ{list-style:none;margin:10px 0;padding:0 0 0 14px;border-left:2px solid #dbe5f1}
+    .att-circ li{position:relative;display:flex;padding:6px 0 6px 10px;font-size:.84rem;color:#8a9bb0}
+    .att-circ li small{display:block;font-size:.72rem}
+    .att-circ li span{position:absolute;left:-21px;top:11px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #b8c7da}
+    .att-circ li.fait{color:#1e4663}.att-circ li.fait span{background:#16a34a;border-color:#16a34a}
+    .att-circ li.now{color:#0b2447;font-weight:700}.att-circ li.now span{background:#f59e0b;border-color:#f59e0b}
+    .att-circ li.rej{color:#92400e;font-weight:700}.att-circ li.rej span{background:#dc2626;border-color:#dc2626}.frise{margin-top:12px}.frise .fr-ph{margin-top:10px}.frise .fr-pt{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#6b7f95;font-weight:700}
 .frise ol{list-style:none;margin:6px 0 0;padding:0 0 0 14px;border-left:2px solid #dbe5f1}
 .frise li{position:relative;display:flex;gap:10px;padding:6px 0 6px 10px;font-size:.84rem}
 .frise li small{display:block;color:#6b7f95;font-size:.72rem}
@@ -2437,7 +2444,7 @@
     html+='<div class="sub" id="s-tra">'+blocTravaux()+'</div>';
     html+='<div class="sub" id="s-rec">'+blocReception()+'</div>';
     if(S.suivi) html+='<div class="sub" id="s-tit">'+blocSuiviTitre()+blocPiecesTitre()+blocDeboursTitre()+'</div>';
-    html+='<div class="sub" id="s-doc">'+sPrixModifs()+'<div class="card"><strong>📁 Mes documents</strong><div style="display:flex; flex-direction:column; gap:12px; margin-top:12px; max-width:340px;"><button class="highlight-btn" style="background:#0077b6;" onclick="docEcheancier()">📅 Échéancier personnalisé</button><button class="highlight-btn" style="background:#0077b6;" onclick="docAttestation()">📑 Attestation de versements</button>'+sAttSoldeBtn()+'</div></div></div>';
+    html+='<div class="sub" id="s-doc">'+sPrixModifs()+sAttSoldeSuivi()+'<div class="card"><strong>📁 Mes documents</strong><div style="display:flex; flex-direction:column; gap:12px; margin-top:12px; max-width:340px;"><button class="highlight-btn" style="background:#0077b6;" onclick="docEcheancier()">📅 Échéancier personnalisé</button><button class="highlight-btn" style="background:#0077b6;" onclick="docAttestation()">📑 Attestation de versements</button>'+sAttSoldeBtn()+'</div></div></div>';
     html+='<div class="sub" id="s-msg"><div class="card">'
       +'<strong style="font-size:1rem;">💬 Messagerie</strong>'
       +'<div style="margin:14px 0 12px;">'
@@ -2591,6 +2598,27 @@
     h+=lg('Total versé',fmt(verse)+' FCFA')+lg(reste>0.5?'Reste à payer':'Solde','<strong>'+(reste>0.5?fmt(reste)+' FCFA':'soldé ✓')+'</strong>')+'</tbody></table></div>'
       +(m.length?'':'<div style="font-size:.78rem;color:#4b6a8b;margin-top:6px;">Aucune modification facturée à ce jour.</div>')
       +'<div style="font-size:.72rem;color:#6b7f95;margin-top:8px;">Frais de souscription exclus. Information indicative ; seules les attestations de solde validées font foi.</div></div>';
+    return h;
+  }
+  /* Circuit de l'attestation de solde : brouillon → validation Direction → validée → disponible. Lecture seule ; le motif d'un rejet reste interne. */
+  function sAttSoldeSuivi(){
+    var h='';
+    [['attestation_solde','Attestation de solde'],['attestation_solde_finale','Attestation de solde — valeur finale']].forEach(function(k){
+      var a=S.client&&S.client[k[0]]; if(!a||!a.statut) return;
+      var rej=a.statut==='rejete', niv={brouillon:0,en_attente:1,valide:a.publie_portail?3:2}[a.statut];
+      if(rej) niv=1;
+      var noms=['Brouillon préparé','En validation (DG / gérant)','Validée','Disponible ici'], dates=[a.date_solde,a.date_demande,a.valide_le,a.publie_le];
+      var h2='<div class="card"><strong>📜 '+esc(k[1])+(a.numero?' N° '+esc(a.numero):'')+'</strong><ol class="att-circ">';
+      noms.forEach(function(n,i){
+        var cl=i<niv?'fait':(i===niv?(rej?'rej':'now'):''), lib=(i===1&&rej)?'À reprendre par la Direction':n;
+        h2+='<li class="'+cl+'"><span></span><div><b>'+esc(lib)+'</b>'+(dates[i]&&i<=niv?'<small>'+esc(dshort(dates[i]))+'</small>':'')+'</div></li>';
+      });
+      h2+='</ol>';
+      if(a.statut==='valide'&&!a.publie_portail) h2+='<div style="font-size:.78rem;color:#4b6a8b;">Validée par la Direction. Le document sera mis à votre disposition prochainement.</div>';
+      else if(a.statut==='valide') h2+='<div style="font-size:.78rem;color:#16a34a;">Document disponible ci-dessous.</div>';
+      else if(rej) h2+='<div style="font-size:.78rem;color:#92400e;">Votre interlocuteur reprend ce dossier avec la Direction.</div>';
+      h+=h2+'</div>';
+    });
     return h;
   }
   function sAttSoldeBtn(){
