@@ -12,7 +12,7 @@ async function html(page, params, opts) {
     DATA.params = a.params; var c = { id: 'c1', nom: 'BENDE', prenoms: 'X', dossier: 'D-1' };
     var h = attSoldeHtml(c, Object.assign({ numero: 'ATS-2026-001', date: '2026-10-14' }, a.opts || {}));
     var d = new DOMParser().parseFromString(h, 'text/html'), pied = d.querySelector('.pied');
-    return { present: !!pied, lignes: pied ? [].slice.call(pied.children).map(function (x) { return x.textContent; }) : [], dernier: d.body.lastElementChild && d.body.lastElementChild.className, css: /\.pied\{/.test(h) && /@media print\{.*\.pied\{position:absolute/.test(h) };
+    return { present: !!pied, lignes: pied ? [].slice.call(pied.children).map(function (x) { return x.textContent; }) : [], dernier: (function () { var els = [].slice.call(d.body.children).filter(function (e) { return e.tagName !== 'SCRIPT'; }), l = els[els.length - 1]; return l && pied && l.contains(pied) ? 'pied' : (l && l.className); })(), css: /\.pied\{/.test(h) };
   }, { params: params, opts: opts });
 }
 
@@ -24,7 +24,7 @@ test('pied de page complet comme le modèle : société + siège / RCCM et CC / 
     'N° RCCM : CI-ABJ-03-2020-M-11200 – CC : 1729048 Q',
     '01 BP 6264 ABIDJAN 01 – TEL : 27 22 52 32 11   CEL : 01 50 06 06 02   E-MAIL : zamuser12@gmail.com'
   ]);
-  assert.equal(r.dernier, 'pied', 'le pied de page termine le document'); assert.equal(r.css, true, 'fixé en bas de chaque page à l\'impression');
+  assert.equal(r.dernier, 'pied', 'le pied de page termine le document'); assert.equal(r.css, true, 'style du pied de page défini (la pagination l\'inscrit sur chaque page imprimée)');
   assert.deepEqual(app.etat.erreursPage, []);
 });
 
@@ -71,7 +71,7 @@ test('attestation déjà validée (document figé sans pied) : le pied est ajout
     var a = { statut: 'valide', html: figee }, avant = a.html, h = attSoldeHtmlFinal(a), d = new DOMParser().parseFromString(h, 'text/html');
     var deja = attSoldeHtmlFinal({ html: h });
     DATA.params = {}; var sansParam = attSoldeHtmlFinal({ html: figee });
-    return { pied: d.querySelectorAll('.pied').length, texte: d.body.textContent.indexOf('Texte validé') !== -1, stocke: a.html === avant, idempotent: deja === h, sansParam: sansParam === figee, css: /\.pied\{position:absolute/.test(h), lignes: d.querySelector('.pied').children.length };
+    return { pied: d.querySelectorAll('.pied').length, texte: d.body.textContent.indexOf('Texte validé') !== -1, stocke: a.html === avant, idempotent: deja === h, sansParam: new DOMParser().parseFromString(sansParam, 'text/html').querySelectorAll('.pied').length === 0 && sansParam.indexOf('Texte validé') !== -1, css: /\.pied\{/.test(h), lignes: d.querySelector('.pied').children.length };
   }, PARAMS);
   assert.equal(r.pied, 1); assert.equal(r.texte, true); assert.equal(r.stocke, true); assert.equal(r.idempotent, true); assert.equal(r.sansParam, true); assert.equal(r.css, true); assert.equal(r.lignes, 3);
 });
@@ -87,8 +87,8 @@ test('identité du promoteur : la division du programme (ZMS Sarl) prévaut sur 
     var d = new DOMParser().parseFromString(avec, 'text/html'), d2 = new DOMParser().parseFromString(sans, 'text/html');
     var figee = '<html><head></head><body><p>Nous, ImmoSuite ERP</p></body></html>';
     var final = attSoldeHtmlFinal({ html: figee }, { id: 'c1', programme_id: 'pz' });
-    return { nous: (d.body.textContent.match(/Nous, ([^,]*),/) || [])[1], immo: /ImmoSuite/.test(avec), rccm: /CI-ABJ-03-2020-M-11200/.test(d.body.textContent), pied: [].slice.call(d.querySelectorAll('.pied > div')).map(function (x) { return x.textContent; }),
-      nousSans: (d2.body.textContent.match(/Nous, ([^,]*),/) || [])[1], immoSans: /ImmoSuite/.test(sans), piedFinal: new DOMParser().parseFromString(final, 'text/html').querySelector('.pied').textContent.indexOf('ZMS Sarl Siège Social') !== -1 };
+    return { nous: (d.body.textContent.match(/Nous, ([^,]*),/) || [])[1], immo: /ImmoSuite/.test(avec.replace(/Document authentifiable — ImmoSuite ERP/g, '')), rccm: /CI-ABJ-03-2020-M-11200/.test(d.body.textContent), pied: [].slice.call(d.querySelectorAll('.pied > div')).map(function (x) { return x.textContent; }),
+      nousSans: (d2.body.textContent.match(/Nous, ([^,]*),/) || [])[1], immoSans: /ImmoSuite/.test(sans.replace(/Document authentifiable — ImmoSuite ERP/g, '')), piedFinal: new DOMParser().parseFromString(final, 'text/html').querySelector('.pied').textContent.indexOf('ZMS Sarl Siège Social') !== -1 };
   });
   assert.equal(r.nous, 'ZMS Sarl'); assert.equal(r.immo, false); assert.equal(r.rccm, true);
   assert.deepEqual(r.pied, ['ZMS Sarl Siège Social : Abidjan Cocody Angré 2 Plateau 7ème Tranche', 'N° RCCM : CI-ABJ-03-2020-M-11200 – CC : 1729048 Q', '01 BP 6264 ABIDJAN 01 – TEL : 27 22 52 32 11   E-MAIL : zamuser12@gmail.com']);
