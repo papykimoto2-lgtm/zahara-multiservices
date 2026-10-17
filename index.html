@@ -60506,6 +60506,7 @@ function fcVueSouscripteur(clientId) {
       reference: d.reference, niveau: d.niveau === 'individuel' ? 'individuel' : 'global', libelle_niveau: d.niveau === 'individuel' ? 'Votre titre individuel — lot ' + (d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ') : "Titre de l'opération (parcelle mère)", programme: prog ? prog.nom : '', parcelle: fcLibelleParcelle(d.parcelle_id), statut: fcStatutSynthetique(d, visibles),
       progression: fcProgressionSouscripteur(d), derniere_mise_a_jour: pubs.length ? pubs[0].publie_le.slice(0, 10) : '',
       prochaine_etape: prochaine ? { libelle: prochaine.libelle, date_indicative: prochaine.date_cible || '' } : null,
+      etapes: visibles.filter(function(e){ return e.statut !== 'annule'; }).sort(function(a, b){ return a.ordre - b.ordre; }).map(function(e){ return { libelle: e.libelle, phase: e.phase, statut: e.statut, date_cible: e.date_cible || '' }; }),
       historique: pubs.map(function(x){ return { date: x.publie_le.slice(0, 10), titre: x.libelle_public, description: x.description_publique, source: FC_LIBELLES_SOURCE[x.source], reference_source: x.source_ref }; }),
       documents: [], pieces_demandees: []
     });

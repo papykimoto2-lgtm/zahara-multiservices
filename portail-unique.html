@@ -202,7 +202,15 @@
     th { color:#4b6a8b; font-size:.72rem; text-transform:uppercase; }
     .pill { padding:4px 10px; border-radius:20px; font-size:.72rem; font-weight:600; }
     .p-vert{ background:#dcfce7; color:#166534;} .p-rouge{ background:#fee2e2; color:#991b1b;} .p-bleu{ background:#dbeafe; color:#1e40af;} .p-or{ background:#fef3c7; color:#92400e;} .p-gris{ background:#eef2f8; color:#4b6a8b;}
-    .prog { height:8px; background:#eef2f8; border-radius:4px; overflow:hidden; margin:8px 0; }
+    .prog { height:8px; background:#eef2f8; border-radius:4px; overflow:hidden; margin:8px 0; }.frise{margin-top:12px}.frise .fr-ph{margin-top:10px}.frise .fr-pt{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#6b7f95;font-weight:700}
+.frise ol{list-style:none;margin:6px 0 0;padding:0 0 0 14px;border-left:2px solid #dbe5f1}
+.frise li{position:relative;display:flex;gap:10px;padding:6px 0 6px 10px;font-size:.84rem}
+.frise li small{display:block;color:#6b7f95;font-size:.72rem}
+.frise .fr-pt-d{position:absolute;left:-21px;top:11px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #b8c7da}
+.frise .fr-ok .fr-pt-d{background:#16a34a;border-color:#16a34a}.frise .fr-cours .fr-pt-d,.frise .fr-att .fr-pt-d{background:#f59e0b;border-color:#f59e0b}
+.frise .fr-ko .fr-pt-d{background:#dc2626;border-color:#dc2626}.frise .fr-av{color:#6b7f95}
+.frise .fr-now{background:#eef3fc;border-radius:8px}.frise .fr-now b::after{content:" ← vous êtes ici";font-weight:400;color:#2563eb;font-size:.72rem}
+
     .prog > div { height:100%; background:#16a34a; border-radius:4px; }
     .photo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-top:12px; }
     .photo-item { aspect-ratio:1; border-radius:12px; overflow:hidden; border:1px solid #eef2f8; position:relative; background:#f1f5f9; }
@@ -2336,6 +2344,27 @@
     var w=window.open('','_blank','width=860,height=900'); if(!w) return;
     w.document.write(n.html); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
   }
+  /* Frise des démarches : étapes publiées au souscripteur, groupées par phase. Lecture seule. */
+  var FRISE_ST={ termine:['Terminé','ok'], en_cours:['En cours','cours'], attente_intervenant:['En attente','att'], attente_document:['En attente','att'], attente_administration:['Chez l\'administration','att'], attente_decision:['En attente de décision','att'], bloque:['À débloquer','att'], rejete:['Rejeté','ko'], a_venir:['À venir',''], a_preparer:['À venir','']};
+  var FRISE_PH={ A:'Ouverture et diagnostic', B:'Préparation technique', C:'Dépôt et instruction', D:'Formalités foncières', E:'Contrôle et clôture' };
+  function friseEtapes(et){
+    if(!et||!et.length) return '';
+    var g={}, ordre=[];
+    et.forEach(function(e){ var p=e.phase||'_'; if(!g[p]){ g[p]=[]; ordre.push(p); } g[p].push(e); });
+    var actif=-1; et.some(function(e,i){ if(['termine','rejete'].indexOf(e.statut)<0){ actif=i; return true; } return false; });
+    var n=0, h='<div class="frise"><strong style="font-size:.85rem;">Frise des démarches</strong>';
+    ordre.forEach(function(p){
+      h+='<div class="fr-ph"><div class="fr-pt">'+esc(FRISE_PH[p]||'Étapes')+'</div><ol>';
+      g[p].forEach(function(e){
+        var st=FRISE_ST[e.statut]||['',''], cur=(n===actif);
+        h+='<li class="fr-'+(st[1]||'av')+(cur?' fr-now':'')+'"><span class="fr-pt-d"></span><div><b>'+esc(e.libelle||'')+'</b>'
+          +'<small>'+esc(st[0])+(e.date_cible&&e.statut!=='termine'?' · prévue '+esc(dshort(e.date_cible)):'')+'</small></div></li>';
+        n++;
+      });
+      h+='</ol></div>';
+    });
+    return h+'</div>';
+  }
   function blocSuiviTitre(){
     var v=S.suivi; if(!v) return '';
     var h='<div class="card"><strong style="font-size:1rem;">📜 Suivi de mon titre foncier</strong>'
@@ -2350,6 +2379,7 @@
       var lignes=Object.keys(ph).sort().map(function(k){ var x=ph[k]||{}; return '<li>'+esc(x.libelle||k)+' : '+(parseInt(x.terminees,10)||0)+' / '+(parseInt(x.etapes,10)||0)+' étape(s)</li>'; }).join('');
       if(lignes) h+='<ul style="font-size:.8rem;margin:8px 0 0 18px;color:#1e4663;">'+lignes+'</ul>';
       if(p.explication) h+='<div style="font-size:.72rem;color:#6b7f95;margin-top:8px;">'+esc(p.explication)+'</div>';
+      h+=friseEtapes(d.etapes);
       if(d.prochaine_etape) h+='<div class="card" style="background:#eef3fc;border-color:#cfe0f5;margin-top:10px;"><strong>Prochaine étape</strong><div style="font-size:.85rem;">'+esc(d.prochaine_etape.libelle||'')+(d.prochaine_etape.date_indicative?(' <span style="color:#4b6a8b;">(date indicative : '+esc(dshort(d.prochaine_etape.date_indicative))+')</span>'):'')+'</div></div>';
       var hist=d.historique||[];
       h+='<div style="margin-top:12px;"><strong style="font-size:.85rem;">Historique des informations</strong>'

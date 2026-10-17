@@ -194,6 +194,9 @@ begin
       'progression', v_prog,
       'derniere_mise_a_jour', coalesce(v_pubs -> 0 ->> 'date', ''),
       'prochaine_etape', v_prochaine,
+      'etapes', (select coalesce(jsonb_agg(jsonb_build_object('libelle', e ->> 'libelle', 'phase', e ->> 'phase',
+                   'statut', e ->> 'statut', 'date_cible', coalesce(e ->> 'date_cible', '')) order by (e ->> 'ordre')::numeric), '[]'::jsonb)
+                 from jsonb_array_elements(v_visibles) e where e ->> 'statut' <> 'annule'),
       'historique', v_pubs);
   end loop;
 
