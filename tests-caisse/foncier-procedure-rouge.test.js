@@ -27,9 +27,9 @@ test('dossier immatriculation urbaine : étapes et phases de la procédure en ro
   assert.deepEqual(app.etat.erreursPage, []);
 });
 
-test('dossier général (ACD classique) : aucune étape en rouge', async () => {
+test('dossier standard (ACD) : seules les étapes qui correspondent à la procédure fournie sont en rouge, phases A-E non rouges', async () => {
   const app = await ouvrirApp();
-  const n = await app.page.evaluate(async () => {
+  const r = await app.page.evaluate(async () => {
     DATA.programmes = [{ id: 'g1', nom: 'Prog' }]; DATA.parcelles = [{ id: 'p1', ref: 'P1', programme_id: 'g1' }]; DATA.lots = []; DATA.clients = [];
     DATA.users = [{ id: 'u1', nom: 'R', login: 'r' }];
     window.userPeutSurStore = () => true; APP.currentUser = { id: 'u1', nom: 'R', role: 'foncier' };
@@ -38,7 +38,14 @@ test('dossier général (ACD classique) : aucune étape en rouge', async () => {
     const d = (await fcOuvrirDossier({ parcelle_id: 'p1', type: 'acd', responsable_id: 'u1' })).dossier;
     document.body.insertAdjacentHTML('beforeend', '<div id="fc-detail"></div>');
     fcRenderDetail(d.id);
-    return document.querySelectorAll('#fc-detail span[title*="procédure d\'immatriculation"]').length;
+    const lignes = [].map.call(document.querySelectorAll('#fc-detail tr.fc-proc'), t => t.getAttribute('data-fcph'));
+    const attendues = d.etapes.filter(e => FC_CORRESP_PROC[e.code]).length;
+    const titres = [].map.call(document.querySelectorAll('#fc-detail tr.fc-proc span[title]'), x => x.getAttribute('title')).join('|');
+    return { rouges: lignes.length, attendues, titres, phasesRouges: [].filter.call(document.querySelectorAll('#fc-detail tr[data-fcphh]'), t => t.querySelector('span[style*="#c0392b"]')).length,
+             libres: d.etapes.filter(e => !FC_CORRESP_PROC[e.code]).length, total: document.querySelectorAll('#fc-detail tr[data-fcph]').length };
   });
-  assert.equal(n, 0);
+  assert.ok(r.attendues >= 5); assert.equal(r.rouges, r.attendues);
+  assert.match(r.titres, /Correspond à une étape de la procédure d'immatriculation fournie/);
+  assert.equal(r.phasesRouges, 0); assert.ok(r.total > r.rouges, 'les autres étapes restent non marquées');
+  assert.deepEqual(app.etat.erreursPage, []);
 });
