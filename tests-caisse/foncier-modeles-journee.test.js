@@ -106,6 +106,7 @@ test('modèle : écran d\'administration (droit requis, validation, enregistreme
     var o = {}; window.dbPut = async function (s, v) { (window.__puts = window.__puts || []).push(s); return true; };
     var h = document.getElementById('fm-root'); APP._fmType = 'acd'; APP.currentUser = { id: 'ux', nom: 'Agent', role: 'foncier' }; fcRenderModeles(); o.lecture = /disabled/.test(h.innerHTML);
     await fcSauverModeleUI(); o.refus = !DATA.params.fc_modeles;
+    DATA.params.fc_modeles = { acd: { actif: true, etapes: {} } };   /* un modèle vide existe : l'écran ne propose plus les valeurs indicatives préremplies */
     APP.currentUser = { id: 'u1', nom: 'Dir', role: 'admin' }; fcRenderModeles(); o.liste = /Création du dossier/.test(h.innerHTML) && /Délai total estimé/.test(h.innerHTML);
     document.getElementById('fm-j-creation_dossier').value = '3'; document.getElementById('fm-j-depot').value = '10'; document.getElementById('fm-r-depot').value = 'u2';
     await fcSauverModeleUI(); var m = DATA.params.fc_modeles.acd; o.saved = [m.actif, m.etapes.creation_dossier.jours, m.etapes.depot.jours, m.etapes.depot.responsable_id, Object.keys(m.etapes).length]; o.puts = window.__puts.indexOf('params') !== -1;
