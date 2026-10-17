@@ -59573,10 +59573,13 @@ function fcReferenceSuivante() {
 }
 function fcEtapesPour(type, situation) {
   var ordre = 0, sit = FC_SITUATIONS[situation] || null;
-  return FC_ETAPES_REF.filter(function(s){
-    if (type === 'rural_a_examiner') return FC_ETAPES_RURAL.indexOf(s[0]) !== -1;
-    return s[5] === '*' || s[5].split(',').indexOf(type) !== -1;
-  }).map(function(s){
+  var liste = type === 'immatriculation_urbaine'
+    ? [FC_ETAPES_REF.filter(function(s){ return s[0] === 'creation_dossier'; })[0]].concat(FC_ETAPES_URBAIN, [FC_ETAPES_REF.filter(function(s){ return s[0] === 'cloture'; })[0]])
+    : FC_ETAPES_REF.filter(function(s){
+        if (type === 'rural_a_examiner') return FC_ETAPES_RURAL.indexOf(s[0]) !== -1;
+        return s[5] === '*' || s[5].split(',').indexOf(type) !== -1;
+      });
+  return liste.map(function(s){
     ordre++;
     var m = fcMetaEtape(s[0]);
     var e = { code: s[0], libelle: fcLibelleEtape(s[0], type, s[1]), phase: s[2], ordre: ordre, statut: ordre === 1 ? 'a_preparer' : 'a_venir', responsable_id: '', date_debut: '', date_cible: '',
@@ -59624,6 +59627,7 @@ async function fcOuvrirDossier(o) {
     controles: fcControlesInitiaux(), procedure_ref_version: FC_PROCEDURE_REF.version
   };
   d.etapes.forEach(function(e){ e.responsable_id = d.responsable_id; });
+  if (o.type === 'immatriculation_urbaine') fcUrbainInit(d, o);
   var modele = o.sans_modele ? null : (fcModeleActif(o.type) || (fcDelaisAutoActif() ? { etapes: {} } : null)), appris = (modele && fcDelaisAutoActif()) ? fcDureesSuggerees(o.type) : {}, appl = modele ? fcAppliquerModele(d, modele, appris) : null;
   if (appl && !d.date_cible && appl.echeance) d.date_cible = appl.echeance;
   if (o.individuel) Object.assign(d, o.individuel);
@@ -59661,6 +59665,16 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
   if (FC_STATUTS_ACTIFS.indexOf(statut) !== -1 && !(e.responsable_id || d.responsable_id)) return { ok: false, erreur: 'Aucun responsable n\'est affecté à cette étape.' };
   if (d.niveau === 'individuel' && statut === 'termine' && FC_ETAPES_APRES_TITRE_MERE.indexOf(code) !== -1 && !d.titre_mere_derogation && !fcTitreMere(d.parcelle_id).disponible) return { ok: false, erreur: "Le titre de l'opération (titre mère) n'est pas disponible : cette étape ne peut pas être terminée." };
   var derogation = false, ordre = false, completude = false;
+  if (d.type_procedure === 'immatriculation_urbaine' && (FC_STATUTS_ACTIFS.indexOf(statut) !== -1 || statut === 'termine')) {
+    var voieMsg = fcUrbainVoieRequise(d, e); if (voieMsg) return { ok: false, erreur: voieMsg };
+    var pm = fcUrbainBloquants(d, e);
+    if (pm.length) {
+      if (!o.derogation_phase) return { ok: false, phase: true, erreur: 'La procédure coutumière et technique n\'est pas terminée (' + pm.length + ' étape(s) obligatoire(s) restante(s) : ' + pm.slice(0, 3).map(function(x){ return x.libelle; }).join(' ; ') + (pm.length > 3 ? ' …' : '') + '). La phase administrative ne peut pas démarrer.' };
+      if (!motif) return { ok: false, erreur: 'Une dérogation à la procédure coutumière et technique exige un motif.' };
+      if (!fcEstAdmin()) return { ok: false, erreur: 'Seul un administrateur peut déroger à la procédure coutumière et technique.' };
+      derogation = true; ordre = true;
+    }
+  }
   if (fcDependancesActives() && (FC_STATUTS_ACTIFS.indexOf(statut) !== -1 || statut === 'termine')) {
     var manq = fcPrerequisManquants(d, code);
     if (manq.length) {
@@ -59807,10 +59821,12 @@ function fcRender() {
   h += '<div class="card"><div class="card-title">➕ Ouvrir un dossier</div><div class="filters-bar" style="align-items:end;flex-wrap:wrap;">'
     + '<div class="form-group"><label>Parcelle</label><select class="filter-select" id="fc-n-parcelle">' + (DATA.parcelles || []).map(function(p){ return '<option value="' + p.id + '">' + escHtml(fcLibelleParcelle(p.id)) + '</option>'; }).join('') + '</select></div>'
     + '<div class="form-group"><label>Situation initiale</label><select class="filter-select" id="fc-n-situation" onchange="fcSituationChange(this)"><option value="">— non précisée —</option>' + Object.keys(FC_SITUATIONS).map(function(k){ return '<option value="' + k + '">' + escHtml(FC_SITUATIONS[k].libelle) + '</option>'; }).join('') + '</select></div>'
-    + '<div class="form-group"><label>Procédure</label><select class="filter-select" id="fc-n-type">' + fcOptions(FC_PROCEDURES, 'acd') + '</select></div>'
+    + '<div class="form-group"><label>Procédure</label><select class="filter-select" id="fc-n-type" onchange="fcTypeChange(this)">' + fcOptions(FC_PROCEDURES, 'acd') + '</select></div>'
     + '<div class="form-group"><label>Responsable</label><select class="filter-select" id="fc-n-resp"><option value="">— choisir —</option>' + users.map(function(u){ return '<option value="' + u.id + '">' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select></div>'
     + '<div class="form-group"><label>Priorité</label><select class="filter-select" id="fc-n-prio"><option value="normale">Normale</option><option value="haute">Haute</option><option value="basse">Basse</option></select></div>'
     + '<div class="form-group"><label>Échéance</label><input type="date" class="form-control" id="fc-n-cible"></div>'
+    + '<div id="fc-n-urbain" style="display:none;gap:10px;align-items:end;flex-wrap:wrap;"><div class="form-group"><label>Propriétaires terriens</label><select class="filter-select" id="fc-n-prop"><option value="plusieurs">Plusieurs propriétaires</option><option value="un">Un seul propriétaire</option></select></div>'
+    + '<div class="form-group"><label>Voie envisagée</label><select class="filter-select" id="fc-n-voie"><option value="">— à choisir plus tard —</option><option value="acd">ACD</option><option value="approbation">Approbation</option></select></div></div>'
     + '<button class="btn btn-primary btn-sm" onclick="fcOuvrirUI()">Ouvrir le dossier</button></div><div id="fc-n-sit-info"></div></div>';
   h += '<div class="card"><div class="card-title" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between;"><span>📋 Dossiers</span><span style="display:flex;flex-wrap:wrap;gap:6px;"><button class="btn btn-secondary btn-sm" onclick="APP._fcTriRisque=!APP._fcTriRisque;fcRender()">' + (APP._fcTriRisque ? '↕ Tri par date' : '🚨 Trier par risque') + '</button><button class="btn btn-secondary btn-sm" onclick="fcImprimerListeUI()">🖨 Imprimer la liste</button></span></div>' + fcHtmlFiltresListe() + '<div id="fc-barre-groupee"></div><div id="fc-liste-corps"></div>';
   h += '</div>' + fcPanneauReference() + '<div id="fc-detail"></div>';
@@ -59820,8 +59836,9 @@ function fcRender() {
 }
 async function fcOuvrirUI() {
   var g = function(i){ return (document.getElementById(i) || {}).value || ''; };
-  var r = await fcOuvrirDossier({ parcelle_id: g('fc-n-parcelle'), type: g('fc-n-type'), situation: g('fc-n-situation'), responsable_id: g('fc-n-resp'), priorite: g('fc-n-prio'), date_cible: g('fc-n-cible') });
-  if (!r.ok && r.doublon && confirm(r.erreur + '\n\nOuvrir quand même un second dossier ?')) r = await fcOuvrirDossier({ parcelle_id: g('fc-n-parcelle'), type: g('fc-n-type'), situation: g('fc-n-situation'), responsable_id: g('fc-n-resp'), priorite: g('fc-n-prio'), date_cible: g('fc-n-cible'), forcer: true });
+  var args = function(extra){ return Object.assign({ parcelle_id: g('fc-n-parcelle'), type: g('fc-n-type'), situation: g('fc-n-situation'), responsable_id: g('fc-n-resp'), priorite: g('fc-n-prio'), date_cible: g('fc-n-cible'), plusieurs_proprietaires: g('fc-n-prop') !== 'un', voie: g('fc-n-voie') }, extra || {}); };
+  var r = await fcOuvrirDossier(args());
+  if (!r.ok && r.doublon && confirm(r.erreur + '\n\nOuvrir quand même un second dossier ?')) r = await fcOuvrirDossier(args({ forcer: true }));
   if (fcMsg(r, 'Dossier ouvert.')) { APP._fcSel = r.dossier.id; fcRender(); (r.avertissements || []).forEach(function(a){ toast(a, 'warning'); }); }
 }
 function fcOuvrirDetail(id) { APP._fcSel = id; fcRenderDetail(id); var el = document.getElementById('fc-detail'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth' }); }
@@ -59834,6 +59851,7 @@ function fcRenderDetail(id) {
   h += fcPanneauModification(d);
   h += '<div style="margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer le dossier</button> <button class="btn btn-secondary btn-sm" onclick="fcAllerJalons(\'' + d.parcelle_id + '\')">🧭 Voir les jalons du titre de la parcelle</button></div>';
   h += fcPanneauDossier(d);
+  h += fcPanneauUrbain(d);
   h += fcPanneauRisque(d);
   h += fcPanneauArchive(d);
   h += fcPanneauCourriers(d);
@@ -59841,7 +59859,7 @@ function fcRenderDetail(id) {
   var phase = '';
   h += '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Statut</th><th>Responsable</th><th>Échéance</th><th>Justificatifs</th><th>Visibilité</th><th></th></tr></thead><tbody>';
   d.etapes.forEach(function(e){
-    if (e.phase !== phase) { phase = e.phase; h += '<tr><td colspan="8" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;">Phase ' + phase + ' — ' + escHtml(FC_PHASES[phase]) + '</td></tr>'; }
+    if (e.phase !== phase) { phase = e.phase; h += '<tr><td colspan="8" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;">' + escHtml(fcLibPhase(phase)) + '</td></tr>'; }
     var figee = FC_STATUTS_FINAUX.indexOf(e.statut) !== -1, et = fcEtatEcheance(e);
     h += '<tr><td>' + e.ordre + '</td><td>' + escHtml(e.libelle) + (e.justificatif_requis ? ' <span title="Justificatif requis" style="color:#B87333;">📎</span>' : '') + fcInfoEtapeHtml(d, e) + fcHintDependance(d, e)
       + (e.issue ? '<br><span style="font-size:11px;color:#2e7d4f;">Issue officielle enregistrée : ' + escHtml(e.issue) + '</span>' : '') + (e.motif ? '<br><span style="font-size:11px;color:#c0392b;">Motif : ' + escHtml(e.motif) + '</span>' : '') + '</td>'
@@ -59877,6 +59895,10 @@ async function fcStatutUI(id, code, sel) {
   if (!r.ok && r.dependance && confirm(r.erreur + "\n\nPasser outre l'ordre des étapes (motif obligatoire, journalisé) ?")) {
     var mo = prompt("Motif de la dérogation à l'ordre des étapes :") || '';
     r = await fcChangerStatutEtape(id, code, statut, { motif: mo, derogation_ordre: true });
+  }
+  if (!r.ok && r.phase && fcEstAdmin() && confirm(r.erreur + '\n\nDéroger par décision d\'administrateur (motif obligatoire, journalisé) ?')) {
+    var mp = prompt('Motif de la dérogation à la procédure coutumière et technique :') || '';
+    r = await fcChangerStatutEtape(id, code, statut, { motif: mp, derogation_phase: true });
   }
   if (!r.ok && r.completude && confirm(r.erreur + '\n\nClôturer quand même par dérogation (motif obligatoire, journalisée) ?')) {
     var mc = prompt('Motif de la dérogation au contrôle de clôture :') || '';
@@ -61025,6 +61047,169 @@ var FC_SITUATIONS = {
   litige: { libelle: 'Terrain faisant l\'objet d\'un litige', procedure: 'regularisation', a_determiner: true, demarche: 'Faire examiner les droits en présence et les procédures administratives ou judiciaires nécessaires.' },
   rural: { libelle: 'Parcelle rurale', procedure: 'rural_a_examiner', a_determiner: true, demarche: 'Examiner la procédure propre au domaine foncier rural, qui est distincte de celle du foncier urbain.' }
 };
+FC_SITUATIONS.terrain_coutumier = { libelle: 'Terrain brut sans titre (droits coutumiers)', procedure: 'immatriculation_urbaine', a_determiner: false, demarche: "Suivre la procédure en deux temps : procédure coutumière et technique (obligatoire), puis procédure administrative et voie ACD ou approbation." };
+/* ═══ Immatriculation d'une parcelle urbaine sans titre (ACD ou approbation) ═══
+   Procédure fournie par le promoteur (17/10/2026) : phase 1 coutumière et technique (bloquante), phase 2 administrative, puis voie ACD ou approbation.
+   Les étapes de la phase 1 sont obligatoires : la phase administrative ne démarre que lorsqu'elles sont toutes terminées (dérogation réservée à un administrateur).
+   Les réformes pouvant rendre certaines étapes facultatives, la direction les déclare dans « Modèles de dossier » (colonne « Obligatoire »). */
+FC_PROCEDURES.immatriculation_urbaine = "Immatriculation d'une parcelle urbaine sans titre (ACD ou approbation)";
+FC_PHASES.U1 = 'Phase 1 — Procédure coutumière et technique (obligatoire)';
+FC_PHASES.U2 = 'Phase 2 — Procédure administrative et technique (ministères)';
+FC_PHASES.U3 = 'Voie ACD — hors lotissement de grande superficie';
+FC_PHASES.U4 = 'Voie approbation';
+FC_PHASES.U5 = 'Aménagement et livraison (voie ACD)';
+FC_PHASES.U6 = 'Clôture';
+Object.assign(FC_ACTEURS_REF, {
+  chef_village: 'Chef de village ou sachants du village', commissaire_justice: 'Commissaire de justice', famille: 'Propriétaires terriens (famille)',
+  urbaniste: "Urbaniste agréé de l'opérateur", interieur: "Ministère de l'Intérieur (mairie ou sous-préfecture)", dtc: 'DTC — Direction de la topographie et de la cartographie',
+  duad: 'DUAD — assainissement et drainage', cabinet: 'Cabinet du ministre', financiers: 'Financiers'
+});
+var FC_URB_REF = {
+  version: '2026-10-17', origine: 'Procédure fournie par le promoteur (17/10/2026), non vérifiée par ImmoSuite',
+  avertissement: "Les réformes peuvent modifier cette procédure à tout moment : la direction peut déclarer certaines étapes facultatives dans « Modèles de dossier ». À faire valider par un juriste ou un géomètre-expert."
+};
+/* [code, libellé, phase, justificatif requis, visibilité (souscripteur = grande étape communiquée pour information), '']. Voie : U3 et U5 = ACD, U4 = approbation. */
+var FC_ETAPES_URBAIN = [
+  ['urb_acquisition', 'Acquisition de la parcelle brute (sans titre)', 'U1', 0, 'souscripteur', ''],
+  ['urb_civilite_delimitation', 'Civilité villageoise et délimitation', 'U1', 0, 'interne', ''],
+  ['urb_leve_topo_contenance', 'Levé topographique pour connaître la contenance', 'U1', 1, 'interne', ''],
+  ['urb_enquete_fonciere', "Enquête foncière auprès des services du ministère de la construction (état foncier avant tout engagement, en attendant la vérification officielle)", 'U1', 0, 'interne', ''],
+  ['urb_contrat_exclusivite', "Contrat d'exclusivité signé avec le ou les propriétaires terriens et la société", 'U1', 1, 'interne', ''],
+  ['urb_pv_famille', 'Établissement du ou des procès-verbaux de famille (représentant ou chef de famille)', 'U1', 1, 'interne', ''],
+  ['urb_enquete_villageoise', 'Enquête villageoise sur les procès-verbaux de famille (chefferie ou sachants), consolidée par un commissaire de justice', 'U1', 1, 'interne', ''],
+  ['urb_parcellaire', 'Parcellaire : superficie de chaque propriétaire terrien (obligatoire si plusieurs propriétaires)', 'U1', 1, 'interne', ''],
+  ['urb_attestations_coutumieres', "Attestations de propriété coutumière (chef de village, par famille) et désignation du représentant légal devant le commissaire de justice", 'U1', 1, 'interne', ''],
+  ['urb_polygonale_ensemble', "Polygonale d'ensemble et attestation de propriété coutumière d'ensemble (si ensemble de propriétaires)", 'U1', 1, 'interne', ''],
+  ['urb_notaire_convention', "Convention entre l'opérateur et les propriétaires terriens : rédaction et signature chez le notaire de l'opérateur", 'U1', 1, 'souscripteur', ''],
+  ['urb_dotation', 'Suivi du paiement de la dotation (avec compensation en nature éventuelle du propriétaire terrien)', 'U1', 1, 'interne', ''],
+  ['urb_leve_geometre', "Levé topographique dressé par le géomètre expert de l'opérateur", 'U1', 1, 'interne', ''],
+  ['urb_avis_servitude', "Demande officielle de l'avis de servitude au ministère de la construction", 'U1', 1, 'interne', ''],
+  ['urb_etat_lieux', 'État des lieux par le géomètre expert', 'U1', 0, 'interne', ''],
+  ['urb_dossier_technique', 'Montage du dossier technique par le géomètre expert', 'U1', 1, 'interne', ''],
+  ['urb_plan_amenagement', "Fichier numérique transmis à l'urbaniste agréé de l'opérateur : plan d'aménagement de la parcelle", 'U1', 1, 'interne', ''],
+  ['urb_prepa_depot', 'Préparation du dossier pour le dépôt au guichet unique du foncier (selon le type d\'immatriculation convenu) — fin de la procédure coutumière et technique', 'U1', 0, 'souscripteur', ''],
+  ['urb_depot_guf', "Dépôt du dossier au guichet unique du foncier du ministère de la construction (demande d'ACD ou d'approbation)", 'U2', 1, 'souscripteur', ''],
+  ['urb_transmission_direction', 'Transmission du dossier à la direction compétente du ministère par le guichet unique', 'U2', 0, 'interne', ''],
+  ['urb_courriers_avis', "Courriers de demande d'avis du ministère aux structures techniques et au ministère de l'Intérieur", 'U2', 0, 'interne', ''],
+  ['urb_avis_dtc', 'Avis de la DTC (direction de la topographie et de la cartographie)', 'U2', 1, 'interne', ''],
+  ['urb_avis_duad', "Avis de la DUAD (ministère de l'assainissement et du drainage)", 'U2', 1, 'interne', ''],
+  ['urb_commodo', "Enquête de commodo et incommodo (ministère de l'Intérieur : mairie ou sous-préfecture)", 'U2', 1, 'interne', ''],
+  ['urb_retour_avis', 'Retour des avis (favorables ou non) à la direction du ministère demandeur', 'U2', 1, 'souscripteur', ''],
+  ['urb_choix_voie', "Transmission à la direction compétente selon le titre demandé : voie ACD ou approbation", 'U2', 0, 'interne', ''],
+  ['urb_convention_tripartite', 'Convention tripartite', 'U3', 1, 'interne', ''],
+  ['urb_attestation_domaniale', 'Attestation domaniale', 'U3', 1, 'interne', ''],
+  ['urb_dm', 'Conservation foncière : création du DM (dossier de morcellement)', 'U3', 1, 'interne', ''],
+  ['urb_bornage_contradictoire', 'Cadastre : bornage contradictoire', 'U3', 1, 'interne', ''],
+  ['urb_creation_tf', 'Conservation foncière : création du titre foncier', 'U3', 1, 'souscripteur', ''],
+  ['urb_projet_acd', "Direction du ministère de la construction : rédaction du projet d'ACD", 'U3', 0, 'interne', ''],
+  ['urb_cabinet_signature', "Cabinet du ministre : vérification, correction et signature de l'ACD", 'U3', 1, 'souscripteur', ''],
+  ['urb_notification_conservation', 'Notification de la signature et transmission à la conservation', 'U3', 0, 'interne', ''],
+  ['urb_droits_publication', 'Paiement des droits et publication à la conservation', 'U3', 1, 'interne', ''],
+  ['urb_retrait_acd', "Retour au ministère de la construction pour le retrait de l'ACD", 'U3', 1, 'souscripteur', ''],
+  ['urb_dossier_domaine_urbain', 'Dossier transmis à la direction du domaine urbain pour traitement', 'U4', 0, 'interne', ''],
+  ['urb_autorisation_lotir', "Délivrance de l'autorisation de lotir", 'U4', 1, 'souscripteur', ''],
+  ['urb_amenagement_plan_approuve', "Aménagement de la parcelle selon le plan d'urbanisation approuvé par le ministère", 'U4', 0, 'interne', ''],
+  ['urb_guide_partage', 'Rédaction et confection du guide de partage', 'U4', 1, 'interne', ''],
+  ['urb_certificat_conformite', 'Certificat de conformité', 'U4', 1, 'interne', ''],
+  ['urb_approbation', "Délivrance de l'approbation après réunion du comité de suivi", 'U4', 1, 'souscripteur', ''],
+  ['urb_attestations_adu', 'Confection et délivrance des attestations (ADU) avec un titre foncier en amont', 'U4', 1, 'interne', ''],
+  ['urb_attestations_souscripteurs', 'Délivrance des attestations aux différents souscripteurs', 'U4', 1, 'souscripteur', ''],
+  ['urb_travaux_amenagement', "Travaux d'aménagement et application du plan d'urbanisme", 'U5', 0, 'souscripteur', ''],
+  ['urb_livraison_financiers', 'Livraison des lots aux financiers', 'U5', 1, 'souscripteur', ''],
+  ['urb_maj_statut', 'Mise à jour du statut foncier', 'U6', 0, 'interne', ''],
+  ['urb_publication_souscripteur', 'Publication des informations autorisées au souscripteur', 'U6', 0, 'souscripteur', '']
+];
+var FC_URB_ACTEURS = {
+  urb_civilite_delimitation: ['famille', 'chef_village'], urb_leve_topo_contenance: ['geometre'], urb_enquete_fonciere: ['demandeur', 'mclu'], urb_contrat_exclusivite: ['demandeur', 'famille'],
+  urb_pv_famille: ['famille'], urb_enquete_villageoise: ['chef_village', 'commissaire_justice'], urb_parcellaire: ['geometre', 'famille'], urb_attestations_coutumieres: ['chef_village', 'commissaire_justice'],
+  urb_polygonale_ensemble: ['geometre', 'chef_village'], urb_notaire_convention: ['notaire', 'famille', 'demandeur'], urb_dotation: ['demandeur', 'famille'], urb_leve_geometre: ['geometre'],
+  urb_avis_servitude: ['mclu'], urb_etat_lieux: ['geometre'], urb_dossier_technique: ['geometre'], urb_plan_amenagement: ['urbaniste'], urb_prepa_depot: ['demandeur', 'geometre'],
+  urb_depot_guf: ['guf', 'mclu'], urb_transmission_direction: ['guf', 'mclu'], urb_courriers_avis: ['mclu', 'interieur'], urb_avis_dtc: ['dtc'], urb_avis_duad: ['duad'], urb_commodo: ['interieur'],
+  urb_retour_avis: ['mclu'], urb_choix_voie: ['mclu'], urb_convention_tripartite: ['mclu', 'demandeur', 'famille'], urb_attestation_domaniale: ['mclu_domaine'], urb_dm: ['conservation_fonciere'],
+  urb_bornage_contradictoire: ['cadastre'], urb_creation_tf: ['conservation_fonciere'], urb_projet_acd: ['mclu'], urb_cabinet_signature: ['cabinet', 'autorite_signature'],
+  urb_notification_conservation: ['mclu', 'conservation_fonciere'], urb_droits_publication: ['conservation_fonciere', 'dgi'], urb_retrait_acd: ['mclu', 'demandeur'],
+  urb_dossier_domaine_urbain: ['mclu'], urb_autorisation_lotir: ['mclu'], urb_amenagement_plan_approuve: ['urbaniste', 'mclu'], urb_guide_partage: ['urbaniste'], urb_certificat_conformite: ['mclu'],
+  urb_approbation: ['mclu'], urb_attestations_adu: ['mclu'], urb_attestations_souscripteurs: ['demandeur'], urb_livraison_financiers: ['demandeur', 'financiers']
+};
+Object.keys(FC_URB_ACTEURS).forEach(function(k){ FC_META_ETAPES[k] = { acteurs: FC_URB_ACTEURS[k], bloc: 0, pieces: [] }; });
+var FC_DEPS_URBAIN = {
+  urb_acquisition: ['creation_dossier'], urb_civilite_delimitation: ['urb_acquisition'], urb_leve_topo_contenance: ['urb_civilite_delimitation'], urb_enquete_fonciere: ['urb_acquisition'],
+  urb_contrat_exclusivite: ['urb_enquete_fonciere', 'urb_leve_topo_contenance'], urb_pv_famille: ['urb_contrat_exclusivite'], urb_enquete_villageoise: ['urb_pv_famille'],
+  urb_parcellaire: ['urb_enquete_villageoise'], urb_attestations_coutumieres: ['urb_enquete_villageoise', 'urb_parcellaire'], urb_polygonale_ensemble: ['urb_attestations_coutumieres'],
+  urb_notaire_convention: ['urb_attestations_coutumieres', 'urb_polygonale_ensemble'], urb_dotation: ['urb_notaire_convention'], urb_leve_geometre: ['urb_notaire_convention'],
+  urb_avis_servitude: ['urb_leve_geometre'], urb_etat_lieux: ['urb_leve_geometre'], urb_dossier_technique: ['urb_etat_lieux', 'urb_avis_servitude'], urb_plan_amenagement: ['urb_dossier_technique'],
+  urb_prepa_depot: ['urb_plan_amenagement', 'urb_dotation'], urb_depot_guf: ['urb_prepa_depot'], urb_transmission_direction: ['urb_depot_guf'], urb_courriers_avis: ['urb_transmission_direction'],
+  urb_avis_dtc: ['urb_courriers_avis'], urb_avis_duad: ['urb_courriers_avis'], urb_commodo: ['urb_courriers_avis'], urb_retour_avis: ['urb_avis_dtc', 'urb_avis_duad', 'urb_commodo'],
+  urb_choix_voie: ['urb_retour_avis'], urb_convention_tripartite: ['urb_choix_voie'], urb_attestation_domaniale: ['urb_convention_tripartite'], urb_dm: ['urb_attestation_domaniale'],
+  urb_bornage_contradictoire: ['urb_dm'], urb_creation_tf: ['urb_bornage_contradictoire'], urb_projet_acd: ['urb_creation_tf'], urb_cabinet_signature: ['urb_projet_acd'],
+  urb_notification_conservation: ['urb_cabinet_signature'], urb_droits_publication: ['urb_notification_conservation'], urb_retrait_acd: ['urb_droits_publication'],
+  urb_dossier_domaine_urbain: ['urb_choix_voie'], urb_autorisation_lotir: ['urb_dossier_domaine_urbain'], urb_amenagement_plan_approuve: ['urb_autorisation_lotir'], urb_guide_partage: ['urb_amenagement_plan_approuve'],
+  urb_certificat_conformite: ['urb_guide_partage'], urb_approbation: ['urb_certificat_conformite'], urb_attestations_adu: ['urb_approbation'], urb_attestations_souscripteurs: ['urb_attestations_adu'],
+  urb_travaux_amenagement: ['urb_retrait_acd'], urb_livraison_financiers: ['urb_travaux_amenagement'],
+  urb_maj_statut: ['urb_livraison_financiers', 'urb_attestations_souscripteurs'], urb_publication_souscripteur: ['urb_livraison_financiers', 'urb_attestations_souscripteurs']
+};
+/* Voie d'une étape : U3 et U5 = ACD, U4 = approbation ; vide pour les autres. */
+function fcUrbainVoieDe(e) { return (e.phase === 'U3' || e.phase === 'U5') ? 'acd' : (e.phase === 'U4' ? 'approbation' : ''); }
+var FC_URB_VOIES = { acd: 'ACD (arrêté de concession définitive)', approbation: 'Approbation du lotissement' };
+function fcUrbainFacultative(code) { var f = (DATA.params || {}).fc_urbain_facultatives; return !!(f && f[code]); }
+function fcLibPhase(ph) { return /^U\d$/.test(ph) ? FC_PHASES[ph] : 'Phase ' + ph + ' — ' + FC_PHASES[ph]; }
+/* Étapes de la phase 1 obligatoires et pas encore terminées ou écartées. */
+function fcUrbainPhase1Manquantes(d) {
+  return (d.etapes || []).filter(function(x){ return x.phase === 'U1' && !fcUrbainFacultative(x.code) && ['termine', 'annule'].indexOf(x.statut) === -1; });
+}
+function fcUrbainBloquants(d, e) {
+  if (d.type_procedure !== 'immatriculation_urbaine' || ['U2', 'U3', 'U4', 'U5'].indexOf(e.phase) === -1) return [];
+  return fcUrbainPhase1Manquantes(d);
+}
+function fcUrbainVoieRequise(d, e) {
+  if (d.type_procedure !== 'immatriculation_urbaine' || !fcUrbainVoieDe(e) || d.voie_immatriculation) return '';
+  return "Choisissez d'abord la voie d'immatriculation (ACD ou approbation) dans le panneau de la procédure.";
+}
+/* Applique le choix de voie : les étapes de l'autre voie sont écartées (annulées avec motif), celles de la voie retenue réactivées. */
+function fcUrbainAppliquerVoie(d, voie) {
+  var lib = FC_URB_VOIES[voie];
+  d.etapes.forEach(function(e){
+    var v = fcUrbainVoieDe(e); if (!v) return;
+    if (v === voie) { if (e.statut === 'annule' && String(e.motif || '').indexOf('Voie non retenue') === 0) { e.statut = 'a_venir'; e.motif = ''; } }
+    else if (['a_preparer', 'a_venir'].indexOf(e.statut) !== -1) { e.statut = 'annule'; e.motif = 'Voie non retenue : ' + lib; }
+  });
+  d.voie_immatriculation = voie;
+}
+async function fcDefinirVoie(dossierId, voie) {
+  var d = fcDossier(dossierId);
+  if (!d || d.type_procedure !== 'immatriculation_urbaine') return { ok: false, erreur: 'Dossier introuvable ou procédure différente.' };
+  if (!FC_URB_VOIES[voie]) return { ok: false, erreur: "Voie d'immatriculation invalide." };
+  if (d.statut === 'cloture') return { ok: false, erreur: 'Dossier clôturé.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) choisit la voie.' };
+  var ancienne = d.voie_immatriculation || '';
+  if (ancienne === voie) return { ok: true, dossier: d };
+  if (ancienne && d.etapes.some(function(e){ return fcUrbainVoieDe(e) === ancienne && (FC_STATUTS_ACTIFS.indexOf(e.statut) !== -1 || e.statut === 'termine'); })) return { ok: false, erreur: 'Changement impossible : des étapes de la voie « ' + FC_URB_VOIES[ancienne] + ' » sont déjà engagées.' };
+  fcUrbainAppliquerVoie(d, voie); fcRecalculerStatut(d); await fcSauver(d);
+  await fcEvenement(d, 'urb_choix_voie', 'choix_voie', "Voie d'immatriculation : " + FC_URB_VOIES[voie], { ancien: ancienne, nouveau: voie, source: 'promoteur' });
+  return { ok: true, dossier: d };
+}
+fcProtegerMutations(['fcDefinirVoie']);
+/* Initialisation à l'ouverture : nombre de propriétaires (parcellaire et polygonale d'ensemble sans objet si un seul) et voie déjà convenue. */
+function fcUrbainInit(d, o) {
+  d.proprietaires = o.plusieurs_proprietaires === false ? 'un' : 'plusieurs';
+  d.voie_immatriculation = '';
+  if (d.proprietaires === 'un') ['urb_parcellaire', 'urb_polygonale_ensemble'].forEach(function(c){ var e = fcEtape(d, c); if (e) { e.statut = 'annule'; e.motif = 'Propriétaire terrien unique : étape sans objet'; } });
+  if (FC_URB_VOIES[o.voie]) fcUrbainAppliquerVoie(d, o.voie);
+}
+function fcPanneauUrbain(d) {
+  if (d.type_procedure !== 'immatriculation_urbaine') return '';
+  var u1 = d.etapes.filter(function(x){ return x.phase === 'U1' && x.statut !== 'annule'; }), ob = u1.filter(function(x){ return !fcUrbainFacultative(x.code); }), faits = ob.filter(function(x){ return x.statut === 'termine'; }).length;
+  var pct = ob.length ? Math.round(faits / ob.length * 100) : 100, manq = fcUrbainPhase1Manquantes(d), engagee = d.voie_immatriculation && d.etapes.some(function(e){ return fcUrbainVoieDe(e) === d.voie_immatriculation && (FC_STATUTS_ACTIFS.indexOf(e.statut) !== -1 || e.statut === 'termine'); });
+  return '<div style="background:#fbf5ec;border-left:4px solid #B87333;padding:8px 12px;margin:8px 0;font-size:12px;">'
+    + '<b>Phase 1 — procédure coutumière et technique :</b> ' + faits + ' / ' + ob.length + ' étapes obligatoires terminées (' + pct + ' %)'
+    + '<div style="height:8px;background:#eadfcb;border-radius:6px;margin:5px 0;"><div style="height:8px;width:' + pct + '%;background:#2e7d4f;border-radius:6px;"></div></div>'
+    + (manq.length ? 'La phase administrative ne peut démarrer qu\'après ces étapes (dérogation réservée à un administrateur, motif obligatoire) : <i>' + escHtml(manq.slice(0, 3).map(function(x){ return x.libelle; }).join(' ; ')) + (manq.length > 3 ? ' (+' + (manq.length - 3) + ')' : '') + '</i>' : '<b style="color:#2e7d4f;">Phase 1 complète : la procédure administrative peut démarrer.</b>')
+    + '<div style="margin-top:8px;">Propriétaires terriens : <b>' + (d.proprietaires === 'un' ? 'un seul' : 'plusieurs') + '</b> · Voie d\'immatriculation : '
+    + '<select class="filter-select" ' + (engagee ? 'disabled title="Des étapes de cette voie sont engagées"' : '') + ' onchange="fcVoieUI(\'' + d.id + '\',this.value)"><option value="">— à choisir —</option>' + Object.keys(FC_URB_VOIES).map(function(k){ return '<option value="' + k + '"' + (d.voie_immatriculation === k ? ' selected' : '') + '>' + escHtml(FC_URB_VOIES[k]) + '</option>'; }).join('') + '</select></div>'
+    + '<div style="margin-top:6px;color:var(--dim);">' + escHtml(FC_URB_REF.avertissement) + ' <i>' + escHtml(FC_URB_REF.origine) + '.</i></div></div>';
+}
+async function fcVoieUI(id, voie) { if (!voie) return; var r = await fcDefinirVoie(id, voie); fcMsg(r, "Voie d'immatriculation enregistrée."); fcRender(); }
+function fcTypeChange(sel) { var z = document.getElementById('fc-n-urbain'); if (z) z.style.display = sel && sel.value === 'immatriculation_urbaine' ? 'flex' : 'none'; }
 /* §VI : points de contrôle essentiels avant de sécuriser une parcelle. */
 var FC_CONTROLES_REF = [
   ['identite', 'Identité', 'Le demandeur ou le vendeur est-il bien la personne désignée dans les documents ?'],
@@ -61097,7 +61282,7 @@ fcProtegerMutations(['fcEvaluerControle', 'fcDefinirReferences']);
 /* ─── Interface du référentiel ─────────────────────────────────────────── */
 function fcSituationChange(sel) {
   var s = FC_SITUATIONS[sel.value], zone = document.getElementById('fc-n-sit-info'), type = document.getElementById('fc-n-type');
-  if (s && type) type.value = s.procedure;
+  if (s && type) { type.value = s.procedure; fcTypeChange(type); }
   if (zone) zone.innerHTML = s ? '<div style="font-size:12px;background:#fbf5ec;border-left:4px solid #B87333;padding:6px 10px;margin-top:6px;"><b>Démarche à examiner :</b> ' + escHtml(s.demarche) + (s.a_determiner ? '<br><b>La procédure applicable doit être déterminée</b> avec les services compétents ou un professionnel habilité avant d\'engager les étapes suivantes.' : '') + '<br><i>' + escHtml(FC_PROCEDURE_REF.non_equivalence) + '</i></div>' : '';
 }
 function fcInfoEtapeHtml(d, e) {
@@ -62779,10 +62964,11 @@ var FC_DEPENDANCES = {
   formalites_livre_foncier: ['traitement_oppositions', 'bornage_contre_bornage'], verification_documents: ['reponse', 'ind_titre_individuel', 'retrait_acd', 'formalites_livre_foncier'],
   concordance_references: ['verification_documents'], documents_finaux: ['concordance_references'], ind_remise_titre: ['documents_finaux'], maj_statut_foncier: ['documents_finaux'], publication_souscripteur: ['documents_finaux']
 };
+Object.assign(FC_DEPENDANCES, FC_DEPS_URBAIN);   /* étapes de l'immatriculation urbaine */
 function fcDependancesActives() { return ((DATA.params || {}).fc_dependances) !== false; }
 /* Étapes préalables (de ce dossier) qui ne sont ni terminées ni annulées. */
 function fcPrerequisManquants(d, code) {
-  return (FC_DEPENDANCES[code] || []).map(function(c){ return fcEtape(d, c); }).filter(function(e){ return e && ['termine', 'annule'].indexOf(e.statut) === -1; });
+  return (FC_DEPENDANCES[code] || []).map(function(c){ return fcEtape(d, c); }).filter(function(e){ return e && ['termine', 'annule'].indexOf(e.statut) === -1 && !(d.type_procedure === 'immatriculation_urbaine' && fcUrbainFacultative(e.code)); });
 }
 function fcHintDependance(d, e) {
   if (!fcDependancesActives() || FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return '';
@@ -62839,18 +63025,18 @@ function fcPeutGererModeles() { return fcEstAdmin() || fcPeutVoirDirection(); }
 function fcRenderModeles() {
   var host = document.getElementById('fm-root'); if (!host) return;
   var type = APP._fmType || 'acd', m = fcModeles()[type] || { actif: true, etapes: {} }, users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; }), sug = fcDureesSuggerees(type), ro = fcPeutGererModeles() ? '' : ' disabled ';
-  var etapes = fcEtapesPour(type, ''), phase = '', total = 0;
+  var etapes = fcEtapesPour(type, ''), phase = '', total = 0, urb = type === 'immatriculation_urbaine';
   var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">📐 Modèles de dossier — délais et responsables par défaut</div>'
     + '<div style="font-size:11px;color:var(--dim);margin-bottom:8px;">À l\'ouverture d\'un dossier de la procédure, les échéances sont calculées en <b>cumulant</b> les durées ci-dessous (en jours calendaires, à partir de la date d\'ouverture) et les responsables par défaut sont affectés. Une durée vide = pas d\'échéance. Les échéances restent modifiables dossier par dossier.</div>'
     + '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;"><div class="form-group"><label>Procédure</label><select class="filter-select" onchange="APP._fmType=this.value;fcRenderModeles()">' + Object.keys(FC_PROCEDURES).filter(function(k){ return k !== 'rural_a_examiner' || true; }).map(function(k){ return '<option value="' + k + '"' + (k === type ? ' selected' : '') + '>' + escHtml(FC_PROCEDURES[k]) + (fcModeles()[k] ? ' ✔' : '') + '</option>'; }).join('') + '</select></div>'
     + '<label style="font-size:12px;"><input type="checkbox" id="fm-actif" ' + (m.actif !== false ? 'checked ' : '') + ro + '> Appliquer ce modèle à l\'ouverture</label></div>'
-    + '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Durée (jours)</th><th>Responsable par défaut</th><th>Observé</th></tr></thead><tbody>';
+    + '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Durée (jours)</th><th>Responsable par défaut</th><th>Observé</th>' + (urb ? '<th title="Une étape facultative ne bloque plus la phase suivante (réforme)">Obligatoire</th>' : '') + '</tr></thead><tbody>';
   etapes.forEach(function(e){
     var c = (m.etapes || {})[e.code] || {}, j = parseInt(c.jours, 10) || 0; total += j;
-    if (e.phase !== phase) { phase = e.phase; h += '<tr><td colspan="5" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;">Phase ' + phase + ' — ' + escHtml(FC_PHASES[phase]) + '</td></tr>'; }
+    if (e.phase !== phase) { phase = e.phase; h += '<tr><td colspan="' + (urb ? 6 : 5) + '" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;">' + escHtml(fcLibPhase(phase)) + '</td></tr>'; }
     h += '<tr><td>' + e.ordre + '</td><td>' + escHtml(e.libelle) + '</td><td><input type="number" min="0" max="3650" class="form-control" style="width:90px;" id="fm-j-' + e.code + '" value="' + (j || '') + '" ' + ro + '></td>'
       + '<td><select class="filter-select" id="fm-r-' + e.code + '" ' + ro + '><option value="">— responsable du dossier —</option>' + users.map(function(u){ return '<option value="' + u.id + '"' + (u.id === c.responsable_id ? ' selected' : '') + '>' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select></td>'
-      + '<td style="font-size:11px;color:var(--dim);">' + (sug && sug[e.code] ? '<span title="Durée sous laquelle 3 dossiers sur 4 se sont terminés (moyenne ' + sug[e.code].moyenne + ' j, médiane ' + sug[e.code].mediane + ' j)">' + sug[e.code].jours + ' j (P75, ' + sug[e.code].n + ' dossiers)</span>' : '') + '</td></tr>';
+      + '<td style="font-size:11px;color:var(--dim);">' + (sug && sug[e.code] ? '<span title="Durée sous laquelle 3 dossiers sur 4 se sont terminés (moyenne ' + sug[e.code].moyenne + ' j, médiane ' + sug[e.code].mediane + ' j)">' + sug[e.code].jours + ' j (P75, ' + sug[e.code].n + ' dossiers)</span>' : '') + '</td>' + (urb && e.phase.charAt(0) === 'U' ? '<td><input type="checkbox" id="fm-o-' + e.code + '" ' + (fcUrbainFacultative(e.code) ? '' : 'checked ') + ro + '></td>' : (urb ? '<td></td>' : '')) + '</tr>';
   });
   h += '</tbody></table></div><div style="margin:8px 0;font-size:12px;">Délai total estimé : <b>' + total + ' jours</b></div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="fcSauverModeleUI()" ' + ro + '>💾 Enregistrer le modèle</button> <button class="btn btn-secondary btn-sm" onclick="fcProposerDureesUI()" ' + ro + '>📊 Proposer les durées observées</button> <button class="btn btn-secondary btn-sm" onclick="fcSupprimerModeleUI()" ' + ro + '>Supprimer le modèle</button></div>'
@@ -62872,7 +63058,12 @@ async function fcSauverModeleUI() {
     if (n > 0 || r) m.etapes[e.code] = { jours: n, responsable_id: r };
   });
   if (bad) { toast('Durée invalide pour « ' + bad + ' » (0 à 3650 jours).', 'error'); return; }
-  DATA.params = DATA.params || {}; DATA.params.fc_modeles = Object.assign({}, fcModeles()); DATA.params.fc_modeles[type] = m;
+  DATA.params = DATA.params || {};
+  if (type === 'immatriculation_urbaine') {
+    var fac = {}; fcEtapesPour(type, '').forEach(function(e){ var c = document.getElementById('fm-o-' + e.code); if (c && !c.checked) fac[e.code] = true; });
+    DATA.params.fc_urbain_facultatives = fac;
+  }
+  DATA.params.fc_modeles = Object.assign({}, fcModeles()); DATA.params.fc_modeles[type] = m;
   try { await fcEnregistrerParams(); toast('Modèle enregistré.', 'success'); } catch (e) { toast('Enregistrement impossible : ' + (e.message || e), 'error'); }
   fcRenderModeles();
 }
