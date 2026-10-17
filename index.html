@@ -59852,7 +59852,7 @@ function fcRender() {
     + kpi('Dossiers', s.total) + kpi('En cours', s.en_cours, '#1565c0') + kpi('Clôturés', s.clotures, '#2e7d4f') + kpi('Bloqués', s.bloques, '#c0392b')
     + kpi('Documents manquants', s.incomplets) + kpi('Chez un prestataire', s.attente_prestataire) + kpi('Chez une administration', s.attente_administration)
     + kpi('Retard interne', s.retard_interne, '#c0392b') + kpi('Délai administratif dépassé', s.delai_administratif_depasse) + '</div>' + fcHtmlParBloc() + '</div>';
-  h += '<div class="card"><div class="card-title">➕ Ouvrir un dossier</div><div class="filters-bar" style="align-items:end;flex-wrap:wrap;">'
+  h += '<details class="card"><summary style="cursor:pointer;font-weight:700;">➕ Ouvrir un dossier</summary><div class="filters-bar" style="align-items:end;flex-wrap:wrap;margin-top:10px;">'
     + '<div class="form-group"><label>Parcelle</label><select class="filter-select" id="fc-n-parcelle">' + (DATA.parcelles || []).map(function(p){ return '<option value="' + p.id + '">' + escHtml(fcLibelleParcelle(p.id)) + '</option>'; }).join('') + '</select></div>'
     + '<div class="form-group"><label>Situation initiale</label><select class="filter-select" id="fc-n-situation" onchange="fcSituationChange(this)"><option value="">— non précisée —</option>' + Object.keys(FC_SITUATIONS).map(function(k){ return '<option value="' + k + '">' + escHtml(FC_SITUATIONS[k].libelle) + '</option>'; }).join('') + '</select></div>'
     + '<div class="form-group"><label>Procédure</label><select class="filter-select" id="fc-n-type" onchange="fcTypeChange(this)">' + fcOptions(FC_PROCEDURES, 'acd') + '</select></div>'
@@ -59861,7 +59861,7 @@ function fcRender() {
     + '<div class="form-group"><label>Échéance</label><input type="date" class="form-control" id="fc-n-cible"></div>'
     + '<div id="fc-n-urbain" style="display:none;gap:10px;align-items:end;flex-wrap:wrap;"><div class="form-group"><label>Propriétaires terriens</label><select class="filter-select" id="fc-n-prop"><option value="plusieurs">Plusieurs propriétaires</option><option value="un">Un seul propriétaire</option></select></div>'
     + '<div class="form-group"><label>Voie envisagée</label><select class="filter-select" id="fc-n-voie"><option value="">— à choisir plus tard —</option><option value="acd">ACD</option><option value="approbation">Approbation</option></select></div></div>'
-    + '<button class="btn btn-primary btn-sm" onclick="fcOuvrirUI()">Ouvrir le dossier</button></div><div id="fc-n-sit-info"></div></div>';
+    + '<button class="btn btn-primary btn-sm" onclick="fcOuvrirUI()">Ouvrir le dossier</button></div><div id="fc-n-sit-info"></div></details>';
   h += '<div class="card"><div class="card-title" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between;"><span>📋 Dossiers</span><span style="display:flex;flex-wrap:wrap;gap:6px;"><button class="btn btn-secondary btn-sm" onclick="APP._fcTriRisque=!APP._fcTriRisque;fcRender()">' + (APP._fcTriRisque ? '↕ Tri par date' : '🚨 Trier par risque') + '</button><button class="btn btn-secondary btn-sm" onclick="fcImprimerListeUI()">🖨 Imprimer la liste</button></span></div>' + fcHtmlFiltresListe() + '<div id="fc-barre-groupee"></div><div id="fc-liste-corps"></div>';
   h += '</div>' + fcPanneauReference() + '<div id="fc-detail"></div>';
   host.innerHTML = h;
@@ -59876,20 +59876,37 @@ async function fcOuvrirUI() {
   if (fcMsg(r, 'Dossier ouvert.')) { APP._fcSel = r.dossier.id; fcRender(); (r.avertissements || []).forEach(function(a){ toast(a, 'warning'); }); }
 }
 function fcOuvrirDetail(id) { APP._fcSel = id; fcRenderDetail(id); var el = document.getElementById('fc-detail'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth' }); }
+/* Onglets du dossier foncier : toutes les sections restent dans le DOM (les identifiants des panneaux et les mises à jour ciblées continuent de fonctionner), une seule est visible. */
+function fcOngletsHtml(sections) {
+  var liste = sections.filter(function(x){ return String(x.h || '').replace(/<[^>]*>/g, '').trim() !== '' || x.k === 'synthese' || x.k === 'etapes'; });
+  var actif = liste.some(function(x){ return x.k === APP._fcOnglet; }) ? APP._fcOnglet : liste[0].k;
+  return '<style>.fc-tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--or);margin:10px 0 12px;position:sticky;top:0;background:var(--card,#fff);z-index:3;padding-top:4px;}'
+    + '.fc-tabs button{border:1px solid var(--bord,#ddd);border-bottom:none;background:var(--card2,#f5f1ea);padding:7px 12px;border-radius:8px 8px 0 0;cursor:pointer;font-size:12px;font-weight:600;color:inherit;}'
+    + '.fc-tabs button.on{background:var(--or);color:#fff;border-color:var(--or);}.fc-nb{background:rgba(0,0,0,.12);border-radius:9px;padding:0 6px;margin-left:4px;font-size:10px;}'
+    + '.fc-pane{display:none;}.fc-pane.on{display:block;}</style>'
+    + '<div class="fc-tabs" role="tablist">' + liste.map(function(x){ return '<button type="button" role="tab" class="' + (x.k === actif ? 'on' : '') + '" data-fcon="' + x.k + '" onclick="fcOnglet(\'' + x.k + '\')">' + x.t + '</button>'; }).join('') + '</div>'
+    + liste.map(function(x){ return '<div class="fc-pane' + (x.k === actif ? ' on' : '') + '" data-fcpane="' + x.k + '">' + x.h + '</div>'; }).join('');
+}
+function fcOnglet(k) {
+  APP._fcOnglet = k;
+  var host = document.getElementById('fc-detail'); if (!host) return;
+  [].forEach.call(host.querySelectorAll('[data-fcon]'), function(b){ b.classList.toggle('on', b.getAttribute('data-fcon') === k); });
+  [].forEach.call(host.querySelectorAll('[data-fcpane]'), function(p){ p.classList.toggle('on', p.getAttribute('data-fcpane') === k); });
+}
 function fcRenderDetail(id) {
   var d = fcDossier(id), host = document.getElementById('fc-detail'); if (!d || !host) return;
   var users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; });
   var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">📂 ' + escHtml(d.reference) + ' — ' + escHtml(FC_PROCEDURES[d.type_procedure] || '') + '</div>'
     + '<div style="font-size:12px;color:var(--dim);margin-bottom:8px;">Parcelle : ' + escHtml(fcLibelleParcelle(d.parcelle_id)) + ' · Responsable : ' + escHtml(fcNomUtilisateur(d.responsable_id)) + ' · Statut : ' + escHtml(d.statut) + '</div>';
+  var _sec = [], _s0 = h; h = '';
   h += fcBandeauNiveau(d);
   h += fcPanneauModification(d);
   h += '<div style="margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer le dossier</button> <button class="btn btn-secondary btn-sm" onclick="fcAllerJalons(\'' + d.parcelle_id + '\')">🧭 Voir les jalons du titre de la parcelle</button></div>';
   h += fcPanneauDossier(d);
   h += fcPanneauUrbain(d);
   h += fcPanneauRisque(d);
-  h += fcPanneauArchive(d);
-  h += fcPanneauCourriers(d);
   h += fcPanneauCompletude(d);
+  _sec.push({ k: 'synthese', t: '📌 Synthèse', h: h }); h = '';
   var phase = '';
   h += '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Statut</th><th>Responsable</th><th>Échéance</th><th>Justificatifs</th><th>Visibilité</th><th></th></tr></thead><tbody>';
   d.etapes.forEach(function(e){
@@ -59906,11 +59923,11 @@ function fcRenderDetail(id) {
       + '<td>' + (figee ? '<button class="btn btn-secondary btn-sm" onclick="fcCorrigerUI(\'' + d.id + '\',\'' + e.code + '\')">Corriger</button>' : '<button class="btn btn-secondary btn-sm" onclick="fcEcheanceUI(\'' + d.id + '\',\'' + e.code + '\')">Échéance</button>') + (e.visibilite === 'souscripteur' ? ' <button class="btn btn-secondary btn-sm" title="Publier une information au souscripteur" onclick="fcPublierUI(\'' + d.id + '\',\'' + e.code + '\')">Publier</button>' : '') + '</td></tr>';
   });
   h += '</tbody></table></div>';
-  h += fcPanneauPieces(d);
-  h += fcPanneauTitresIndividuels(d);
-  h += fcPanneauFrais(d);
-  h += fcPanneauBudget(d);
-  h += fcPanneauRemise(d);
+  var _nbFait = d.etapes.filter(function(e){ return e.statut === 'termine'; }).length;
+  _sec.push({ k: 'etapes', t: '🧭 Étapes <span class="fc-nb">' + _nbFait + '/' + d.etapes.length + '</span>', h: h }); h = '';
+  _sec.push({ k: 'pieces', t: '📎 Pièces &amp; courriers', h: fcPanneauPieces(d) + fcPanneauCourriers(d) + fcPanneauArchive(d) });
+  _sec.push({ k: 'titres', t: '🏷 Titres individuels', h: fcPanneauTitresIndividuels(d) });
+  _sec.push({ k: 'finance', t: '💶 Frais &amp; budget', h: fcPanneauFrais(d) + fcPanneauBudget(d) + fcPanneauRemise(d) });
   var pubs = (DATA.publications_foncieres || []).filter(function(x){ return x.dossier_id === d.id; }).sort(function(a, b){ return b.publie_le.localeCompare(a.publie_le); });
   h += '<div class="card-title" style="margin-top:14px;">📣 Informations publiées au souscripteur</div>' + (pubs.length ? pubs.map(function(x){
     return '<div style="padding:5px 0;border-bottom:1px solid var(--bord,#eee);font-size:12px;' + (x.retire ? 'opacity:.55;' : '') + '"><b>' + escHtml(x.publie_le.slice(0, 10)) + '</b> · ' + escHtml(x.libelle_public) + ' <i>(' + escHtml(FC_LIBELLES_SOURCE[x.source]) + ')</i>'
@@ -59918,8 +59935,9 @@ function fcRenderDetail(id) {
   var evs = (DATA.evenements_fonciers || []).filter(function(x){ return x.dossier_id === d.id; }).sort(function(a, b){ return b.date.localeCompare(a.date); }), nbHist = (APP._fcHist || {})[d.id] || FC_TAILLE_HISTORIQUE;
   h += '<div class="card-title" style="margin-top:14px;">🕑 Historique (ajout seul) <span style="font-size:11px;color:var(--dim);">' + Math.min(nbHist, evs.length) + ' / ' + evs.length + '</span></div><div style="max-height:260px;overflow:auto;font-size:12px;">'
     + (evs.length ? evs.slice(0, nbHist).map(function(x){ return '<div style="padding:4px 0;border-bottom:1px solid var(--bord,#eee);"><b>' + escHtml(x.date.slice(0, 16).replace('T', ' ')) + '</b> · ' + escHtml(x.acteur || '—') + ' · ' + escHtml(x.description) + (x.motif ? ' <i>(motif : ' + escHtml(x.motif) + ')</i>' : '') + '</div>'; }).join('') : '<div style="color:var(--dim);">Aucun événement.</div>')
-    + '</div>' + (evs.length > nbHist ? '<button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="fcPlusHistorique(\'' + d.id + '\')">Afficher ' + FC_TAILLE_HISTORIQUE + ' événements de plus (' + (evs.length - nbHist) + ' restants)</button>' : '') + '</div>';
-  host.innerHTML = h;
+    + '</div>' + (evs.length > nbHist ? '<button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="fcPlusHistorique(\'' + d.id + '\')">Afficher ' + FC_TAILLE_HISTORIQUE + ' événements de plus (' + (evs.length - nbHist) + ' restants)</button>' : '');
+  _sec.push({ k: 'suivi', t: '📣 Souscripteur &amp; historique', h: h });
+  host.innerHTML = _s0 + fcOngletsHtml(_sec) + '</div>';
   fcMajCourrierUI(d.id);
 }
 async function fcStatutUI(id, code, sel) {
