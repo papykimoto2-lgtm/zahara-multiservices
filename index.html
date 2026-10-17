@@ -59991,6 +59991,7 @@ function fcRenderDetail(id) {
   _sec.push({ k: 'synthese', t: '📌 Synthèse', h: h }); h = '';
   var phase = '', _q = "'" + d.id + "'", _tot = {}, _ok = {};
   d.etapes.forEach(function(e){ _tot[e.phase] = (_tot[e.phase] || 0) + 1; if (e.statut === 'termine') _ok[e.phase] = (_ok[e.phase] || 0) + 1; });
+  h += fcPanneauSuggestionsEtapes(d);
   h += fcPanneauEquipe(d);
   h += '<div style="margin-bottom:6px;display:flex;gap:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="fcPhasesTout(' + _q + ',true)">▾ Tout déployer</button><button type="button" class="btn btn-secondary btn-sm" onclick="fcPhasesTout(' + _q + ',false)">▸ Tout réduire</button></div>';
   h += '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Statut</th><th>Responsable</th><th>Échéance</th><th>Justificatifs</th><th>Visibilité</th><th></th></tr></thead><tbody>';
@@ -63207,9 +63208,10 @@ function fcChargeUtilisateur(uid) {
 }
 function fcLibFonction(f) { return (FC_FONCTIONS[f] || {}).lib || f; }
 /* Répartit les étapes non personnalisées entre les personnes de la fonction concernée, en équilibrant la charge. Les étapes déjà confiées à quelqu'un d'autre que le responsable du dossier ne sont pas touchées. */
-function fcRepartirEquipe(d) {
+function fcRepartirEquipe(d, codes) {
   var charge = {}, parPersonne = {}, sans = {}, n = 0, chargeDe = function(u){ if (charge[u.id] == null) charge[u.id] = fcChargeUtilisateur(u.id); return charge[u.id]; };
   d.etapes.slice().sort(function(a, b){ return a.ordre - b.ordre; }).forEach(function(e){
+    if (codes && codes.indexOf(e.code) === -1) return;
     if (FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return;
     if (e.responsable_id && e.responsable_id !== d.responsable_id) return;
     var f = fcEquipeEtape(e.code).exec, pool = fcUsersFonction(f);
@@ -63275,6 +63277,79 @@ async function fcSauverEquipeUI() {
   DATA.params = DATA.params || {}; DATA.params.fc_fonctions_roles = m;
   try { await fcEnregistrerParams(); toast('Équipe interne enregistrée.', 'success'); } catch (e) { toast('Enregistrement impossible : ' + (e.message || e), 'error'); }
   fcRenderModeles();
+}
+/* ── Assistant d'étapes : propose les étapes concernées par la procédure et le contexte, et permet d'en ajouter au dossier ──
+   Règle A : étapes que la procédure prévoit aujourd'hui mais absentes du dossier (ouvert avant une mise à jour, étape manquante).
+   Règle B : dossier d'une procédure standard en situation coutumière (terrain brut, attestation villageoise) → étapes de la phase coutumière et technique.
+   Ajout manuel : tout le catalogue des étapes connues. Chaque ajout est journalisé, confié à la fonction concernée et inséré à sa place logique. */
+function fcDefEtape(code) { var l = FC_ETAPES_REF.concat(FC_ETAPES_URBAIN); for (var i = 0; i < l.length; i++) if (l[i][0] === code) return l[i]; return null; }
+function fcCreerEtape(code, type, d) {
+  var s = fcDefEtape(code); if (!s) return null; var m = fcMetaEtape(code);
+  return { code: s[0], libelle: fcLibelleEtape(s[0], type, s[1]), phase: s[2], ordre: 0, statut: 'a_venir', responsable_id: d.responsable_id || '', date_debut: '', date_cible: '', date_fin: '', justificatif_requis: !!s[3], justificatifs: [],
+           motif: '', observations: '', visibilite: s[4], valide_par: '', valide_le: '', issue: '', acteurs: m.acteurs.slice(), bloc: m.bloc, pieces: m.pieces.slice(), ajoutee: true };
+}
+/* Insère l'étape après l'ancre (ou avant la clôture), puis renumérote. */
+function fcInsererEtape(d, etape, ancreCode) {
+  var i = d.etapes.findIndex(function(e){ return e.code === ancreCode; });
+  if (i === -1) { var c = d.etapes.findIndex(function(e){ return e.code === 'cloture'; }); i = c === -1 ? d.etapes.length - 1 : c - 1; }
+  d.etapes.splice(i + 1, 0, etape); d.etapes.forEach(function(e, k){ e.ordre = k + 1; });
+}
+function fcAncreEtape(d, code) {
+  var ref = fcEtapesPour(d.type_procedure, d.situation_initiale || '').map(function(e){ return e.code; }), k = ref.indexOf(code);
+  if (k === -1) { var s = fcDefEtape(code), memePhase = d.etapes.filter(function(e){ return s && e.phase === s[2]; }); return memePhase.length ? memePhase[memePhase.length - 1].code : 'identification_procedure'; }
+  for (var j = k - 1; j >= 0; j--) if (d.etapes.some(function(e){ return e.code === ref[j]; })) return ref[j];
+  return 'creation_dossier';
+}
+function fcSuggestionsEtapes(d) {
+  var out = [], ont = {}; d.etapes.forEach(function(e){ ont[e.code] = 1; });
+  var ref = fcEtapesPour(d.type_procedure, d.situation_initiale || ''), manq = ref.filter(function(e){ return !ont[e.code]; });
+  if (manq.length) out.push({ id: 'ref', titre: 'Étapes prévues par la procédure et absentes de ce dossier', raison: 'La procédure « ' + (FC_PROCEDURES[d.type_procedure] || d.type_procedure) + ' » prévoit ces étapes : le dossier a été ouvert avant une mise à jour ou une étape manque.', codes: manq.map(function(e){ return e.code; }) });
+  if (d.type_procedure !== 'immatriculation_urbaine' && ['terrain_coutumier', 'attestation_villageoise'].indexOf(d.situation_initiale) !== -1) {
+    var u1 = FC_ETAPES_URBAIN.filter(function(s){ return s[2] === 'U1'; }).map(function(s){ return s[0]; }).filter(function(c){ return !ont[c]; });
+    if (u1.length) out.push({ id: 'coutumier', titre: 'Phase coutumière et technique (terrain sans titre)', raison: 'La situation « ' + ((FC_SITUATIONS[d.situation_initiale] || {}).libelle || d.situation_initiale) + ' » suppose les étapes coutumières : civilité villageoise, procès-verbaux de famille, attestations de propriété coutumière, levé topographique, convention chez le notaire…', codes: u1, apres: 'identification_procedure' });
+  }
+  return out;
+}
+async function fcAjouterEtapes(dossierId, codes, o) {
+  o = o || {}; var d = fcDossier(dossierId);
+  if (!d) return { ok: false, erreur: 'Dossier introuvable.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) ajoute des étapes.' };
+  if (['cloture', 'annule'].indexOf(d.statut) !== -1) return { ok: false, erreur: 'Dossier ' + d.statut + ' : aucune étape ne peut être ajoutée.' };
+  var nouv = [], deja = {}; d.etapes.forEach(function(e){ deja[e.code] = 1; });
+  (codes || []).forEach(function(c){ if (deja[c] || !fcDefEtape(c)) return; deja[c] = 1; nouv.push(c); });
+  if (!nouv.length) return { ok: false, erreur: 'Aucune étape à ajouter (déjà présentes ou inconnues).' };
+  var ancre = o.apres || null, ajoutees = [];
+  nouv.forEach(function(c){ var e = fcCreerEtape(c, d.type_procedure, d); fcInsererEtape(d, e, ancre || fcAncreEtape(d, c)); ancre = e.code; ajoutees.push(e); });
+  var rep = fcRepartirEquipe(d, nouv);
+  fcRecalculerStatut(d); await fcSauver(d);
+  await fcEvenement(d, '', 'etapes_ajoutees', nouv.length + ' étape(s) ajoutée(s) : ' + ajoutees.map(function(e){ return e.libelle; }).slice(0, 4).join(' ; ') + (nouv.length > 4 ? ' (+' + (nouv.length - 4) + ')' : '') + (o.raison ? ' — ' + o.raison : ''), { source: 'promoteur', motif: o.raison || '' });
+  return { ok: true, ajoutees: nouv.length, codes: nouv, assignees: rep.assignees };
+}
+fcProtegerMutations(['fcAjouterEtapes']);
+function fcPanneauSuggestionsEtapes(d) {
+  if (['cloture', 'annule'].indexOf(d.statut) !== -1) return '';
+  var sug = fcSuggestionsEtapes(d); APP._fcSug = APP._fcSug || {}; APP._fcSug[d.id] = sug;
+  var ont = {}; d.etapes.forEach(function(e){ ont[e.code] = 1; });
+  var libres = FC_ETAPES_REF.concat(FC_ETAPES_URBAIN).filter(function(s, i, a){ return !ont[s[0]] && a.findIndex(function(x){ return x[0] === s[0]; }) === i; });
+  var cartes = sug.map(function(x, i){
+    return '<div style="border-left:4px solid #2e7d4f;background:#f1f8f3;padding:8px 10px;margin:6px 0;font-size:12px;"><b>' + escHtml(x.titre) + '</b> <span class="fc-nb">' + x.codes.length + '</span><div style="color:var(--dim);margin:3px 0;">' + escHtml(x.raison) + '</div>'
+      + '<div style="font-size:11px;">' + x.codes.slice(0, 5).map(function(c){ return escHtml(fcLibelleEtape(c, d.type_procedure, (fcDefEtape(c) || [])[1] || c)); }).join(' · ') + (x.codes.length > 5 ? ' …(+' + (x.codes.length - 5) + ')' : '') + '</div>'
+      + '<button class="btn btn-primary btn-sm" style="margin-top:4px;" onclick="fcAjouterSuggestionUI(\'' + d.id + '\',' + i + ')">➕ Ajouter ces ' + x.codes.length + ' étape(s)</button></div>';
+  }).join('');
+  var opts = libres.map(function(s){ return '<option value="' + s[0] + '">' + escHtml((FC_PHASES[s[2]] ? s[2] + ' · ' : '') + s[1]) + '</option>'; }).join('');
+  return '<details class="card" style="margin-bottom:8px;"' + (sug.length ? ' open' : '') + '><summary style="cursor:pointer;font-weight:700;">🧭 Étapes suggérées pour ce dossier' + (sug.length ? ' <span class="fc-nb" style="background:#2e7d4f;color:#fff;">' + sug.length + '</span>' : '') + '</summary>'
+    + (cartes || '<div style="font-size:12px;color:var(--dim);margin:6px 0;">Aucune étape manquante au regard de la procédure et du contexte.</div>')
+    + (libres.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:12px;">Ajouter une étape du catalogue : <select class="filter-select" id="fc-add-etape" style="max-width:420px;">' + opts + '</select><button class="btn btn-secondary btn-sm" onclick="fcAjouterCatalogueUI(\'' + d.id + '\')">➕ Ajouter</button></div>' : '') + '</details>';
+}
+async function fcAjouterSuggestionUI(id, i) {
+  var x = ((APP._fcSug || {})[id] || [])[i]; if (!x) return;
+  var r = await fcAjouterEtapes(id, x.codes, { apres: x.apres, raison: x.titre });
+  if (fcMsg(r, r.ok ? r.ajoutees + ' étape(s) ajoutée(s).' : '')) fcRenderDetail(id);
+}
+async function fcAjouterCatalogueUI(id) {
+  var c = (document.getElementById('fc-add-etape') || {}).value; if (!c) return;
+  var r = await fcAjouterEtapes(id, [c], { raison: 'ajout manuel' });
+  if (fcMsg(r, 'Étape ajoutée.')) fcRenderDetail(id);
 }
 /* ── Modèles préremplis : délais indicatifs et responsables par défaut ──
    Estimations de départ en jours calendaires, À VALIDER par la direction (elles ne sont pas des délais légaux). Elles sont proposées à l'ouverture d'un dossier
