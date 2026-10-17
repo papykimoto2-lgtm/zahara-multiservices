@@ -60403,6 +60403,22 @@ async function fcMissionUI(envoyer) {
   if (envoyer === true) { var s = await fcChangerStatutMission(r.mission.id, 'envoyee', {}); fcMsg(s, 'Mission créée et envoyée à l\'intervenant.'); }
   APP._fiSel = r.mission.id; fcRenderIntervenants();
 }
+/* Partage d'une mission avec le souscripteur : l'intervenant (organisation, rôle, contact) apparaît dans son espace.
+   Jamais pour un brouillon ni une mission annulée (filtré aussi côté SQL) ; uniquement pour un dossier de titre individuel. */
+async function fcPartagerMissionSouscripteur(missionId, partage) {
+  var m = fcMission(missionId), d = m && fcDossier(m.dossier_id);
+  if (!m || !d) return { ok: false, erreur: 'Mission introuvable.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) peut partager une mission.' };
+  if (!fcEstIndividuel(d)) return { ok: false, erreur: 'Le partage ne concerne que les dossiers de titre individuel (un souscripteur précis).' };
+  partage = !!partage;
+  if (!!m.partage_souscripteur === partage) return { ok: true, inchange: true, mission: m };
+  m.partage_souscripteur = partage;
+  await fcSauverMission(m);
+  await fcEvenementMission(m, 'partage_souscripteur', partage ? 'Intervenant ' + fcNomIntervenant(m.intervenant_id) + ' rendu visible du souscripteur' : 'Intervenant ' + fcNomIntervenant(m.intervenant_id) + ' retiré de l\'espace du souscripteur', { nouveau: partage ? 'partage' : 'prive' });
+  return { ok: true, mission: m };
+}
+fcProtegerMutations(['fcPartagerMissionSouscripteur']);
+async function fcPartageMissionUI(id, ck) { var r = await fcPartagerMissionSouscripteur(id, ck.checked); if (!fcMsg(r, ck.checked ? 'Intervenant visible du souscripteur.' : 'Intervenant retiré de l\'espace du souscripteur.')) ck.checked = !ck.checked; fcRenderMissionDetail(id); }
 function fcMissionDetail(id) { APP._fiSel = id; fcRenderMissionDetail(id); fcMarquerMessagesLus(id).then(function(r){ if (r && r.marques) fcRenderMissionDetail(id); }).catch(function(){}); var el = document.getElementById('fi-detail'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth' }); }
 function fcRenderMissionDetail(id) {
   var m = fcMission(id), host = document.getElementById('fi-detail'); if (!m || !host) return;
@@ -60411,6 +60427,7 @@ function fcRenderMissionDetail(id) {
     + '<div style="font-size:12px;color:var(--dim);margin-bottom:8px;">Intervenant : ' + escHtml(fcNomIntervenant(m.intervenant_id)) + ' · Validation : ' + escHtml(fcNomUtilisateur(m.responsable_validation_id)) + ' · Statut : <b>' + fcPastilleMission(m) + '</b>'
     + (m.acceptation ? ' · Acceptation : ' + escHtml(m.acceptation.reference) : '') + (m.contrat_reference ? '' : ' · <span style="color:#B87333;">Aucun contrat référencé</span>') + '</div>'
     + '<div style="margin-bottom:10px;">' + (suiv || '<i>Mission terminée.</i>') + '</div>'
+    + (fcEstIndividuel(fcDossier(m.dossier_id) || {}) ? '<label style="display:block;font-size:12px;margin-bottom:10px;"><input type="checkbox" ' + (m.partage_souscripteur ? 'checked ' : '') + 'onchange="fcPartageMissionUI(\'' + m.id + '\',this)"> Partager avec le souscripteur (nom et contacts de l\'intervenant visibles dans son espace' + (m.statut === 'brouillon' ? ' — dès l\'envoi de la mission' : '') + ')</label>' : '')
     + '<div class="table-wrap"><table><thead><tr><th>Livrable attendu</th><th>Versions</th><th></th></tr></thead><tbody>'
     + m.livrables.map(function(l){
       var der = l.versions[l.versions.length - 1];

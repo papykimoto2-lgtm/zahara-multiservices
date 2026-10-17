@@ -197,6 +197,25 @@ begin
       'etapes', (select coalesce(jsonb_agg(jsonb_build_object('libelle', e ->> 'libelle', 'phase', e ->> 'phase',
                    'statut', e ->> 'statut', 'date_cible', coalesce(e ->> 'date_cible', '')) order by (e ->> 'ordre')::numeric), '[]'::jsonb)
                  from jsonb_array_elements(v_visibles) e where e ->> 'statut' <> 'annule'),
+      'intervenants', case when d.j ->> 'niveau' = 'individuel' then
+        (select coalesce(jsonb_agg(s.x order by s.x ->> 'organisation'), '[]'::jsonb) from (
+           select jsonb_build_object(
+             'organisation', coalesce(i.data ->> 'nom_organisation', ''),
+             'role', case i.data ->> 'type' when 'geometre' then 'Géomètre' when 'notaire' then 'Notaire' when 'avocat' then 'Avocat'
+                       when 'prestataire_technique' then 'Prestataire technique' when 'conseil_juridique' then 'Conseil juridique'
+                       when 'intermediaire' then 'Intermédiaire mandaté' when 'organisme_public' then 'Organisme public' else 'Intervenant' end,
+             'contact', coalesce(i.data ->> 'contact_nom', ''),
+             'telephone', coalesce(i.data ->> 'telephone', ''),
+             'email', coalesce(i.data ->> 'email', ''),
+             'missions', jsonb_agg(m.data ->> 'titre' order by m.data ->> 'titre')) as x
+           from public.pi_missions_foncieres m
+           join public.pi_intervenants_fonciers i on i.id = m.data ->> 'intervenant_id'
+           where m.data ->> 'dossier_id' = d.id
+             and coalesce((m.data ->> 'partage_souscripteur')::boolean, false)
+             and coalesce(m.data ->> 'statut', '') not in ('brouillon', 'annulee')
+             and coalesce(i.data ->> 'statut_relation', '') = 'actif'
+           group by i.id, i.data) s)
+        else '[]'::jsonb end,
       'historique', v_pubs);
   end loop;
 
