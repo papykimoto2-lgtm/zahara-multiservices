@@ -59998,6 +59998,13 @@ var FC_TYPES_INTERVENANT = {
   geometre: 'Géomètre', notaire: 'Notaire', avocat: 'Avocat', prestataire_technique: 'Prestataire technique', conseil_juridique: 'Conseil juridique',
   intermediaire: 'Intermédiaire mandaté', promoteur_partenaire: 'Promoteur partenaire', organisme_public: 'Organisme public', autre: 'Autre acteur autorisé'
 };
+/* Visibilité côté intervenant : le portail n'affiche ni les brouillons ni les missions annulées. La pastille évite de chercher une mission « disparue ». */
+function fcPastilleMission(m) {
+  var lib = escHtml(FC_STATUTS_MISSION[m.statut] || m.statut || '');
+  if (m.statut === 'brouillon') return '<span title="Cliquez « → Envoyée » pour la rendre visible dans l\'espace Intervenant" style="background:#fff3cd;color:#8a5a00;border:1px solid #f0c36d;padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;">📝 ' + lib + ' — non visible de l\'intervenant</span>';
+  if (m.statut === 'annulee') return '<span style="background:#eee;color:#666;border:1px solid #ccc;padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;">' + lib + ' — retirée du portail</span>';
+  return lib;
+}
 var FC_STATUTS_MISSION = {
   brouillon: 'Brouillon', envoyee: 'Envoyée', acceptee: 'Acceptée', en_cours: 'En cours', attente_informations: "En attente d'informations",
   livrable_soumis: 'Livrable soumis', en_verification: 'En vérification', a_corriger: 'À corriger', validee: 'Validée', cloturee: 'Clôturée', annulee: 'Annulée'
@@ -60226,7 +60233,7 @@ function fcRenderIntervenants() {
   h += ms.length ? '<div class="table-wrap"><table><thead><tr><th>Mission</th><th>Dossier</th><th>Intervenant</th><th>Statut</th><th>Échéance</th><th>Contrat</th><th></th></tr></thead><tbody>'
     + pgM.items.map(function(m){
       var d = fcDossier(m.dossier_id), retard = fcMissionEnRetard(m);
-      return '<tr><td><strong>' + escHtml(m.reference) + '</strong><br>' + escHtml(m.titre) + '</td><td>' + escHtml(d ? d.reference : '—') + '</td><td>' + escHtml(fcNomIntervenant(m.intervenant_id)) + '</td><td>' + escHtml(FC_STATUTS_MISSION[m.statut]) + '</td>'
+      return '<tr><td><strong>' + escHtml(m.reference) + '</strong><br>' + escHtml(m.titre) + '</td><td>' + escHtml(d ? d.reference : '—') + '</td><td>' + escHtml(fcNomIntervenant(m.intervenant_id)) + '</td><td>' + fcPastilleMission(m) + '</td>'
         + '<td>' + escHtml(m.echeance) + (retard ? '<br><span style="color:#c0392b;font-size:11px;">En retard</span>' : '') + '</td><td>' + escHtml(m.contrat_reference || '—') + '</td>'
         + '<td><button class="btn btn-secondary btn-sm" onclick="fcMissionDetail(\'' + m.id + '\')">Ouvrir' + (fcMessagesNonLus(m) ? ' 💬' + fcMessagesNonLus(m) : '') + '</button></td></tr>';
     }).join('') + '</tbody></table></div>' + fcHtmlPagination(pgM, 'missions', 'fcRenderIntervenants') : '<div style="color:var(--dim);padding:8px;">Aucune mission.</div>';
@@ -60358,7 +60365,7 @@ function fcRenderMissionDetail(id) {
   var m = fcMission(id), host = document.getElementById('fi-detail'); if (!m || !host) return;
   var suiv = (FC_TRANSITIONS_MISSION[m.statut] || []).map(function(s){ return '<button class="btn btn-secondary btn-sm" onclick="fcStatutMissionUI(\'' + m.id + '\',\'' + s + '\')">→ ' + escHtml(FC_STATUTS_MISSION[s]) + '</button>'; }).join(' ');
   var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">📌 ' + escHtml(m.reference) + ' — ' + escHtml(m.titre) + '</div>'
-    + '<div style="font-size:12px;color:var(--dim);margin-bottom:8px;">Intervenant : ' + escHtml(fcNomIntervenant(m.intervenant_id)) + ' · Validation : ' + escHtml(fcNomUtilisateur(m.responsable_validation_id)) + ' · Statut : <b>' + escHtml(FC_STATUTS_MISSION[m.statut]) + '</b>'
+    + '<div style="font-size:12px;color:var(--dim);margin-bottom:8px;">Intervenant : ' + escHtml(fcNomIntervenant(m.intervenant_id)) + ' · Validation : ' + escHtml(fcNomUtilisateur(m.responsable_validation_id)) + ' · Statut : <b>' + fcPastilleMission(m) + '</b>'
     + (m.acceptation ? ' · Acceptation : ' + escHtml(m.acceptation.reference) : '') + (m.contrat_reference ? '' : ' · <span style="color:#B87333;">Aucun contrat référencé</span>') + '</div>'
     + '<div style="margin-bottom:10px;">' + (suiv || '<i>Mission terminée.</i>') + '</div>'
     + '<div class="table-wrap"><table><thead><tr><th>Livrable attendu</th><th>Versions</th><th></th></tr></thead><tbody>'
