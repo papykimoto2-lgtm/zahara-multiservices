@@ -2387,6 +2387,14 @@
       if(lignes) h+='<ul style="font-size:.8rem;margin:8px 0 0 18px;color:#1e4663;">'+lignes+'</ul>';
       if(p.explication) h+='<div style="font-size:.72rem;color:#6b7f95;margin-top:8px;">'+esc(p.explication)+'</div>';
       h+=friseEtapes(d.etapes);
+      var ivs=d.intervenants||[];
+      if(ivs.length) h+='<div class="card" style="margin-top:10px;"><strong>Vos interlocuteurs pour ce dossier</strong>'+ivs.map(function(x){
+        var tel=String(x.telephone||'').replace(/[^\d+]/g,'');
+        return '<div style="padding:8px 0;border-bottom:1px solid #eef2f8;"><div><strong>'+esc(x.organisation||'')+'</strong> <span class="pill p-gris">'+esc(x.role||'')+'</span></div>'
+          +(x.contact?'<div style="font-size:.82rem;">'+esc(x.contact)+'</div>':'')
+          +(x.missions&&x.missions.length?'<div style="font-size:.78rem;color:#4b6a8b;">Mission : '+x.missions.map(esc).join(' · ')+'</div>':'')
+          +'<div style="font-size:.82rem;margin-top:2px;">'+(x.telephone?('📞 <a href="tel:'+esc(tel)+'">'+esc(x.telephone)+'</a> '):'')+(x.email?('✉️ <a href="mailto:'+esc(x.email)+'">'+esc(x.email)+'</a>'):'')+'</div></div>';
+      }).join('')+'</div>';
       if(d.prochaine_etape) h+='<div class="card" style="background:#eef3fc;border-color:#cfe0f5;margin-top:10px;"><strong>Prochaine étape</strong><div style="font-size:.85rem;">'+esc(d.prochaine_etape.libelle||'')+(d.prochaine_etape.date_indicative?(' <span style="color:#4b6a8b;">(date indicative : '+esc(dshort(d.prochaine_etape.date_indicative))+')</span>'):'')+'</div></div>';
       var hist=d.historique||[];
       h+='<div style="margin-top:12px;"><strong style="font-size:.85rem;">Historique des informations</strong>'
