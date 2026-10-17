@@ -4688,6 +4688,20 @@
     rendreFinancier();
   }
 
+  /* Circuit des documents du partenaire : solde intégral → validation Direction → délivrance (réservation, cession définitive). Lecture seule. */
+  function fiCircuitDocs(p,solde){
+    var de=p.docs_etat||{}, dg=!!p.dg_valide;
+    var etat=function(k){ var d=de[k]; if(k==='attestation_cession'&&p.attestation_emise) return {etat:'delivre',date:p.date_attestation}; return d||{etat:'a_delivrer'}; };
+    var docs=[['contrat_reservation','Contrat de réservation'],['attestation_reservation','Attestation de réservation provisoire'],['attestation_cession','Attestation de cession définitive']];
+    var h='<div class="card"><strong>📜 Suivi de mes documents</strong><ol class="att-circ">'
+      +'<li class="'+(solde?'fait':'now')+'"><span></span><div><b>Engagement soldé</b>'+(solde?'':'<small>En attente du versement intégral</small>')+'</div></li>'
+      +'<li class="'+(dg?'fait':(solde?'now':''))+'"><span></span><div><b>Validation de la Direction</b>'+(dg&&p.dg_valide_date?'<small>'+esc(dshort(p.dg_valide_date))+'</small>':'')+'</div></li>';
+    docs.forEach(function(d){
+      var e=etat(d[0]), ok=e.etat==='delivre';
+      h+='<li class="'+(ok?'fait':(dg?'now':''))+'"><span></span><div><b>'+esc(d[1])+'</b><small>'+(ok?'Délivré'+(e.date?' le '+esc(dshort(e.date)):''):(dg?'À délivrer par la Direction':(solde?'Brouillon prêt — en attente de validation de la Direction':'Brouillon dès que l\'engagement est soldé')))+'</small></div></li>';
+    });
+    return h+'</ol><div style="font-size:.74rem;color:#6b7f95;">Les documents délivrés vous sont remis par votre interlocuteur ; ceux mis en ligne figurent ci-dessous.</div></div>';
+  }
   function rendreFinancier(){
     var p=FI.part;
     var engage=parseFloat(p.montant_engagement)||0;
@@ -4737,7 +4751,7 @@
         +'<div style="font-size:.72rem;color:#4b6a8b;">'+dshort(d.upload_date||'')+(d.description?' · '+esc(d.description):'')+'</div></div>'
         +'<a href="'+esc(d.blob||'#')+'" download="'+esc(d.name||'document')+'" class="highlight-btn" style="width:auto;padding:6px 12px;">⬇</a></div>';
     }).join(''):'<p style="color:#4b6a8b;font-size:.85rem;">Aucun document disponible pour l\'instant.</p>';
-    h+='<div class="sub" id="fi-docs"><div class="card"><strong>📎 Documents transmis</strong>'
+    h+='<div class="sub" id="fi-docs">'+fiCircuitDocs(p,soldeIntegral)+'<div class="card"><strong>📎 Documents transmis</strong>'
       +'<div style="margin-top:10px;">'+docLignes+'</div></div></div>';
 
     var statutBadge={en_attente:'<span class="pill p-or">⏳ En attente</span>',validee:'<span class="pill p-vert">✅ Validée</span>',rejetee:'<span class="pill p-rouge">❌ Rejetée</span>'};
