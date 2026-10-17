@@ -114798,7 +114798,7 @@ function printFacture(id){
 /* ══════════════════════════════════════════════════════
    VALIDATIONS HIÉRARCHIQUES — workflow générique
    ══════════════════════════════════════════════════════ */
-function valTypeLabel(t){ var m={bon_commande:'Bon de commande',situation:'Situation de travaux',convention:'Convention',facture_fournisseur:'Facture fournisseur',liberation_garantie:'Libération retenue garantie',reception_travaux:'Réception de travaux',livraison:'Livraison souscripteur',attestation_solde:'Attestation de solde',attestation_solde_finale:'Attestation de solde (valeur finale)',cession:'Cession foncière',autre:'Autre'}; return m[t]||t; }
+function valTypeLabel(t){ var m={bon_commande:'Bon de commande',situation:'Situation de travaux',convention:'Convention',facture_fournisseur:'Facture fournisseur',liberation_garantie:'Libération retenue garantie',reception_travaux:'Réception de travaux',livraison:'Livraison souscripteur',attestation_solde:'Attestation de solde',attestation_solde_finale:'Attestation de solde (valeur finale)',cession:'Cession foncière',attestation_solde_cession:'Attestation de solde (cession foncière)',autre:'Autre'}; return m[t]||t; }
 function valStatutBadge(st){ var m={en_attente:'badge-or',valide:'badge-vert',rejete:'badge-rouge',annule:'badge-rouge'}; var l={en_attente:'⏳ En attente',valide:'✅ Validé',rejete:'⛔ Rejeté',annule:'↩ Validation annulée'}; return '<span class="badge '+(m[st]||'badge-or')+'">'+(l[st]||st)+'</span>'; }
 function valPending(type,refId){ return (DATA.validations||[]).find(function(v){return v.type===type&&v.ref_id===refId&&v.statut==='en_attente';}); }
 async function valCreate(type,refId,libelle,montant,meta){
@@ -114849,6 +114849,22 @@ async function valApply(type,refId,decision){
       }
       attSoldeSauver(ac);
       attSoldeRafraichirUI(ac.id);
+    }
+  }
+  if(type===CES_ATT_TYPE){
+    var cc=(DATA.cessions_foncieres||[]).find(function(x){return x.id===refId;});
+    if(cc && cc.attestation_solde){
+      var ata=cc.attestation_solde, nomC=(APP.currentUser&&APP.currentUser.nom)||'—';
+      if(decision==='valide' && !cesAttSolde(cc).solde){ ata.statut='rejete'; ata.motif='Cession non soldée à la date de validation'; toast('⚠️ Cette cession n\'est plus soldée : attestation refusée.','error'); }
+      else if(decision==='valide'){
+        ata.statut='valide'; ata.valide_par=nomC; ata.valide_le=today(); ata.date_emission=today();
+        ata.html=cesAttHtml(cc,{numero:ata.numero,date:today(),signataire:nomC});
+      } else {
+        var vrc=(DATA.validations||[]).filter(function(x){return x.type===type&&x.ref_id===refId&&x.statut==='rejete';}).pop();
+        ata.statut='rejete'; ata.motif=(vrc&&vrc.motif)||'';
+      }
+      cesAttSauver(cc);
+      if(typeof cesRender==='function') cesRender();
     }
   }
   /* extensible : situation, convention, cession … */
@@ -114903,6 +114919,7 @@ function renderValidations(){
         if(canDecide) acts='<button class="btn btn-primary btn-sm" onclick="valDecide(\''+v.id+'\',\'valide\')">✅ Valider</button> <button class="btn btn-danger btn-sm" onclick="valReject(\''+v.id+'\')">⛔ Rejeter</button>';
         else acts='<span style="font-size:11px;color:var(--blanc-dim);">réservé à la hiérarchie</span>';
       } else { acts='<span style="font-size:11px;color:var(--blanc-dim);">'+(v.valideur||'')+' · '+(v.date_decision||'')+(v.motif?(' · '+v.motif):'')+'</span>'; }
+      if(v.type==='attestation_solde_cession') acts='<button class="btn btn-secondary btn-sm" onclick="cesAttApercu(\''+v.ref_id+'\')">👁 Voir</button> '+acts;
       if(v.type==='attestation_solde' || v.type==='attestation_solde_finale') acts='<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">👁 Voir</button> '+acts;
       return '<tr><td>'+valTypeLabel(v.type)+'</td><td style="font-size:12px;">'+v.libelle+'</td><td style="text-align:right;font-weight:600;">'+fmtF(Math.round(v.montant||0))+'</td><td style="font-size:11px;">'+(v.demandeur||'—')+'</td><td>'+(v.date_demande||'—')+'</td><td>'+valStatutBadge(v.statut)+'</td><td style="white-space:nowrap;">'+acts+'</td></tr>';
     }).join('');
@@ -117289,6 +117306,7 @@ function cesRender() {
   var tb = document.getElementById('tbody-cessions'); if (!tb) return;
   var q = ((document.getElementById('ces-search')||{}).value||'').toLowerCase();
   var L = DATA.cessions_foncieres || [];
+  L.forEach(cesAttAuto);
   var statutBadge = { promesse:'badge-or', cedee:'badge-bleu', soldee:'badge-vert', resiliee:'badge-violet' };
   var list = L.filter(function(c){ return !q || ((c.acquereur||'')+' '+(c.designation||'')+' '+cesSourceRef(c.source_key)).toLowerCase().indexOf(q)!==-1; })
               .sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
@@ -117309,7 +117327,7 @@ function cesRender() {
       +'<td style="text-align:right;">'+margeCell+'</td>'
       +'<td style="text-align:right;color:var(--vert);">'+fmtF(c.montant_encaisse)+(reste>0?('<br><span style="font-size:10px;color:var(--rouge);">reste '+fmtF(reste)+'</span>'):'')+'</td>'
       +'<td><span class="badge '+(statutBadge[c.statut]||'badge-neutre')+'">'+({promesse:'Promesse',cedee:'Cédée',soldee:'Soldée',resiliee:'Résiliée'}[c.statut]||c.statut||'—')+'</span></td>'
-      +'<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm btn-icon" title="Acte / contrat" onclick="cesGenererContrat(\''+c.id+'\')">🖨</button> <button class="btn btn-secondary btn-sm btn-icon" onclick="cesOpen(\''+c.id+'\')">✏️</button>'
+      +'<td style="white-space:nowrap;">'+cesAttCellule(c)+'<button class="btn btn-secondary btn-sm btn-icon" title="Acte / contrat" onclick="cesGenererContrat(\''+c.id+'\')">🖨</button> <button class="btn btn-secondary btn-sm btn-icon" onclick="cesOpen(\''+c.id+'\')">✏️</button>'
       +(c.statut!=='resiliee' ? (' <button class="btn btn-secondary btn-sm btn-icon" onclick="cesResilierOuvrir(\''+c.id+'\')" title="Résilier la cession" style="background:#FEF3C7;color:#92400E;border-color:#FCD34D;">📄</button>') : '')
       +(c.statut==='resiliee' && c.resiliation && c.resiliation.montant_rembourse>0 && !c.resiliation.rembourse ? (' <button class="btn btn-secondary btn-sm btn-icon" onclick="cesResilierOuvrirRemboursement(\''+c.id+'\')" title="Marquer remboursé" style="background:#DCFCE7;color:#166534;border-color:#86EFAC;">💰</button>') : '')
       +'</td>'
@@ -117346,6 +117364,159 @@ function cesRender() {
     + kpi('Ticket moyen',fmtF(Math.round(ticket))+' F','#F59E0B')
     + kpi('% notarié',pctNot+' %','#1A6B3A')
     + kpi('Soldées',soldees+' / '+nb,'#16A34A');
+}
+
+/* ══ Attestation de solde de cession foncière ══
+   Circuit : brouillon (généré au constat du solde) → validation DG / gérant (module Validations) → validée → publiée au portail acquéreur.
+   Stockée dans la fiche de cession (c.attestation_solde). Le texte validé est figé (a.html), comme l'attestation du souscripteur. */
+var CES_ATT_TYPE = 'attestation_solde_cession';
+function cesAttPaiements(c) {
+  var ps = (c.paiements || []).map(function(p){ return { date: p.date || c.date || '', montant: parseFloat(p.montant) || 0, mode: p.mode || '', ref: p.ref || '' }; });
+  var diff = (parseFloat(c.montant_encaisse) || 0) - ps.reduce(function(s, p){ return s + p.montant; }, 0);
+  if (diff > 0.01) ps.push({ date: c.date || '', montant: diff, mode: c.mode || '', ref: '' });
+  return ps.sort(function(a, b){ return String(a.date).localeCompare(String(b.date)); });
+}
+function cesAttSolde(c) {
+  var prix = parseFloat(c.prix_cession) || 0, verse = crecVerse(c), ps = cesAttPaiements(c);
+  return { prix: prix, verse: verse, ps: ps, dateSolde: ps.length ? ps[ps.length - 1].date : (c.date || ''), solde: c.statut !== 'resiliee' && prix > 0 && verse >= prix - 0.5 };
+}
+function cesAttNumero() {
+  var an = new Date().getFullYear(), max = 0, re = /^ACS-(\d{4})-(\d+)$/;
+  (DATA.cessions_foncieres || []).forEach(function(c){
+    var m = c.attestation_solde && re.exec(c.attestation_solde.numero || '');
+    if (m && parseInt(m[1], 10) === an) max = Math.max(max, parseInt(m[2], 10));
+  });
+  return 'ACS-' + an + '-' + ('0000' + (max + 1)).slice(-4);
+}
+function cesAttSauver(c) {
+  c._modifie = new Date().toISOString();
+  dbPut('cessions_foncieres', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_cessions_foncieres', c);
+}
+/* Brouillon automatique au constat du solde ; retiré si le solde disparaît (versement supprimé) avant toute soumission. */
+function cesAttAuto(c) {
+  var a = c.attestation_solde, S = cesAttSolde(c);
+  if (!a && S.solde) {
+    c.attestation_solde = { numero: cesAttNumero(), statut: 'brouillon', date_brouillon: today(), prix: S.prix, verse: S.verse, date_solde: S.dateSolde, publie_portail: false };
+    cesAttSauver(c);
+  } else if (a && a.statut === 'brouillon' && !S.solde) {
+    delete c.attestation_solde; cesAttSauver(c);
+  }
+}
+function cesAttHtml(c, opts) {
+  opts = opts || {};
+  var p = DATA.params || {}, E = function(x){ return escHtml(x == null ? '' : String(x)); }, S = cesAttSolde(c), a = c.acheteur || {};
+  var n = function(x){ return new Intl.NumberFormat('fr-FR').format(Math.round(x)); };
+  var lettres = (typeof _montantEnLettres === 'function') ? _montantEnLettres(S.prix) : '';
+  var bien = (c.designation || '—') + (c.superficie ? ' — superficie ' + n(c.superficie) + ' m²' : '') + (c.nb_lots ? ' — ' + c.nb_lots + ' lot(s)' : '') + ' (' + cesSourceRef(c.source_key) + ')';
+  var ident = [a.piece_type, a.piece_num && ('N° ' + a.piece_num)].filter(Boolean).join(' ');
+  var cumul = 0;
+  var lignes = S.ps.map(function(v){ cumul += v.montant; return '<tr><td>' + E(dateShort(v.date)) + '</td><td>' + E(v.ref || '—') + '</td><td>' + E(v.mode || '—') + '</td><td style="text-align:right;">' + n(v.montant) + '</td><td style="text-align:right;">' + n(cumul) + '</td><td style="text-align:right;">' + n(Math.max(0, S.prix - cumul)) + '</td></tr>'; }).join('');
+  var nom = cesAcquereurLabel(a);
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Attestation de solde ' + E(opts.numero || '') + '</title>'
+    + '<style>body{font-family:Georgia,serif;color:#1a1a1a;padding:38px 46px;max-width:760px;margin:0 auto;font-size:13px;line-height:1.55;position:relative;}'
+    + 'h1{text-align:center;font-size:21px;letter-spacing:1px;margin:16px 0 2px;color:#1A6B3A;}.sub{text-align:center;font-size:12px;color:#555;margin-bottom:14px;}'
+    + '.ref{display:flex;justify-content:space-between;font-size:12px;color:#444;border-bottom:2px solid #1A6B3A;padding-bottom:8px;}'
+    + 'table{width:100%;border-collapse:collapse;margin:8px 0 12px;}td,th{border:1px solid #ccc;padding:5px 9px;font-size:12px;text-align:left;}th{background:#eef7f1;}'
+    + 'h3{font-size:13px;color:#1A6B3A;margin:14px 0 4px;text-transform:uppercase;letter-spacing:.5px;}.art{margin:6px 0;text-align:justify;}'
+    + '.mont{border:2px solid #1A6B3A;text-align:center;padding:10px;margin:10px 0;font-size:15px;font-weight:bold;color:#1A6B3A;}'
+    + '.sig{display:flex;justify-content:space-between;margin-top:34px;}.sig div{width:46%;text-align:center;font-size:12px;}.fin-bloc{break-inside:avoid;page-break-inside:avoid;}'
+    + '.projet{position:fixed;top:40%;left:8%;font-size:64px;color:rgba(200,0,0,.13);transform:rotate(-24deg);font-weight:bold;pointer-events:none;}'
+    + ATT_PIED_CSS + '</style></head><body>'
+    + (opts.projet ? '<div class="projet">PROJET — NON VALIDÉ</div>' : '')
+    + '<div class="ref"><div><strong style="font-size:15px;">' + E(p.societe || '') + '</strong></div><div style="text-align:right;">N° <strong>' + E(opts.numero || '—') + '</strong><br>Dossier : ' + E(c.dossier || c.id) + '</div></div>'
+    + '<h1>ATTESTATION DE SOLDE</h1><div class="sub">Quitus de paiement intégral du prix de cession foncière</div>'
+    + '<h3>Le cédant</h3><div class="art">' + attSoldePromoteurTexte(p) + '.</div>'
+    + '<h3>Le cessionnaire (acquéreur)</h3><table><tr><th style="width:28%">' + (a.type === 'morale' ? 'Dénomination' : 'Nom et prénoms') + '</th><td>' + E(nom) + '</td></tr>'
+    + (a.type === 'morale' ? (a.rccm ? '<tr><th>RCCM</th><td>' + E(a.rccm) + '</td></tr>' : '') + (a.rep_nom ? '<tr><th>Représentant</th><td>' + E(a.rep_nom + (a.rep_qualite ? ' — ' + a.rep_qualite : '')) + '</td></tr>' : '') : (ident ? '<tr><th>Pièce d\'identité</th><td>' + E(ident) + '</td></tr>' : ''))
+    + '<tr><th>Contact</th><td>' + E([a.tel, a.email, a.adresse].filter(Boolean).join(' — ') || '—') + '</td></tr></table>'
+    + '<h3>Le bien cédé</h3><table><tr><th style="width:28%">Désignation</th><td>' + E(bien) + '</td></tr>'
+    + '<tr><th>Contrat</th><td>' + E(c.contrat_ref || '—') + ' du ' + E(dateShort(c.acte_date || c.date)) + '</td></tr></table>'
+    + '<h3>Situation financière</h3>'
+    + '<div class="art">Nous, ' + E(p.societe || 'le cédant') + ', attestons que <strong>' + E(nom) + '</strong> a <strong>intégralement réglé le prix de cession</strong> du bien désigné ci-dessus, fixé à <strong>' + n(S.prix) + ' FCFA</strong>' + (lettres ? ' (' + E(lettres) + ' francs CFA)' : '') + ', le dernier versement ayant été constaté le <strong>' + E(dateShort(S.dateSolde)) + '</strong>.</div>'
+    + '<h3>Tableau des versements</h3><table><thead><tr><th>Date</th><th>Référence</th><th>Mode</th><th style="text-align:right;">Versement (FCFA)</th><th style="text-align:right;">Cumul versé (FCFA)</th><th style="text-align:right;">Reste dû (FCFA)</th></tr></thead><tbody>'
+    + (lignes || '<tr><td colspan="6">Aucun versement détaillé.</td></tr>')
+    + '<tr><td colspan="3"><strong>Total</strong></td><td style="text-align:right;"><strong>' + n(S.verse) + '</strong></td><td style="text-align:right;"><strong>' + n(S.verse) + '</strong></td><td style="text-align:right;"><strong>0</strong></td></tr></tbody></table>'
+    + '<div class="mont">Solde restant dû : 0 FCFA</div>'
+    + '<div class="fin-bloc"><h3>Portée et réserves</h3>'
+    + '<div class="art">1. Le cessionnaire est libéré de toute obligation de paiement au titre du prix de cession du bien désigné ci-dessus.</div>'
+    + '<div class="art">2. La présente attestation est établie sous réserve de l\'encaissement effectif des sommes versées et sur la foi de la comptabilité du cédant à la date de son émission.</div>'
+    + '<div class="art">3. Elle ne constitue ni un titre de propriété ni un acte de vente authentique. Le transfert de propriété est constaté par acte authentique établi par notaire et inscrit à la Conservation de la propriété foncière, conformément à la législation ivoirienne en vigueur.</div>'
+    + '<div class="art">4. La présente attestation est délivrée à l\'intéressé(e) pour servir et valoir ce que de droit, notamment auprès du notaire et de la Conservation foncière.</div>'
+    + '<div class="sig"><div>Le cessionnaire<br><br><br>(lu et pris connaissance)</div>'
+    + '<div>Fait à ' + E(p.ville || '____________') + ', le ' + E(dateShort(opts.date || today())) + '<br><strong>Le Directeur Général / Le Gérant</strong><br>' + E(opts.signataire || '') + '<br><br><br>Signature et cachet</div></div>'
+    + (typeof printQrFooter === 'function' ? printQrFooter('Attestation de solde ' + (opts.numero || '')) : '') + '</div>'
+    + docPiedDePageEntreprise(p) + '</body></html>';
+}
+async function cesAttDemander(id) {
+  var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === id; }); if (!c) return;
+  var S = cesAttSolde(c);
+  if (!S.solde) { toast('Cession non soldée : attestation impossible.', 'error'); return; }
+  cesAttAuto(c);
+  var a = c.attestation_solde;
+  if (a.statut === 'en_attente') { toast('Une demande de validation est déjà en cours.', 'info'); return; }
+  if (a.statut === 'valide') return;
+  a.statut = 'en_attente'; a.date_demande = today(); a.demandeur = (APP.currentUser && APP.currentUser.nom) || '—'; a.prix = S.prix; a.verse = S.verse; a.date_solde = S.dateSolde; a.publie_portail = false;
+  cesAttSauver(c);
+  await valCreate(CES_ATT_TYPE, c.id, 'Attestation de solde de cession ' + a.numero + ' — ' + cesAcquereurLabel(c.acheteur) + (c.dossier ? ' (' + c.dossier + ')' : ''), S.prix, { cession_id: c.id });
+  cesRender();
+  toast('📤 Attestation transmise au DG / gérant pour validation (menu Validations).', 'success');
+}
+function cesAttApercu(id) {
+  var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === id; }); if (!c) return;
+  var a = c.attestation_solde || {};
+  var html = (a.statut === 'valide' && a.html) ? a.html : cesAttHtml(c, { numero: a.numero || cesAttNumero(), date: today(), projet: true });
+  var w = window.open('', '_blank', 'width=860,height=900'); if (!w) { toast('Fenêtre bloquée par le navigateur.', 'error'); return; }
+  w.document.write(html); w.document.close();
+}
+function cesAttImprimer(id) {
+  var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === id; }), a = c && c.attestation_solde;
+  if (!a || a.statut !== 'valide' || !a.html) { toast('Attestation non validée.', 'error'); return; }
+  var w = window.open('', '_blank', 'width=860,height=900'); if (!w) { toast('Fenêtre bloquée par le navigateur.', 'error'); return; }
+  w.document.write(a.html); w.document.close(); setTimeout(function(){ try { w.print(); } catch (e) {} }, 400);
+}
+function cesAttPublier(id, on) {
+  var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === id; }), a = c && c.attestation_solde; if (!a || a.statut !== 'valide') return;
+  a.publie_portail = !!on; if (on) a.publie_le = today();
+  cesAttSauver(c); cesRender();
+  toast(on ? '🌐 Attestation disponible dans l\'espace portail de l\'acquéreur.' : 'Attestation retirée du portail.', 'info');
+}
+async function cesAttAnnulerValidation(id) {
+  var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === id; }), a = c && c.attestation_solde;
+  if (!a || a.statut !== 'valide') return;
+  if (typeof hasRole === 'function' && !hasRole('admin') && !hasRole('manager')) { toast('Annulation réservée à la hiérarchie.', 'error'); return; }
+  var motif = prompt('Motif de l\'annulation de la validation (obligatoire) :\nL\'attestation N° ' + a.numero + ' repassera en brouillon et sera retirée du portail.', '');
+  if (motif === null) return; motif = String(motif).trim();
+  if (!motif) { toast('Le motif de l\'annulation est obligatoire.', 'error'); return; }
+  var qui = (APP.currentUser && APP.currentUser.nom) || '—';
+  a.annulations = (a.annulations || []).concat([{ le: today(), par: qui, motif: motif, valide_par: a.valide_par || '', valide_le: a.valide_le || '' }]);
+  a.statut = 'brouillon'; a.publie_portail = false; a.date_brouillon = today();
+  ['html', 'valide_par', 'valide_le', 'date_emission', 'publie_le', 'date_demande', 'demandeur', 'motif'].forEach(function(k){ delete a[k]; });
+  (DATA.validations || []).filter(function(v){ return v.type === CES_ATT_TYPE && v.ref_id === id && v.statut === 'valide'; }).forEach(function(v){
+    v.statut = 'annule'; v.motif = 'Validation annulée par ' + qui + ' le ' + today() + ' : ' + motif;
+    dbPut('validations', v); if (typeof syncToSupabase === 'function') syncToSupabase('pi_validations', v);
+  });
+  cesAttSauver(c); cesRender();
+  if (typeof renderValidations === 'function') renderValidations();
+  toast('↩ Validation annulée : l\'attestation est en brouillon.', 'success');
+}
+function cesAttCellule(c) {
+  var a = c.attestation_solde; if (!a) return '';
+  var b = 'style="font-size:10px;padding:2px 6px;"', q = '\'' + c.id + '\'';
+  var h = '<div style="margin-bottom:4px;"><span style="font-size:10px;color:var(--blanc-dim);">📜 ' + escHtml(a.numero || '') + '</span> ';
+  if (a.statut === 'brouillon' || a.statut === 'rejete') {
+    h += (a.statut === 'rejete' ? '<span class="badge badge-rouge" style="font-size:10px;" title="' + escHtml(a.motif || '') + '">⛔ Rejetée</span> ' : '<span class="badge badge-bleu" style="font-size:10px;">📝 Brouillon</span> ')
+      + '<button class="btn btn-secondary btn-sm" ' + b + ' title="Aperçu" onclick="cesAttApercu(' + q + ')">👁</button> '
+      + '<button class="btn btn-secondary btn-sm" ' + b + ' onclick="cesAttDemander(' + q + ')">📤 Soumettre au DG</button>';
+  } else if (a.statut === 'en_attente') {
+    h += '<span class="badge badge-or" style="font-size:10px;">⏳ En attente DG/gérant</span> <button class="btn btn-secondary btn-sm" ' + b + ' onclick="cesAttApercu(' + q + ')">👁</button>';
+  } else {
+    h += '<span class="badge badge-vert" style="font-size:10px;">✅ Validée</span> '
+      + '<button class="btn btn-secondary btn-sm" ' + b + ' title="Imprimer" onclick="cesAttImprimer(' + q + ')">🖨</button> '
+      + '<button class="btn ' + (a.publie_portail ? 'btn-primary' : 'btn-secondary') + ' btn-sm" ' + b + ' title="' + (a.publie_portail ? 'Publiée au portail — cliquer pour retirer' : 'Publier au portail de l\'acquéreur') + '" onclick="cesAttPublier(' + q + ',' + (a.publie_portail ? 'false' : 'true') + ')">🌐</button> '
+      + '<button class="btn btn-secondary btn-sm" ' + b + ' title="Annuler la validation (retour en brouillon)" onclick="cesAttAnnulerValidation(' + q + ')">↩</button>';
+  }
+  return h + '</div>';
 }
 
 /* ── Génération de l'acte / contrat de cession ── */
