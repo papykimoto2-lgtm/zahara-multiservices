@@ -2807,6 +2807,27 @@
     rendreFoncier();
   }
 
+  /* Attestation de solde de cession : circuit visible dès le brouillon ; le document n'est ouvrable qu'une fois validé et publié. Motif de rejet jamais exposé. */
+  function fonAttCarte(c){
+    var a=c&&c.attestation_solde; if(!a||!a.statut) return '';
+    var rej=a.statut==='rejete', niv=rej?1:{brouillon:0,en_attente:1,valide:a.publie_portail?3:2}[a.statut];
+    var noms=['Brouillon préparé','En validation (DG / gérant)','Validée','Disponible ici'], dates=[a.date_solde,a.date_demande,a.valide_le,a.publie_le];
+    var h='<div class="card"><strong>📜 Attestation de solde'+(a.numero?' N° '+esc(a.numero):'')+'</strong><ol class="att-circ">';
+    noms.forEach(function(n,i){
+      var cl=i<niv?'fait':(i===niv?(rej?'rej':'now'):''), lib=(i===1&&rej)?'À reprendre par la Direction':n;
+      h+='<li class="'+cl+'"><span></span><div><b>'+esc(lib)+'</b>'+(dates[i]&&i<=niv?'<small>'+esc(dshort(dates[i]))+'</small>':'')+'</div></li>';
+    });
+    h+='</ol>';
+    if(a.statut==='valide'&&a.publie_portail&&a.html) h+='<button class="highlight-btn" style="background:#16a34a;" onclick="fonOuvrirAttestation()">📜 Consulter / imprimer l\'attestation</button>';
+    else if(a.statut==='valide') h+='<div style="font-size:.78rem;color:#4b6a8b;">Validée par la Direction. Le document sera mis à votre disposition prochainement.</div>';
+    else if(rej) h+='<div style="font-size:.78rem;color:#92400e;">Votre interlocuteur reprend ce dossier avec la Direction.</div>';
+    return h+'</div>';
+  }
+  function fonOuvrirAttestation(){
+    var a=F.cession&&F.cession.attestation_solde; if(!a||a.statut!=='valide'||!a.publie_portail||!a.html) return;
+    var w=window.open('','_blank','width=860,height=900'); if(!w) return;
+    w.document.write(a.html); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
+  }
   function rendreFoncier(){
     var c=F.cession||{};
     var prix=parseFloat(c.prix_cession||0);
@@ -2834,6 +2855,7 @@
       +'<div class="card"><div style="height:8px;background:#e5edf5;border-radius:4px;overflow:hidden;"><div style="height:100%;width:'+Math.min(100,pct)+'%;background:#B8732F;"></div></div>'
       +'<div style="margin-top:8px;font-size:.82rem;color:#4b6a8b;">Statut : '+(stMap[c.statut]||c.statut||'—')+'</div></div>'
 
+      +fonAttCarte(c)
       +'<div class="card"><h4><i class="fas fa-receipt"></i> Mes versements enregistrés</h4>'
       +(paiements.length
         ? '<table style="width:100%;border-collapse:collapse;font-size:.85rem;"><thead><tr><th style="text-align:left;padding:6px;">Date</th><th style="text-align:right;padding:6px;">Montant</th><th style="text-align:left;padding:6px;">Mode</th><th style="text-align:left;padding:6px;">Réf.</th></tr></thead><tbody>'
