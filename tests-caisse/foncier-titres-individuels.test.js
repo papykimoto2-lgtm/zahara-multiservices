@@ -120,7 +120,7 @@ test('interface : panneau des titres individuels, bandeau du dossier individuel,
   const app = await ouvrirApp(); const { g } = await preparer(app.page, { tfDefinitif: true });
   const d = (await run(app.page, () => fcOuvrirDossierIndividuel({ lot_id: 'l3' }))).dossier.id;
   const h = await run(app.page, (a) => { document.body.insertAdjacentHTML('beforeend', '<div id="fc-root"></div><div id="fc-detail"></div>'); return { pan: fcPanneauTitresIndividuels(fcDossier(a.g)), ban: fcBandeauNiveau(fcDossier(a.d)), vide: fcPanneauTitresIndividuels(fcDossier(a.d)) }; }, { g: g, d: d });
-  assert.match(h.pan, /Titres individuels de l'opération/); assert.match(h.pan, /Jean Yao/); assert.match(h.pan, /Ouvrir le dossier/); assert.match(h.pan, /disponible/);
+  assert.match(h.pan, /Titres individuels de l'opération/); assert.match(h.pan, /Jean Yao/); assert.match(h.pan, /Créer le titre/); assert.match(h.pan, /disponible/);
   assert.match(h.ban, /Titre individuel/); assert.match(h.ban, /dossier global/); assert.equal(h.vide, '');
   const liste = await run(app.page, () => { fcRender(); return document.getElementById('fc-root').innerHTML; });
   assert.match(liste, /Titre individuel/); assert.deepEqual(app.etat.erreursPage, []);

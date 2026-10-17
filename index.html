@@ -63497,15 +63497,30 @@ function fcLotsDeParcelle(parcelleId) {
   return (DATA.lots || []).filter(function(l){ return l.parcelle_id === parcelleId; }).map(function(l){
     var clients = (DATA.clients || []).filter(function(c){ return fcLotsIdsClient(c).indexOf(l.id) !== -1; });
     var dossier = (DATA.dossiers_fonciers || []).find(function(d){ return fcEstIndividuel(d) && d.statut !== 'annule' && (d.lots_ids || [d.lot_id]).indexOf(l.id) !== -1; }) || null;
-    return { lot: l, clients: clients, dossier: dossier };
+    return Object.assign({ lot: l, clients: clients, dossier: dossier }, fcSoldeLot(clients));
   });
+}
+/* Un titre individuel ne s'ouvre que pour un souscripteur ayant soldé le prix (logement comme terrain).
+   Valeur du bien = contrat (prix initial + modifications) ; versé = versements imputés sur le prix. */
+function fcSoldeLot(clients) {
+  var valeur = 0, verse = 0, solde = clients.length > 0;
+  clients.forEach(function(c){
+    if (typeof attSoldeSolde !== 'function') { solde = false; return; }
+    var f = attSoldeSolde(c, 'finale'), i = attSoldeSolde(c, 'initial');
+    valeur += f.totalContrat || 0; verse += f.verse || 0;
+    if (!i.solde || c.statut === 'resilie') solde = false;
+  });
+  /* Réglage : Foncier › « Exiger le solde » (DATA.params.fc_titre_solde_requis, actif par défaut). */
+  if ((DATA.params || {}).fc_titre_solde_requis === false) solde = clients.length > 0;
+  return { valeur: valeur, verse: verse, solde: solde };
 }
 function fcLibelleLot(l) { return (l && (l.numero || l.ref || l.reference || l.nom || l.id)) || '—'; }
 function fcRemisTitre(d) { var e = fcEtape(d, 'ind_remise_titre'); return !!(e && e.statut === 'termine'); }
 function fcSyntheseOperation(parcelleId) {
   var lots = fcLotsDeParcelle(parcelleId).filter(function(x){ return x.clients.length; }), tm = fcTitreMere(parcelleId);
-  var r = { titre_mere: tm, lots_suivis: lots.length, sans_dossier: 0, attente_titre_mere: 0, en_cours: 0, bloques: 0, remis: 0 };
+  var r = { titre_mere: tm, lots_suivis: lots.length, non_soldes: 0, sans_dossier: 0, attente_titre_mere: 0, en_cours: 0, bloques: 0, remis: 0 };
   lots.forEach(function(x){
+    if (!x.dossier && !x.solde) { r.non_soldes++; return; }
     if (!x.dossier) { r.sans_dossier++; if (!tm.disponible) r.attente_titre_mere++; return; }
     if (fcRemisTitre(x.dossier)) r.remis++; else { r.en_cours++; if (x.dossier.etapes.some(function(e){ return e.statut === 'bloque'; })) r.bloques++; }
   });
@@ -63524,6 +63539,7 @@ async function fcOuvrirDossierIndividuel(o) {
   var clients = (DATA.clients || []).filter(function(c){ return ids.every(function(id){ return fcLotsIdsClient(c).indexOf(id) !== -1; }); });
   if (o.client_id) clients = clients.filter(function(c){ return c.id === o.client_id; });
   if (!clients.length) return { ok: false, erreur: ids.length > 1 ? "Aucun souscripteur n'est rattaché à tous ces lots." : "Aucun souscripteur n'est rattaché à ce lot : un titre individuel suit un souscripteur." };
+  if (!fcSoldeLot(clients).solde) return { ok: false, erreur: 'Titre individuel réservé aux souscripteurs ayant soldé le prix : ' + clients.map(function(c){ return c.nom || c.id; }).join(', ') + ' n\'a pas soldé.', non_solde: true };
   var deja = (DATA.dossiers_fonciers || []).find(function(d){ return fcEstIndividuel(d) && ['cloture', 'annule'].indexOf(d.statut) === -1 && (d.lots_ids || [d.lot_id]).some(function(x){ return ids.indexOf(x) !== -1; }); });
   if (deja && !o.forcer) return { ok: false, erreur: 'Un dossier individuel est déjà ouvert pour ce lot (' + deja.reference + ').', doublon: deja.id };
   var tm = fcTitreMere(parcelleId), motif = String(o.motif_derogation || '').trim();
@@ -63543,7 +63559,7 @@ async function fcOuvrirIndividuelsEnLot(parcelleId, responsableId) {
   var tm = fcTitreMere(parcelleId);
   if (!tm.disponible) return { ok: false, erreur: "Le titre de l'opération n'est pas disponible : " + tm.raison + '. Ouvrez les dossiers un par un, par dérogation motivée.' };
   var ouverts = 0, echecs = [];
-  var lots = fcLotsDeParcelle(parcelleId).filter(function(x){ return x.clients.length && !x.dossier; });
+  var lots = fcLotsDeParcelle(parcelleId).filter(function(x){ return x.clients.length && !x.dossier && x.solde; });
   for (var i = 0; i < lots.length; i++) {
     var r = await fcOuvrirDossierIndividuel({ lot_id: lots[i].lot.id, responsable_id: responsableId });
     if (r.ok) ouverts++; else echecs.push(fcLibelleLot(lots[i].lot) + ' : ' + r.erreur);
@@ -63898,14 +63914,15 @@ function fcPanneauTitresIndividuels(d) {
   var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">🏠 Titres individuels de l\'opération</div>'
     + '<div style="font-size:12px;margin-bottom:6px;">Titre mère : ' + (s.titre_mere.disponible ? '<b style="color:#2e7d4f;">disponible</b>' : '<b style="color:#c0392b;">non disponible</b>') + ' — ' + escHtml(s.titre_mere.raison) + '</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:8px;">' + fcKpi('Lots suivis', s.lots_suivis) + fcKpi('Titres remis', s.remis, '#2e7d4f') + fcKpi('En cours', s.en_cours, '#1565c0') + fcKpi('Bloqués', s.bloques, '#c0392b')
-    + fcKpi('Sans dossier', s.sans_dossier, '#B87333') + fcKpi('Attendent le titre mère', s.attente_titre_mere, '#6a5acd') + '</div>';
-  h += '<div class="table-wrap"><table><thead><tr><th></th><th>Lot</th><th>Souscripteur</th><th>Dossier individuel</th><th>Étape courante</th><th></th></tr></thead><tbody>' + lots.map(function(x){
+    + fcKpi('Soldés sans dossier', s.sans_dossier, '#B87333') + fcKpi('Non soldés', s.non_soldes, '#7f8c8d', 'Pas de titre tant que le prix n\'est pas soldé') + fcKpi('Attendent le titre mère', s.attente_titre_mere, '#6a5acd') + '</div>';
+  h += '<div class="table-wrap"><table><thead><tr><th></th><th>Lot</th><th>Souscripteur</th><th style="text-align:right;">Valeur du bien</th><th style="text-align:right;">Montant versé</th><th>Dossier individuel</th><th>Étape courante</th><th></th></tr></thead><tbody>' + lots.map(function(x){
     var e = x.dossier ? fcProchaineEtape(x.dossier) : null;
-    var ck = x.dossier ? (x.dossier.groupe_id && fcGroupe(x.dossier.groupe_id) && fcGroupe(x.dossier.groupe_id).statut !== 'dissous' ? '<span title="Groupe ' + escHtml(fcGroupe(x.dossier.groupe_id).reference) + '" style="font-size:10px;color:#6a5acd;">' + escHtml(fcGroupe(x.dossier.groupe_id).reference) + '</span>' : (fcDossierOuvert(x.dossier) ? '<input type="checkbox" class="fc-ck-dos" value="' + x.dossier.id + '" title="Grouper ce dossier">' : '')) : '<input type="checkbox" class="fc-ck-lot" value="' + x.lot.id + '" title="Ouvrir un dossier groupé avec d\'autres lots du même souscripteur">';
+    var ck = x.dossier ? (x.dossier.groupe_id && fcGroupe(x.dossier.groupe_id) && fcGroupe(x.dossier.groupe_id).statut !== 'dissous' ? '<span title="Groupe ' + escHtml(fcGroupe(x.dossier.groupe_id).reference) + '" style="font-size:10px;color:#6a5acd;">' + escHtml(fcGroupe(x.dossier.groupe_id).reference) + '</span>' : (fcDossierOuvert(x.dossier) ? '<input type="checkbox" class="fc-ck-dos" value="' + x.dossier.id + '" title="Grouper ce dossier">' : '')) : (x.solde ? '<input type="checkbox" class="fc-ck-lot" value="' + x.lot.id + '" title="Ouvrir un dossier groupé avec d\'autres lots du même souscripteur">' : '');
     return '<tr><td>' + ck + '</td><td>' + escHtml(fcLibelleLot(x.lot)) + '</td><td>' + escHtml(x.clients.map(function(c){ return c.nom || c.id; }).join(', ')) + '</td>'
+      + '<td style="text-align:right;">' + fmtF(x.valeur) + ' F</td><td style="text-align:right;color:' + (x.solde ? '#2e7d4f' : '#c0392b') + ';">' + fmtF(x.verse) + ' F' + (x.solde ? ' ✔' : '') + '</td>'
       + '<td>' + (x.dossier ? '<b>' + escHtml(x.dossier.reference) + '</b> ' + (fcRemisTitre(x.dossier) ? '<span style="color:#2e7d4f;">titre remis</span>' : fcBadgeStatut(x.dossier.statut === 'ouvert' ? 'en_cours' : x.dossier.statut)) : '<span style="color:var(--dim);">—</span>') + '</td>'
-      + '<td>' + (e ? escHtml(e.libelle) : '—') + '</td><td>' + (x.dossier ? '<button class="btn btn-secondary btn-sm" onclick="fcAllerDossier(\'' + x.dossier.id + '\')">Ouvrir</button>' : '<button class="btn btn-secondary btn-sm" onclick="fcOuvrirIndividuelUI(\'' + x.lot.id + '\')">Ouvrir le dossier</button>') + '</td></tr>'; }).join('')
-    + '</tbody></table></div>' + (s.sans_dossier ? '<div style="margin-top:8px;"><button class="btn btn-primary btn-sm" onclick="fcOuvrirEnLotUI(\'' + d.parcelle_id + '\')">Ouvrir tous les dossiers manquants (' + s.sans_dossier + ')</button> <button class="btn btn-secondary btn-sm" onclick="fcOuvrirGroupeSouscripteurUI(\'' + d.parcelle_id + '\')">Ouvrir un dossier groupé pour les lots cochés (même souscripteur)</button></div>' : '')
+      + '<td>' + (e ? escHtml(e.libelle) : '—') + '</td><td>' + (x.dossier ? '<button class="btn btn-secondary btn-sm" onclick="fcAllerDossier(\'' + x.dossier.id + '\')">Ouvrir</button>' : (x.solde ? '<button class="btn btn-secondary btn-sm" onclick="fcOuvrirIndividuelUI(\'' + x.lot.id + '\')">Créer le titre</button>' : '<span style="font-size:11px;color:#c0392b;">Reste ' + fmtF(Math.max(0, x.valeur - x.verse)) + ' F à solder</span>')) + '</td></tr>'; }).join('')
+    + '</tbody></table></div>' + (s.sans_dossier ? '<div style="margin-top:8px;"><button class="btn btn-primary btn-sm" onclick="fcOuvrirEnLotUI(\'' + d.parcelle_id + '\')">Créer tous les titres des souscripteurs soldés (' + s.sans_dossier + ')</button> <button class="btn btn-secondary btn-sm" onclick="fcOuvrirGroupeSouscripteurUI(\'' + d.parcelle_id + '\')">Ouvrir un dossier groupé pour les lots cochés (même souscripteur)</button></div>' : '')
     + (sansSuivi ? '<div style="font-size:11px;color:var(--dim);margin-top:6px;">' + sansSuivi + ' lot(s) sans souscripteur ne sont pas suivis.</div>' : '') + '</div>';
   return h + fcPanneauGroupes(d);
 }
