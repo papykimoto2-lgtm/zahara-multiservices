@@ -18614,6 +18614,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
         <div class="form-group">
           <label>Type</label>
           <select class="form-control" id="v-type" onchange="onTypeVersementChange()">
+            <option value="">— Choisir le type —</option>
             <option value="frais_souscription">Frais de souscription (non remboursable)</option>
             <option value="apport">Apport initial</option>
             <option value="mensualite">Mensualité</option>
@@ -34835,6 +34836,7 @@ function clearPaiementForm() {
     if (el) el.value = '';
   });
   var _o = document.getElementById('v-objet'); if (_o) _o.value = 'Valeur initiale logement';
+  var _tv = document.getElementById('v-type'); if (_tv) _tv.value = '';   /* jamais de type par défaut : « frais » faussait solde et compta */
   document.getElementById('v-solde-info').style.display = 'none';
 }
 
@@ -36964,6 +36966,18 @@ function _vrsComptesManquants(mode, type) {
   return m;
 }
 
+/* Garde-fou : un versement « frais de souscription » est non remboursable, hors prix et crédite le compte produit des frais.
+   Le choisir par erreur fausse le solde du souscripteur ET la comptabilité : on demande confirmation si le montant dépasse nettement
+   les frais prévus (paramètre « Frais de souscription », à défaut 5 % du montant du contrat). */
+function vrsTypeSuspect(clientId, type, montant) {
+  if (type !== 'frais_souscription') return '';
+  var fp = parseFloat((DATA.params || {}).frais_souscription) || 0;
+  var c = (DATA.clients || []).find(function(x){ return x.id === clientId; });
+  var seuil = fp > 0 ? fp : 0.05 * (parseFloat(c && c.montant_total) || 0);
+  if (!(seuil > 0) || montant <= seuil * 1.001) return '';
+  return '⚠️ Ce versement de ' + fmtF(montant) + ' F est enregistré en « Frais de souscription » (non remboursable, hors prix du bien), alors que ' + (fp > 0 ? 'les frais prévus sont de ' + fmtF(fp) + ' F' : 'le montant dépasse 5 % du contrat') + '.\n\nS\'il s\'agit d\'un paiement sur le prix, annulez et choisissez « Apport » ou « Mensualité ».\n\nConfirmer quand même en frais de souscription ?';
+}
+
 async function savePaiement() {
   var cid = document.getElementById('v-client').value;
   var montant = parseFloat(document.getElementById('v-montant').value);
@@ -36980,6 +36994,10 @@ async function savePaiement() {
     toast('⛔ Ce client est gelé (SFC) — l\'enregistrement d\'un versement est interdit tant que la mesure de gel est active.', 'error');
     return;
   }
+  var _typeV = document.getElementById('v-type').value;
+  if (!_typeV) { toast('Choisissez le type de versement (apport, mensualité, frais de souscription…).', 'error'); return; }
+  var _alerteFrais = vrsTypeSuspect(cid, _typeV, montant);
+  if (_alerteFrais && !confirm(_alerteFrais)) return;
   var _manque = _vrsComptesManquants(document.getElementById('v-mode').value, document.getElementById('v-type').value);
   if (_manque.length) {
     toast('⛔ Versement NON enregistré : paramétrage comptable manquant — ' + _manque.join(' ; ') + '. Aucune donnée n\'a été enregistrée : corrigez puis revalidez.', 'error', 12000);
