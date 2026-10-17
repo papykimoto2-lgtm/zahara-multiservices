@@ -142,6 +142,27 @@ Onglets : Promoteur · Responsable foncier · Intervenants · Direction · **Co�
 - Ne publier au souscripteur que des informations vérifiées ; indiquer la source.
 - Garder « Imposer l'ordre des étapes » actif ; ne désactiver que si le travail est massivement parallèle.
 
+## 13 bis. Immatriculation d'une parcelle urbaine sans titre (ACD ou approbation)
+
+**Quand** : terrain brut sans titre, droits coutumiers. **Ouvrir** : Foncier › 2.2 Dossiers fonciers › situation « Terrain brut sans titre (droits coutumiers) ». Indiquer un seul ou plusieurs propriétaires terriens, et la voie envisagée si elle est déjà convenue.
+
+| Phase | Contenu | Règle |
+|---|---|---|
+| 1 — Procédure coutumière et technique | Acquisition, délimitation, levé, enquêtes foncière et villageoise, contrat d'exclusivité, PV de famille, parcellaire, attestations coutumières, convention chez le notaire, dotation, dossier technique, plan d'aménagement | **Obligatoire et bloquante** |
+| 2 — Procédure administrative | Dépôt au guichet unique, transmission, avis DTC, DUAD, commodo et incommodo, retour des avis, choix de la voie | Démarre seulement quand la phase 1 est complète |
+| Voie ACD | Convention tripartite, attestation domaniale, DM, bornage contradictoire, titre foncier, projet d'ACD, signature, droits et publication, retrait ; puis aménagement et livraison des lots aux financiers | Étapes de l'approbation écartées |
+| Voie approbation | Domaine urbain, autorisation de lotir, aménagement, guide de partage, certificat de conformité, approbation, attestations ADU, attestations aux souscripteurs | Étapes de l'ACD écartées |
+
+**Règles**
+- **Phase 1** : la phase 2 ne démarre que si toutes les étapes obligatoires de la phase 1 sont terminées ou écartées. Une dérogation est réservée à un **administrateur**, avec motif, journalisée.
+- **Un seul propriétaire** : le parcellaire et la polygonale d'ensemble sont écartés automatiquement.
+- **Voie** : choisie dans le panneau de la procédure, avant toute étape ACD ou approbation. Elle se change tant qu'aucune étape de la voie n'est engagée.
+- **Justificatifs** : exigés sur les étapes clés (PV de famille, attestations, convention, avis, signature, retrait de l'ACD, approbation…).
+- **Réformes** : la direction peut décocher « Obligatoire » d'une étape (Foncier › Modèles de dossier › procédure « Immatriculation d'une parcelle urbaine »). Elle ne bloque alors plus la suite.
+- **Souscripteurs** : seules les grandes étapes leur sont communiquées pour information (acquisition, convention, fin de la phase 1, dépôt, retour des avis, titre foncier, signature, retrait, autorisation de lotir, approbation, attestations, travaux, livraison).
+
+Procédure fournie par le promoteur, à faire valider par un juriste ou un géomètre-expert.
+
 ## 14. Dépannage
 
 | Symptôme | Cause probable | Action |

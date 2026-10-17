@@ -67,7 +67,7 @@ test('parcelle rurale : procédure distincte, aucune étape du circuit urbain', 
 test('situation initiale : procédure proposée, situations à déterminer, preuve exigée avant d\'identifier la procédure', async () => {
   const app = await ouvrirApp(); await preparer(app.page);
   const sit = await app.page.evaluate(function () { return Object.keys(FC_SITUATIONS).map(function (k) { return k + ':' + FC_SITUATIONS[k].procedure + ':' + FC_SITUATIONS[k].a_determiner; }); });
-  assert.deepEqual(sit, ['lettre_attribution:acd:false', 'acp:regularisation:true', 'acd_delivre:avec_acd:false', 'attestation_villageoise:regularisation:true', 'lotissement_non_approuve:regularisation:true', 'litige:regularisation:true', 'rural:rural_a_examiner:true']);
+  assert.deepEqual(sit, ['lettre_attribution:acd:false', 'acp:regularisation:true', 'acd_delivre:avec_acd:false', 'attestation_villageoise:regularisation:true', 'lotissement_non_approuve:regularisation:true', 'litige:regularisation:true', 'rural:rural_a_examiner:true', 'terrain_coutumier:immatriculation_urbaine:false']);
   assert.match((await ouvrir(app.page, { situation: 'inconnue', type: 'acd' })).erreur, /Situation initiale inconnue/);
   const r = await ouvrir(app.page, { situation: 'attestation_villageoise' });
   assert.equal(r.ok, true); assert.equal(r.dossier.type_procedure, 'regularisation'); assert.equal(r.dossier.procedure_a_determiner, true); assert.equal(r.dossier.situation_initiale, 'attestation_villageoise');
