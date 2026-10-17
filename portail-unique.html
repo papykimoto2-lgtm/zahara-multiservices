@@ -2423,7 +2423,7 @@
       +kpiBox('Montant total',fmt(total)+' F','')
       +kpiBox('Versé sur prix',fmt(versePrix)+' F','color:#16a34a;')
       +kpiBox('Reste à payer',fmt(reste)+' F','color:#991b1b;')
-      +kpiBox('Avancement',pct.toFixed(0)+'%','')+'</div>';
+      +kpiBox('Prix réglé',pct.toFixed(0)+'%','')+'</div>';
     if(frais>0) html+='<div class="card" style="background:#fff7ed; border-color:#fed7aa; display:flex; justify-content:space-between; align-items:center;"><div><strong style="color:#92400e;">📝 Frais de souscription</strong><div style="font-size:.75rem; color:#4b6a8b;">Non remboursables — hors prix du bien</div></div><div style="font-weight:700; color:#92400e;">'+fmt(frais)+' F</div></div>';
     html+='<div class="subnav">'
       +'<button class="on" onclick="sSub(this,\'fin\')">Finances</button>'
