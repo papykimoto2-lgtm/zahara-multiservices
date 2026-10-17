@@ -59919,6 +59919,23 @@ async function fcOuvrirUI() {
   if (fcMsg(r, 'Dossier ouvert.')) { APP._fcSel = r.dossier.id; fcRender(); (r.avertissements || []).forEach(function(a){ toast(a, 'warning'); }); }
 }
 function fcOuvrirDetail(id) { APP._fcSel = id; fcRenderDetail(id); var el = document.getElementById('fc-detail'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth' }); }
+/* Étapes en arborescence : une branche par phase, repliable ; l'état est mémorisé par dossier (conservé après chaque changement de statut). */
+function fcPhaseReduite(did, ph) { return !!((APP._fcPh || {})[did] || {})[ph]; }
+function fcPhasesAppliquer(did) {
+  var host = document.getElementById('fc-detail'); if (!host) return;
+  [].forEach.call(host.querySelectorAll('tr[data-fcph]'), function(tr){ tr.style.display = fcPhaseReduite(did, tr.getAttribute('data-fcph')) ? 'none' : ''; });
+  [].forEach.call(host.querySelectorAll('tr[data-fcphh]'), function(tr){ var r = fcPhaseReduite(did, tr.getAttribute('data-fcphh')), s = tr.querySelector('.fc-ph-fl'); if (s) s.textContent = r ? '▸' : '▾'; tr.setAttribute('aria-expanded', r ? 'false' : 'true'); });
+}
+function fcPhaseBascule(did, ph) {
+  if (!APP._fcPh) APP._fcPh = {}; if (!APP._fcPh[did]) APP._fcPh[did] = {};
+  APP._fcPh[did][ph] = !APP._fcPh[did][ph]; fcPhasesAppliquer(did);
+}
+function fcPhasesTout(did, ouvert) {
+  var d = fcDossier(did); if (!d) return;
+  if (!APP._fcPh) APP._fcPh = {}; APP._fcPh[did] = {};
+  if (!ouvert) d.etapes.forEach(function(e){ APP._fcPh[did][e.phase] = true; });
+  fcPhasesAppliquer(did);
+}
 /* Onglets du dossier foncier : toutes les sections restent dans le DOM (les identifiants des panneaux et les mises à jour ciblées continuent de fonctionner), une seule est visible. */
 function fcOngletsHtml(sections) {
   var liste = sections.filter(function(x){ return String(x.h || '').replace(/<[^>]*>/g, '').trim() !== '' || x.k === 'synthese' || x.k === 'etapes'; });
@@ -59950,12 +59967,14 @@ function fcRenderDetail(id) {
   h += fcPanneauRisque(d);
   h += fcPanneauCompletude(d);
   _sec.push({ k: 'synthese', t: '📌 Synthèse', h: h }); h = '';
-  var phase = '';
+  var phase = '', _q = "'" + d.id + "'", _tot = {}, _ok = {};
+  d.etapes.forEach(function(e){ _tot[e.phase] = (_tot[e.phase] || 0) + 1; if (e.statut === 'termine') _ok[e.phase] = (_ok[e.phase] || 0) + 1; });
+  h += '<div style="margin-bottom:6px;display:flex;gap:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="fcPhasesTout(' + _q + ',true)">▾ Tout déployer</button><button type="button" class="btn btn-secondary btn-sm" onclick="fcPhasesTout(' + _q + ',false)">▸ Tout réduire</button></div>';
   h += '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Statut</th><th>Responsable</th><th>Échéance</th><th>Justificatifs</th><th>Visibilité</th><th></th></tr></thead><tbody>';
   d.etapes.forEach(function(e){
-    if (e.phase !== phase) { phase = e.phase; h += '<tr><td colspan="8" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;">' + escHtml(fcLibPhase(phase)) + '</td></tr>'; }
+    if (e.phase !== phase) { phase = e.phase; h += '<tr data-fcphh="' + e.phase + '" role="button" tabindex="0" aria-expanded="' + (fcPhaseReduite(d.id, e.phase) ? 'false' : 'true') + '" onclick="fcPhaseBascule(' + _q + ',\'' + e.phase + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}" style="cursor:pointer;"><td colspan="8" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;"><span class="fc-ph-fl">' + (fcPhaseReduite(d.id, e.phase) ? '▸' : '▾') + '</span> ' + escHtml(fcLibPhase(phase)) + ' <span class="fc-nb" style="background:rgba(0,0,0,.1);border-radius:9px;padding:0 6px;font-weight:400;">' + (_ok[e.phase] || 0) + '/' + _tot[e.phase] + '</span></td></tr>'; }
     var figee = FC_STATUTS_FINAUX.indexOf(e.statut) !== -1, et = fcEtatEcheance(e);
-    h += '<tr><td>' + e.ordre + '</td><td>' + escHtml(e.libelle) + (e.justificatif_requis ? ' <span title="Justificatif requis" style="color:#B87333;">📎</span>' : '') + fcInfoEtapeHtml(d, e) + fcHintDependance(d, e)
+    h += '<tr data-fcph="' + e.phase + '"' + (fcPhaseReduite(d.id, e.phase) ? ' style="display:none"' : '') + '><td>' + e.ordre + '</td><td>' + escHtml(e.libelle) + (e.justificatif_requis ? ' <span title="Justificatif requis" style="color:#B87333;">📎</span>' : '') + fcInfoEtapeHtml(d, e) + fcHintDependance(d, e)
       + (e.issue ? '<br><span style="font-size:11px;color:#2e7d4f;">Issue officielle enregistrée : ' + escHtml(e.issue) + '</span>' : '') + (e.motif ? '<br><span style="font-size:11px;color:#c0392b;">Motif : ' + escHtml(e.motif) + '</span>' : '') + '</td>'
       + '<td>' + (figee ? fcBadgeStatut(e.statut) : '<select class="filter-select" onchange="fcStatutUI(\'' + d.id + '\',\'' + e.code + '\',this)">' + Object.keys(FC_STATUTS).map(function(k){ return '<option value="' + k + '"' + (k === e.statut ? ' selected' : '') + '>' + escHtml(FC_STATUTS[k]) + '</option>'; }).join('') + '</select>') + '</td>'
       + '<td>' + escHtml(fcNomUtilisateur(e.responsable_id || d.responsable_id)) + '</td>'
