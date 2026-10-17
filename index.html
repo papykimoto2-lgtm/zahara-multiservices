@@ -59707,13 +59707,16 @@ async function fcOuvrirDossier(o) {
   if (o.type === 'immatriculation_urbaine') fcUrbainInit(d, o);
   var modele = o.sans_modele ? null : (fcModeleActif(o.type) || ((o.modele_defaut && !fcModeles()[o.type]) ? fcModeleParDefaut(o.type) : (fcDelaisAutoActif() ? { etapes: {} } : null))), appris = (modele && fcDelaisAutoActif()) ? fcDureesSuggerees(o.type) : {}, appl = modele ? fcAppliquerModele(d, modele, appris) : null;
   if (appl && !d.date_cible && appl.echeance) d.date_cible = appl.echeance;
+  var repart = o.repartition_auto ? fcRepartirEquipe(d) : null;
   if (o.individuel) Object.assign(d, o.individuel);
   if (!DATA.dossiers_fonciers) DATA.dossiers_fonciers = [];
   DATA.dossiers_fonciers.push(d);
   await fcSauver(d);
   await fcEvenement(d, '', 'ouverture', 'Dossier ouvert : ' + FC_PROCEDURES[o.type] + (o.situation ? ' (situation : ' + FC_SITUATIONS[o.situation].libelle + ')' : ''), { nouveau: d.reference, source: 'promoteur' });
   if (appl && appl.etapes) await fcEvenement(d, '', 'modele', 'Modèle de dossier appliqué' + (modele && modele.defaut ? ' (délais et responsables indicatifs)' : '') + ' : ' + appl.etapes + ' réglage(s), échéance finale ' + (appl.echeance || '—') + (appl.auto ? ', dont ' + appl.auto + ' échéance(s) estimée(s) d\'après la durée habituelle de vos dossiers (75 % terminés plus vite)' : ''), { source: 'promoteur' });
+  if (repart && repart.assignees) await fcEvenement(d, '', 'repartition', 'Équipe interne : ' + repart.assignees + ' étape(s) réparties entre ' + repart.personnes + ' personne(s) selon leur fonction', { source: 'promoteur' });
   var avertissements = [];
+  if (repart) Object.keys(repart.fonctions_sans_equipe).forEach(function(f){ avertissements.push('Aucun utilisateur n\'est rattaché à la fonction « ' + fcLibFonction(f) + ' » (' + repart.fonctions_sans_equipe[f] + ' étape(s) restent à votre charge). Réglage : Modèles de dossier › Équipe interne.'); });
   if (o.situation && FC_SITUATIONS[o.situation].procedure !== o.type) avertissements.push('La situation « ' + FC_SITUATIONS[o.situation].libelle + ' » oriente plutôt vers « ' + FC_PROCEDURES[FC_SITUATIONS[o.situation].procedure] + ' ». ' + FC_PROCEDURE_REF.non_equivalence);
   if (o.situation && FC_SITUATIONS[o.situation].a_determiner) avertissements.push('Procédure à déterminer avec les services compétents ou un professionnel habilité : ' + FC_SITUATIONS[o.situation].demarche);
   return { ok: true, dossier: d, avertissements: avertissements };
@@ -59902,7 +59905,7 @@ function fcRender() {
     + '<div class="form-group"><label>Responsable</label><select class="filter-select" id="fc-n-resp"><option value="">— choisir —</option>' + users.map(function(u){ return '<option value="' + u.id + '">' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select></div>'
     + '<div class="form-group"><label>Priorité</label><select class="filter-select" id="fc-n-prio"><option value="normale">Normale</option><option value="haute">Haute</option><option value="basse">Basse</option></select></div>'
     + '<div class="form-group"><label>Échéance</label><input type="date" class="form-control" id="fc-n-cible"></div>'
-    + '<div class="form-group" style="min-width:280px;max-width:420px;"><label style="font-size:12px;"><input type="checkbox" id="fc-n-modele-ck" checked> Appliquer le modèle de délais et responsables</label><div id="fc-n-modele-info" style="font-size:11px;color:var(--dim);">' + fcApercuModeleHtml('acd') + '</div></div>'
+    + '<div class="form-group" style="min-width:280px;max-width:420px;"><label style="font-size:12px;"><input type="checkbox" id="fc-n-modele-ck" checked> Appliquer le modèle de délais et responsables</label><div id="fc-n-modele-info" style="font-size:11px;color:var(--dim);">' + fcApercuModeleHtml('acd') + '</div><label style="font-size:12px;display:block;margin-top:4px;"><input type="checkbox" id="fc-n-equipe-ck" checked> Répartir les étapes entre l\'équipe interne (selon leur fonction)</label></div>'
     + '<div id="fc-n-urbain" style="display:none;gap:10px;align-items:end;flex-wrap:wrap;"><div class="form-group"><label>Propriétaires terriens</label><select class="filter-select" id="fc-n-prop"><option value="plusieurs">Plusieurs propriétaires</option><option value="un">Un seul propriétaire</option></select></div>'
     + '<div class="form-group"><label>Voie envisagée</label><select class="filter-select" id="fc-n-voie"><option value="">— à choisir plus tard —</option><option value="acd">ACD</option><option value="approbation">Approbation</option></select></div></div>'
     + '<button class="btn btn-primary btn-sm" onclick="fcOuvrirUI()">Ouvrir le dossier</button></div><div id="fc-n-sit-info"></div></details>';
@@ -59914,7 +59917,7 @@ function fcRender() {
 }
 async function fcOuvrirUI() {
   var g = function(i){ return (document.getElementById(i) || {}).value || ''; };
-  var args = function(extra){ return Object.assign({ parcelle_id: g('fc-n-parcelle'), type: g('fc-n-type'), situation: g('fc-n-situation'), responsable_id: g('fc-n-resp'), priorite: g('fc-n-prio'), date_cible: g('fc-n-cible'), plusieurs_proprietaires: g('fc-n-prop') !== 'un', voie: g('fc-n-voie'), sans_modele: !(document.getElementById('fc-n-modele-ck') || { checked: true }).checked, modele_defaut: true }, extra || {}); };
+  var args = function(extra){ return Object.assign({ parcelle_id: g('fc-n-parcelle'), type: g('fc-n-type'), situation: g('fc-n-situation'), responsable_id: g('fc-n-resp'), priorite: g('fc-n-prio'), date_cible: g('fc-n-cible'), plusieurs_proprietaires: g('fc-n-prop') !== 'un', voie: g('fc-n-voie'), sans_modele: !(document.getElementById('fc-n-modele-ck') || { checked: true }).checked, modele_defaut: true, repartition_auto: !!(document.getElementById('fc-n-equipe-ck') || { checked: true }).checked }, extra || {}); };
   var r = await fcOuvrirDossier(args());
   if (!r.ok && r.doublon && confirm(r.erreur + '\n\nOuvrir quand même un second dossier ?')) r = await fcOuvrirDossier(args({ forcer: true }));
   if (fcMsg(r, 'Dossier ouvert.')) { APP._fcSel = r.dossier.id; fcRender(); (r.avertissements || []).forEach(function(a){ toast(a, 'warning'); }); }
@@ -59988,12 +59991,13 @@ function fcRenderDetail(id) {
   _sec.push({ k: 'synthese', t: '📌 Synthèse', h: h }); h = '';
   var phase = '', _q = "'" + d.id + "'", _tot = {}, _ok = {};
   d.etapes.forEach(function(e){ _tot[e.phase] = (_tot[e.phase] || 0) + 1; if (e.statut === 'termine') _ok[e.phase] = (_ok[e.phase] || 0) + 1; });
+  h += fcPanneauEquipe(d);
   h += '<div style="margin-bottom:6px;display:flex;gap:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="fcPhasesTout(' + _q + ',true)">▾ Tout déployer</button><button type="button" class="btn btn-secondary btn-sm" onclick="fcPhasesTout(' + _q + ',false)">▸ Tout réduire</button></div>';
   h += '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Statut</th><th>Responsable</th><th>Échéance</th><th>Justificatifs</th><th>Visibilité</th><th></th></tr></thead><tbody>';
   d.etapes.forEach(function(e){
     if (e.phase !== phase) { phase = e.phase; h += '<tr data-fcphh="' + e.phase + '" role="button" tabindex="0" aria-expanded="' + (fcPhaseReduite(d.id, e.phase) ? 'false' : 'true') + '" onclick="fcPhaseBascule(' + _q + ',\'' + e.phase + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}" style="cursor:pointer;"><td colspan="8" style="background:' + (/^U/.test(e.phase) ? 'rgba(192,57,43,.14)' : 'var(--card2,#f5f1ea)') + ';font-weight:700;font-size:12px;"><span class="fc-ph-fl">' + (fcPhaseReduite(d.id, e.phase) ? '▸' : '▾') + '</span> ' + (/^U/.test(e.phase) ? fcRouge(escHtml(fcLibPhase(phase))) : escHtml(fcLibPhase(phase))) + ' <span class="fc-nb" style="background:rgba(0,0,0,.1);border-radius:9px;padding:0 6px;font-weight:400;">' + (_ok[e.phase] || 0) + '/' + _tot[e.phase] + '</span></td></tr>'; }
     var figee = FC_STATUTS_FINAUX.indexOf(e.statut) !== -1, et = fcEtatEcheance(e);
-    h += '<tr data-fcph="' + e.phase + '"' + (fcPhaseReduite(d.id, e.phase) ? ' style="display:none"' : '') + (fcEtapeProcedure(e) ? ' class="fc-proc"' : '') + '><td>' + e.ordre + '</td><td>' + (fcEtapeProcedure(e) ? fcRouge(escHtml(e.libelle), fcTitreEtapeProc(e)) : escHtml(e.libelle)) + (e.justificatif_requis ? ' <span title="Justificatif requis" style="color:#B87333;">📎</span>' : '') + fcInfoEtapeHtml(d, e) + fcHintDependance(d, e)
+    h += '<tr data-fcph="' + e.phase + '"' + (fcPhaseReduite(d.id, e.phase) ? ' style="display:none"' : '') + (fcEtapeProcedure(e) ? ' class="fc-proc"' : '') + '><td>' + e.ordre + '</td><td>' + (fcEtapeProcedure(e) ? fcRouge(escHtml(e.libelle), fcTitreEtapeProc(e)) : escHtml(e.libelle)) + (e.justificatif_requis ? ' <span title="Justificatif requis" style="color:#B87333;">📎</span>' : '') + fcInfoEtapeHtml(d, e) + fcHintDependance(d, e) + fcEquipeLigneHtml(e.code)
       + (e.issue ? '<br><span style="font-size:11px;color:#2e7d4f;">Issue officielle enregistrée : ' + escHtml(e.issue) + '</span>' : '') + (e.motif ? '<br><span style="font-size:11px;color:#c0392b;">Motif : ' + escHtml(e.motif) + '</span>' : '') + '</td>'
       + '<td>' + (figee ? fcBadgeStatut(e.statut) : '<select class="filter-select" onchange="fcStatutUI(\'' + d.id + '\',\'' + e.code + '\',this)">' + Object.keys(FC_STATUTS).map(function(k){ return '<option value="' + k + '"' + (k === e.statut ? ' selected' : '') + '>' + escHtml(FC_STATUTS[k]) + '</option>'; }).join('') + '</select>') + '</td>'
       + '<td>' + escHtml(fcNomUtilisateur(e.responsable_id || d.responsable_id)) + '</td>'
@@ -63147,6 +63151,131 @@ function fcIncoherences(d) {
 }
 
 /* ── Modèles de dossier ── */
+/* ── Équipe interne : qui intervient à chaque étape ──
+   Un dossier foncier ne peut pas reposer sur une seule personne. Chaque étape est rattachée à des FONCTIONS (service foncier, juridique, technique, finance, relation
+   souscripteurs, assistance, direction) ; chaque fonction correspond à un ou plusieurs rôles du logiciel (réglable dans Modèles de dossier › Équipe interne).
+   exécute = responsable de l'étape · valide = contrôle ou décision · appui = contribue · informé = tenu au courant. */
+var FC_FONCTIONS = {
+  foncier:    { lib: 'Service foncier',          icone: '🗺️', roles: ['service_foncier'] },
+  juridique:  { lib: 'Juridique et conformité',  icone: '⚖️', roles: ['juridique'] },
+  technique:  { lib: 'Technique et aménagement', icone: '📐', roles: ['technique'] },
+  finance:    { lib: 'Finance et comptabilité',  icone: '💼', roles: ['comptable', 'financier'] },
+  commercial: { lib: 'Relation souscripteurs',   icone: '🎯', roles: ['commercial'] },
+  assistance: { lib: 'Assistance et courrier',   icone: '📨', roles: ['assistante_de_direction', 'assistant'] },
+  direction:  { lib: 'Direction',                icone: '👑', roles: ['admin', 'manager', 'dg', 'direction'] }
+};
+/* code : [exécute, valide, [appui], [informé]] */
+var FC_EQUIPE_ETAPES = {
+  creation_dossier: ['foncier', '', [], ['direction']], completude_documents: ['foncier', '', ['assistance'], []], identification_procedure: ['foncier', 'direction', ['juridique'], []],
+  verification_references: ['foncier', '', ['technique'], []], anomalies: ['foncier', '', ['juridique'], []], ind_verification_titre_mere: ['juridique', '', ['foncier'], ['commercial']],
+  mission_technique: ['foncier', 'direction', ['finance'], []], documents_techniques: ['technique', '', ['foncier'], []], reception_livrables: ['technique', '', ['foncier'], []],
+  controle_pieces: ['foncier', '', ['juridique'], []], validation_technique: ['technique', 'direction', ['foncier'], []], ind_identification_lot: ['technique', '', ['commercial'], []],
+  ind_pieces_souscripteur: ['commercial', '', ['foncier'], []], preparation_dossier_admin: ['foncier', '', ['assistance'], []], ind_acte_mutation: ['juridique', 'direction', ['foncier'], []],
+  ind_droits_frais: ['finance', '', ['juridique'], ['commercial']], depot: ['assistance', '', ['foncier'], []], recepisse: ['assistance', '', [], ['foncier']],
+  publication_requisition: ['foncier', '', ['juridique'], []], recueil_oppositions: ['juridique', '', ['foncier'], []], bornage_contre_bornage: ['technique', '', ['foncier'], []],
+  traitement_oppositions: ['juridique', 'direction', ['foncier'], []], suivi_instruction: ['foncier', '', [], ['direction']], observations_complements: ['foncier', '', ['juridique'], []],
+  preparation_complements: ['foncier', '', ['assistance'], []], transmission_complements: ['assistance', '', [], ['foncier']], reponse: ['foncier', '', [], ['direction', 'commercial']],
+  attestation_domaniale: ['foncier', '', ['finance'], []], formalites_titre: ['foncier', '', ['finance'], []], references_justificatifs: ['foncier', '', [], []],
+  acd_signature: ['foncier', '', [], ['direction']], enregistrement_publicite: ['finance', '', ['foncier'], []], ind_titre_individuel: ['foncier', '', [], ['commercial']],
+  retrait_acd: ['assistance', '', ['foncier'], []], formalites_livre_foncier: ['juridique', '', ['foncier'], []], verification_documents: ['juridique', '', ['foncier'], []],
+  concordance_references: ['technique', '', ['foncier'], []], documents_finaux: ['foncier', '', [], []], ind_remise_titre: ['commercial', 'direction', ['assistance'], []],
+  maj_statut_foncier: ['foncier', '', [], []], publication_souscripteur: ['commercial', 'foncier', [], []], cloture: ['foncier', 'direction', [], []],
+  urb_acquisition: ['direction', '', ['juridique'], ['foncier']], urb_civilite_delimitation: ['foncier', '', ['commercial'], []], urb_leve_topo_contenance: ['technique', '', [], ['foncier']],
+  urb_enquete_fonciere: ['foncier', '', ['juridique'], []], urb_contrat_exclusivite: ['juridique', 'direction', [], []], urb_pv_famille: ['juridique', '', ['foncier'], []],
+  urb_enquete_villageoise: ['juridique', '', ['foncier'], []], urb_parcellaire: ['technique', '', ['foncier'], []], urb_attestations_coutumieres: ['juridique', '', ['foncier'], []],
+  urb_polygonale_ensemble: ['technique', '', [], ['foncier']], urb_notaire_convention: ['juridique', 'direction', ['foncier'], []], urb_dotation: ['finance', 'direction', ['juridique'], []],
+  urb_leve_geometre: ['technique', '', [], ['foncier']], urb_avis_servitude: ['foncier', '', ['technique'], []], urb_etat_lieux: ['technique', '', [], []],
+  urb_dossier_technique: ['technique', 'foncier', [], []], urb_plan_amenagement: ['technique', '', ['foncier'], []], urb_prepa_depot: ['foncier', 'direction', ['assistance', 'juridique'], []],
+  urb_depot_guf: ['assistance', '', ['foncier'], ['direction']], urb_transmission_direction: ['foncier', '', [], []], urb_courriers_avis: ['assistance', '', ['foncier'], []],
+  urb_avis_dtc: ['foncier', '', ['technique'], []], urb_avis_duad: ['foncier', '', ['technique'], []], urb_commodo: ['foncier', '', ['juridique'], []],
+  urb_retour_avis: ['foncier', '', [], ['direction']], urb_choix_voie: ['direction', '', ['juridique', 'foncier'], []], urb_convention_tripartite: ['juridique', 'direction', ['foncier'], []],
+  urb_attestation_domaniale: ['foncier', '', ['finance'], []], urb_dm: ['foncier', '', ['technique'], []], urb_bornage_contradictoire: ['technique', '', ['foncier'], []],
+  urb_creation_tf: ['foncier', '', [], ['direction', 'commercial']], urb_projet_acd: ['foncier', '', ['juridique'], []], urb_cabinet_signature: ['direction', '', ['foncier'], []],
+  urb_notification_conservation: ['assistance', '', ['foncier'], []], urb_droits_publication: ['finance', '', ['foncier'], []], urb_retrait_acd: ['assistance', '', ['foncier'], ['direction']],
+  urb_dossier_domaine_urbain: ['foncier', '', [], []], urb_autorisation_lotir: ['foncier', 'direction', ['juridique'], []], urb_amenagement_plan_approuve: ['technique', '', ['finance'], []],
+  urb_guide_partage: ['technique', '', ['juridique'], []], urb_certificat_conformite: ['technique', '', ['foncier'], []], urb_approbation: ['direction', '', ['foncier'], ['commercial']],
+  urb_attestations_adu: ['foncier', '', ['juridique'], []], urb_attestations_souscripteurs: ['commercial', 'direction', ['foncier'], []], urb_travaux_amenagement: ['technique', '', ['finance'], ['commercial']],
+  urb_livraison_financiers: ['commercial', '', ['juridique'], []], urb_maj_statut: ['foncier', '', [], []], urb_publication_souscripteur: ['commercial', 'foncier', [], []]
+};
+function fcEquipeEtape(code) { var q = FC_EQUIPE_ETAPES[code]; return q ? { exec: q[0], valide: q[1], appui: q[2], info: q[3] } : { exec: 'foncier', valide: '', appui: [], info: [] }; }
+function fcRolesFonction(f) { var p = ((DATA.params || {}).fc_fonctions_roles || {})[f]; return Array.isArray(p) ? p : ((FC_FONCTIONS[f] || {}).roles || []); }
+function fcUsersFonction(f) { var roles = fcRolesFonction(f); return (DATA.users || []).filter(function(u){ return u && u.statut !== 'inactif' && roles.indexOf(u.role) !== -1; }); }
+/* Charge = étapes non terminées dont la personne est responsable, dans les dossiers actifs. */
+function fcChargeUtilisateur(uid) {
+  var n = 0; (DATA.dossiers_fonciers || []).forEach(function(d){ if (['cloture', 'annule'].indexOf(d.statut) !== -1) return; (d.etapes || []).forEach(function(e){ if (e.responsable_id === uid && FC_STATUTS_FINAUX.indexOf(e.statut) === -1) n++; }); });
+  return n;
+}
+function fcLibFonction(f) { return (FC_FONCTIONS[f] || {}).lib || f; }
+/* Répartit les étapes non personnalisées entre les personnes de la fonction concernée, en équilibrant la charge. Les étapes déjà confiées à quelqu'un d'autre que le responsable du dossier ne sont pas touchées. */
+function fcRepartirEquipe(d) {
+  var charge = {}, parPersonne = {}, sans = {}, n = 0, chargeDe = function(u){ if (charge[u.id] == null) charge[u.id] = fcChargeUtilisateur(u.id); return charge[u.id]; };
+  d.etapes.slice().sort(function(a, b){ return a.ordre - b.ordre; }).forEach(function(e){
+    if (FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return;
+    if (e.responsable_id && e.responsable_id !== d.responsable_id) return;
+    var f = fcEquipeEtape(e.code).exec, pool = fcUsersFonction(f);
+    if (!pool.length) { sans[f] = (sans[f] || 0) + 1; return; }
+    var choix = pool.slice().sort(function(a, b){ return chargeDe(a) - chargeDe(b); })[0];
+    if (e.responsable_id !== choix.id) { e.responsable_id = choix.id; n++; }
+    charge[choix.id] = chargeDe(choix) + 1; parPersonne[choix.id] = (parPersonne[choix.id] || 0) + 1;
+  });
+  return { assignees: n, personnes: Object.keys(parPersonne).length, par_personne: parPersonne, fonctions_sans_equipe: sans };
+}
+async function fcRepartirEquipeDossier(dossierId) {
+  var d = fcDossier(dossierId); if (!d) return { ok: false, erreur: 'Dossier introuvable.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) répartit les étapes.' };
+  if (['cloture', 'annule'].indexOf(d.statut) !== -1) return { ok: false, erreur: 'Dossier ' + d.statut + '.' };
+  var r = fcRepartirEquipe(d); await fcSauver(d);
+  await fcEvenement(d, '', 'repartition', 'Équipe interne : ' + r.assignees + ' étape(s) réparties entre ' + r.personnes + ' personne(s) selon leur fonction', { source: 'promoteur' });
+  return Object.assign({ ok: true }, r);
+}
+fcProtegerMutations(['fcRepartirEquipeDossier']);
+function fcEquipeLigneHtml(code) {
+  var q = fcEquipeEtape(code), l = ['<b>' + escHtml(fcLibFonction(q.exec)) + '</b> exécute'];
+  if (q.valide) l.push(escHtml(fcLibFonction(q.valide)) + ' valide');
+  if (q.appui.length) l.push('appui : ' + q.appui.map(fcLibFonction).map(escHtml).join(', '));
+  if (q.info.length) l.push('informé : ' + q.info.map(fcLibFonction).map(escHtml).join(', '));
+  return '<br><span style="font-size:11px;color:#5b6b7a;" title="Fonctions internes qui interviennent à cette étape">👥 ' + l.join(' · ') + '</span>';
+}
+function fcPanneauEquipe(d) {
+  var etapes = d.etapes.filter(function(e){ return e.statut !== 'annule'; }), lignes = [], sans = [];
+  Object.keys(FC_FONCTIONS).forEach(function(f){
+    var exec = etapes.filter(function(e){ return fcEquipeEtape(e.code).exec === f; }), pool = fcUsersFonction(f); if (!exec.length) return;
+    var faites = exec.filter(function(e){ return e.statut === 'termine'; }).length;
+    if (!pool.length) sans.push(fcLibFonction(f) + ' (' + exec.length + ' étape' + (exec.length > 1 ? 's' : '') + ')');
+    lignes.push('<tr><td>' + FC_FONCTIONS[f].icone + ' <b>' + escHtml(fcLibFonction(f)) + '</b></td><td>' + (pool.length ? pool.map(function(u){ return escHtml(u.nom || u.login) + ' <span style="color:var(--dim);font-size:10px;">(' + fcChargeUtilisateur(u.id) + ' en charge)</span>'; }).join(', ') : '<span style="color:#c0392b;">aucune personne</span>') + '</td><td style="text-align:center;">' + faites + ' / ' + exec.length + '</td><td style="font-size:11px;">'
+      + escHtml(Object.keys(exec.reduce(function(m, e){ var r = e.responsable_id && fcNomUtilisateur(e.responsable_id); if (r) m[r] = 1; return m; }, {})).join(', ') || '—') + '</td></tr>');
+  });
+  return '<details class="card" style="margin-bottom:8px;"><summary style="cursor:pointer;font-weight:700;">👥 Équipe interne du dossier — qui intervient, étape par étape</summary>'
+    + '<div style="font-size:11px;color:var(--dim);margin:6px 0;">Chaque étape est rattachée à une fonction. Un dossier ne peut pas reposer sur une seule personne : la répartition affecte chaque étape à la personne la moins chargée de la fonction concernée.</div>'
+    + (sans.length ? '<div style="background:#fdecea;border-left:4px solid #c0392b;padding:6px 10px;font-size:12px;margin-bottom:6px;">⚠ Aucun utilisateur n\'est rattaché à : <b>' + sans.map(escHtml).join(' ; ') + '</b>. Ces étapes restent au responsable du dossier. Associez un rôle à chaque fonction dans <i>Modèles de dossier › Équipe interne</i>.</div>' : '')
+    + '<div class="table-wrap"><table><thead><tr><th>Fonction</th><th>Personnes</th><th>Étapes terminées</th><th>Affectées à</th></tr></thead><tbody>' + lignes.join('') + '</tbody></table></div>'
+    + '<button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="fcRepartirUI(\'' + d.id + '\')">⚖️ Répartir les étapes selon les fonctions</button></details>';
+}
+async function fcRepartirUI(id) {
+  var r = await fcRepartirEquipeDossier(id);
+  if (fcMsg(r, r.ok ? r.assignees + ' étape(s) réparties entre ' + r.personnes + ' personne(s).' : '')) { var s = Object.keys(r.fonctions_sans_equipe || {}); if (s.length) toast('Fonctions sans personne : ' + s.map(fcLibFonction).join(', '), 'warning'); fcRenderDetail(id); }
+}
+function fcEditeurEquipe() {
+  var roles = (typeof getAllRoles === 'function') ? getAllRoles() : {}, ro = fcPeutGererModeles() ? '' : ' disabled ';
+  return '<div class="card" style="border:1px solid var(--or);"><div class="card-title">👥 Équipe interne — fonctions et rôles</div>'
+    + '<div style="font-size:11px;color:var(--dim);margin-bottom:8px;">Associez chaque fonction aux rôles du logiciel qui l\'exercent. À l\'ouverture d\'un dossier, chaque étape est confiée à la personne la moins chargée de la fonction concernée.</div>'
+    + '<div class="table-wrap"><table><thead><tr><th>Fonction</th><th>Rôles</th><th>Personnes</th></tr></thead><tbody>' + Object.keys(FC_FONCTIONS).map(function(f){
+      var sel = fcRolesFonction(f), ids = Object.keys(roles);
+      FC_FONCTIONS[f].roles.forEach(function(r){ if (ids.indexOf(r) === -1) ids.push(r); });
+      return '<tr><td>' + FC_FONCTIONS[f].icone + ' <b>' + escHtml(FC_FONCTIONS[f].lib) + '</b></td><td>' + ids.map(function(r){ return '<label style="margin-right:8px;font-size:12px;white-space:nowrap;"><input type="checkbox" id="fq-' + f + '-' + r + '" ' + (sel.indexOf(r) !== -1 ? 'checked ' : '') + ro + '> ' + escHtml((roles[r] && roles[r].label) || r) + '</label>'; }).join('')
+        + '</td><td style="font-size:12px;">' + (fcUsersFonction(f).map(function(u){ return escHtml(u.nom || u.login); }).join(', ') || '<span style="color:#c0392b;">aucune personne</span>') + '</td></tr>'; }).join('')
+    + '</tbody></table></div><button class="btn btn-primary btn-sm" onclick="fcSauverEquipeUI()" ' + ro + '>💾 Enregistrer l\'équipe</button></div>';
+}
+async function fcSauverEquipeUI() {
+  if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); return; }
+  var m = {}; Object.keys(FC_FONCTIONS).forEach(function(f){
+    var ids = [].map.call(document.querySelectorAll('input[id^="fq-' + f + '-"]'), function(c){ return c.checked ? c.id.slice(('fq-' + f + '-').length) : ''; }).filter(Boolean);
+    m[f] = ids;
+  });
+  DATA.params = DATA.params || {}; DATA.params.fc_fonctions_roles = m;
+  try { await fcEnregistrerParams(); toast('Équipe interne enregistrée.', 'success'); } catch (e) { toast('Enregistrement impossible : ' + (e.message || e), 'error'); }
+  fcRenderModeles();
+}
 /* ── Modèles préremplis : délais indicatifs et responsables par défaut ──
    Estimations de départ en jours calendaires, À VALIDER par la direction (elles ne sont pas des délais légaux). Elles sont proposées à l'ouverture d'un dossier
    tant qu'aucun modèle n'est enregistré pour la procédure ; la durée observée sur vos dossiers terminés (option « Estimer les échéances ») les remplace dès qu'elle existe. */
@@ -63255,7 +63384,7 @@ function fcRenderModeles() {
     + '<hr><label style="font-size:12px;"><input type="checkbox" ' + (fcDelaisAutoActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_delais_auto\',this.checked,\'Échéances estimées\')"> <b>Estimer les échéances d\'après vos dossiers</b> : pour les étapes sans durée dans le modèle, l\'échéance utilise la durée habituelle observée (75 % des dossiers terminés plus vite, au moins ' + FC_SEUIL_MESURE + ' dossiers), marquée « estimée ».</label>'
     + '<br><label style="font-size:12px;"><input type="checkbox" id="fm-deps" ' + (fcDependancesActives() ? 'checked ' : '') + ro + ' onchange="fcBasculerDependancesUI(this.checked)"> <b>Imposer l\'ordre des étapes</b> : une étape ne démarre ni ne se termine avant ses étapes préalables (dérogation motivée du responsable, journalisée).</label>'
     + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleClotureActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_cloture\',this.checked,\'Contrôle de clôture\')"> <b>Contrôler la complétude à la clôture</b> : pièces à contrôler, missions, demandes, anomalies, frais et notes du titre.</label>'
-    + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleConcurrenceActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_concurrence\',this.checked,\'Protection contre les modifications simultanées\')"> <b>Protéger contre les modifications simultanées</b> : refuser une modification si un collègue a enregistré le dossier entre-temps.</label></div>' + fcEditeurGabaritsCourrier() + fcEditeurReglagesFin();
+    + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleConcurrenceActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_concurrence\',this.checked,\'Protection contre les modifications simultanées\')"> <b>Protéger contre les modifications simultanées</b> : refuser une modification si un collègue a enregistré le dossier entre-temps.</label></div>' + fcEditeurEquipe() + fcEditeurGabaritsCourrier() + fcEditeurReglagesFin();
   host.innerHTML = h;
 }
 async function fcEnregistrerParams() {
