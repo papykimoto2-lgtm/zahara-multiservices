@@ -60023,6 +60023,63 @@ function fcActionsEtapeHtml(d, e) {
   return h;
 }
 
+/* ── Suivi des délais réels : prévu (modèle ou délai par défaut) contre réel (journal) ── */
+function fcDelaiPrevuEtape(type, code) {
+  var m = fcModeleActif(type), j = m && m.etapes && m.etapes[code] ? parseInt(m.etapes[code].jours, 10) : 0;
+  return j > 0 ? j : (FC_DELAIS_DEFAUT[code] || 0);
+}
+function fcDelaisReelsEtapes() {
+  var par = {};
+  fcDureesEtapes().forEach(function(x){
+    var d = fcDossier(x.dossier_id); if (!d || !x.termine || !x.mesure) return;
+    var k = d.type_procedure + '|' + x.etape_code, c = x.categories;
+    (par[k] = par[k] || { type: d.type_procedure, code: x.etape_code, v: [] }).v.push(c.interne + c.prestataire + c.document + c.administration);
+  });
+  return Object.keys(par).map(function(k){
+    var p = par[k], prevu = fcDelaiPrevuEtape(p.type, p.code), moy = fcMoyenne(p.v).moyenne, et = fcEtapesPour(p.type, '').find(function(e){ return e.code === p.code; }) || {};
+    return { type: p.type, code: p.code, libelle: et.libelle || p.code, phase: et.phase || '', n: p.v.length, prevu: prevu, moyenne: moy, mediane: Math.round(fcPercentile(p.v, 0.5) * 10) / 10,
+      ecart: prevu ? Math.round((moy - prevu) * 10) / 10 : null, taux: prevu ? Math.round(p.v.filter(function(x){ return x <= prevu; }).length / p.v.length * 100) : null };
+  }).sort(function(a, b){ return (b.ecart == null ? -1e9 : b.ecart) - (a.ecart == null ? -1e9 : a.ecart); });
+}
+function fcDelaisReelsMissions() {
+  var evs = (DATA.evenements_fonciers || []).filter(function(e){ return e.type === 'mission_statut' && e.mission_id; }), par = {};
+  var date = function(id, statut){ var l = evs.filter(function(e){ return e.mission_id === id && e.nouveau === statut; }).map(function(e){ return String(e.date).slice(0, 10); }).sort(); return l[0] || ''; };
+  (DATA.missions_foncieres || []).forEach(function(m){
+    var p = par[m.intervenant_id] = par[m.intervenant_id] || { intervenant_id: m.intervenant_id, terminees: 0, mesurees: 0, prevu: [], reel: [], dans: 0, retard_en_cours: 0 };
+    if (['validee', 'cloturee'].indexOf(m.statut) !== -1) {
+      p.terminees++; var env = date(m.id, 'envoyee'), fin = date(m.id, 'validee') || date(m.id, 'cloturee');
+      if (env && fin && m.echeance) { p.mesurees++; p.reel.push(fcJours(env, fin)); p.prevu.push(fcJours(env, m.echeance)); if (fin <= m.echeance) p.dans++; }
+    } else if (typeof fcMissionEnRetard === 'function' && FC_MISSIONS_ACTIVES.indexOf(m.statut) !== -1 && fcMissionEnRetard(m)) p.retard_en_cours++;
+  });
+  return Object.keys(par).map(function(k){
+    var p = par[k], r = fcMoyenne(p.reel).moyenne, v = fcMoyenne(p.prevu).moyenne;
+    return { intervenant_id: k, nom: fcNomIntervenant(k), terminees: p.terminees, mesurees: p.mesurees, prevu: v, reel: r, ecart: r != null ? Math.round((r - v) * 10) / 10 : null,
+      taux: p.mesurees ? Math.round(p.dans / p.mesurees * 100) : null, retard_en_cours: p.retard_en_cours };
+  }).filter(function(x){ return x.terminees || x.retard_en_cours; }).sort(function(a, b){ return (b.ecart == null ? -1e9 : b.ecart) - (a.ecart == null ? -1e9 : a.ecart); });
+}
+function fcPastilleEcart(e, prevu) {
+  if (e == null) return '<span style="color:var(--dim);">—</span>';
+  var r = prevu ? e / prevu : 0, c = e <= 0 ? '#2e7d4f' : r <= 0.25 ? '#B87333' : '#c0392b';
+  return '<b style="color:' + c + ';">' + (e > 0 ? '+' : '') + e + ' j</b>';
+}
+function fcHtmlDelaisReels() {
+  var E = fcDelaisReelsEtapes(), M = fcDelaisReelsMissions(), mesures = E.filter(function(x){ return x.ecart != null; });
+  var nObs = E.reduce(function(s, x){ return s + x.n; }, 0), tauxGlobal = mesures.length ? Math.round(mesures.reduce(function(s, x){ return s + x.taux * x.n; }, 0) / mesures.reduce(function(s, x){ return s + x.n; }, 0)) : null;
+  var tete = function(cols){ return '<thead><tr>' + cols.map(function(c){ return '<th>' + c + '</th>'; }).join('') + '</tr></thead>'; };
+  var kpi = function(t, v){ return '<div class="kpi-card"><div class="kpi-label">' + t + '</div><div class="kpi-value" style="font-size:20px;">' + v + '</div></div>'; };
+  return '<div class="card"><div class="card-title">⏱ Délais réels — écart entre le prévu et le réel</div>'
+    + '<div style="font-size:11px;color:var(--dim);margin-bottom:8px;">Prévu = délai du modèle de dossier (à défaut, délai indicatif par défaut). Réel = temps passé dans les états actifs d\'après le journal, pour les étapes terminées. Un écart positif signifie un dépassement.</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">' + kpi('Étapes mesurées', E.length) + kpi('Observations', nObs) + kpi('Terminées dans le prévu', tauxGlobal == null ? '—' : tauxGlobal + ' %') + kpi('Intervenants suivis', M.length) + '</div></div>'
+    + '<div class="card"><div class="card-title">🧭 Par étape <span style="color:var(--or);">(' + E.length + ')</span></div>' + (E.length
+      ? '<div class="table-wrap"><table>' + tete(['Étape', 'Procédure', 'Dossiers', 'Prévu', 'Réel moyen', 'Médiane', 'Écart', 'Dans le prévu']) + '<tbody>' + E.slice(0, 60).map(function(x){
+          return '<tr><td>' + escHtml(x.libelle) + '</td><td style="font-size:11px;">' + escHtml(FC_PROCEDURES[x.type] || x.type) + '</td><td>' + x.n + (x.n < FC_SEUIL_MESURE ? ' <span title="Échantillon faible" style="color:#B87333;">⚠</span>' : '') + '</td><td>' + (x.prevu ? x.prevu + ' j' : '—') + '</td><td>' + x.moyenne + ' j</td><td>' + x.mediane + ' j</td><td>' + fcPastilleEcart(x.ecart, x.prevu) + '</td><td>' + (x.taux == null ? '—' : x.taux + ' %') + '</td></tr>'; }).join('') + '</tbody></table></div>' + (E.length > 60 ? '<div style="font-size:11px;color:var(--dim);">60 étapes les plus en retard affichées sur ' + E.length + '.</div>' : '')
+      : '<div style="color:var(--dim);padding:8px;">Aucune étape terminée avec un historique mesurable pour l\'instant. Les écarts apparaissent dès que des étapes sont terminées après être passées par « En cours » ou une attente.</div>') + '</div>'
+    + '<div class="card"><div class="card-title">🤝 Par intervenant <span style="color:var(--or);">(' + M.length + ')</span></div>' + (M.length
+      ? '<div class="table-wrap"><table>' + tete(['Intervenant', 'Missions terminées', 'Délai prévu moyen', 'Délai réel moyen', 'Écart', 'Dans les délais', 'En retard actuellement']) + '<tbody>' + M.map(function(x){
+          return '<tr><td>' + escHtml(x.nom) + '</td><td>' + x.terminees + (x.mesurees < x.terminees ? ' <span title="Missions sans date d\'envoi ou de validation au journal" style="font-size:10px;color:var(--dim);">(' + x.mesurees + ' mesurées)</span>' : '') + '</td><td>' + (x.prevu == null ? '—' : x.prevu + ' j') + '</td><td>' + (x.reel == null ? '—' : x.reel + ' j') + '</td><td>' + fcPastilleEcart(x.ecart, x.prevu) + '</td><td>' + (x.taux == null ? '—' : x.taux + ' %') + '</td><td>' + (x.retard_en_cours ? '<b style="color:#c0392b;">' + x.retard_en_cours + '</b>' : '0') + '</td></tr>'; }).join('') + '</tbody></table></div>'
+      : '<div style="color:var(--dim);padding:8px;">Aucune mission terminée ou en retard pour l\'instant.</div>') + '</div>';
+}
+
 /* Onglets du dossier foncier : toutes les sections restent dans le DOM (les identifiants des panneaux et les mises à jour ciblées continuent de fonctionner), une seule est visible. */
 function fcOngletsHtml(sections) {
   var liste = sections.filter(function(x){ return String(x.h || '').replace(/<[^>]*>/g, '').trim() !== '' || x.k === 'synthese' || x.k === 'etapes'; });
@@ -62293,8 +62350,8 @@ function fcRenderPilotage() { fcAvecFiltre(fcFiltrePilotage(), fcRenderPilotageC
 function fcRenderPilotageCorps() {
   var host = document.getElementById('fp-root'); if (!host) return;
   var vue = APP._fpVue || 'promoteur', moi = fcActeur(), uid = APP._fpUser || moi.id, t = fcAuj();
-  if (['direction', 'equipe', 'couts', 'rapport'].indexOf(vue) !== -1 && !fcPeutVoirDirection()) vue = APP._fpVue = 'promoteur';
-  var onglets = [['promoteur', '🏢 Promoteur'], ['risques', '🚨 Dossiers à risque'], ['responsable', '🧑‍💼 Responsable foncier'], ['intervenants', '🤝 Intervenants']].concat(fcPeutVoirDirection() ? [['direction', '📈 Direction'], ['equipe', '👥 Équipe et charge'], ['couts', '💶 Coûts du titre'], ['rapport', '📑 Rapport périodique']] : []);
+  if (['direction', 'equipe', 'delais', 'couts', 'rapport'].indexOf(vue) !== -1 && !fcPeutVoirDirection()) vue = APP._fpVue = 'promoteur';
+  var onglets = [['promoteur', '🏢 Promoteur'], ['risques', '🚨 Dossiers à risque'], ['responsable', '🧑‍💼 Responsable foncier'], ['intervenants', '🤝 Intervenants']].concat(fcPeutVoirDirection() ? [['direction', '📈 Direction'], ['equipe', '👥 Équipe et charge'], ['delais', '⏱ Délais réels'], ['couts', '💶 Coûts du titre'], ['rapport', '📑 Rapport périodique']] : []);
   var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">🎯 Pilotage foncier</div><div style="font-size:11px;color:var(--dim);margin-bottom:8px;">Les durées sont calculées à partir du journal horodaté. Une valeur reposant sur moins de ' + FC_SEUIL_MESURE + ' observations est signalée comme indicative. Un retard n\'est jamais attribué à une administration ou à un prestataire sans donnée suffisante.</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">' + onglets.map(function(o){ return '<button class="btn ' + (o[0] === vue ? 'btn-primary' : 'btn-secondary') + ' btn-sm" onclick="APP._fpVue=\'' + o[0] + '\';fcRenderPilotage()">' + o[1] + '</button>'; }).join('') + '</div>';
   h += fcBarreFiltresPilotage();
@@ -62313,6 +62370,8 @@ function fcRenderPilotageCorps() {
     });
   } else if (vue === 'equipe') {
     h += fcHtmlEquipeCharge(t);
+  } else if (vue === 'delais') {
+    h += fcHtmlDelaisReels();
   } else if (vue === 'risques') {
     h += fcHtmlRisques(t);
   } else if (vue === 'couts') {
@@ -62345,7 +62404,7 @@ function fcRenderPilotageCorps() {
 var FC_TITRES_PILOTAGE = { promoteur: 'Tableau de bord du promoteur', responsable: 'Tableau de bord du responsable foncier', intervenants: 'Tableau de bord des intervenants', direction: 'Tableau de bord de direction', couts: 'Coûts du titre foncier', risques: 'Dossiers à risque', rapport: 'Rapport périodique de pilotage foncier', retards: 'Rapport des retards' };
 function fcExporterPilotageUI(vue, format) {
   if (!fcPeutExporter()) { fcMsg({ ok: false, erreur: "Votre profil ne permet pas d'exporter les données foncières." }); return; }
-  if (['direction', 'equipe', 'couts', 'rapport'].indexOf(vue) !== -1 && !fcPeutVoirDirection()) { fcMsg({ ok: false, erreur: 'Réservé à la direction.' }); return; }
+  if (['direction', 'equipe', 'delais', 'couts', 'rapport'].indexOf(vue) !== -1 && !fcPeutVoirDirection()) { fcMsg({ ok: false, erreur: 'Réservé à la direction.' }); return; }
   var l = fcAvecFiltre(fcFiltrePilotage(), function(){ return fcLignesPilotage(vue, APP._fpUser || fcActeur().id, fcAuj()); });
   if (format === 'pdf') openPrintPreview(fcHtmlTableau(FC_TITRES_PILOTAGE[vue], l), FC_TITRES_PILOTAGE[vue], true); else fcTelechargerTexte('foncier-' + vue + '-' + fcAuj() + '.csv', fcCsv(l));
 }
