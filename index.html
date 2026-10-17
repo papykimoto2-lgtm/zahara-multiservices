@@ -10792,7 +10792,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div id="attest-kpi" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"></div>
             <div class="filters-bar">
               <input type="text" class="search-input" id="attest-recherche" placeholder="🔍 Nom, n° d'attestation, dossier…" oninput="_debInput('renderAttestationsJuridiques')">
-              <select class="filter-select" id="attest-filtre-type" onchange="renderAttestationsJuridiques()"><option value="">Tous types</option><option value="solde">Attestation de solde</option><option value="cession">Attestation de cession</option><option value="reservation">Attestation de réservation</option></select>
+              <select class="filter-select" id="attest-filtre-type" onchange="renderAttestationsJuridiques()"><option value="">Tous types</option><option value="solde">Attestation de solde</option><option value="solde_cession">Attestation de solde (cession foncière)</option><option value="cession">Attestation de cession</option><option value="reservation">Attestation de réservation</option></select>
               <select class="filter-select" id="attest-filtre-statut" onchange="renderAttestationsJuridiques()"><option value="">Tous statuts (hors « à établir »)</option><option value="valide">Validée</option><option value="en_attente">En attente DG/gérant</option><option value="brouillon">Brouillon</option><option value="rejete">Rejetée</option><option value="delivre">Délivrée</option><option value="a_etablir">À établir (soldés sans attestation)</option></select>
             </div>
             <div id="attest-jur-box"></div>
@@ -89492,6 +89492,10 @@ function attRegistreLignes() {
     else if (c.statut !== 'resilie' && typeof attSoldeApplicable === 'function' && attSoldeApplicable(c, 'finale') && attSoldeSolde(c, 'finale').solde)
       L.push({ type:'solde_finale', typeLib:'Attestation de solde (valeur finale)', ref:'—', nom:nom, dossier:c.dossier || '', statut:'a_etablir', date:'', clientId:c.id, djId:c.dossier_juridique_id || '', variantes:0 });
   });
+  (DATA.cessions_foncieres || []).forEach(function(c){
+    var a = c.attestation_solde; if (!a || !a.statut) return;
+    L.push({ type:'solde_cession', typeLib:'Attestation de solde (cession foncière)', ref:a.numero || '—', nom:cesAcquereurLabel(c.acheteur), dossier:c.dossier || '', statut:a.statut, date:a.valide_le || a.date_demande || a.date_brouillon || '', cessionId:c.id, djId:'', variantes:0 });
+  });
   if (typeof finGetAll === 'function' && typeof finDocEtat === 'function') {
     finGetAll().forEach(function(f){
       var ec = finDocEtat(f, 'attestation_cession'), er = finDocEtat(f, 'attestation_reservation');
@@ -89522,7 +89526,8 @@ function renderAttestationsJuridiques() {
       var cq = '\'' + x.clientId + '\'', kq = x.type === 'solde_finale' ? ',\'finale\'' : '';
       act = x.statut === 'valide' ? '<button class="btn btn-secondary btn-sm" onclick="attSoldeImprimer(' + cq + kq + ')" title="Version officielle, sans modification">🖨 Sans modif.</button>' + (kq ? '' : ' <button class="btn btn-secondary btn-sm" onclick="attSoldeVarianteOuvrir(' + cq + ')" title="Version indicative avec modifications">✏️ Avec modif.</button>')
         : '<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(' + cq + kq + ')">👁 Voir</button>' + (x.statut === 'a_etablir' ? ' <button class="btn btn-primary btn-sm" onclick="attSoldeDemander(' + cq + kq + ')">📜 Établir</button>' : '');
-    } else if (x.type === 'cession') act = '<button class="btn btn-secondary btn-sm" onclick="finImprimerAttestation(\'' + x.finId + '\')">🖨 Imprimer</button>';
+    } else if (x.type === 'solde_cession') act = x.statut === 'valide' ? '<button class="btn btn-secondary btn-sm" onclick="cesAttImprimer(\'' + x.cessionId + '\')">🖨 Imprimer</button>' : '<button class="btn btn-secondary btn-sm" onclick="cesAttApercu(\'' + x.cessionId + '\')">👁 Voir</button>';
+    else if (x.type === 'cession') act = '<button class="btn btn-secondary btn-sm" onclick="finImprimerAttestation(\'' + x.finId + '\')">🖨 Imprimer</button>';
     else if (x.type === 'reservation' && typeof finImprimerAttestationReservation === 'function') act = '<button class="btn btn-secondary btn-sm" onclick="finImprimerAttestationReservation(\'' + x.finId + '\')">🖨 Imprimer</button>';
     return '<tr><td style="font-size:11px;">' + escHtml(x.typeLib) + (x.variantes ? '<br><span style="color:var(--or);">✏️ ' + x.variantes + ' version(s) indicative(s)</span>' : '') + '</td>'
       + '<td style="font-family:monospace;color:var(--or);font-weight:700;">' + escHtml(x.ref || '—') + '</td>'

@@ -68,3 +68,15 @@ test('portail : carte circuit, motif jamais exposé, document seulement si publi
   assert.ok(!/fonOuvrirAttestation\(\)"/.test(rendre({ attestation_solde: { statut: 'valide', html: '<p>x</p>' } })));
   assert.match(rendre({ attestation_solde: { statut: 'valide', publie_portail: true, html: '<p>x</p>' } }), /fonOuvrirAttestation\(\)/);
 });
+
+test('registre des attestations juridiques : ligne de l\'attestation de cession, imprimable une fois validée', async () => {
+  const app = await ouvrirApp(); await preparer(app.page, true);
+  const r = await app.page.evaluate(async () => {
+    cesRender(); await cesAttDemander('k1'); await valDecide(DATA.validations[0].id, 'valide');
+    const l = attRegistreLignes().filter(x => x.type === 'solde_cession');
+    renderAttestationsJuridiques();
+    return { n: l.length, st: l[0] && l[0].statut, ref: l[0] && l[0].ref };
+  });
+  assert.equal(r.n, 1); assert.equal(r.st, 'valide'); assert.match(r.ref, /^ACS-/);
+  assert.equal(app.etat.erreursPage.length, 0, app.etat.erreursPage.join('\n'));
+});

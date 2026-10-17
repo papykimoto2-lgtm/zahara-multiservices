@@ -3091,11 +3091,11 @@
   function carteLocation(l,i){
     var map=_locMapUrl(l), typ=CAT_TYPES[3];
     var lig=function(lib,val,fort){ return '<div'+(fort?' class="vt-fort"':'')+'><span>'+lib+'</span><strong>'+fmt(val)+' F</strong></div>'; };
-    return '<article class="vt-bien"><div class="vt-bien-img"><img src="'+esc(photoBien(l,typ,'location'))+'" loading="lazy" alt="'+esc(l.nom||'Bien')+'"><span class="vt-chip-cat">Location</span>'+(l.pieces?'<span class="vt-bien-pieces">'+esc(l.pieces)+'</span>':'')+'<span class="vt-etat">'+_locDispoBadge(l)+'</span></div>'
+    return '<article class="vt-bien"><div class="vt-bien-img" style="cursor:pointer;" onclick="ouvrirFicheLocation('+i+')"><img src="'+esc(photoBien(l,typ,'location'))+'" loading="lazy" alt="'+esc(l.nom||'Bien')+'"><span class="vt-chip-cat">Location</span>'+(l.pieces?'<span class="vt-bien-pieces">'+esc(l.pieces)+'</span>':'')+'<span class="vt-etat">'+_locDispoBadge(l)+'</span></div>'
       +'<div class="vt-bien-corps"><h5>'+esc(l.nom)+'</h5>'+(l.surf?'<div class="vt-bien-surf">Superficie : '+esc(l.surf)+'</div>':'')
       +(l.adresse?'<div class="vt-meta"><i class="fas fa-location-dot"></i><span>'+esc(l.adresse)+'</span></div>':'')
       +'<div class="vt-prix">'+(l.loyer?lig('Loyer / mois',l.loyer,true):'')+(l.caution?lig('Caution',l.caution,false):'')+'</div>'
-      +'<div class="vt-actions">'+(map?'<a class="vt-lien" href="'+esc(map)+'" target="_blank" rel="noopener"><i class="fas fa-map-location-dot"></i> Localisation</a>':'')
+      +'<div class="vt-actions"><button type="button" class="vt-lien" onclick="ouvrirFicheLocation('+i+')"><i class="fas fa-circle-info"></i> Détails et budget</button>'+(map?'<a class="vt-lien" href="'+esc(map)+'" target="_blank" rel="noopener"><i class="fas fa-map-location-dot"></i> Localisation</a>':'')
       +'<button type="button" class="highlight-btn" onclick="choisirLocationPourReservation('+i+')"><i class="fas fa-calendar-check"></i> Réserver</button></div></div></article>';
   }
   function renderLocations(){
@@ -5244,14 +5244,14 @@
     var dispo = p.lots_disponibles != null ? +p.lots_disponibles : null;
     var total = p.lots_prevus != null ? +p.lots_prevus : (p.lots_morceles != null ? +p.lots_morceles : null);
     var pct = (dispo!=null && total) ? Math.max(0,Math.min(100,Math.round((1-dispo/total)*100))) : null;
-    return '<article class="vt-bien"><div class="vt-bien-img"><img src="'+esc(photoProgramme(p,typ))+'" loading="lazy" alt="'+esc(p.nom||'Programme')+'"><span class="vt-chip-cat">'+esc(PROG_STATUTS[p.statut]||'Programme')+'</span></div>'
+    return '<article class="vt-bien"><div class="vt-bien-img" style="cursor:pointer;" onclick="ouvrirFicheProgramme(\''+esc(p.id)+'\')"><img src="'+esc(photoProgramme(p,typ))+'" loading="lazy" alt="'+esc(p.nom||'Programme')+'"><span class="vt-chip-cat">'+esc(PROG_STATUTS[p.statut]||'Programme')+'</span></div>'
       +'<div class="vt-bien-corps"><h5>'+esc(p.nom||'Programme')+'</h5>'
       +(p.commune?'<div class="vt-meta"><i class="fas fa-location-dot"></i><span>'+esc(p.commune)+'</span></div>':'')
       +(p.description?'<p class="vt-desc">'+esc(p.description)+'</p>':'')
       +(pct!=null?'<div><div class="vt-barre" role="img" aria-label="'+pct+' % des lots réservés"><i style="width:'+pct+'%"></i></div><div class="vt-barre-lib"><span>'+dispo+' lot'+(dispo>1?'s':'')+' disponible'+(dispo>1?'s':'')+'</span><span>sur '+total+'</span></div></div>'
         :(dispo!=null?'<span class="badge">'+dispo+' lot'+(dispo>1?'s':'')+' disponible'+(dispo>1?'s':'')+'</span>':''))
       +(p.date_livraison?'<div class="vt-meta"><i class="fas fa-calendar-check"></i><span>Livraison prévue : '+dshort(p.date_livraison)+'</span></div>':'')
-      +'<div class="vt-actions"><button type="button" class="highlight-btn" onclick="basculerVersOnglet(\'catalogue\')">Voir les biens</button></div></div></article>';
+      +'<div class="vt-actions"><button type="button" class="vt-lien" onclick="ouvrirFicheProgramme(\''+esc(p.id)+'\')"><i class="fas fa-circle-info"></i> Détails</button><button type="button" class="highlight-btn" onclick="basculerVersOnglet(\'catalogue\')">Voir les biens</button></div></div></article>';
   }
   function renderProgrammesListe(){
     var box=document.getElementById('programme-liste-cards'); if(!box || !_progsData) return;
@@ -5266,6 +5266,86 @@
     }
     box.innerHTML=_progsData.filter(function(p){ return progFiltre==='*'||p.statut===progFiltre; }).map(carteProgramme).join('');
   }
+  /* ───── Fiches détaillées Location et Programme : même fenêtre que la fiche d'un bien ───── */
+  function montrerFiche(html,photos){
+    _ficheDeclencheur=document.activeElement;
+    var vo=document.getElementById('bien-voile');
+    if(!vo){
+      vo=document.createElement('div'); vo.id='bien-voile'; vo.className='bien-voile'; vo.hidden=true; document.body.appendChild(vo);
+      vo.addEventListener('click',function(e){ if(e.target===vo) fermerFicheBien(); });
+      document.addEventListener('keydown',function(e){ var o=document.getElementById('bien-voile'); if(e.key==='Escape' && o && !o.hidden){ var lb=document.getElementById('pp-lb-overlay'); if(lb && lb.classList.contains('active')) return; fermerFicheBien(); } });
+    }
+    vo.innerHTML=html; vo.hidden=false; document.body.style.overflow='hidden'; vo.scrollTop=0;
+    var vig=vo.querySelector('.bien-vignettes');
+    if(vig) vig.addEventListener('click',function(e){
+      var it=e.target.closest?e.target.closest('.photo-item'):null; if(!it) return;
+      e.stopPropagation();
+      var im=it.querySelector('img'); document.getElementById('bien-principale').src=im.getAttribute('src');
+      [].forEach.call(vig.querySelectorAll('.photo-item'),function(x){ x.classList.toggle('on',x===it); });
+    },true);
+    var f=document.getElementById('bien-fermer'); if(f) f.focus();
+  }
+  function _galerieFiche(photos,nom){
+    return '<div class="bien-galerie"><img class="bien-principale" id="bien-principale" src="'+esc(photos[0].src)+'" alt="'+esc(nom)+'" onclick="ppLbOpenImage(this)">'
+      +(photos.length>1?'<div class="photo-grid bien-vignettes">'+photos.map(function(ph,k){ return '<div class="photo-item'+(k===0?' on':'')+'" data-k="'+k+'"><img src="'+esc(ph.src)+'" alt="'+esc(ph.titre||'Photo')+'" loading="lazy"></div>'; }).join('')+'</div>':'')+'</div>';
+  }
+  function photosLocation(l){
+    var nom=String(l.nom||'').toLowerCase().split(' · ')[0].trim();
+    var m=nom?(MEDIAS||[]).filter(function(x){ return x.type==='photo' && x.categorie==='location' && (x.data||x.url) && String(x.titre||'').toLowerCase().indexOf(nom)!==-1; }):[];
+    return m.map(function(x){ return {src:x.data||x.url, titre:x.titre||''}; });
+  }
+  function simulerLocation(i){
+    var l=LOCATIONS[i]; if(!l) return;
+    var g=function(id){ return document.getElementById(id); }, n=parseInt(g('loc-avance').value,10)||0;
+    g('loc-avance-v').textContent=n+' mois';
+    g('loc-entree').textContent=fmt((l.caution||0)+n*(l.loyer||0))+' F';
+    g('loc-an').textContent=fmt(12*(l.loyer||0))+' F';
+  }
+  function ouvrirFicheLocation(i){
+    var l=LOCATIONS[i]; if(!l) return;
+    var photos=photosLocation(l); if(!photos.length) photos=[{src:photoBien(l,CAT_TYPES[3],'location'), titre:l.nom||''}];
+    var map=_locMapUrl(l);
+    montrerFiche('<div class="bien-fiche" role="dialog" aria-modal="true" aria-label="'+esc(l.nom||'Bien à louer')+'">'
+      +'<button type="button" class="bien-fermer" id="bien-fermer" aria-label="Fermer" onclick="fermerFicheBien()">✕</button>'
+      +'<div class="bien-grille">'+_galerieFiche(photos,l.nom||'Bien')
+      +'<div class="bien-corps"><h3>'+esc(l.nom||'Bien à louer')+'</h3>'
+      +'<div class="bien-meta"><span>Location</span>'+(l.pieces?'<span>'+esc(l.pieces)+'</span>':'')+(l.surf?'<span>'+esc(l.surf)+'</span>':'')+'</div>'
+      +'<div style="margin:6px 0 10px;">'+_locDispoBadge(l)+'</div>'
+      +(l.adresse?'<div class="vt-meta"><i class="fas fa-location-dot"></i><span>'+esc(l.adresse)+'</span></div>':'')
+      +(map?'<p><a class="vt-lien" href="'+esc(map)+'" target="_blank" rel="noopener"><i class="fas fa-map-location-dot"></i> Voir la localisation</a></p>':'')
+      +'<div class="sim"><h4>Votre budget à l\'entrée</h4>'
+      +'<div class="sim-res" style="margin-top:0;"><div><span>Loyer mensuel</span><strong>'+(l.loyer?fmt(l.loyer)+' F':'—')+'</strong></div><div><span>Caution</span><strong>'+(l.caution?fmt(l.caution)+' F':'—')+'</strong></div></div>'
+      +'<label>Mois de loyer d\'avance <b id="loc-avance-v"></b><input type="range" id="loc-avance" min="0" max="6" step="1" value="1" oninput="simulerLocation('+i+')"></label>'
+      +'<div class="sim-res"><div><span>À prévoir à l\'entrée (caution + avance)</span><strong id="loc-entree"></strong></div><div><span>Coût annuel du loyer</span><strong id="loc-an"></strong></div></div>'
+      +'<p class="sim-note">Estimation indicative, hors frais d\'agence éventuels. Les conditions définitives figurent dans le contrat de bail.</p></div>'
+      +'<button type="button" class="highlight-btn" onclick="fermerFicheBien();choisirLocationPourReservation('+i+')">Réserver ce bien</button>'
+      +'</div></div></div>');
+    simulerLocation(i);
+  }
+  window.ouvrirFicheLocation=ouvrirFicheLocation; window.simulerLocation=simulerLocation;
+  function photosProgramme(p){
+    return (MEDIAS||[]).filter(function(x){ return x.type==='photo' && (x.categorie==='eden'||x.categorie==='catalogue') && (x.data||x.url) && x.ref_type==='programme' && String(x.ref_id)===String(p.id); }).map(function(x){ return {src:x.data||x.url, titre:x.titre||''}; });
+  }
+  function ouvrirFicheProgramme(id){
+    var p=(_progsData||[]).filter(function(x){ return String(x.id)===String(id); })[0]; if(!p) return;
+    var typ=PROG_TYPES[p.statut]||CAT_TYPES[0], photos=photosProgramme(p); if(!photos.length) photos=[{src:photoProgramme(p,typ), titre:p.nom||''}];
+    var dispo=p.lots_disponibles!=null?+p.lots_disponibles:null, total=p.lots_prevus!=null?+p.lots_prevus:(p.lots_morceles!=null?+p.lots_morceles:null);
+    var pct=(dispo!=null&&total)?Math.max(0,Math.min(100,Math.round((1-dispo/total)*100))):null;
+    montrerFiche('<div class="bien-fiche" role="dialog" aria-modal="true" aria-label="'+esc(p.nom||'Programme')+'">'
+      +'<button type="button" class="bien-fermer" id="bien-fermer" aria-label="Fermer" onclick="fermerFicheBien()">✕</button>'
+      +'<div class="bien-grille">'+_galerieFiche(photos,p.nom||'Programme')
+      +'<div class="bien-corps"><h3>'+esc(p.nom||'Programme')+'</h3>'
+      +'<div class="bien-meta"><span>'+esc(PROG_STATUTS[p.statut]||'Programme')+'</span>'+(p.commune?'<span>'+esc(p.commune)+'</span>':'')+'</div>'
+      +(p.description?'<p style="line-height:1.6;">'+esc(p.description)+'</p>':'')
+      +(pct!=null?'<div><div class="vt-barre" role="img" aria-label="'+pct+' % des lots réservés"><i style="width:'+pct+'%"></i></div><div class="vt-barre-lib"><span>'+dispo+' lot'+(dispo>1?'s':'')+' disponible'+(dispo>1?'s':'')+'</span><span>sur '+total+'</span></div></div>'
+        :(dispo!=null?'<p><b>'+dispo+'</b> lot'+(dispo>1?'s':'')+' disponible'+(dispo>1?'s':'')+'</p>':''))
+      +(p.date_livraison?'<div class="vt-meta"><i class="fas fa-calendar-check"></i><span>Livraison prévue : '+dshort(p.date_livraison)+'</span></div>':'')
+      +'<div class="vt-actions" style="margin-top:14px;"><button type="button" class="highlight-btn" onclick="fermerFicheBien();basculerVersOnglet(\'catalogue\')">Voir les biens</button>'
+      +'<button type="button" class="highlight-btn" style="background:#0b1b3a;" onclick="fermerFicheBien();basculerVersOnglet(\'contact\')">Nous contacter</button></div>'
+      +'</div></div></div>');
+  }
+  window.ouvrirFicheProgramme=ouvrirFicheProgramme;
+
   async function chargerListeProgrammes(){
     var box = document.getElementById('programme-liste-cards');
     if (!box) return;
