@@ -59705,14 +59705,14 @@ async function fcOuvrirDossier(o) {
   };
   d.etapes.forEach(function(e){ e.responsable_id = d.responsable_id; });
   if (o.type === 'immatriculation_urbaine') fcUrbainInit(d, o);
-  var modele = o.sans_modele ? null : (fcModeleActif(o.type) || (fcDelaisAutoActif() ? { etapes: {} } : null)), appris = (modele && fcDelaisAutoActif()) ? fcDureesSuggerees(o.type) : {}, appl = modele ? fcAppliquerModele(d, modele, appris) : null;
+  var modele = o.sans_modele ? null : (fcModeleActif(o.type) || ((o.modele_defaut && !fcModeles()[o.type]) ? fcModeleParDefaut(o.type) : (fcDelaisAutoActif() ? { etapes: {} } : null))), appris = (modele && fcDelaisAutoActif()) ? fcDureesSuggerees(o.type) : {}, appl = modele ? fcAppliquerModele(d, modele, appris) : null;
   if (appl && !d.date_cible && appl.echeance) d.date_cible = appl.echeance;
   if (o.individuel) Object.assign(d, o.individuel);
   if (!DATA.dossiers_fonciers) DATA.dossiers_fonciers = [];
   DATA.dossiers_fonciers.push(d);
   await fcSauver(d);
   await fcEvenement(d, '', 'ouverture', 'Dossier ouvert : ' + FC_PROCEDURES[o.type] + (o.situation ? ' (situation : ' + FC_SITUATIONS[o.situation].libelle + ')' : ''), { nouveau: d.reference, source: 'promoteur' });
-  if (appl && appl.etapes) await fcEvenement(d, '', 'modele', 'Modèle de dossier appliqué : ' + appl.etapes + ' réglage(s), échéance finale ' + (appl.echeance || '—') + (appl.auto ? ', dont ' + appl.auto + ' échéance(s) estimée(s) d\'après la durée habituelle de vos dossiers (75 % terminés plus vite)' : ''), { source: 'promoteur' });
+  if (appl && appl.etapes) await fcEvenement(d, '', 'modele', 'Modèle de dossier appliqué' + (modele && modele.defaut ? ' (délais et responsables indicatifs)' : '') + ' : ' + appl.etapes + ' réglage(s), échéance finale ' + (appl.echeance || '—') + (appl.auto ? ', dont ' + appl.auto + ' échéance(s) estimée(s) d\'après la durée habituelle de vos dossiers (75 % terminés plus vite)' : ''), { source: 'promoteur' });
   var avertissements = [];
   if (o.situation && FC_SITUATIONS[o.situation].procedure !== o.type) avertissements.push('La situation « ' + FC_SITUATIONS[o.situation].libelle + ' » oriente plutôt vers « ' + FC_PROCEDURES[FC_SITUATIONS[o.situation].procedure] + ' ». ' + FC_PROCEDURE_REF.non_equivalence);
   if (o.situation && FC_SITUATIONS[o.situation].a_determiner) avertissements.push('Procédure à déterminer avec les services compétents ou un professionnel habilité : ' + FC_SITUATIONS[o.situation].demarche);
@@ -59902,6 +59902,7 @@ function fcRender() {
     + '<div class="form-group"><label>Responsable</label><select class="filter-select" id="fc-n-resp"><option value="">— choisir —</option>' + users.map(function(u){ return '<option value="' + u.id + '">' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select></div>'
     + '<div class="form-group"><label>Priorité</label><select class="filter-select" id="fc-n-prio"><option value="normale">Normale</option><option value="haute">Haute</option><option value="basse">Basse</option></select></div>'
     + '<div class="form-group"><label>Échéance</label><input type="date" class="form-control" id="fc-n-cible"></div>'
+    + '<div class="form-group" style="min-width:280px;max-width:420px;"><label style="font-size:12px;"><input type="checkbox" id="fc-n-modele-ck" checked> Appliquer le modèle de délais et responsables</label><div id="fc-n-modele-info" style="font-size:11px;color:var(--dim);">' + fcApercuModeleHtml('acd') + '</div></div>'
     + '<div id="fc-n-urbain" style="display:none;gap:10px;align-items:end;flex-wrap:wrap;"><div class="form-group"><label>Propriétaires terriens</label><select class="filter-select" id="fc-n-prop"><option value="plusieurs">Plusieurs propriétaires</option><option value="un">Un seul propriétaire</option></select></div>'
     + '<div class="form-group"><label>Voie envisagée</label><select class="filter-select" id="fc-n-voie"><option value="">— à choisir plus tard —</option><option value="acd">ACD</option><option value="approbation">Approbation</option></select></div></div>'
     + '<button class="btn btn-primary btn-sm" onclick="fcOuvrirUI()">Ouvrir le dossier</button></div><div id="fc-n-sit-info"></div></details>';
@@ -59913,7 +59914,7 @@ function fcRender() {
 }
 async function fcOuvrirUI() {
   var g = function(i){ return (document.getElementById(i) || {}).value || ''; };
-  var args = function(extra){ return Object.assign({ parcelle_id: g('fc-n-parcelle'), type: g('fc-n-type'), situation: g('fc-n-situation'), responsable_id: g('fc-n-resp'), priorite: g('fc-n-prio'), date_cible: g('fc-n-cible'), plusieurs_proprietaires: g('fc-n-prop') !== 'un', voie: g('fc-n-voie') }, extra || {}); };
+  var args = function(extra){ return Object.assign({ parcelle_id: g('fc-n-parcelle'), type: g('fc-n-type'), situation: g('fc-n-situation'), responsable_id: g('fc-n-resp'), priorite: g('fc-n-prio'), date_cible: g('fc-n-cible'), plusieurs_proprietaires: g('fc-n-prop') !== 'un', voie: g('fc-n-voie'), sans_modele: !(document.getElementById('fc-n-modele-ck') || { checked: true }).checked, modele_defaut: true }, extra || {}); };
   var r = await fcOuvrirDossier(args());
   if (!r.ok && r.doublon && confirm(r.erreur + '\n\nOuvrir quand même un second dossier ?')) r = await fcOuvrirDossier(args({ forcer: true }));
   if (fcMsg(r, 'Dossier ouvert.')) { APP._fcSel = r.dossier.id; fcRender(); (r.avertissements || []).forEach(function(a){ toast(a, 'warning'); }); }
@@ -61366,7 +61367,7 @@ function fcPanneauUrbain(d) {
     + '<div style="margin-top:6px;color:var(--dim);">' + escHtml(FC_URB_REF.avertissement) + ' <i>' + escHtml(FC_URB_REF.origine) + '.</i></div></div>';
 }
 async function fcVoieUI(id, voie) { if (!voie) return; var r = await fcDefinirVoie(id, voie); fcMsg(r, "Voie d'immatriculation enregistrée."); fcRender(); }
-function fcTypeChange(sel) { var z = document.getElementById('fc-n-urbain'); if (z) z.style.display = sel && sel.value === 'immatriculation_urbaine' ? 'flex' : 'none'; }
+function fcTypeChange(sel) { var z = document.getElementById('fc-n-urbain'); if (z) z.style.display = sel && sel.value === 'immatriculation_urbaine' ? 'flex' : 'none'; if (sel) fcMajApercuModele(sel.value); }
 /* §VI : points de contrôle essentiels avant de sécuriser une parcelle. */
 var FC_CONTROLES_REF = [
   ['identite', 'Identité', 'Le demandeur ou le vendeur est-il bien la personne désignée dans les documents ?'],
@@ -63146,6 +63147,59 @@ function fcIncoherences(d) {
 }
 
 /* ── Modèles de dossier ── */
+/* ── Modèles préremplis : délais indicatifs et responsables par défaut ──
+   Estimations de départ en jours calendaires, À VALIDER par la direction (elles ne sont pas des délais légaux). Elles sont proposées à l'ouverture d'un dossier
+   tant qu'aucun modèle n'est enregistré pour la procédure ; la durée observée sur vos dossiers terminés (option « Estimer les échéances ») les remplace dès qu'elle existe. */
+var FC_DELAIS_DEFAUT = {
+  creation_dossier: 1, completude_documents: 5, identification_procedure: 3, verification_references: 7, anomalies: 5, ind_verification_titre_mere: 5,
+  mission_technique: 3, documents_techniques: 30, reception_livrables: 10, controle_pieces: 5, validation_technique: 5, ind_identification_lot: 7, ind_pieces_souscripteur: 15,
+  preparation_dossier_admin: 7, ind_acte_mutation: 15, ind_droits_frais: 15, depot: 3, recepisse: 7, publication_requisition: 30, recueil_oppositions: 30,
+  bornage_contre_bornage: 15, traitement_oppositions: 30, suivi_instruction: 60, observations_complements: 15, preparation_complements: 10, transmission_complements: 5, reponse: 30,
+  attestation_domaniale: 30, formalites_titre: 30, references_justificatifs: 5, acd_signature: 60, enregistrement_publicite: 30, ind_titre_individuel: 30, retrait_acd: 15,
+  formalites_livre_foncier: 60, verification_documents: 5, concordance_references: 5, documents_finaux: 5, ind_remise_titre: 7, maj_statut_foncier: 2, publication_souscripteur: 2, cloture: 1,
+  urb_acquisition: 14, urb_civilite_delimitation: 14, urb_leve_topo_contenance: 14, urb_enquete_fonciere: 21, urb_contrat_exclusivite: 14, urb_pv_famille: 14, urb_enquete_villageoise: 21,
+  urb_parcellaire: 14, urb_attestations_coutumieres: 21, urb_polygonale_ensemble: 14, urb_notaire_convention: 30, urb_dotation: 30, urb_leve_geometre: 21, urb_avis_servitude: 30,
+  urb_etat_lieux: 7, urb_dossier_technique: 21, urb_plan_amenagement: 21, urb_prepa_depot: 7, urb_depot_guf: 3, urb_transmission_direction: 15, urb_courriers_avis: 15,
+  urb_avis_dtc: 30, urb_avis_duad: 30, urb_commodo: 30, urb_retour_avis: 15, urb_choix_voie: 7, urb_convention_tripartite: 30, urb_attestation_domaniale: 30, urb_dm: 30,
+  urb_bornage_contradictoire: 30, urb_creation_tf: 60, urb_projet_acd: 30, urb_cabinet_signature: 30, urb_notification_conservation: 7, urb_droits_publication: 15, urb_retrait_acd: 15,
+  urb_dossier_domaine_urbain: 15, urb_autorisation_lotir: 60, urb_amenagement_plan_approuve: 90, urb_guide_partage: 30, urb_certificat_conformite: 30, urb_approbation: 60,
+  urb_attestations_adu: 30, urb_attestations_souscripteurs: 15, urb_travaux_amenagement: 180, urb_livraison_financiers: 30, urb_maj_statut: 2, urb_publication_souscripteur: 2
+};
+/* Responsable par défaut selon le rôle : affecté seulement si UN SEUL utilisateur actif porte ce rôle (sinon le responsable du dossier reste responsable de l'étape). */
+var FC_ROLES_DEFAUT = {
+  ind_droits_frais: ['comptable'], urb_dotation: ['comptable'], urb_droits_publication: ['comptable'], enregistrement_publicite: ['comptable'],
+  controle_pieces: ['service_foncier'], validation_technique: ['service_foncier'], completude_documents: ['service_foncier'], verification_references: ['service_foncier']
+};
+function fcUserUniqueParRole(roles) {
+  var l = (DATA.users || []).filter(function(u){ return u && u.statut !== 'inactif' && roles.indexOf(u.role) !== -1; });
+  return l.length === 1 ? l[0].id : '';
+}
+function fcModeleParDefaut(type) {
+  var appris = fcDelaisAutoActif() ? fcDureesSuggerees(type) : {}, m = { actif: true, defaut: true, etapes: {} };
+  fcEtapesPour(type, '').forEach(function(e){
+    var j = appris[e.code] ? 0 : (FC_DELAIS_DEFAUT[e.code] || 0), r = FC_ROLES_DEFAUT[e.code] ? fcUserUniqueParRole(FC_ROLES_DEFAUT[e.code]) : '';
+    if (j > 0 || r) m.etapes[e.code] = { jours: j, responsable_id: r };
+  });
+  return m;
+}
+/* Aperçu affiché à l'ouverture : quel modèle sera appliqué, durée cumulée et échéance finale. */
+function fcApercuModele(type) {
+  var enreg = fcModeles()[type], actif = fcModeleActif(type), modele = actif || (enreg ? null : fcModeleParDefaut(type)), appris = fcDelaisAutoActif() ? fcDureesSuggerees(type) : {};
+  if (!modele) return { source: 'desactive', jours: 0, echeance: '', responsables: 0 };
+  var jours = 0, resp = 0;
+  fcEtapesPour(type, '').forEach(function(e){
+    var c = (modele.etapes || {})[e.code] || {}, j = parseInt(c.jours, 10);
+    if (!(j > 0) && appris[e.code]) j = appris[e.code].jours;
+    if (j > 0) jours += j; if (c.responsable_id) resp++;
+  });
+  return { source: actif ? 'enregistre' : 'indicatif', jours: jours, echeance: jours ? fcAjouterJours(fcAuj(), jours) : '', responsables: resp };
+}
+function fcApercuModeleHtml(type) {
+  var a = fcApercuModele(type);
+  if (a.source === 'desactive') return 'Le modèle de cette procédure est désactivé : aucune échéance préremplie.';
+  return (a.source === 'enregistre' ? 'Modèle enregistré' : '<b>Délais indicatifs</b> (aucun modèle enregistré — à valider dans Modèles de dossier)') + ' : ' + (a.jours ? 'échéance finale estimée au <b>' + escHtml(a.echeance) + '</b> (' + a.jours + ' jours)' : 'aucun délai défini') + (a.responsables ? ', ' + a.responsables + ' responsable(s) par défaut' : '') + '.';
+}
+function fcMajApercuModele(type) { var z = document.getElementById('fc-n-modele-info'); if (z) z.innerHTML = fcApercuModeleHtml(type); }
 function fcModeles() { return ((DATA.params || {}).fc_modeles) || {}; }
 function fcModeleActif(type) { var m = fcModeles()[type]; return m && m.actif !== false ? m : null; }
 function fcAppliquerModele(d, modele, appris) {
@@ -63181,10 +63235,11 @@ function fcDelaisAutoActif() { return ((DATA.params || {}).fc_delais_auto) !== f
 function fcPeutGererModeles() { return fcEstAdmin() || fcPeutVoirDirection(); }
 function fcRenderModeles() {
   var host = document.getElementById('fm-root'); if (!host) return;
-  var type = APP._fmType || 'acd', m = fcModeles()[type] || { actif: true, etapes: {} }, users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; }), sug = fcDureesSuggerees(type), ro = fcPeutGererModeles() ? '' : ' disabled ';
+  var type = APP._fmType || 'acd', propose = !fcModeles()[type], m = fcModeles()[type] || fcModeleParDefaut(type), users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; }), sug = fcDureesSuggerees(type), ro = fcPeutGererModeles() ? '' : ' disabled ';
   var etapes = fcEtapesPour(type, ''), phase = '', total = 0, urb = type === 'immatriculation_urbaine';
   var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">📐 Modèles de dossier — délais et responsables par défaut</div>'
     + '<div style="font-size:11px;color:var(--dim);margin-bottom:8px;">À l\'ouverture d\'un dossier de la procédure, les échéances sont calculées en <b>cumulant</b> les durées ci-dessous (en jours calendaires, à partir de la date d\'ouverture) et les responsables par défaut sont affectés. Une durée vide = pas d\'échéance. Les échéances restent modifiables dossier par dossier.</div>'
+    + (propose ? '<div style="font-size:12px;background:#fff3cd;border:1px solid #f0c36d;border-radius:6px;padding:8px 10px;margin-bottom:8px;">✨ <b>Aucun modèle enregistré pour cette procédure</b> : les délais et responsables ci-dessous sont des <b>valeurs indicatives préremplies</b> (à valider). Elles sont déjà proposées à l\'ouverture d\'un dossier ; cliquez sur « Enregistrer le modèle » pour les adopter.</div>' : '')
     + '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;"><div class="form-group"><label>Procédure</label><select class="filter-select" onchange="APP._fmType=this.value;fcRenderModeles()">' + Object.keys(FC_PROCEDURES).filter(function(k){ return k !== 'rural_a_examiner' || true; }).map(function(k){ return '<option value="' + k + '"' + (k === type ? ' selected' : '') + '>' + escHtml(FC_PROCEDURES[k]) + (fcModeles()[k] ? ' ✔' : '') + '</option>'; }).join('') + '</select></div>'
     + '<label style="font-size:12px;"><input type="checkbox" id="fm-actif" ' + (m.actif !== false ? 'checked ' : '') + ro + '> Appliquer ce modèle à l\'ouverture</label></div>'
     + '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Durée (jours)</th><th>Responsable par défaut</th><th>Observé</th>' + (urb ? '<th title="Une étape facultative ne bloque plus la phase suivante (réforme)">Obligatoire</th>' : '') + '</tr></thead><tbody>';
@@ -63196,7 +63251,7 @@ function fcRenderModeles() {
       + '<td style="font-size:11px;color:var(--dim);">' + (sug && sug[e.code] ? '<span title="Durée sous laquelle 3 dossiers sur 4 se sont terminés (moyenne ' + sug[e.code].moyenne + ' j, médiane ' + sug[e.code].mediane + ' j)">' + sug[e.code].jours + ' j (P75, ' + sug[e.code].n + ' dossiers)</span>' : '') + '</td>' + (urb && e.phase.charAt(0) === 'U' ? '<td><input type="checkbox" id="fm-o-' + e.code + '" ' + (fcUrbainFacultative(e.code) ? '' : 'checked ') + ro + '></td>' : (urb ? '<td></td>' : '')) + '</tr>';
   });
   h += '</tbody></table></div><div style="margin:8px 0;font-size:12px;">Délai total estimé : <b>' + total + ' jours</b></div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="fcSauverModeleUI()" ' + ro + '>💾 Enregistrer le modèle</button> <button class="btn btn-secondary btn-sm" onclick="fcProposerDureesUI()" ' + ro + '>📊 Proposer les durées observées</button> <button class="btn btn-secondary btn-sm" onclick="fcSupprimerModeleUI()" ' + ro + '>Supprimer le modèle</button></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="fcSauverModeleUI()" ' + ro + '>💾 Enregistrer le modèle</button> <button class="btn btn-secondary btn-sm" onclick="fcPrerempliModeleUI()" ' + ro + '>✨ Préremplir les champs vides</button> <button class="btn btn-secondary btn-sm" onclick="fcProposerDureesUI()" ' + ro + '>📊 Proposer les durées observées</button> <button class="btn btn-secondary btn-sm" onclick="fcSupprimerModeleUI()" ' + ro + '>Supprimer le modèle</button></div>'
     + '<hr><label style="font-size:12px;"><input type="checkbox" ' + (fcDelaisAutoActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_delais_auto\',this.checked,\'Échéances estimées\')"> <b>Estimer les échéances d\'après vos dossiers</b> : pour les étapes sans durée dans le modèle, l\'échéance utilise la durée habituelle observée (75 % des dossiers terminés plus vite, au moins ' + FC_SEUIL_MESURE + ' dossiers), marquée « estimée ».</label>'
     + '<br><label style="font-size:12px;"><input type="checkbox" id="fm-deps" ' + (fcDependancesActives() ? 'checked ' : '') + ro + ' onchange="fcBasculerDependancesUI(this.checked)"> <b>Imposer l\'ordre des étapes</b> : une étape ne démarre ni ne se termine avant ses étapes préalables (dérogation motivée du responsable, journalisée).</label>'
     + '<br><label style="font-size:12px;"><input type="checkbox" ' + (fcControleClotureActif() ? 'checked ' : '') + ro + ' onchange="fcBasculerReglageUI(\'fc_controle_cloture\',this.checked,\'Contrôle de clôture\')"> <b>Contrôler la complétude à la clôture</b> : pièces à contrôler, missions, demandes, anomalies, frais et notes du titre.</label>'
@@ -63228,6 +63283,15 @@ async function fcSupprimerModeleUI() {
   if (!fcPeutGererModeles()) { toast('Réservé à la direction ou aux administrateurs.', 'error'); return; }
   var type = APP._fmType || 'acd'; if (!fcModeles()[type]) return; if (!confirm('Supprimer le modèle « ' + FC_PROCEDURES[type] + ' » ? Les dossiers déjà ouverts ne changent pas.')) return;
   DATA.params.fc_modeles = Object.assign({}, fcModeles()); delete DATA.params.fc_modeles[type]; await fcEnregistrerParams(); fcRenderModeles();
+}
+function fcPrerempliModeleUI() {
+  var type = APP._fmType || 'acd', def = fcModeleParDefaut(type), n = 0;
+  Object.keys(def.etapes).forEach(function(k){
+    var j = document.getElementById('fm-j-' + k), r = document.getElementById('fm-r-' + k), c = def.etapes[k];
+    if (j && !j.value && c.jours > 0) { j.value = c.jours; n++; }
+    if (r && !r.value && c.responsable_id) { r.value = c.responsable_id; n++; }
+  });
+  toast(n ? n + ' champ(s) prérempli(s) avec les valeurs indicatives : vérifiez puis enregistrez.' : 'Aucun champ vide à préremplir.', n ? 'info' : 'warning');
 }
 function fcProposerDureesUI() {
   var type = APP._fmType || 'acd', s = fcDureesSuggerees(type), n = Object.keys(s).length;
