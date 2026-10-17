@@ -2828,6 +2828,18 @@
     var w=window.open('','_blank','width=860,height=900'); if(!w) return;
     w.document.write(a.html); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
   }
+  /* Documents remis : seules les lignes marquées « visible portail » sont affichées (état et date) ; jamais de fichier ni de note interne. */
+  var FON_DOCS_LIB={ contrat:'Contrat de cession / promesse / acte de vente', recus:'Reçus de versement', plan_lot:'Plan de situation / plan du lot', pv_remise:'PV de remise du terrain (bornage)', titre_mere:'Copie du titre mère (ACD / titre foncier)', arrete_lotissement:'Arrêté d\'approbation du lotissement', non_gage:'Certificat de non-gage / état foncier', acte_notarie:'Acte de vente notarié', titre_individuel:'Titre foncier individuel' };
+  function fonDocsCarte(c){
+    var dr=(c&&c.documents_remis)||{}, L=[];
+    Object.keys(dr).forEach(function(k){
+      var d=dr[k]; if(!d||!d.portail) return;
+      var lib=FON_DOCS_LIB[k]||(k.indexOf('autre_')===0?String(d.libelle||''):''); if(!lib) return;
+      L.push('<li class="'+(d.statut==='remis'?'fait':'')+'"><span></span><div><b>'+esc(lib)+'</b><small>'+(d.statut==='remis'?'Remis'+(d.date?' le '+esc(dshort(d.date)):''):'À venir')+'</small></div></li>');
+    });
+    if(!L.length) return '';
+    return '<div class="card"><strong>📋 Mes documents</strong><ol class="att-circ">'+L.join('')+'</ol><div style="font-size:.74rem;color:#6b7f95;">Les documents remis vous sont délivrés par votre interlocuteur ; cette liste en indique l\'état.</div></div>';
+  }
   function rendreFoncier(){
     var c=F.cession||{};
     var prix=parseFloat(c.prix_cession||0);
@@ -2856,6 +2868,7 @@
       +'<div style="margin-top:8px;font-size:.82rem;color:#4b6a8b;">Statut : '+(stMap[c.statut]||c.statut||'—')+'</div></div>'
 
       +fonAttCarte(c)
+      +fonDocsCarte(c)
       +'<div class="card"><h4><i class="fas fa-receipt"></i> Mes versements enregistrés</h4>'
       +(paiements.length
         ? '<table style="width:100%;border-collapse:collapse;font-size:.85rem;"><thead><tr><th style="text-align:left;padding:6px;">Date</th><th style="text-align:right;padding:6px;">Montant</th><th style="text-align:left;padding:6px;">Mode</th><th style="text-align:left;padding:6px;">Réf.</th></tr></thead><tbody>'

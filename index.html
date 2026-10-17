@@ -10249,6 +10249,22 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
         </div>
       </div>
 
+      <!-- ── MODAL : Documents remis à l'acquéreur foncier ── -->
+      <div class="modal-overlay" id="modal-ces-docs">
+        <div class="modal" style="max-width:760px;">
+          <div class="modal-header"><div class="modal-title">📋 Documents remis — <span id="cesdoc-acq"></span></div><button class="modal-close" onclick="closeModal('modal-ces-docs')">✕</button></div>
+          <div class="modal-body">
+            <div class="alert alert-info" style="margin-bottom:10px;font-size:12px;">Liste indicative des pièces d'un dossier d'acquisition foncière ; à confirmer avec votre notaire selon l'opération. « Visible portail » rend la ligne visible à l'acquéreur (état seulement).</div>
+            <div id="cesdoc-body"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="cesDocAjouter()">➕ Autre document</button>
+            <button class="btn btn-secondary" onclick="cesDocBordereau(_cesDocId)">🖨 Bordereau de remise</button>
+            <button class="btn btn-primary" onclick="closeModal('modal-ces-docs')">Fermer</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ── MODAL : Encaisser / Modifier un versement ── -->
       <div class="modal-overlay" id="modal-crec-paiement">
         <div class="modal" style="max-width:520px;">
@@ -117327,7 +117343,7 @@ function cesRender() {
       +'<td style="text-align:right;">'+margeCell+'</td>'
       +'<td style="text-align:right;color:var(--vert);">'+fmtF(c.montant_encaisse)+(reste>0?('<br><span style="font-size:10px;color:var(--rouge);">reste '+fmtF(reste)+'</span>'):'')+'</td>'
       +'<td><span class="badge '+(statutBadge[c.statut]||'badge-neutre')+'">'+({promesse:'Promesse',cedee:'Cédée',soldee:'Soldée',resiliee:'Résiliée'}[c.statut]||c.statut||'—')+'</span></td>'
-      +'<td style="white-space:nowrap;">'+cesAttCellule(c)+'<button class="btn btn-secondary btn-sm btn-icon" title="Acte / contrat" onclick="cesGenererContrat(\''+c.id+'\')">🖨</button> <button class="btn btn-secondary btn-sm btn-icon" onclick="cesOpen(\''+c.id+'\')">✏️</button>'
+      +'<td style="white-space:nowrap;">'+cesAttCellule(c)+'<button class="btn btn-secondary btn-sm btn-icon" title="Documents remis à l\'acquéreur" onclick="cesDocOuvrir(\''+c.id+'\')">📋 '+cesDocCompteur(c)+'</button> <button class="btn btn-secondary btn-sm btn-icon" title="Acte / contrat" onclick="cesGenererContrat(\''+c.id+'\')">🖨</button> <button class="btn btn-secondary btn-sm btn-icon" onclick="cesOpen(\''+c.id+'\')">✏️</button>'
       +(c.statut!=='resiliee' ? (' <button class="btn btn-secondary btn-sm btn-icon" onclick="cesResilierOuvrir(\''+c.id+'\')" title="Résilier la cession" style="background:#FEF3C7;color:#92400E;border-color:#FCD34D;">📄</button>') : '')
       +(c.statut==='resiliee' && c.resiliation && c.resiliation.montant_rembourse>0 && !c.resiliation.rembourse ? (' <button class="btn btn-secondary btn-sm btn-icon" onclick="cesResilierOuvrirRemboursement(\''+c.id+'\')" title="Marquer remboursé" style="background:#DCFCE7;color:#166534;border-color:#86EFAC;">💰</button>') : '')
       +'</td>'
@@ -117517,6 +117533,101 @@ function cesAttCellule(c) {
       + '<button class="btn btn-secondary btn-sm" ' + b + ' title="Annuler la validation (retour en brouillon)" onclick="cesAttAnnulerValidation(' + q + ')">↩</button>';
   }
   return h + '</div>';
+}
+
+/* ══ Documents remis à l'acquéreur foncier ══
+   Registre par cession (c.documents_remis[clé] = {statut, date, par, note, portail}) + bordereau de remise signé. L'attestation de solde est suivie
+   automatiquement depuis son circuit. Le portail n'affiche que les lignes marquées « visible portail » (état et date, jamais de fichier). */
+var CES_DOCS = [
+  { key:'contrat',            label:'Contrat de cession / promesse / acte de vente' },
+  { key:'recus',              label:'Reçus de versement' },
+  { key:'attestation_solde',  label:'Attestation de solde', auto:true },
+  { key:'plan_lot',           label:'Plan de situation / plan du lot' },
+  { key:'pv_remise',          label:'PV de remise du terrain (bornage)' },
+  { key:'titre_mere',         label:'Copie du titre mère (ACD / titre foncier)' },
+  { key:'arrete_lotissement', label:'Arrêté d\'approbation du lotissement' },
+  { key:'non_gage',           label:'Certificat de non-gage / état foncier' },
+  { key:'acte_notarie',       label:'Acte de vente notarié' },
+  { key:'titre_individuel',   label:'Titre foncier individuel' }
+];
+var _cesDocId = null;
+function cesDocListe(c) {
+  var dr = c.documents_remis || {}, L = CES_DOCS.map(function(d){ return { key: d.key, label: d.label, auto: !!d.auto }; });
+  Object.keys(dr).filter(function(k){ return k.indexOf('autre_') === 0; }).forEach(function(k){ L.push({ key: k, label: dr[k].libelle || 'Autre document', auto: false }); });
+  return L;
+}
+function cesDocRemis(c, d) {
+  if (d.auto) { var a = c.attestation_solde; return !!(a && a.statut === 'valide' && a.publie_portail); }
+  return ((c.documents_remis || {})[d.key] || {}).statut === 'remis';
+}
+function cesDocCompteur(c) {
+  var L = cesDocListe(c), n = L.filter(function(d){ return cesDocRemis(c, d); }).length;
+  return n + '/' + L.length;
+}
+function cesDocOuvrir(id) {
+  var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === id; }); if (!c) return;
+  _cesDocId = id; cesDocRender(); openModal('modal-ces-docs');
+}
+function cesDocRender() {
+  var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === _cesDocId; }); if (!c) return;
+  var q = '\'' + c.id + '\'', dr = c.documents_remis || {};
+  document.getElementById('cesdoc-acq').textContent = cesAcquereurLabel(c.acheteur) + (c.dossier ? ' (' + c.dossier + ')' : '');
+  document.getElementById('cesdoc-body').innerHTML = '<table style="width:100%;font-size:12px;border-collapse:collapse;"><thead><tr><th style="text-align:left;">Document</th><th>Remis</th><th>Date</th><th>Visible portail</th><th style="text-align:left;">Note</th></tr></thead><tbody>'
+    + cesDocListe(c).map(function(d){
+      var e = dr[d.key] || {}, k = '\'' + d.key + '\'';
+      if (d.auto) {
+        var a = c.attestation_solde, lib = !a ? 'Non établie' : a.statut === 'valide' ? (a.publie_portail ? '✅ Publiée' : '✅ Validée, non publiée') : a.statut === 'en_attente' ? '⏳ En validation' : a.statut === 'rejete' ? '⛔ Rejetée' : '📝 Brouillon';
+        return '<tr style="border-top:1px solid var(--bord);"><td style="padding:5px 4px;">' + escHtml(d.label) + (a && a.numero ? ' <span style="color:var(--blanc-dim);">' + escHtml(a.numero) + '</span>' : '') + '</td><td colspan="4" style="text-align:center;color:var(--blanc-dim);">' + lib + ' (suivi automatique)</td></tr>';
+      }
+      var remis = e.statut === 'remis';
+      return '<tr style="border-top:1px solid var(--bord);"><td style="padding:5px 4px;">' + escHtml(d.label) + '</td>'
+        + '<td style="text-align:center;"><input type="checkbox" ' + (remis ? 'checked' : '') + ' onchange="cesDocMaj(' + q + ',' + k + ',\'remis\',this.checked)"></td>'
+        + '<td style="text-align:center;">' + (remis ? '<input type="date" class="form-control" style="padding:2px 4px;font-size:11px;" value="' + escHtml(e.date || '') + '" onchange="cesDocMaj(' + q + ',' + k + ',\'date\',this.value)">' : '—') + '</td>'
+        + '<td style="text-align:center;"><input type="checkbox" ' + (e.portail ? 'checked' : '') + ' onchange="cesDocMaj(' + q + ',' + k + ',\'portail\',this.checked)"></td>'
+        + '<td><input class="form-control" style="padding:2px 6px;font-size:11px;" value="' + escHtml(e.note || '') + '" placeholder="Réf., observations…" onchange="cesDocMaj(' + q + ',' + k + ',\'note\',this.value)"></td></tr>';
+    }).join('') + '</tbody></table>';
+}
+function cesDocMaj(id, key, champ, val) {
+  var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === id; }); if (!c) return;
+  if (!c.documents_remis) c.documents_remis = {};
+  var d = c.documents_remis[key] || (c.documents_remis[key] = {});
+  if (champ === 'remis') {
+    if (val) { d.statut = 'remis'; d.date = d.date || today(); d.par = (APP.currentUser && APP.currentUser.nom) || ''; if (d.portail === undefined) d.portail = true; }
+    else { d.statut = 'a_remettre'; delete d.date; delete d.par; }
+  } else if (champ === 'portail') d.portail = !!val;
+  else if (champ === 'date') d.date = val;
+  else if (champ === 'note') d.note = String(val || '').slice(0, 200);
+  cesAttSauver(c); cesDocRender(); cesRender();
+}
+function cesDocAjouter() {
+  var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === _cesDocId; }); if (!c) return;
+  var lib = prompt('Intitulé du document :', ''); if (lib === null) return; lib = String(lib).trim().slice(0, 120);
+  if (!lib) { toast('Intitulé obligatoire.', 'error'); return; }
+  if (!c.documents_remis) c.documents_remis = {};
+  c.documents_remis['autre_' + uid()] = { libelle: lib, statut: 'a_remettre', portail: false };
+  cesAttSauver(c); cesDocRender(); cesRender();
+}
+function cesDocBordereau(id) {
+  var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === id; }); if (!c) return;
+  var p = DATA.params || {}, E = function(x){ return escHtml(x == null ? '' : String(x)); }, dr = c.documents_remis || {};
+  var remis = cesDocListe(c).filter(function(d){ return cesDocRemis(c, d); });
+  if (!remis.length) { toast('Aucun document remis à porter au bordereau.', 'info'); return; }
+  var lignes = remis.map(function(d, i){
+    var e = d.auto ? { date: (c.attestation_solde || {}).valide_le, note: (c.attestation_solde || {}).numero } : (dr[d.key] || {});
+    return '<tr><td>' + (i + 1) + '</td><td>' + E(d.label) + '</td><td>' + E(dateShort(e.date)) + '</td><td>' + E(e.note || '') + '</td></tr>';
+  }).join('');
+  var w = window.open('', '_blank', 'width=860,height=900'); if (!w) { toast('Fenêtre bloquée par le navigateur.', 'error'); return; }
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bordereau de remise ' + E(c.dossier || '') + '</title><style>body{font-family:Georgia,serif;padding:38px 46px;max-width:760px;margin:0 auto;font-size:13px;line-height:1.55;color:#1a1a1a;}'
+    + 'h1{text-align:center;font-size:20px;color:#1A6B3A;margin:14px 0 4px;}table{width:100%;border-collapse:collapse;margin:10px 0;}td,th{border:1px solid #ccc;padding:5px 9px;font-size:12px;text-align:left;}th{background:#eef7f1;}'
+    + '.sig{display:flex;justify-content:space-between;margin-top:40px;}.sig div{width:46%;text-align:center;font-size:12px;}' + ATT_PIED_CSS + '</style></head><body>'
+    + '<div style="border-bottom:2px solid #1A6B3A;padding-bottom:8px;display:flex;justify-content:space-between;"><strong style="font-size:15px;">' + E(p.societe || '') + '</strong><span>Dossier : ' + E(c.dossier || c.id) + '</span></div>'
+    + '<h1>BORDEREAU DE REMISE DE DOCUMENTS</h1>'
+    + '<p>Acquéreur : <strong>' + E(cesAcquereurLabel(c.acheteur)) + '</strong><br>Bien : ' + E(c.designation || '—') + ' (' + E(cesSourceRef(c.source_key)) + ')</p>'
+    + '<table><thead><tr><th>N°</th><th>Document</th><th>Remis le</th><th>Référence / observations</th></tr></thead><tbody>' + lignes + '</tbody></table>'
+    + '<p>L\'acquéreur reconnaît avoir reçu les documents listés ci-dessus.</p>'
+    + '<div class="sig"><div>L\'acquéreur<br><br><br>(lu et approuvé)</div><div>Fait à ' + E(p.ville || '____________') + ', le ' + E(dateShort(today())) + '<br><strong>Pour ' + E(p.societe || 'le cédant') + '</strong><br><br><br>Signature et cachet</div></div>'
+    + docPiedDePageEntreprise(p) + '</body></html>');
+  w.document.close(); setTimeout(function(){ try { w.print(); } catch (e) {} }, 400);
 }
 
 /* ── Génération de l'acte / contrat de cession ── */
