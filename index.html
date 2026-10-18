@@ -36817,6 +36817,12 @@ async function _vrsCreerBonCaisse(versement, caisseId) {
   var diag = caisse ? _vrsDiagSession(caisseId, d) : { ok: false, raison: 'caisse introuvable' };
   if (!diag.ok) return { mvt: null, raison: diag.raison };
   var session = diag.session;
+  /* [FIX écarts 2026-10-18] Versement daté d'une session close : si le tiroir compté ce jour-là ne contenait pas cet argent
+     (le rattacher creuserait l'écart), il entre dans la session ouverte, où l'argent est réellement remis. */
+  if (diag.cloturee && session.fond_cloture_reel !== null && session.fond_cloture_reel !== undefined) {
+    var _rV = parseFloat(session.fond_cloture_reel) || 0, _tV = parseFloat(session.fond_cloture_theorique) || 0, _mV = parseFloat(versement.montant) || 0, _ouvV = caisseGetSessionOuverte(caisseId);
+    if (_ouvV && Math.abs(_rV - (_tV + _mV)) > Math.abs(_rV - _tV)) { session = _ouvV; diag = { ok: true, session: _ouvV, cloturee: false }; }
+  }
   var numero = await caisseProchainNumero(caisseId, 'entree', d, caisse.compte);
   var auteur = (APP.currentUser && APP.currentUser.nom) || '—';
   var lib = _vrsMotif(versement);
@@ -133855,25 +133861,51 @@ function caisseBanniereAnciennes() {
 /* Un mouvement validé APRÈS la clôture de sa session change le solde théorique : sans recalcul,
    le solde et l'écart enregistrés restaient périmés et l'écart réapparaissait à la session suivante. */
 async function caisseRecalculerSiCloturee(mvt) {
+  /* [FIX écarts 2026-10-18] Mouvement validé après la clôture de sa session : on retient l'hypothèse qui colle au comptage réel.
+     - le tiroir compté contenait déjà l'argent (réel plus proche du théorique AVEC le mouvement) → la session close est recalculée ;
+     - sinon l'argent a bougé après le comptage → le mouvement est rattaché à la session ouverte (ou à la prochaine ouverture)
+       et la session close reste telle que comptée. Auparavant elle était toujours recalculée : 17 écarts artificiels (≈ 8,5 M F) chez Menco. */
   if (!mvt || !mvt.session_id) return;
   var sess = (DATA.caisse_sessions || []).find(function(x){ return x.id === mvt.session_id; });
-  if (sess && sess.statut === 'cloturee' && !sess.session_technique && mvt.valide_le && sess.cloturee_le && mvt.valide_le > sess.cloturee_le && !mvt.valide_apres_cloture) {
-    mvt.valide_apres_cloture = true;
+  var apres = !!(sess && sess.statut === 'cloturee' && !sess.session_technique && mvt.valide_le && sess.cloturee_le && mvt.valide_le > sess.cloturee_le);
+  if (!sess || sess.statut !== 'cloturee' || sess.ecart_regularise || sess.session_technique) {
+    if (apres && !mvt.valide_apres_cloture) { mvt.valide_apres_cloture = true; mvt._baseModifie = mvt._modifie || null; await dbPut('caisse_mouvements', mvt); await caisseSyncEtAlerter('pi_caisse_mouvements', mvt); }
+    return;
+  }
+  var avant = parseFloat(sess.fond_cloture_theorique) || 0, theo = caisseSoldeSession(sess);
+  if (theo === avant) { if (apres && !mvt.valide_apres_cloture) { mvt.valide_apres_cloture = true; mvt._baseModifie = mvt._modifie || null; await dbPut('caisse_mouvements', mvt); await caisseSyncEtAlerter('pi_caisse_mouvements', mvt); } return; }
+  var reel = (sess.fond_cloture_reel !== null && sess.fond_cloture_reel !== undefined) ? (parseFloat(sess.fond_cloture_reel) || 0) : null;
+  var dejaCompte = reel === null || Math.abs(reel - theo) <= Math.abs(reel - avant);
+  if (apres) mvt.valide_apres_cloture = true;
+  if (!dejaCompte) {
+    var cible = caisseGetSessionOuverte(mvt.caisse_id);
+    mvt.session_precedente = mvt.session_id;
+    if (cible) { mvt.session_id = cible.id; mvt.rattache_le = new Date().toISOString(); delete mvt.en_attente_session; }
+    else { mvt.session_id = ''; mvt.en_attente_session = true; }
     mvt._baseModifie = mvt._modifie || null;
     await dbPut('caisse_mouvements', mvt);
     await caisseSyncEtAlerter('pi_caisse_mouvements', mvt);
+    return;
   }
-  if (!sess || sess.statut !== 'cloturee' || sess.ecart_regularise || sess.session_technique) return;
-  var avant = parseFloat(sess.fond_cloture_theorique) || 0;
-  var theo = caisseSoldeSession(sess);
-  if (theo === avant) return;
+  if (apres) { mvt._baseModifie = mvt._modifie || null; await dbPut('caisse_mouvements', mvt); await caisseSyncEtAlerter('pi_caisse_mouvements', mvt); }
   sess.fond_cloture_theorique = theo;
-  if (sess.fond_cloture_reel !== null && sess.fond_cloture_reel !== undefined) sess.ecart = (parseFloat(sess.fond_cloture_reel) || 0) - theo;
+  if (reel !== null) sess.ecart = reel - theo;
   sess.recalcule_le = new Date().toISOString();
-  sess.recalcule_motif = 'Mouvement validé après la clôture';
+  sess.recalcule_motif = 'Mouvement validé après la clôture, déjà présent dans le tiroir compté';
   sess._baseModifie = sess._modifie || null;
   await dbPut('caisse_sessions', sess);
   await caisseSyncEtAlerter('pi_caisse_sessions', sess);
+}
+/* À l'ouverture : les mouvements validés pendant que la caisse était fermée entrent dans la nouvelle session. */
+async function caisseRattacherEnAttente(session) {
+  var l = (DATA.caisse_mouvements || []).filter(function(m){ return m.caisse_id === session.caisse_id && m.en_attente_session && !m.session_id; });
+  for (var i = 0; i < l.length; i++) {
+    var m = l[i]; m.session_id = session.id; m.rattache_le = new Date().toISOString(); delete m.en_attente_session;
+    m._baseModifie = m._modifie || null;
+    await dbPut('caisse_mouvements', m);
+    await caisseSyncEtAlerter('pi_caisse_mouvements', m);
+  }
+  return l.length;
 }
 
 /* ═══ REPRISE D'HISTORIQUE ═══════════════════════════════════════════════
@@ -133884,6 +133916,11 @@ function caisseDateDemarrage(caisseId) {
   var ds = (DATA.caisse_sessions || []).filter(function(s){ return s.caisse_id === caisseId && !s.session_technique; })
     .map(function(s){ return String(s.date || '').slice(0,10); }).filter(Boolean).sort();
   return ds[0] || '';
+}
+/* Bon antidaté : date antérieure au jour de la session ouverte (hors reprise d'historique). */
+function caisseBonAntidate(caisseId, date) {
+  var so = caisseGetSessionOuverte(caisseId);
+  return !!(so && date && so.date && String(date).slice(0,10) < String(so.date).slice(0,10));
 }
 function caisseEstReprise(caisseId, date) {
   var dem = caisseDateDemarrage(caisseId);
@@ -135579,8 +135616,9 @@ async function caisseOuvrir() {
       return;
     }
   }
+  var _nRatt = await caisseRattacherEnAttente(session);
   closeModal('modal-caisse-ouvrir');
-  toast('🔓 Caisse ouverte avec un fond de ' + fmtF(fond) + ' FCFA.', 'success');
+  toast('🔓 Caisse ouverte avec un fond de ' + fmtF(fond) + ' FCFA.' + (_nRatt ? ' ' + _nRatt + ' mouvement(s) validé(s) caisse fermée rattaché(s) à cette session.' : ''), 'success');
   caisseRenderListe();
   if (typeof caisseRenderDashboard === 'function') caisseRenderDashboard();
 }
@@ -135824,6 +135862,10 @@ async function caisseSaveBon() {
 
   /* ── MODE CRÉATION ────────────────────────────────────────────────────── */
   var _reprise = caisseEstReprise(caisseId, date);
+  if (!_reprise && caisseBonAntidate(caisseId, date)) {
+    var _soA = caisseGetSessionOuverte(caisseId);
+    _reprise = !confirm('📅 Ce bon est daté du ' + dateShort(String(date).slice(0,10)) + ', avant la session en cours (' + dateShort(String(_soA.date || '').slice(0,10)) + ').\n\nOK : l\'argent entre ou sort du tiroir AUJOURD\'HUI (compté dans la session).\nAnnuler : régularisation d\'une opération passée, SANS effet sur le tiroir.');
+  }
   var session = _reprise ? await caisseSessionHistorique(caisseId) : caisseGetSessionOuverte(caisseId);
   if (!session) { toast('La caisse a été clôturée entre-temps — impossible d\'enregistrer ce bon.', 'error'); closeModal('modal-caisse-bon'); return; }
   /* Revérifié ici (pas seulement à l'ouverture de la modale) : la modale a pu
@@ -135862,7 +135904,8 @@ async function caisseSaveBon() {
   if (type === 'sortie' && !_reprise) {
     var soldeCourant = caisseSoldeSession(session);
     if (montant > soldeCourant) {
-      if (!confirm('⚠️ Solde de caisse insuffisant (solde actuel : ' + fmtF(soldeCourant) + ' FCFA pour une sortie de ' + fmtF(montant) + ' FCFA).\n\nConfirmer tout de même l\'enregistrement de ce bon de sortie ?')) return;
+      toast('⛔ Solde de caisse insuffisant : ' + fmtF(soldeCourant) + ' FCFA disponibles pour une sortie de ' + fmtF(montant) + ' FCFA. Enregistrez d\'abord l\'entrée correspondante (une caisse ne peut pas être négative).', 'error', 8000);
+      return;
     }
   }
 
@@ -136042,7 +136085,8 @@ async function caisseTransfererFonds() {
 
   var soldeSource = caisseSoldeSession(sessionSource);
   if (montant > soldeSource) {
-    if (!confirm('⚠️ Solde de la caisse source insuffisant (solde actuel : ' + fmtF(soldeSource) + ' FCFA pour un transfert de ' + fmtF(montant) + ' FCFA).\n\nConfirmer tout de même ?')) return;
+    toast('⛔ Solde de la caisse source insuffisant : ' + fmtF(soldeSource) + ' FCFA pour un transfert de ' + fmtF(montant) + ' FCFA. Une caisse ne peut pas être négative.', 'error', 8000);
+    return;
   }
 
   var transfertId = uid();
@@ -136436,7 +136480,7 @@ async function reapServirConfirmer() {
     compte585 = (DATA.params && DATA.params.comptes_defaut && DATA.params.comptes_defaut.virement_interne) || '';
     if (!compte585) { toast('⚠️ Compte "Virement interne entre caisses" non paramétré — Paramètres → Comptes par défaut.', 'error', 7000); return; }
     var soldeSource = caisseSoldeSession(sessionSource);
-    if (montant > soldeSource && !confirm('⚠️ Solde de la caisse source insuffisant (' + fmtF(soldeSource) + ' FCFA pour ' + fmtF(montant) + ' FCFA).\n\nConfirmer tout de même ?')) return;
+    if (montant > soldeSource) { toast('⛔ Solde de la caisse source insuffisant (' + fmtF(soldeSource) + ' FCFA pour ' + fmtF(montant) + ' FCFA). Une caisse ne peut pas être négative.', 'error', 8000); return; }
   }
   if (!confirm('Verser ' + fmtF(montant) + ' FCFA dans la caisse « ' + (caisse.nom||'') + ' »'
     + (externe ? ' (fonds hors caisse : ' + justif + ')' : ' depuis la caisse « ' + (source.nom||'') + ' »') + ' ?\n\n'
@@ -139907,6 +139951,15 @@ async function caisseValiderDecaissement(mvtId) {
     if (Math.round(parseFloat(jumeau.montant)||0) !== Math.round(montant)) { toast('⛔ Montants incohérents entre ' + (mvt.numero||'') + ' et ' + (jumeau.numero||'') + ' — validation bloquée.', 'error', 8000); return; }
   }
   var jumeauAValider = jumeau && jumeau.requiert_validation && !jumeau.valide;
+  var _sortie = mvt.type === 'sortie' ? mvt : (jumeauAValider && jumeau.type === 'sortie' ? jumeau : null);
+  if (_sortie) {
+    var _sessS = (DATA.caisse_sessions || []).find(function(x){ return x.id === _sortie.session_id; });
+    if (_sessS && !_sessS.session_technique) {
+      var _sessCpt = _sessS.statut === 'ouverte' ? _sessS : caisseGetSessionOuverte(_sortie.caisse_id);
+      var _dispo = _sessCpt ? caisseSoldeSession(_sessCpt) : null;
+      if (_dispo !== null && (parseFloat(_sortie.montant) || 0) > _dispo) { toast('⛔ Validation impossible : ' + fmtF(_dispo) + ' FCFA disponibles dans ' + _caisseNomCaisse(_sortie.caisse_id) + ' pour une sortie de ' + fmtF(parseFloat(_sortie.montant) || 0) + ' FCFA. Une caisse ne peut pas être négative.', 'error', 8000); return; }
+    }
+  }
   if (!confirm('Valider ' + (mvt.type==='entree'?'l\'entrée':'la sortie') + ' de ' + fmtF(montant) + ' FCFA (' + (mvt.motif||'') + ') ?\n\nLe montant sera immédiatement ' + (mvt.type==='entree'?'ajouté au':'déduit du') + ' solde de caisse.'
     + (jumeauAValider ? '\n\n🔄 Transfert entre caisses : le bon lié ' + (jumeau.numero||'') + ' (' + (jumeau.type==='entree'?'entrée':'sortie') + ' — ' + _caisseNomCaisse(jumeau.caisse_id) + ') sera validé en même temps.' : ''))) return;
 
