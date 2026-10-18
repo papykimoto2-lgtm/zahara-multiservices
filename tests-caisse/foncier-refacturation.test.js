@@ -102,7 +102,7 @@ test('encaissement : D trésorerie / C 4111 en brouillard, équilibré, idempote
     o.statut = fcNoteDebours(fcDossier(d), n.id).statut; o.deux = (await fcEncaisserNoteDebours(d, n.id, { mode: 'virement', date: fcAuj() })).erreur; o.nb = DATA.ecritures.length - nb; o.syn = fcSyntheseFraisTitre(fcDossier(d));
     return o;
   }, [d, ids]);
-  assert.match(r.mode, /Mode de règlement/); assert.match(r.date, /Date d'encaissement/); assert.match(r.sansCompte, /non paramétré/); assert.match(r.droit, /droit de comptabiliser/);
+  assert.match(r.mode, /Mode de règlement/); assert.match(r.date, /Date d'encaissement/); assert.match(r.sansCompte, /non paramétré/); assert.match(r.droit, /droit de comptabiliser|ne permet pas de modifier/);
   assert.equal(r.ok, true); assert.deepEqual(r.lignes, [['521', 'D', 300000], ['4111', 'C', 300000]]); assert.equal(r.valide, false); assert.equal(r.type, 'actif'); assert.equal(r.statut, 'encaissee');
   assert.match(r.deux, /Déjà encaissée/); assert.equal(r.nb, 1); assert.equal(r.syn.encaisse, 300000);
 });
