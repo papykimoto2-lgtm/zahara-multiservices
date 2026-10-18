@@ -89274,6 +89274,7 @@ async function installerAppERP() {
 }
 
 async function startApp() {
+  setTimeout(function(){ try { if (typeof caisseAlerteQuotidienne === 'function') caisseAlerteQuotidienne(); } catch (e) {} }, 8000);
   await initDB();
   await loadAllData();
 
@@ -140596,13 +140597,75 @@ function _caisseResumeEcartsTexte(liste){
   }).join('\n');
 }
 
+
+/* ── Revue des écarts (18/10/2026) : ruptures de fond à justifier + alerte quotidienne des responsables ── */
+function caisseRupturesAJustifier() {
+  var out = [];
+  caissesVisibles().forEach(function(c){
+    var sess = (DATA.caisse_sessions || []).filter(function(s){ return s.caisse_id === c.id && !s.session_technique; })
+      .sort(function(a, b){ return String(a.ouverte_le || a.date || '').localeCompare(String(b.ouverte_le || b.date || '')); });
+    var prec = null;
+    sess.forEach(function(s){
+      if (prec && prec.fond_cloture_reel !== null && prec.fond_cloture_reel !== undefined) {
+        var d = (parseFloat(s.fond_ouverture) || 0) - (parseFloat(prec.fond_cloture_reel) || 0);
+        if (Math.round(d) !== 0 && !String(s.fond_ouverture_motif || '').trim() && !s.rupture_justification) out.push({ session: s, precedente: prec, diff: d, caisse: c });
+      }
+      if (s.statut === 'cloturee') prec = s;
+    });
+  });
+  return out.sort(function(a, b){ return String(b.session.date || '').localeCompare(String(a.session.date || '')); });
+}
+function caisseHtmlRuptures(l) {
+  if (!l.length) return '';
+  return '<div class="card" style="padding:16px;border-left:3px solid var(--or,#B87333);margin-top:12px;">'
+    + '<div style="font-weight:800;font-size:15px;margin-bottom:6px;">🔗 Fonds d\'ouverture à justifier <span style="color:var(--or,#B87333);">(' + l.length + ')</span></div>'
+    + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:10px;">Le fond saisi à l\'ouverture diffère du comptage de la clôture précédente, sans motif. Chaque différence est de l\'argent entré ou sorti hors bon : indiquez ce qui s\'est passé.</div>'
+    + '<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Date</th><th>Caisse</th><th>Ouverte par</th><th>Comptage veille</th><th>Fond saisi</th><th>Différence</th><th></th></tr></thead><tbody>'
+    + l.map(function(r){ var s = r.session;
+        return '<tr><td>' + escHtml(String(s.date || '').slice(0,10)) + '</td><td>' + escHtml(r.caisse.nom || '') + '</td><td>' + escHtml(s.ouverte_par || '—') + '</td>'
+          + '<td style="text-align:right;">' + fmtF(r.precedente.fond_cloture_reel) + '</td><td style="text-align:right;">' + fmtF(s.fond_ouverture) + '</td>'
+          + '<td style="text-align:right;font-weight:700;color:' + (r.diff > 0 ? 'var(--vert)' : 'var(--rouge)') + ';">' + (r.diff > 0 ? '+' : '') + fmtF(r.diff) + '</td>'
+          + '<td><button class="btn btn-secondary btn-sm" onclick="caisseJustifierRupture(\'' + s.id + '\')">📝 Justifier</button></td></tr>'; }).join('')
+    + '</tbody></table></div></div>';
+}
+async function caisseJustifierRupture(sessionId) {
+  if (!exigerDroit('Caisse', 'v', 'la justification d\'un fond d\'ouverture')) return;
+  var s = (DATA.caisse_sessions || []).find(function(x){ return x.id === sessionId; }); if (!s) return;
+  var t = prompt('Justification de la différence de fond d\'ouverture du ' + String(s.date || '').slice(0,10) + ' (obligatoire) :\nEx. : versement en banque du …, apport du gérant, erreur de saisie corrigée…', '');
+  if (t === null) return; t = t.trim();
+  if (!t) { toast('⚠️ La justification est obligatoire.', 'error'); return; }
+  s.rupture_justification = { texte: t, par: (APP.currentUser && APP.currentUser.nom) || '—', par_id: (APP.currentUser && APP.currentUser.id) || null, le: new Date().toISOString() };
+  s._baseModifie = s._modifie || null;
+  await dbPut('caisse_sessions', s);
+  await caisseSyncEtAlerter('pi_caisse_sessions', s);
+  toast('✅ Justification enregistrée.', 'success');
+  caisseRenderEcarts();
+}
+/* Une fois par jour et par responsable : rappel des écarts non régularisés et des fonds d'ouverture non justifiés. */
+function caisseAlerteQuotidienne() {
+  if (!APP.currentUser || !caisseRoleAdminLike()) return null;
+  var cle = 'caisse_alerte_' + (APP.currentUser.id || ''), jour = today();
+  APP._caisseAlerte = APP._caisseAlerte || {};
+  if (APP._caisseAlerte[cle] === jour) return null;
+  try { if (localStorage.getItem(cle) === jour) return null; } catch (e) {}
+  var vis = {}; caissesVisibles().forEach(function(c){ vis[c.id] = true; });
+  var ec = _caisseEcartsEnAttente().filter(function(s){ return vis[s.caisse_id]; }), ru = caisseRupturesAJustifier();
+  if (!ec.length && !ru.length) return null;
+  var net = ec.reduce(function(a, s){ return a + (parseFloat(s.ecart) || 0); }, 0);
+  var msg = '⚖️ Caisse : ' + (ec.length ? ec.length + ' écart(s) non régularisé(s) (net ' + (net > 0 ? '+' : '') + fmtF(net) + ' FCFA)' : '') + (ec.length && ru.length ? ' et ' : '') + (ru.length ? ru.length + ' fond(s) d\'ouverture à justifier' : '') + '. Voir Caisse › Écarts.';
+  toast(msg, 'warning', 12000);
+  APP._caisseAlerte[cle] = jour;
+  try { localStorage.setItem(cle, jour); } catch (e) {}
+  return { ecarts: ec.length, ruptures: ru.length, net: net };
+}
+
 function caisseRenderEcarts(){
   var box = document.getElementById('caisse-ecarts-box');
   if (!box) return;
   if (!caisseRoleAdminLike()) { box.innerHTML = ''; return; }
 
-  var liste = _caisseEcartsEnAttente();
-  if (!liste.length) { box.innerHTML = ''; return; }
+  var liste = _caisseEcartsEnAttente(), _rupt = caisseRupturesAJustifier();
+  if (!liste.length) { box.innerHTML = caisseHtmlRuptures(_rupt); return; }
 
   var html = '<div class="card" style="padding:16px;border-left:3px solid var(--rouge);">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
@@ -140635,7 +140698,7 @@ function caisseRenderEcarts(){
     + '</tr>';
   });
   html += '</tbody></table></div></div>';
-  box.innerHTML = html;
+  box.innerHTML = html + caisseHtmlRuptures(_rupt);
 }
 
 async function genererEcritureEcartCaisse(session, motif){
