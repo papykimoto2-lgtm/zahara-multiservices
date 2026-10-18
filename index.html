@@ -136182,8 +136182,10 @@ var REAPPRO_STATUTS = {
   soumise:   { lib:'🕓 En attente de validation', couleur:'var(--or)' },
   validee:   { lib:'✅ Validée — à servir',       couleur:'var(--or)' },
   rejetee:   { lib:'❌ Rejetée',                  couleur:'var(--rouge)' },
-  servie:    { lib:'🏦 Servie',                   couleur:'var(--vert)' }
+  servie:    { lib:'🏦 Servie',                   couleur:'var(--vert)' },
+  annulee:   { lib:'⊘ Annulée',                   couleur:'var(--blanc-dim)' }
 };
+var REAPPRO_RETARD_JOURS = 7;
 
 function reapGenererNumero() {
   var annee = new Date().getFullYear();
@@ -136324,6 +136326,8 @@ async function _reapNotifier(d, etape) {
       ? '🏦 Demande de réapprovisionnement ' + (d.numero||'') + ' — ' + fmtF(d.montant_demande) + ' FCFA pour « ' + (c.nom||'') + ' », soumise par ' + (d.demande_par||'—') + '.\nMotif : ' + (d.motif||'—') + '\nÀ valider ou rejeter : Pilotage → Validations → Réapprovisionnement (ou Caisse → Réapprovisionnement).'
       : etape === 'validee'
       ? '✅ Demande ' + (d.numero||'') + ' validée par ' + (d.valide_par||'—') + ' pour ' + fmtF(d.montant_accorde) + ' FCFA — à servir (bouton « Servir »).'
+      : etape === 'annulee'
+      ? '⊘ Demande ' + (d.numero||'') + ' (validée, non servie) annulée par ' + (d.annule_par||'—') + '.\nMotif : ' + (d.motif_annulation||'—')
       : '✖ Demande ' + (d.numero||'') + ' rejetée par ' + (d.valide_par||'—') + '.\nMotif : ' + (d.motif_rejet||'—');
     await caisseEnvoyerMessageInterne(c, texte);
   } catch(e) {}
@@ -136385,6 +136389,24 @@ async function reapRejeter(id, motif) {
   toast('❌ Demande ' + d.numero + ' rejetée.', 'info');
   reapRender();
   _reapNotifier(d, 'rejetee');
+}
+
+/* Une demande validée mais jamais servie (caduque, ou fonds remis hors logiciel) est annulée avec motif, jamais supprimée. */
+async function reapAnnuler(id, motif) {
+  var d = (DATA.demandes_reappro||[]).find(function(x){ return x.id===id; }); if (!d) return;
+  if (!exigerDroit('Caisse', 'v', 'l\'annulation de cette demande de réapprovisionnement')) return;
+  if (d.statut !== 'validee') { toast('Seule une demande validée et non servie peut être annulée.', 'error'); return; }
+  if (motif === undefined) motif = prompt('Motif de l\'annulation de ' + (d.numero||'') + ' (obligatoire) :\nEx. : besoin disparu, fonds remis hors logiciel le …', '');
+  if (motif === null) return;
+  motif = String(motif).trim();
+  if (!motif) { toast('⚠️ Le motif est obligatoire.', 'error'); return; }
+  d.statut = 'annulee'; d.motif_annulation = motif;
+  d.annule_par = (APP.currentUser&&APP.currentUser.nom)||'—'; d.annule_le = new Date().toISOString(); d._modifie = d.annule_le;
+  await dbPut('demandes_reappro', d, { forceRole: true }); /* droit 'v' déjà exigé — cf. reapValider */
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_demandes_reappro', d);
+  toast('⊘ Demande ' + d.numero + ' annulée.', 'info');
+  reapRender();
+  _reapNotifier(d, 'annulee');
 }
 
 async function reapSupprimer(id) {
@@ -136577,6 +136599,62 @@ async function reapServirConfirmer() {
   }
 }
 
+/* Réapprovisionnement : « À traiter » (brouillon, soumise, validée) et « Historique » (servie, rejetée,
+   annulée, en arborescence Caisse ▸ Mois), bandeau de synthèse cliquable, retard de service signalé. */
+var REAP_A_TRAITER = { soumise: 0, validee: 1, brouillon: 2 };
+function reapAgeJours(iso) { var t = Date.parse(iso || ''); return isNaN(t) ? 0 : Math.floor((Date.now() - t) / 86400000); }
+function reapEnRetard(d) { return d.statut === 'validee' && reapAgeJours(d.valide_le) > REAPPRO_RETARD_JOURS; }
+function reapOnglet(o, f) { APP._reapOnglet = o; APP._reapFiltre = f || null; reapRender(); }
+function reapBasculeDetail(id) { APP._reapOuvert = APP._reapOuvert || {}; APP._reapOuvert[id] = !APP._reapOuvert[id]; reapRender(); }
+function reapActionsHtml(d) {
+  var peutValider = typeof userPeut === 'function' ? userPeut('Caisse', 'v') : true;
+  if (d.statut === 'brouillon') {
+    return '<button class="btn btn-secondary btn-sm btn-icon" title="Modifier" onclick="reapOuvrirModal(\'' + d.id + '\')">✏️</button> '
+      + '<button class="btn btn-primary btn-sm" onclick="reapSoumettre(\'' + d.id + '\')">📤 Soumettre</button> '
+      + '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer" onclick="reapSupprimer(\'' + d.id + '\')">🗑</button>';
+  }
+  if (d.statut === 'soumise' && !peutValider) return '<span style="font-size:11px;color:var(--blanc-dim);">🕓 En attente d\'un responsable</span>';
+  if (d.statut === 'soumise') {
+    return '<button class="btn btn-primary btn-sm" onclick="(function(){var m=prompt(\'Montant accordé (FCFA) :\', \'' + (d.montant_demande||0) + '\');if(m!==null)reapValider(\'' + d.id + '\', m);})()">✅ Valider</button> '
+      + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)reapRejeter(\'' + d.id + '\', m);})()">❌ Rejeter</button>';
+  }
+  if (d.statut === 'validee') {
+    return '<button class="btn btn-primary btn-sm" onclick="reapServir(\'' + d.id + '\')">🏦 Servir</button>'
+      + (peutValider ? ' <button class="btn btn-secondary btn-sm" title="Demande caduque ou fonds remis hors logiciel" onclick="reapAnnuler(\'' + d.id + '\')">⊘ Annuler</button>' : '');
+  }
+  return '';
+}
+function reapDetailHtml(d, caisse) {
+  var l = [];
+  var ligne = function(lib, v){ if (v) l.push('<div><span style="color:var(--blanc-dim);">' + lib + ' :</span> ' + v + '</div>'); };
+  ligne('Demandée par', escHtml(d.demande_par || '—') + (d.demande_le ? ' le ' + dateShort(d.demande_le) : ''));
+  ligne('Caisse', escHtml(caisse ? (caisse.nom || '') : 'caisse supprimée') + (d.solde_constate !== null && d.solde_constate !== undefined ? ' · solde constaté ' + fmtF(d.solde_constate) + ' F' : ''));
+  ligne('Motif', escHtml(d.motif || ''));
+  if (d.valide_par) ligne(d.statut === 'rejetee' ? 'Rejetée par' : 'Validée par', escHtml(d.valide_par) + (d.valide_le ? ' le ' + dateShort(d.valide_le) : ''));
+  if (d.statut === 'rejetee') ligne('Motif du rejet', '<span style="color:var(--rouge);">' + escHtml(d.motif_rejet || '—') + '</span>');
+  if (d.statut === 'annulee') ligne('Annulée', escHtml(d.annule_par || '—') + ' le ' + dateShort(d.annule_le) + ' — ' + escHtml(d.motif_annulation || ''));
+  if (d.statut === 'servie') {
+    var src = d.caisse_source_id ? (DATA.caisses||[]).find(function(c){ return c.id === d.caisse_source_id; }) : null;
+    var prov = src ? 'depuis ' + escHtml(src.nom || '') : (d.provenance_externe ? 'hors caisse : ' + escHtml(d.provenance_externe) : '<span style="color:var(--rouge);">⚠️ provenance non tracée</span>');
+    ligne('Servie', escHtml(d.servi_par || '—') + ' le ' + dateShort(d.servi_le) + ' — ' + prov);
+  }
+  return '<div style="font-size:11px;display:grid;gap:3px;padding:4px 0;">' + l.join('') + '</div>';
+}
+function reapLigneHtml(d) {
+  var st = REAPPRO_STATUTS[d.statut] || { lib: d.statut || '', couleur: 'var(--blanc-dim)' };
+  var caisse = (DATA.caisses||[]).find(function(c){ return c.id === d.caisse_id; });
+  var ouvert = !!(APP._reapOuvert || {})[d.id], retard = reapEnRetard(d);
+  var montant = fmtF(d.montant_demande) + ' F' + (d.montant_accorde && Math.round(d.montant_accorde) !== Math.round(d.montant_demande || 0) ? ' → <b>' + fmtF(d.montant_accorde) + ' F</b>' : '');
+  var age = retard ? '<div style="font-size:10px;color:var(--rouge);font-weight:700;">⏰ validée il y a ' + reapAgeJours(d.valide_le) + ' j, non servie</div>' : '';
+  return '<tr data-reap="' + d.id + '"' + (retard ? ' style="background:rgba(220,53,69,0.07);"' : '') + '>'
+    + '<td style="white-space:nowrap;"><button type="button" class="btn btn-secondary btn-sm btn-icon" title="Détail" onclick="reapBasculeDetail(\'' + d.id + '\')">' + (ouvert ? '▾' : '▸') + '</button> <b>' + escHtml(d.numero || '') + '</b><div style="font-size:10px;color:var(--blanc-dim);">' + dateShort(d.demande_le || d.created_at) + '</div></td>'
+    + '<td>' + escHtml(caisse ? (caisse.nom || '') : 'caisse supprimée') + '<div style="font-size:10px;color:var(--blanc-dim);">' + escHtml(d.division_id ? _nomDivision(d.division_id) : '') + '</div></td>'
+    + '<td style="text-align:right;white-space:nowrap;">' + montant + '</td>'
+    + '<td style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escHtml(d.motif || '') + '">' + escHtml(d.motif || '') + '</td>'
+    + '<td><span class="badge" style="color:' + st.couleur + ';">' + st.lib + '</span>' + age + '</td>'
+    + '<td style="white-space:nowrap;">' + reapActionsHtml(d) + '</td></tr>'
+    + (ouvert ? '<tr data-reap-detail="' + d.id + '"><td colspan="6" style="background:var(--card2);">' + reapDetailHtml(d, caisse) + '</td></tr>' : '');
+}
 function reapRender() {
   var box = document.getElementById('caisse-reappro-box'); if (!box) return;
   var liste = (DATA.demandes_reappro||[]).slice().sort(function(a,b){
@@ -136598,47 +136676,45 @@ function reapRender() {
     box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune demande pour l\'instant — cliquez sur « ➕ Nouvelle demande » lorsqu\'une caisse de division doit être réapprovisionnée.</div>';
     return;
   }
-  var html = '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>'
-    + '<th>N°</th><th>Division / Caisse</th><th style="text-align:right;">Demandé</th><th style="text-align:right;">Accordé</th>'
-    + '<th>Motif</th><th>Statut</th><th></th></tr></thead><tbody>';
-  liste.forEach(function(d){
-    var st = REAPPRO_STATUTS[d.statut] || { lib: d.statut||'', couleur:'var(--blanc-dim)' };
-    var caisse = (DATA.caisses||[]).find(function(c){ return c.id===d.caisse_id; });
-    var actions = '';
-    if (d.statut === 'brouillon') {
-      actions = '<button class="btn btn-secondary btn-sm btn-icon" title="Modifier" onclick="reapOuvrirModal(\''+d.id+'\')">✏️</button> '
-              + '<button class="btn btn-primary btn-sm" onclick="reapSoumettre(\''+d.id+'\')">📤 Soumettre</button> '
-              + '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer" onclick="reapSupprimer(\''+d.id+'\')">🗑</button>';
-    } else if (d.statut === 'soumise' && !(typeof userPeut === 'function' ? userPeut('Caisse', 'v') : true)) {
-      actions = '<span style="font-size:11px;color:var(--blanc-dim);">🕓 En attente d\'un responsable</span>';
-    } else if (d.statut === 'soumise') {
-      actions = '<button class="btn btn-primary btn-sm" onclick="(function(){var m=prompt(\'Montant accordé (FCFA) :\', \''+(d.montant_demande||0)+'\');if(m!==null)reapValider(\''+d.id+'\', m);})()">✅ Valider</button> '
-              + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)reapRejeter(\''+d.id+'\', m);})()">❌ Rejeter</button>';
-    } else if (d.statut === 'validee') {
-      actions = '<button class="btn btn-primary btn-sm" onclick="reapServir(\''+d.id+'\')">🏦 Servir (entrée en caisse)</button>';
-    }
-    var detail = '';
-    if (d.statut === 'rejetee' && d.motif_rejet) detail = '<div style="font-size:10px;color:var(--rouge);">Motif : '+escHtml(d.motif_rejet)+'</div>';
-    else if (d.statut === 'servie') {
-      var _src = d.caisse_source_id ? (DATA.caisses||[]).find(function(c){ return c.id===d.caisse_source_id; }) : null;
-      var _prov = _src ? 'depuis ' + (_src.nom||'') : (d.provenance_externe ? 'hors caisse : ' + d.provenance_externe : '⚠️ provenance non tracée');
-      detail = '<div style="font-size:10px;color:var(--blanc-dim);">par '+escHtml(d.servi_par||'—')+' le '+dateShort(d.servi_le)+'</div>'
-             + '<div style="font-size:10px;color:'+(_src||d.provenance_externe?'var(--blanc-dim)':'var(--rouge)')+';">'+escHtml(_prov)+'</div>';
-    }
-    else if (d.statut === 'validee' || d.statut === 'rejetee') detail = '<div style="font-size:10px;color:var(--blanc-dim);">par '+escHtml(d.valide_par||'—')+'</div>';
-    html += '<tr>'
-      + '<td><b>'+escHtml(d.numero||'')+'</b><div style="font-size:10px;color:var(--blanc-dim);">'+escHtml(d.demande_par||'')+'</div></td>'
-      + '<td>'+escHtml(d.division_id ? _nomDivision(d.division_id) : '—')
-        + '<div style="font-size:10px;color:var(--blanc-dim);">'+escHtml(caisse ? (caisse.nom||'') : 'caisse supprimée')
-        + (d.solde_constate !== null && d.solde_constate !== undefined ? ' · solde constaté '+fmtF(d.solde_constate)+' F' : '')+'</div></td>'
-      + '<td style="text-align:right;font-weight:700;">'+fmtF(d.montant_demande)+' F</td>'
-      + '<td style="text-align:right;font-weight:700;">'+(d.montant_accorde ? fmtF(d.montant_accorde)+' F' : '—')+'</td>'
-      + '<td style="font-size:11px;max-width:240px;">'+escHtml(d.motif||'')+'</td>'
-      + '<td><span class="badge" style="color:'+st.couleur+';">'+st.lib+'</span>'+detail+'</td>'
-      + '<td style="white-space:nowrap;">'+actions+'</td>'
-      + '</tr>';
-  });
-  html += '</tbody></table></div>';
+  var aTraiter = liste.filter(function(d){ return d.statut in REAP_A_TRAITER; });
+  var histo = liste.filter(function(d){ return !(d.statut in REAP_A_TRAITER); });
+  var somme = function(l, f){ return l.reduce(function(a, d){ return a + (parseFloat(f(d)) || 0); }, 0); };
+  var soumises = aTraiter.filter(function(d){ return d.statut === 'soumise'; }), validees = aTraiter.filter(function(d){ return d.statut === 'validee'; });
+  var retards = validees.filter(reapEnRetard), mois = new Date().toISOString().slice(0, 7);
+  var servisMois = histo.filter(function(d){ return d.statut === 'servie' && String(d.servi_le || '').slice(0, 7) === mois; });
+  var onglet = APP._reapOnglet === 'histo' ? 'histo' : 'traiter', filtre = onglet === 'traiter' ? APP._reapFiltre : null;
+  var tuile = function(lib, val, n, o, f, coul){
+    var actif = onglet === o && (APP._reapFiltre || null) === (f || null) && f;
+    return '<button type="button" class="card" data-reap-tuile="' + (f || o) + '" onclick="reapOnglet(\'' + o + '\',' + (f ? '\'' + f + '\'' : 'null') + ')" style="text-align:left;padding:10px 12px;cursor:pointer;border-left:3px solid ' + coul + ';' + (actif ? 'outline:2px solid ' + coul + ';' : '') + '">'
+      + '<div style="font-size:11px;color:var(--blanc-dim);">' + lib + '</div><div style="font-size:16px;font-weight:800;">' + fmtF(val) + ' F</div><div style="font-size:11px;color:var(--blanc-dim);">' + n + ' demande(s)</div></button>';
+  };
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px;">'
+    + tuile('🕓 Demandé, à valider', somme(soumises, function(d){ return d.montant_demande; }), soumises.length, 'traiter', 'soumise', 'var(--or)')
+    + tuile('✅ Accordé, non servi', somme(validees, function(d){ return d.montant_accorde; }), validees.length, 'traiter', 'validee', 'var(--or)')
+    + (retards.length ? tuile('⏰ Non servi depuis plus de ' + REAPPRO_RETARD_JOURS + ' j', somme(retards, function(d){ return d.montant_accorde; }), retards.length, 'traiter', 'retard', 'var(--rouge)') : '')
+    + tuile('🏦 Servi ce mois', somme(servisMois, function(d){ return d.montant_accorde || d.montant_demande; }), servisMois.length, 'histo', null, 'var(--vert)')
+    + '</div>'
+    + '<div class="etape-btns" style="margin-bottom:10px;">'
+    + '<button class="tab-btn' + (onglet === 'traiter' ? ' active' : '') + '" data-reap-onglet="traiter" onclick="reapOnglet(\'traiter\')">⏳ À traiter <span class="badge">' + aTraiter.length + '</span></button>'
+    + '<button class="tab-btn' + (onglet === 'histo' ? ' active' : '') + '" data-reap-onglet="histo" onclick="reapOnglet(\'histo\')">📁 Historique <span class="badge">' + histo.length + '</span></button>'
+    + '</div>';
+  var thead = '<tr><th>N°</th><th>Caisse</th><th style="text-align:right;">Demandé → accordé</th><th>Motif</th><th>Statut</th><th></th></tr>';
+  if (onglet === 'traiter') {
+    var l = aTraiter.filter(function(d){ return !filtre || (filtre === 'retard' ? reapEnRetard(d) : d.statut === filtre); });
+    l.sort(function(a, b){
+      return (REAP_A_TRAITER[a.statut] - REAP_A_TRAITER[b.statut]) || ((reapEnRetard(b) ? 1 : 0) - (reapEnRetard(a) ? 1 : 0))
+        || String(a.valide_le || a.demande_le || '').localeCompare(String(b.valide_le || b.demande_le || ''));
+    });
+    if (filtre) html += '<div style="font-size:12px;margin-bottom:6px;">Filtre : <b>' + (filtre === 'retard' ? 'non servies depuis plus de ' + REAPPRO_RETARD_JOURS + ' j' : (REAPPRO_STATUTS[filtre] || {}).lib) + '</b> <button type="button" class="btn btn-secondary btn-sm" onclick="reapOnglet(\'traiter\')">✕ Tout afficher</button></div>';
+    html += l.length
+      ? '<div style="overflow-x:auto;"><table class="data-table"><thead>' + thead + '</thead><tbody>' + l.map(reapLigneHtml).join('') + '</tbody></table></div>'
+      : '<div class="alert alert-info" style="text-align:center;padding:16px;">Rien à traiter.</div>';
+  } else {
+    html += histo.length
+      ? caisseArboTableau('reap', histo, function(d){ return d.caisse_id; }, function(d){ return d.servi_le || d.valide_le || d.demande_le || d.created_at; }, reapLigneHtml, thead,
+          function(x){ var s = x.filter(function(d){ return d.statut === 'servie'; }); return '🏦 ' + fmtF(somme(s, function(d){ return d.montant_accorde || d.montant_demande; })) + ' F servis'; })
+      : '<div class="alert alert-info" style="text-align:center;padding:16px;">Aucune demande clôturée.</div>';
+  }
   box.innerHTML = html;
 }
 
