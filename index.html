@@ -97797,22 +97797,30 @@ function _prevCompute(s, sens) {
   var tva = n0(h.tva) / 100, isP = n0(h.is) / 100, imfP = n0(h.imf_pct) / 100, imfMin = n0(h.imf_min), imfMax = n0(h.imf_max) || Infinity;
   var infl = n0(h.inflation) / 100;
   var masseM = h.masse_salariale_auto && typeof calcMasseSalariale === 'function' ? (calcMasseSalariale().coutEmployeur || 0) : n0(h.masse_salariale_mois);
-  var invest = n0(f.invest), dotationsAn = invest > 0 ? invest / Math.max(1, n0(f.amort_ans) || 1) : n0(h.dotations_an);
+  var invest = n0(f.invest), amortAns = Math.max(1, Math.round(n0(f.amort_ans)) || 1);
+  /* Un investissement s'amortit sur sa durée, puis plus rien ; sans investissement, dotation saisie chaque année. */
+  var dotationAn = function(y){ return invest > 0 ? (y < amortAns ? invest / amortAns : 0) : n0(h.dotations_an); };
+  var rAct = (n0(f.actualisation) || 12) / 100;   /* champ vide ou 0 = 12 % (taux par défaut) */
   var P = n0(f.emp_montant), i = n0(f.emp_taux) / 100 / 12, dur = Math.max(1, n0(f.emp_duree) || 1), diff = Math.max(0, n0(f.emp_differe));
   var nAmort = Math.max(1, dur - diff), annuite = i > 0 ? P * i / (1 - Math.pow(1 + i, -nAmort)) : P / nAmort;
   var financement = P + n0(f.apports) + n0(f.subventions);
   var z = function(){ var a = []; for (var k = 0; k < N; k++) a.push(0); return a; };
   var lotsM = z(), saleM = z(), cosM = z(), prodCashM = z(), encM = z(), intM = z(), capM = z();
-  var vendus = 0, creancesFin = 0, outstanding = P;
-  for (var m = 0; m < N; m++) {
+  /* Les ventes se poursuivent après l'horizon : leur foncier et leurs travaux engagés avant la fin restent
+     décaissés dans l'horizon (stock de fin). Créances et stock de fin sont actualisés à leur date de réalisation. */
+  var lead = Math.max(avance, dureeTx), vendus = 0, creancesFin = 0, creancesFinVA = 0, outstanding = P;
+  var vaFin = function(moisApres){ return Math.pow(1 + rAct, -moisApres / 12); };
+  for (var m = 0; m < N + lead; m++) {
     var l = lotsAn0 * Math.pow(1 + g, Math.floor(m / 12)) / 12;
     if (lotsMax > 0) l = Math.max(0, Math.min(l, lotsMax - vendus));
-    vendus += l; lotsM[m] = l; saleM[m] = l * prix;
+    vendus += l;
+    prodCashM[Math.max(0, m - avance)] += m - avance < N ? l * foncierLot * (1 + imprevusP) : 0;
+    for (var w = 1; w <= dureeTx; w++) if (m - w < N) prodCashM[Math.max(0, m - w)] += l * autresLot * (1 + imprevusP) / dureeTx;
+    if (m >= N) continue;
+    lotsM[m] = l; saleM[m] = l * prix;
     cosM[m] = l * (foncierLot + autresLot) * (1 + imprevusP);
-    prodCashM[Math.max(0, m - avance)] += l * foncierLot * (1 + imprevusP);
-    for (var w = 1; w <= dureeTx; w++) prodCashM[Math.max(0, m - w)] += l * autresLot * (1 + imprevusP) / dureeTx;
     encM[m] += apport * saleM[m];
-    for (var j = 1; j <= credit; j++) { var part = (1 - apport) * saleM[m] / credit; if (m + j < N) encM[m + j] += part; else creancesFin += part; }
+    for (var j = 1; j <= credit; j++) { var part = (1 - apport) * saleM[m] / credit; if (m + j < N) encM[m + j] += part; else { creancesFin += part; creancesFinVA += part * vaFin(m + j - N + 1); } }
     var interet = 0, capital = 0;
     if (m + 1 <= dur && outstanding > 0.5) {
       interet = outstanding * i;
@@ -97826,7 +97834,7 @@ function _prevCompute(s, sens) {
     var idx = Math.pow(1 + infl, y);
     var a = { y: y, an: debut.getFullYear() + y, lots: 0, CA: 0, prodCost: 0, imprevus: 0, etudes: 0, comm: 0, marketing: 0,
       chFixes: n0(h.charges_fixes_mois) * 12 * idx, masse: masseM * 12 * idx, taxesLoc: n0(h.taxes_locales_an) * idx,
-      interets: 0, rembCapital: 0, encaisse: 0, prodCash: 0, dotations: dotationsAn, hao: 0 };
+      interets: 0, rembCapital: 0, encaisse: 0, prodCash: 0, dotations: dotationAn(y), hao: 0 };
     for (var mm = y * 12; mm < (y + 1) * 12; mm++) {
       a.lots += lotsM[mm]; a.CA += saleM[mm]; a.prodCost += cosM[mm] / (1 + imprevusP); a.imprevus += cosM[mm] - cosM[mm] / (1 + imprevusP);
       a.etudes += saleM[mm] * etudesP; a.comm += saleM[mm] * commP; a.marketing += saleM[mm] * marketingP;
@@ -97895,8 +97903,8 @@ function _prevCompute(s, sens) {
     for (var mc = ya * 12; mc < (ya + 1) * 12; mc++) { var x = treso[mc]; v += x.enc - x.production - x.exploitation - x.is - x.invest; }
     ecoCF.push(v);
   }
-  ecoCF[H - 1] += creancesFin - years[H - 1].is;
-  var rAct = (f.actualisation === '' || f.actualisation === undefined ? 12 : n0(f.actualisation)) / 100;
+  /* Fin d'horizon : créances (actualisées à leur échéance), stock récupéré par les ventes suivantes, IS restant dû. */
+  ecoCF[H - 1] += creancesFinVA + stock * vaFin(lead) - years[H - 1].is;
   var npv = function(rate){ var vv = 0; for (var q = 0; q < ecoCF.length; q++) vv += ecoCF[q] / Math.pow(1 + rate, q + 1); return vv; };
   var van = npv(rAct), tri = null, lo = -0.9, hi = 3, flo = npv(lo), fhi = npv(hi);
   if (flo * fhi < 0) {
@@ -97905,17 +97913,18 @@ function _prevCompute(s, sens) {
   var cumEco = 0, payback = null;
   for (var pb = 0; pb < ecoCF.length; pb++) { cumEco += ecoCF[pb]; if (payback === null && cumEco >= 0) payback = pb + 1; }
   var capEngage = financement, cafCumul = years.reduce(function(sum, a){ return sum + a.caf; }, 0);
+  var lotsHorizon = lotsM.reduce(function(a, x){ return a + x; }, 0);
   return { H: H, N: N, years: years, treso: treso, plan: plan, totals: T, ecoCF: ecoCF, creancesFin: creancesFin,
-    stockFin: stock, detteFiscaleFin: dette, lotsVendus: vendus, plafondAtteint: lotsMax > 0 && vendus >= lotsMax - 1e-6,
+    stockFin: stock, detteFiscaleFin: dette, lotsVendus: lotsHorizon, plafondAtteint: lotsMax > 0 && lotsHorizon >= lotsMax - 1e-6,
     mensuel: { sale: saleM, cos: cosM },
     ratios: { seuilRentab: seuilRentab, seuilAn: yS.an, dscr: dscrMin === null ? 0 : dscrMin, dscrMin: dscrMin, dscrMinAn: dscrMinAn, dscrAns: dscrAns,
       margeNettePct: T.CA > 0 ? T.rNet / T.CA * 100 : 0, capaRemb: P > 0 ? cafCumul / P : 0,
       van: van, tri: tri, payback: payback, roi: capEngage > 0 ? T.rNet / capEngage * 100 : 0, tauxActu: rAct, capEngage: capEngage,
       tresoMin: tresoMin.cumul, tresoMinMois: tresoMin.label } };
 }
-function _prevSensibilite(s) {
+function _prevSensibilite(s, central) {
   return PREV_SENSIBILITE.map(function(v){
-    var c = _prevCompute(s, v), r = c.ratios;
+    var c = v.cle === 'central' && central ? central : _prevCompute(s, v), r = c.ratios;
     return { cle: v.cle, lib: v.lib, desc: v.desc, CA: c.totals.CA, rNet: c.totals.rNet, van: r.van, tri: r.tri, tresoMin: r.tresoMin, dscrMin: r.dscrMin };
   });
 }
@@ -98031,10 +98040,13 @@ function prevSeedFromProgramme() {
   if (!pid) { toast('Sélectionnez un programme.', 'info'); return; }
   var lots = (DATA.lots || []).filter(function(l){ return l.programme_id === pid; });
   if (!lots.length) { toast('Aucun lot sur ce programme.', 'info'); return; }
-  var n = lots.length, avecPrix = lots.filter(function(l){ return parseFloat(l.prix) > 0; });
+  /* Plafond et prix moyen sur les lots restant à vendre : vendus et réservés sont déjà dans le réel. */
+  var n = lots.length, restants = lots.filter(function(l){ return l.statut !== 'vendu' && l.statut !== 'reserve'; });
+  var avecPrix = restants.filter(function(l){ return parseFloat(l.prix) > 0; });
+  if (!restants.length) { toast('Tous les lots de ce programme sont vendus ou réservés.', 'info'); return; }
   if (avecPrix.length) _sv('prev-prix-lot', Math.round(avecPrix.reduce(function(a, l){ return a + parseFloat(l.prix); }, 0) / avecPrix.length));
-  _sv('prev-lots-max', n);
-  _sv('prev-lots-an', Math.max(1, Math.round(n / (parseInt(_gv('prev-horizon')) || 3))));
+  _sv('prev-lots-max', restants.length);
+  _sv('prev-lots-an', Math.max(1, Math.round(restants.length / (parseInt(_gv('prev-horizon')) || 3))));
   /* Coût d'acquisition (et non la valeur actuelle) pour le foncier */
   var terrains = (DATA.terrains || []).filter(function(t){ return t.programme_id === pid; })
     .reduce(function(a, t){ return a + (parseFloat(t.prix_acq || t.valeur_actuelle) || 0); }, 0);
@@ -98046,22 +98058,27 @@ function prevSeedFromProgramme() {
   if (amenagement > 0) _sv('prev-vrd-lot', Math.round(amenagement / n));
   if (construction > 0) _sv('prev-travaux-lot', Math.round(construction / n));
   prevRender();
-  toast('Hypothèses pré-remplies : ' + n + ' lots (plafond), prix moyen sur ' + avecPrix.length + ' lot(s) au prix renseigné, foncier au coût d\'acquisition.', 'success', 7000);
+  toast('Hypothèses pré-remplies : ' + restants.length + ' lot(s) restant à vendre sur ' + n + ' (plafond), prix moyen sur ' + avecPrix.length + ' lot(s) au prix renseigné, foncier au coût d\'acquisition.', 'success', 7000);
 }
-/* Charges de fonctionnement reprises du budget validé (module Budget) de l'exercice de début. */
-var PREV_RUBRIQUES_FRAIS = ['transports', 'sousTraitance', 'locationsCharges', 'entretienBiens', 'assurances', 'honorairesJuridiques', 'telecomInformatique', 'gardiennageSecurite', 'autresServices', 'chargesCopropriete'];
+/* Charges de fonctionnement reprises du budget validé (module Budget) de l'exercice de début.
+   Non repris : achats (classe 60 = coût de production, déjà par lot), publicité (déjà en % du CA),
+   commissions (déjà en % du CA), charges financières et HAO (calculées par le moteur). Un champ sans montant au budget est conservé. */
+var PREV_BUDGET_EXCLUES = { ventes: 1, prodStockee: 1, autresProd: 1, prodFin: 1, prodHAO: 1, reprises: 1, achats: 1, publiciteMarketing: 1, commissionsCourtage: 1,
+  chargesFin: 1, chargesHAO: 1, personnel: 1, impots: 1, dotations: 1 };
 function prevReprendreBudget() {
   if (typeof _cexpBudgetParRubrique !== 'function') { toast('Module Budget indisponible.', 'error'); return; }
   var ex = String(_gv('prev-date') || today()).slice(0, 4), b = _cexpBudgetParRubrique('', ex);
-  var tot = function(cle){ return (b[cle] || []).reduce(function(a, v){ return a + v; }, 0); };
-  var frais = PREV_RUBRIQUES_FRAIS.reduce(function(a, k){ return a + tot(k); }, 0), perso = tot('personnel'), impots = tot('impots'), dot = tot('dotations');
+  var tot = function(cle){ return _cexpSomme12(b[cle] || []); };
+  var frais = Object.keys(b).filter(function(k){ return !PREV_BUDGET_EXCLUES[k]; }).reduce(function(a, k){ return a + tot(k); }, 0);
+  var perso = tot('personnel'), impots = tot('impots'), dot = tot('dotations'), repris = [], gardes = [];
   if (!(frais + perso + impots + dot)) { toast('Aucun budget validé pour l\'exercice ' + ex + ' (module Budget).', 'info', 6000); return; }
-  _sv('prev-charges-fixes', Math.round(frais / 12));
-  if (perso) { var mAuto = document.getElementById('prev-masse-auto'); if (mAuto) mAuto.checked = false; var mi = document.getElementById('prev-masse-salariale'); if (mi) mi.readOnly = false; _sv('prev-masse-salariale', Math.round(perso / 12)); }
-  _sv('prev-taxes-locales', Math.round(impots));
-  if (dot && !_gn('prev-invest')) _sv('prev-dotations', Math.round(dot));
+  if (frais) { _sv('prev-charges-fixes', Math.round(frais / 12)); repris.push('frais généraux ' + fmtF(Math.round(frais / 12)) + ' F/mois'); } else gardes.push('frais généraux');
+  if (perso) { var mAuto = document.getElementById('prev-masse-auto'); if (mAuto) mAuto.checked = false; var mi = document.getElementById('prev-masse-salariale'); if (mi) mi.readOnly = false; _sv('prev-masse-salariale', Math.round(perso / 12)); repris.push('personnel ' + fmtF(Math.round(perso / 12)) + ' F/mois'); } else gardes.push('personnel');
+  if (impots) { _sv('prev-taxes-locales', Math.round(impots)); repris.push('impôts et taxes ' + fmtF(Math.round(impots)) + ' F/an'); } else gardes.push('impôts et taxes');
+  if (dot && !_gn('prev-invest')) { _sv('prev-dotations', Math.round(dot)); repris.push('dotations ' + fmtF(Math.round(dot)) + ' F/an'); }
   prevRender();
-  toast('Budget ' + ex + ' repris : frais généraux ' + fmtF(Math.round(frais / 12)) + ' F/mois, personnel ' + fmtF(Math.round(perso / 12)) + ' F/mois, impôts et taxes ' + fmtF(Math.round(impots)) + ' F/an.', 'success', 8000);
+  toast('Budget ' + ex + ' repris : ' + repris.join(', ') + '.' + (gardes.length ? ' Sans montant au budget, saisie conservée : ' + gardes.join(', ') + '.' : '')
+    + ' Achats, publicité et commissions non repris (déjà dans le coût par lot ou en % du CA).', 'success', 10000);
 }
 
 async function prevSaveScenario() {
@@ -98098,8 +98115,8 @@ function prevRestaurerVersion(vid) {
   prevFillForm(s); prevRender();
 }
 function _prevVersionCourante(s) {
-  var e = JSON.stringify([s.date_debut, +s.horizon_annees, _prevNormaliser(s).hyp, _prevNormaliser(s).fin]);
-  return (s.versions || []).slice().reverse().find(function(v){ return JSON.stringify([v.date_debut, +v.horizon_annees, _prevNormaliser(v).hyp, _prevNormaliser(v).fin]) === e; }) || null;
+  var cle = function(x){ var n = _prevNormaliser(x); return JSON.stringify([n.date_debut, +n.horizon_annees, n.hyp, n.fin]); }, e = cle(s);
+  return (s.versions || []).slice().reverse().find(function(v){ return cle(v) === e; }) || null;
 }
 
 async function prevDeleteScenario() {
@@ -98183,16 +98200,16 @@ function _prevTresoHTML(c, nb) {
   return _prevTable('<th>Mois</th>' + cols.map(function(k){ return '<th class="num">' + k[1] + '</th>'; }).join(''),
     l.map(function(t){ return '<tr' + (t.cumul < 0 ? ' class="neg"' : '') + '><td>' + t.label + '</td>' + cols.map(function(k){ return '<td class="num">' + _prevF((t[k[0]])) + '</td>'; }).join('') + '</tr>'; }).join(''));
 }
-function _prevSensibiliteHTML(s) {
+function _prevSensibiliteHTML(s, c) {
   var fp = function(v){ return v === null ? 'n.d.' : (v * 100).toFixed(1) + ' %'; };
   return _prevTable('<th>Scénario</th><th class="num">CA cumulé</th><th class="num">Résultat net cumulé</th><th class="num">VAN</th><th class="num">TRI</th><th class="num">Trésorerie minimum</th><th class="num">DSCR minimum</th>',
-    _prevSensibilite(s).map(function(x){
+    _prevSensibilite(s, c).map(function(x){
       return '<tr' + (x.cle === 'central' ? ' class="sous"' : '') + '><td>' + x.lib + '<div style="font-size:10px;opacity:.7;">' + x.desc + '</div></td><td class="num">' + _prevF((x.CA)) + '</td><td class="num">' + _prevF((x.rNet)) + '</td>'
         + '<td class="num">' + _prevF((x.van)) + '</td><td class="num">' + fp(x.tri) + '</td><td class="num">' + _prevF((x.tresoMin)) + '</td><td class="num">' + (x.dscrMin === null ? '—' : x.dscrMin.toFixed(2)) + '</td></tr>';
     }).join(''));
 }
 function _prevSyntheseHTML(s, c) {
-  var r = c.ratios, h = _prevNormaliser(s).hyp, f = _prevNormaliser(s).fin, fp = function(v){ return v === null ? 'n.d.' : (v * 100).toFixed(1) + ' %'; };
+  var n = _prevNormaliser(s), r = c.ratios, h = n.hyp, f = n.fin, fp = function(v){ return v === null ? 'n.d.' : (v * 100).toFixed(1) + ' %'; };
   var L = function(a, b){ return '<tr><th style="width:55%;">' + a + '</th><td class="num">' + b + '</td></tr>'; };
   return '<table><tbody>'
     + L('Prix moyen d\'un lot / lots vendus la 1re année', fcfa(h.prix_lot) + ' / ' + h.lots_par_an + (h.lots_max ? ' (plafond ' + h.lots_max + ' lots)' : ''))
@@ -98261,7 +98278,7 @@ function prevRender() {
   box.innerHTML = '<style>#prev-results table{width:100%;font-size:12px;}' + PREV_CSS.replace(/(^|})([^{}]+){/g, function(m0, a, sel){ return a + sel.split(',').map(function(x){ return '#prev-results ' + x; }).join(',') + '{'; }) + '</style>'
     + verdict + (alertes.length ? '<div class="alert alert-warning" style="margin-bottom:12px;font-size:12px;">' + alertes.map(function(x){ return '⚠ ' + x; }).join('<br>') + '</div>' : '')
     + kpis + chartCA
-    + section('Sensibilité : trois scénarios', 'var(--violet)', _prevSensibiliteHTML(s))
+    + section('Sensibilité : trois scénarios', 'var(--violet)', _prevSensibiliteHTML(s, c))
     + section('① Compte d\'exploitation prévisionnel (soldes de gestion SYSCOHADA)', 'var(--or)', _prevExploitHTML(c))
     + section('② Compte de résultat prévisionnel', 'var(--bleu)', _prevResultatHTML(c))
     + section('③ Plan de financement prévisionnel', 'var(--vert)', _prevPlanHTML(c))
@@ -98300,7 +98317,7 @@ function etatPrevTresorerie() { var s = prevReadForm(), c = _prevCompute(s); _pr
 function etatDossierBancaire() {
   var s = prevReadForm(), c = _prevCompute(s), v = _prevVerdict(c);
   var contenu = '<h3>Synthèse du projet — ' + v.lib + ' (' + v.nbOk + '/' + v.criteres.length + ' critères)</h3>' + _prevSyntheseHTML(s, c)
-    + '<h3>Sensibilité</h3>' + _prevSensibiliteHTML(s)
+    + '<h3>Sensibilité</h3>' + _prevSensibiliteHTML(s, c)
     + '<div class="pb"></div><h3>① Compte d\'exploitation prévisionnel</h3>' + _prevExploitHTML(c)
     + '<div class="pb"></div><h3>② Compte de résultat prévisionnel</h3>' + _prevResultatHTML(c)
     + '<div class="pb"></div><h3>③ Plan de financement prévisionnel</h3>' + _prevPlanHTML(c)

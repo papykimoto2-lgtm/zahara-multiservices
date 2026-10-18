@@ -25,6 +25,10 @@ test('moteur : flux réalistes, rapprochement plan/trésorerie, fiscalité, rati
       const sV = _prevDefaut(); sV.fin.invest = 50000000; sV.fin.amort_ans = 5; const cV = _prevCompute(sV);
       o.invest = [cV.years[0].dotations === 10000000, cV.plan[0].invest === 50000000, cV.treso[0].invest === 50000000];
       o.seuil = R.seuilRentab > 0;
+      const sA = _prevDefaut(); sA.fin.invest = 50000000; sA.fin.amort_ans = 2; sA.horizon_annees = 5; const cA = _prevCompute(sA);
+      o.amort = cA.years.map(a => a.dotations);
+      const s0 = _prevDefaut(); s0.fin.actualisation = 0; o.actu = _prevCompute(s0).ratios.tauxActu;
+      o.stock = [c.stockFin > 0, c.treso.slice(-6).every(t => t.production > 0)];
       o.verdict = [R.tresoMin < 0, _prevVerdict(c).bancable, _prevVerdict(c).nbOk >= 4];
       o.sens = _prevSensibilite(s).map(x => Math.round(x.van / 1e6));
       const ancien = { nom: 'Ancien', date_debut: '2026-01-01', horizon_annees: 3, hyp: { prix_lot: 1000000, lots_par_an: 10 }, fin: {} };
@@ -41,6 +45,9 @@ test('moteur : flux réalistes, rapprochement plan/trésorerie, fiscalité, rati
     assert.equal(r.inflation, true);
     assert.deepEqual(r.invest, [true, true, true]);
     assert.equal(r.seuil, true);
+    assert.deepEqual(r.amort, [25000000, 25000000, 0, 0, 0]);
+    assert.equal(r.actu, 0.12);
+    assert.deepEqual(r.stock, [true, true]);
     assert.deepEqual(r.verdict, [true, false, true]);
     assert.ok(r.sens[0] < r.sens[1] && r.sens[1] < r.sens[2]);
     assert.deepEqual(r.ancien, [6, 3000000, 5]);
@@ -77,7 +84,11 @@ test('écran : copie de travail, versions figées, Budget, pré-remplissage, PDF
         b.transports[0] = 1200000; b.autresServices[5] = 1200000; b.personnel[0] = 24000000; b.impots[1] = 500000; b.dotations[2] = 900000; return b; };
       prevReprendreBudget();
       o.budget = [val('prev-charges-fixes'), val('prev-masse-salariale'), val('prev-taxes-locales'), val('prev-dotations')];
-      DATA.lots = [{ programme_id: 'p1', prix: 10000000 }, { programme_id: 'p1', prix: 20000000 }, { programme_id: 'p1', prix: 0 }];
+      saisir('prev-charges-fixes', '777'); saisir('prev-taxes-locales', '888');
+      window._cexpBudgetParRubrique = function () { const b = { personnel: Array(12).fill(0), achats: Array(12).fill(0), publiciteMarketing: Array(12).fill(0) }; b.personnel[0] = 1200000; b.achats[0] = 9e6; b.publiciteMarketing[0] = 5e6; return b; };
+      prevReprendreBudget();
+      o.budgetPartiel = [val('prev-charges-fixes'), val('prev-taxes-locales'), val('prev-masse-salariale')];
+      DATA.lots = [{ programme_id: 'p1', prix: 10000000 }, { programme_id: 'p1', prix: 20000000 }, { programme_id: 'p1', prix: 0 }, { programme_id: 'p1', prix: 90000000, statut: 'vendu' }, { programme_id: 'p1', prix: 90000000, statut: 'reserve' }];
       DATA.terrains = [{ programme_id: 'p1', prix_acq: 3000000, valeur_actuelle: 9000000 }];
       document.getElementById('prev-programme').value = 'p1'; prevSeedFromProgramme();
       o.seed = [val('prev-prix-lot'), val('prev-lots-max'), val('prev-foncier-lot')];
@@ -93,7 +104,8 @@ test('écran : copie de travail, versions figées, Budget, pré-remplissage, PDF
     assert.equal(r.ecranPdf, true);
     assert.equal(r.travail, true);
     assert.deepEqual(r.budget, ['200000', '2000000', '500000', '900000']);
-    assert.deepEqual(r.seed, ['15000000', '3', '1000000']);
+    assert.deepEqual(r.budgetPartiel, ['777', '888', '100000']);
+    assert.deepEqual(r.seed, ['15000000', '3', '600000']);
     assert.deepEqual(app.etat.erreursPage, []);
   } finally { await app.fermer(); }
 });
