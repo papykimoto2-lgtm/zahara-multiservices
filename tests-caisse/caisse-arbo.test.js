@@ -21,7 +21,7 @@ test('arborescence Caisse ▸ Mois : écarts et fonds à justifier, déployer/r�
       o.replie = n1().every(d => !d.open);
       caisseArboTout('ecart', true); o.deploye = [...arbo.querySelectorAll('details')].every(d => d.open);
       caisseRenderEcarts(); o.conserve = [...document.querySelectorAll('[data-caarbo="ecart"] details')].every(d => d.open);
-      o.ruptures = !!box.querySelector('[data-caarbo="rupture"]');
+      o.ruptures = !!document.querySelector('#caisse-ruptures-box [data-caarbo="rupture"]');
       return o;
     });
     assert.deepEqual(r.structure, [2, 4, 20, true, true, true]);

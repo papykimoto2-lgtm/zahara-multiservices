@@ -26,7 +26,7 @@ test('fonds d\'ouverture à justifier : détection, justification, disparition d
       const l = caisseRupturesAJustifier(), o = {};
       o.avant = l.map(x => [x.session.id, x.diff]);
       document.body.insertAdjacentHTML('beforeend', '<div id="caisse-ecarts-box"></div>'); caisseRenderEcarts();
-      o.html = [/Fonds d'ouverture à justifier/.test(document.getElementById('caisse-ecarts-box').innerHTML), /Écarts de caisse à régulariser/.test(document.getElementById('caisse-ecarts-box').innerHTML)];
+      o.html = [/Fonds d'ouverture à justifier/.test(document.getElementById('caisse-ruptures-box').innerHTML), /Écarts de caisse à régulariser/.test(document.getElementById('caisse-ecarts-box').innerHTML)];
       window.prompt = () => ''; await caisseJustifierRupture('s2'); o.vide = !DATA.caisse_sessions[1].rupture_justification;
       window.prompt = () => 'Apport du gérant'; await caisseJustifierRupture('s2');
       o.apres = [caisseRupturesAJustifier().length, DATA.caisse_sessions[1].rupture_justification.texte, DATA.caisse_sessions[1].rupture_justification.par];
