@@ -78,7 +78,8 @@
   "git": {
     "deploymentEnabled": {
       "claude/admiring-hopper-i4ptq0": false,
-      "claude/*": false
+      "claude/*": false,
+      "ccr-*": false
     }
   }
 }
