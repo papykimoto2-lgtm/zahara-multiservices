@@ -69641,7 +69641,7 @@ function checkDeclBadge() {
 
 // Formatter FCFA
 function fmtF(n) {
-  return Math.round(n).toLocaleString('fr-FR');
+  return (Math.round(n) + 0).toLocaleString('fr-FR');   /* + 0 : un arrondi de -0,4 s'affiche « 0 », jamais « -0 » */
 }
 
 /* ══════════════════════════════════════════════════════
@@ -97734,17 +97734,26 @@ function etatGrandLivreIntervalle(itv) {
 ===================================================== */
 
 /* ---- Valeurs par défaut d'un scénario ---- */
+function _prevSetMasseAuto(on) {
+  var chk = document.getElementById('prev-masse-auto'), inp = document.getElementById('prev-masse-salariale');
+  if (chk) chk.checked = !!on;
+  if (inp) inp.readOnly = !!on;
+}
 function prevToggleMasseAuto() {
-  var chk = document.getElementById('prev-masse-auto');
-  var inp = document.getElementById('prev-masse-salariale');
-  if (chk && chk.checked && typeof calcMasseSalariale === 'function') {
+  var chk = document.getElementById('prev-masse-auto'), on = !!(chk && chk.checked && typeof calcMasseSalariale === 'function');
+  _prevSetMasseAuto(on);
+  if (on) {
     var ms = calcMasseSalariale();
-    if (inp) { inp.value = Math.round(ms.coutEmployeur || 0); inp.readOnly = true; }
-    toast('Masse salariale récupérée du module RH : ' + fmtF(Math.round(ms.coutEmployeur||0)) + ' F/mois (' + ms.effectif + ' actifs).', 'success');
-  } else if (inp) {
-    inp.readOnly = false;
+    _sv('prev-masse-salariale', Math.round(ms.coutEmployeur || 0));
+    toast('Masse salariale récupérée du module RH : ' + fmtF(ms.coutEmployeur || 0) + ' F/mois (' + ms.effectif + ' actifs).', 'success');
   }
   prevRender();
+}
+/* Paie recalculée au plus une fois par 30 s (le moteur tourne 3 fois par frappe). */
+function _prevMasseRH() {
+  var c = APP._prevMasseRH, t = Date.now();
+  if (!c || t - c.t > 30000) c = APP._prevMasseRH = { t: t, v: calcMasseSalariale().coutEmployeur || 0 };
+  return c.v;
 }
 
 function _prevDefaut() {
@@ -97764,10 +97773,10 @@ function _prevDefaut() {
 }
 /* Un scénario enregistré avant l'ajout d'une hypothèse reçoit sa valeur par défaut (jamais 0 par omission). */
 function _prevNormaliser(s) {
-  var d = _prevDefaut(), o = JSON.parse(JSON.stringify(s || d));
-  o.hyp = Object.assign({}, d.hyp, o.hyp || {});
-  o.fin = Object.assign({}, d.fin, o.fin || {});
-  o.versions = o.versions || [];
+  var d = _prevDefaut(), o = Object.assign({}, s || d);
+  o.hyp = Object.assign({}, d.hyp, o.hyp);
+  o.fin = Object.assign({}, d.fin, o.fin);
+  o.versions = (o.versions || []).slice();   /* les versions figées ne sont jamais modifiées, seulement remplacées */
   return o;
 }
 var PREV_SENSIBILITE = [
@@ -97796,23 +97805,31 @@ function _prevCompute(s, sens) {
   var etudesP = n0(h.etudes_pct) / 100, commP = n0(h.commission_pct) / 100, imprevusP = n0(h.imprevus_pct) / 100, marketingP = n0(h.marketing_pct) / 100;
   var tva = n0(h.tva) / 100, isP = n0(h.is) / 100, imfP = n0(h.imf_pct) / 100, imfMin = n0(h.imf_min), imfMax = n0(h.imf_max) || Infinity;
   var infl = n0(h.inflation) / 100;
-  var masseM = h.masse_salariale_auto && typeof calcMasseSalariale === 'function' ? (calcMasseSalariale().coutEmployeur || 0) : n0(h.masse_salariale_mois);
-  var invest = n0(f.invest), dotationsAn = invest > 0 ? invest / Math.max(1, n0(f.amort_ans) || 1) : n0(h.dotations_an);
+  var masseM = h.masse_salariale_auto && typeof calcMasseSalariale === 'function' ? _prevMasseRH() : n0(h.masse_salariale_mois);
+  var invest = n0(f.invest), amortAns = Math.max(1, Math.round(n0(f.amort_ans)) || 1);
+  /* Un investissement s'amortit sur sa durée, puis plus rien ; sans investissement, dotation saisie chaque année. */
+  var dotationAn = function(y){ return invest > 0 ? (y < amortAns ? invest / amortAns : 0) : n0(h.dotations_an); };
+  var rAct = (n0(f.actualisation) || 12) / 100;   /* champ vide ou 0 = 12 % (taux par défaut) */
   var P = n0(f.emp_montant), i = n0(f.emp_taux) / 100 / 12, dur = Math.max(1, n0(f.emp_duree) || 1), diff = Math.max(0, n0(f.emp_differe));
   var nAmort = Math.max(1, dur - diff), annuite = i > 0 ? P * i / (1 - Math.pow(1 + i, -nAmort)) : P / nAmort;
   var financement = P + n0(f.apports) + n0(f.subventions);
   var z = function(){ var a = []; for (var k = 0; k < N; k++) a.push(0); return a; };
-  var lotsM = z(), saleM = z(), cosM = z(), prodCashM = z(), encM = z(), intM = z(), capM = z();
-  var vendus = 0, creancesFin = 0, outstanding = P;
-  for (var m = 0; m < N; m++) {
+  var lotsM = z(), saleM = z(), cosM = z(), imprM = z(), prodCashM = z(), encM = z(), intM = z(), capM = z();
+  /* Les ventes se poursuivent après l'horizon : leur foncier et leurs travaux engagés avant la fin restent
+     décaissés dans l'horizon (stock de fin). Créances et stock de fin sont actualisés à leur date de réalisation. */
+  var lead = Math.max(avance, dureeTx), vendus = 0, creancesFin = 0, creancesFinVA = 0, outstanding = P;
+  var vaFin = function(moisApres){ return Math.pow(1 + rAct, -moisApres / 12); };
+  for (var m = 0; m < N + lead; m++) {
     var l = lotsAn0 * Math.pow(1 + g, Math.floor(m / 12)) / 12;
     if (lotsMax > 0) l = Math.max(0, Math.min(l, lotsMax - vendus));
-    vendus += l; lotsM[m] = l; saleM[m] = l * prix;
-    cosM[m] = l * (foncierLot + autresLot) * (1 + imprevusP);
-    prodCashM[Math.max(0, m - avance)] += l * foncierLot * (1 + imprevusP);
-    for (var w = 1; w <= dureeTx; w++) prodCashM[Math.max(0, m - w)] += l * autresLot * (1 + imprevusP) / dureeTx;
+    vendus += l;
+    prodCashM[Math.max(0, m - avance)] += m - avance < N ? l * foncierLot * (1 + imprevusP) : 0;
+    for (var w = 1; w <= dureeTx; w++) if (m - w < N) prodCashM[Math.max(0, m - w)] += l * autresLot * (1 + imprevusP) / dureeTx;
+    if (m >= N) continue;
+    lotsM[m] = l; saleM[m] = l * prix;
+    cosM[m] = l * (foncierLot + autresLot); imprM[m] = cosM[m] * imprevusP;
     encM[m] += apport * saleM[m];
-    for (var j = 1; j <= credit; j++) { var part = (1 - apport) * saleM[m] / credit; if (m + j < N) encM[m + j] += part; else creancesFin += part; }
+    for (var j = 1; j <= credit; j++) { var part = (1 - apport) * saleM[m] / credit; if (m + j < N) encM[m + j] += part; else { creancesFin += part; creancesFinVA += part * vaFin(m + j - N + 1); } }
     var interet = 0, capital = 0;
     if (m + 1 <= dur && outstanding > 0.5) {
       interet = outstanding * i;
@@ -97826,9 +97843,9 @@ function _prevCompute(s, sens) {
     var idx = Math.pow(1 + infl, y);
     var a = { y: y, an: debut.getFullYear() + y, lots: 0, CA: 0, prodCost: 0, imprevus: 0, etudes: 0, comm: 0, marketing: 0,
       chFixes: n0(h.charges_fixes_mois) * 12 * idx, masse: masseM * 12 * idx, taxesLoc: n0(h.taxes_locales_an) * idx,
-      interets: 0, rembCapital: 0, encaisse: 0, prodCash: 0, dotations: dotationsAn, hao: 0 };
+      interets: 0, rembCapital: 0, encaisse: 0, prodCash: 0, dotations: dotationAn(y), hao: 0 };
     for (var mm = y * 12; mm < (y + 1) * 12; mm++) {
-      a.lots += lotsM[mm]; a.CA += saleM[mm]; a.prodCost += cosM[mm] / (1 + imprevusP); a.imprevus += cosM[mm] - cosM[mm] / (1 + imprevusP);
+      a.lots += lotsM[mm]; a.CA += saleM[mm]; a.prodCost += cosM[mm]; a.imprevus += imprM[mm];
       a.etudes += saleM[mm] * etudesP; a.comm += saleM[mm] * commP; a.marketing += saleM[mm] * marketingP;
       a.interets += intM[mm]; a.rembCapital += capM[mm]; a.encaisse += encM[mm]; a.prodCash += prodCashM[mm];
     }
@@ -97858,7 +97875,7 @@ function _prevCompute(s, sens) {
     var isMois = (t % 12 === 0 && t > 0) ? years[yt - 1].is : 0;
     var inflow = encM[t] + tvaColl + fin0, outflow = prodCashM[t] + expl + tvaColl + intM[t] + capM[t] + isMois + inv0;
     cumul += inflow - outflow;
-    treso.push({ label: new Date(debut.getFullYear(), debut.getMonth() + t, 1).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' }),
+    treso.push({ label: _prevMoisFmt().format(new Date(debut.getFullYear(), debut.getMonth() + t, 1)),
       enc: encM[t], tva: tvaColl, financement: fin0, production: prodCashM[t], exploitation: expl, dette: intM[t] + capM[t], is: isMois, invest: inv0,
       inflow: inflow, outflow: outflow, net: inflow - outflow, cumul: cumul });
   }
@@ -97895,8 +97912,8 @@ function _prevCompute(s, sens) {
     for (var mc = ya * 12; mc < (ya + 1) * 12; mc++) { var x = treso[mc]; v += x.enc - x.production - x.exploitation - x.is - x.invest; }
     ecoCF.push(v);
   }
-  ecoCF[H - 1] += creancesFin - years[H - 1].is;
-  var rAct = (f.actualisation === '' || f.actualisation === undefined ? 12 : n0(f.actualisation)) / 100;
+  /* Fin d'horizon : créances (actualisées à leur échéance), stock récupéré par les ventes suivantes, IS restant dû. */
+  ecoCF[H - 1] += creancesFinVA + stock * vaFin(lead) - years[H - 1].is;
   var npv = function(rate){ var vv = 0; for (var q = 0; q < ecoCF.length; q++) vv += ecoCF[q] / Math.pow(1 + rate, q + 1); return vv; };
   var van = npv(rAct), tri = null, lo = -0.9, hi = 3, flo = npv(lo), fhi = npv(hi);
   if (flo * fhi < 0) {
@@ -97904,18 +97921,18 @@ function _prevCompute(s, sens) {
   }
   var cumEco = 0, payback = null;
   for (var pb = 0; pb < ecoCF.length; pb++) { cumEco += ecoCF[pb]; if (payback === null && cumEco >= 0) payback = pb + 1; }
-  var capEngage = financement, cafCumul = years.reduce(function(sum, a){ return sum + a.caf; }, 0);
+  var lotsHorizon = _cexpSomme12(lotsM);
   return { H: H, N: N, years: years, treso: treso, plan: plan, totals: T, ecoCF: ecoCF, creancesFin: creancesFin,
-    stockFin: stock, detteFiscaleFin: dette, lotsVendus: vendus, plafondAtteint: lotsMax > 0 && vendus >= lotsMax - 1e-6,
-    mensuel: { sale: saleM, cos: cosM },
-    ratios: { seuilRentab: seuilRentab, seuilAn: yS.an, dscr: dscrMin === null ? 0 : dscrMin, dscrMin: dscrMin, dscrMinAn: dscrMinAn, dscrAns: dscrAns,
-      margeNettePct: T.CA > 0 ? T.rNet / T.CA * 100 : 0, capaRemb: P > 0 ? cafCumul / P : 0,
-      van: van, tri: tri, payback: payback, roi: capEngage > 0 ? T.rNet / capEngage * 100 : 0, tauxActu: rAct, capEngage: capEngage,
+    stockFin: stock, detteFiscaleFin: dette, lotsVendus: lotsHorizon, plafondAtteint: lotsMax > 0 && lotsHorizon >= lotsMax - 1e-6,
+    mensuel: { sale: saleM, cos: cosM.map(function(x, k){ return x + imprM[k]; }) },
+    ratios: { seuilRentab: seuilRentab, seuilAn: yS.an, dscrMin: dscrMin, dscrMinAn: dscrMinAn, dscrAns: dscrAns,
+      margeNettePct: T.CA > 0 ? T.rNet / T.CA * 100 : 0, van: van, tri: tri, payback: payback, tauxActu: rAct,
       tresoMin: tresoMin.cumul, tresoMinMois: tresoMin.label } };
 }
-function _prevSensibilite(s) {
+function _prevMoisFmt() { return APP._prevMoisFmt || (APP._prevMoisFmt = new Intl.DateTimeFormat('fr-FR', { month: 'short', year: '2-digit' })); }
+function _prevSensibilite(s, central) {
   return PREV_SENSIBILITE.map(function(v){
-    var c = _prevCompute(s, v), r = c.ratios;
+    var c = v.cle === 'central' && central ? central : _prevCompute(s, v), r = c.ratios;
     return { cle: v.cle, lib: v.lib, desc: v.desc, CA: c.totals.CA, rNet: c.totals.rNet, van: r.van, tri: r.tri, tresoMin: r.tresoMin, dscrMin: r.dscrMin };
   });
 }
@@ -97943,7 +97960,7 @@ function prevRenderEcart(s, c) {
   var real = bpCompute(s.programme_id), d0 = new Date(s.date_debut || today()), now = new Date();
   var ecoules = (now.getFullYear() - d0.getFullYear()) * 12 + now.getMonth() - d0.getMonth() + 1;
   if (ecoules < 1) { box.innerHTML = '<div style="color:var(--dim);font-size:12px;padding:8px;">Le scénario commence le ' + dateShort(s.date_debut) + ' : rien à comparer encore.</div>'; return; }
-  var e = Math.min(ecoules, c.N), somme = function(arr){ var t = 0; for (var k = 0; k < e; k++) t += arr[k]; return t; };
+  var e = Math.min(ecoules, c.N), somme = function(arr){ return _cexpSomme12(arr.slice(0, e)); };
   var caP = somme(c.mensuel.sale), coutP = somme(c.mensuel.cos);
   var row = function(lib, prevu, reel, inverse){
     var ecart = reel - prevu, pct = prevu !== 0 ? ecart / Math.abs(prevu) * 100 : 0, bon = inverse ? ecart <= 0 : ecart >= 0;
@@ -97978,7 +97995,11 @@ function loadPrevisionnel() {
   prevRender();
 }
 /* Le formulaire travaille sur une copie : rien n'est modifié dans DATA avant « Enregistrer ». */
-function _prevEmpreinte(s) { var o = _prevNormaliser(s); return JSON.stringify([o.nom || '', o.programme_id || '', o.date_debut, +o.horizon_annees, o.hyp, o.fin]); }
+/* Empreinte des hypothèses ; avec l'identité (nom, programme) pour l'indicateur « non enregistré », sans pour reconnaître une version figée. */
+function _prevEmpreinte(s, sansIdentite) {
+  var o = _prevNormaliser(s), base = [o.date_debut, +o.horizon_annees, o.hyp, o.fin];
+  return JSON.stringify(sansIdentite ? base : [o.nom || '', o.programme_id || ''].concat(base));
+}
 function prevSelectScenario() {
   var id = document.getElementById('prev-select').value;
   var src = id ? DATA.previsionnels.find(function(s){ return s.id === id; }) : null;
@@ -98022,8 +98043,7 @@ function prevFillForm(s) {
   _sv('prev-nom', s.nom); _sv('prev-programme', s.programme_id); _sv('prev-date', s.date_debut); _sv('prev-horizon', s.horizon_annees);
   Object.keys(PREV_CHAMPS_HYP).forEach(function(k){ _sv(PREV_CHAMPS_HYP[k], s.hyp[k]); });
   Object.keys(PREV_CHAMPS_FIN).forEach(function(k){ _sv(PREV_CHAMPS_FIN[k], s.fin[k]); });
-  var mAuto = document.getElementById('prev-masse-auto'); if (mAuto) mAuto.checked = !!s.hyp.masse_salariale_auto;
-  var mInp = document.getElementById('prev-masse-salariale'); if (mInp) mInp.readOnly = !!s.hyp.masse_salariale_auto;
+  _prevSetMasseAuto(s.hyp.masse_salariale_auto);
 }
 
 function prevSeedFromProgramme() {
@@ -98031,10 +98051,13 @@ function prevSeedFromProgramme() {
   if (!pid) { toast('Sélectionnez un programme.', 'info'); return; }
   var lots = (DATA.lots || []).filter(function(l){ return l.programme_id === pid; });
   if (!lots.length) { toast('Aucun lot sur ce programme.', 'info'); return; }
-  var n = lots.length, avecPrix = lots.filter(function(l){ return parseFloat(l.prix) > 0; });
+  /* Plafond et prix moyen sur les lots restant à vendre : vendus et réservés sont déjà dans le réel. */
+  var n = lots.length, restants = lots.filter(function(l){ return l.statut !== 'vendu' && l.statut !== 'reserve'; });
+  var avecPrix = restants.filter(function(l){ return parseFloat(l.prix) > 0; });
+  if (!restants.length) { toast('Tous les lots de ce programme sont vendus ou réservés.', 'info'); return; }
   if (avecPrix.length) _sv('prev-prix-lot', Math.round(avecPrix.reduce(function(a, l){ return a + parseFloat(l.prix); }, 0) / avecPrix.length));
-  _sv('prev-lots-max', n);
-  _sv('prev-lots-an', Math.max(1, Math.round(n / (parseInt(_gv('prev-horizon')) || 3))));
+  _sv('prev-lots-max', restants.length);
+  _sv('prev-lots-an', Math.max(1, Math.round(restants.length / (parseInt(_gv('prev-horizon')) || 3))));
   /* Coût d'acquisition (et non la valeur actuelle) pour le foncier */
   var terrains = (DATA.terrains || []).filter(function(t){ return t.programme_id === pid; })
     .reduce(function(a, t){ return a + (parseFloat(t.prix_acq || t.valeur_actuelle) || 0); }, 0);
@@ -98046,22 +98069,26 @@ function prevSeedFromProgramme() {
   if (amenagement > 0) _sv('prev-vrd-lot', Math.round(amenagement / n));
   if (construction > 0) _sv('prev-travaux-lot', Math.round(construction / n));
   prevRender();
-  toast('Hypothèses pré-remplies : ' + n + ' lots (plafond), prix moyen sur ' + avecPrix.length + ' lot(s) au prix renseigné, foncier au coût d\'acquisition.', 'success', 7000);
+  toast('Hypothèses pré-remplies : ' + restants.length + ' lot(s) restant à vendre sur ' + n + ' (plafond), prix moyen sur ' + avecPrix.length + ' lot(s) au prix renseigné, foncier au coût d\'acquisition.', 'success', 7000);
 }
-/* Charges de fonctionnement reprises du budget validé (module Budget) de l'exercice de début. */
-var PREV_RUBRIQUES_FRAIS = ['transports', 'sousTraitance', 'locationsCharges', 'entretienBiens', 'assurances', 'honorairesJuridiques', 'telecomInformatique', 'gardiennageSecurite', 'autresServices', 'chargesCopropriete'];
+/* Charges de fonctionnement reprises du budget validé (module Budget) de l'exercice de début.
+   Non repris : achats (classe 60 = coût de production, déjà par lot), publicité (déjà en % du CA),
+   commissions (déjà en % du CA), charges financières et HAO (calculées par le moteur). Un champ sans montant au budget est conservé. */
+var PREV_BUDGET_AILLEURS = { achats: 1, publiciteMarketing: 1, commissionsCourtage: 1, chargesFin: 1, chargesHAO: 1, personnel: 1, impots: 1, dotations: 1 };
 function prevReprendreBudget() {
   if (typeof _cexpBudgetParRubrique !== 'function') { toast('Module Budget indisponible.', 'error'); return; }
   var ex = String(_gv('prev-date') || today()).slice(0, 4), b = _cexpBudgetParRubrique('', ex);
-  var tot = function(cle){ return (b[cle] || []).reduce(function(a, v){ return a + v; }, 0); };
-  var frais = PREV_RUBRIQUES_FRAIS.reduce(function(a, k){ return a + tot(k); }, 0), perso = tot('personnel'), impots = tot('impots'), dot = tot('dotations');
+  var tot = function(cle){ return _cexpSomme12(b[cle] || []); };
+  var frais = _toutesLesRubriques().filter(function(r){ return r.type === 'charge' && !PREV_BUDGET_AILLEURS[r.cle]; }).reduce(function(a, r){ return a + tot(r.cle); }, 0);
+  var perso = tot('personnel'), impots = tot('impots'), dot = tot('dotations'), repris = [], gardes = [];
   if (!(frais + perso + impots + dot)) { toast('Aucun budget validé pour l\'exercice ' + ex + ' (module Budget).', 'info', 6000); return; }
-  _sv('prev-charges-fixes', Math.round(frais / 12));
-  if (perso) { var mAuto = document.getElementById('prev-masse-auto'); if (mAuto) mAuto.checked = false; var mi = document.getElementById('prev-masse-salariale'); if (mi) mi.readOnly = false; _sv('prev-masse-salariale', Math.round(perso / 12)); }
-  _sv('prev-taxes-locales', Math.round(impots));
-  if (dot && !_gn('prev-invest')) _sv('prev-dotations', Math.round(dot));
+  if (frais) { _sv('prev-charges-fixes', Math.round(frais / 12)); repris.push('frais généraux ' + fmtF(frais / 12) + ' F/mois'); } else gardes.push('frais généraux');
+  if (perso) { _prevSetMasseAuto(false); _sv('prev-masse-salariale', Math.round(perso / 12)); repris.push('personnel ' + fmtF(perso / 12) + ' F/mois'); } else gardes.push('personnel');
+  if (impots) { _sv('prev-taxes-locales', Math.round(impots)); repris.push('impôts et taxes ' + fmtF(impots) + ' F/an'); } else gardes.push('impôts et taxes');
+  if (dot && !_gn('prev-invest')) { _sv('prev-dotations', Math.round(dot)); repris.push('dotations ' + fmtF(dot) + ' F/an'); }
   prevRender();
-  toast('Budget ' + ex + ' repris : frais généraux ' + fmtF(Math.round(frais / 12)) + ' F/mois, personnel ' + fmtF(Math.round(perso / 12)) + ' F/mois, impôts et taxes ' + fmtF(Math.round(impots)) + ' F/an.', 'success', 8000);
+  toast('Budget ' + ex + ' repris : ' + repris.join(', ') + '.' + (gardes.length ? ' Sans montant au budget, saisie conservée : ' + gardes.join(', ') + '.' : '')
+    + ' Achats, publicité et commissions non repris (déjà dans le coût par lot ou en % du CA).', 'success', 10000);
 }
 
 async function prevSaveScenario() {
@@ -98098,8 +98125,8 @@ function prevRestaurerVersion(vid) {
   prevFillForm(s); prevRender();
 }
 function _prevVersionCourante(s) {
-  var e = JSON.stringify([s.date_debut, +s.horizon_annees, _prevNormaliser(s).hyp, _prevNormaliser(s).fin]);
-  return (s.versions || []).slice().reverse().find(function(v){ return JSON.stringify([v.date_debut, +v.horizon_annees, _prevNormaliser(v).hyp, _prevNormaliser(v).fin]) === e; }) || null;
+  var e = _prevEmpreinte(s, true);
+  return (s.versions || []).slice().reverse().find(function(v){ return _prevEmpreinte(v, true) === e; }) || null;
 }
 
 async function prevDeleteScenario() {
@@ -98115,12 +98142,12 @@ async function prevDeleteScenario() {
 }
 
 /* ---- États (écran et PDF partagent les mêmes tableaux : ce qui est imprimé est ce qui est affiché) ---- */
-function _prevF(x) { return fmtF(Math.round(x) + 0); }   /* + 0 : jamais « -0 » */
+function _prevPct(v) { return v === null || v === undefined ? 'n.d.' : (v * 100).toFixed(1) + ' %'; }
 function _prevTable(head, corps) { return '<table><thead><tr>' + head + '</tr></thead><tbody>' + corps + '</tbody></table>'; }
-function _prevLignesAns(c, defs) {
+function _prevLignesAns(c, defs, cols) {
   return defs.map(function(d){
-    var cl = d[2] === 'total' ? ' class="total"' : (d[2] === 'sous' ? ' class="sous"' : '');
-    return '<tr' + cl + '><td>' + d[0] + '</td>' + c.years.map(function(a){ var v = typeof d[1] === 'function' ? d[1](a) : a[d[1]]; return '<td class="num">' + (typeof v === 'string' ? v : _prevF((v))) + '</td>'; }).join('') + '</tr>';
+    var cl = d[2] ? ' class="' + d[2] + '"' : '';
+    return '<tr' + cl + '><td>' + d[0] + '</td>' + (cols || c.years).map(function(a){ var v = typeof d[1] === 'function' ? d[1](a) : a[d[1]]; return '<td class="num">' + (typeof v === 'string' ? v : fmtF((v))) + '</td>'; }).join('') + '</tr>';
   }).join('');
 }
 function _prevHeadAns(c) { return '<th>Rubrique</th>' + c.years.map(function(a){ return '<th class="num">' + a.an + '</th>'; }).join(''); }
@@ -98154,26 +98181,22 @@ function _prevResultatHTML(c) {
 }
 function _prevPlanHTML(c) {
   var head = '<th>Rubrique</th>' + c.plan.map(function(p){ return '<th class="num">' + p.an + '</th>'; }).join('');
-  var L = function(lib, f, cl){ return '<tr' + (cl ? ' class="' + cl + '"' : '') + '><td>' + lib + '</td>' + c.plan.map(function(p){ return '<td class="num">' + _prevF((f(p))) + '</td>'; }).join('') + '</tr>'; };
+  var titre = function(t){ return '<tr class="sous"><td colspan="' + (c.plan.length + 1) + '">' + t + '</td></tr>'; };
+  var pos = function(f){ return function(p){ return Math.max(0, f(p)); }; };
   return _prevTable(head,
-    '<tr class="sous"><td colspan="' + (c.plan.length + 1) + '">Ressources</td></tr>'
-    + L('Capacité d\'autofinancement', function(p){ return p.caf; })
-    + L('Emprunt bancaire', function(p){ return p.emprunt; })
-    + L('Apports des associés', function(p){ return p.apports; })
-    + L('Subventions', function(p){ return p.subventions; })
-    + L('Hausse de la dette fiscale (IS à payer)', function(p){ return Math.max(0, p.dDette); })
-    + L('Déstockage / baisse des créances', function(p){ return Math.max(0, -p.dStock) + Math.max(0, -p.dCreances); })
-    + L('Total ressources', function(p){ return p.ressources; }, 'sous')
-    + '<tr class="sous"><td colspan="' + (c.plan.length + 1) + '">Emplois</td></tr>'
-    + L('Investissements', function(p){ return p.invest; })
-    + L('Hausse du stock (foncier et travaux payés, lots non vendus)', function(p){ return Math.max(0, p.dStock); })
-    + L('Hausse des créances acheteurs', function(p){ return Math.max(0, p.dCreances); })
-    + L('Baisse de la dette fiscale', function(p){ return Math.max(0, -p.dDette); })
-    + L('Remboursement du capital emprunté', function(p){ return p.rembCapital; })
-    + L('Total emplois', function(p){ return p.emplois; }, 'sous')
-    + L('Solde annuel', function(p){ return p.solde; })
-    + L('TRÉSORERIE CUMULÉE', function(p){ return p.cumul; }, 'total'))
-    + '<p style="font-size:11px;">Fin d\'horizon : créances acheteurs ' + _prevF((c.creancesFin)) + ' F à encaisser · stock ' + _prevF((c.stockFin)) + ' F · IS à payer ' + _prevF((c.detteFiscaleFin)) + ' F.</p>';
+    titre('Ressources') + _prevLignesAns(c, [
+      ['Capacité d\'autofinancement', 'caf'], ['Emprunt bancaire', 'emprunt'], ['Apports des associés', 'apports'], ['Subventions', 'subventions'],
+      ['Hausse de la dette fiscale (IS à payer)', pos(function(p){ return p.dDette; })],
+      ['Déstockage / baisse des créances', function(p){ return Math.max(0, -p.dStock) + Math.max(0, -p.dCreances); }],
+      ['Total ressources', 'ressources', 'sous']], c.plan)
+    + titre('Emplois') + _prevLignesAns(c, [
+      ['Investissements', 'invest'],
+      ['Hausse du stock (foncier et travaux payés, lots non vendus)', pos(function(p){ return p.dStock; })],
+      ['Hausse des créances acheteurs', pos(function(p){ return p.dCreances; })],
+      ['Baisse de la dette fiscale', pos(function(p){ return -p.dDette; })],
+      ['Remboursement du capital emprunté', 'rembCapital'],
+      ['Total emplois', 'emplois', 'sous'], ['Solde annuel', 'solde'], ['TRÉSORERIE CUMULÉE', 'cumul', 'total']], c.plan))
+    + '<p style="font-size:11px;">Fin d\'horizon : créances acheteurs ' + fmtF(c.creancesFin) + ' F à encaisser · stock ' + fmtF(c.stockFin) + ' F · IS à payer ' + fmtF(c.detteFiscaleFin) + ' F.</p>';
 }
 function _prevTresoHTML(c, nb) {
   var l = nb ? c.treso.slice(0, nb) : c.treso;
@@ -98181,18 +98204,17 @@ function _prevTresoHTML(c, nb) {
   var cols = [['enc', 'Encaissements ventes'], ['tva', 'TVA collectée = reversée'], ['financement', 'Financement'], ['production', 'Foncier & travaux'], ['exploitation', 'Exploitation'],
     ['dette', 'Service de la dette'], ['is', 'IS'], ['invest', 'Invest.'], ['net', 'Solde du mois'], ['cumul', 'Cumul']];
   return _prevTable('<th>Mois</th>' + cols.map(function(k){ return '<th class="num">' + k[1] + '</th>'; }).join(''),
-    l.map(function(t){ return '<tr' + (t.cumul < 0 ? ' class="neg"' : '') + '><td>' + t.label + '</td>' + cols.map(function(k){ return '<td class="num">' + _prevF((t[k[0]])) + '</td>'; }).join('') + '</tr>'; }).join(''));
+    l.map(function(t){ return '<tr' + (t.cumul < 0 ? ' class="neg"' : '') + '><td>' + t.label + '</td>' + cols.map(function(k){ return '<td class="num">' + fmtF((t[k[0]])) + '</td>'; }).join('') + '</tr>'; }).join(''));
 }
-function _prevSensibiliteHTML(s) {
-  var fp = function(v){ return v === null ? 'n.d.' : (v * 100).toFixed(1) + ' %'; };
+function _prevSensibiliteHTML(s, c) {
   return _prevTable('<th>Scénario</th><th class="num">CA cumulé</th><th class="num">Résultat net cumulé</th><th class="num">VAN</th><th class="num">TRI</th><th class="num">Trésorerie minimum</th><th class="num">DSCR minimum</th>',
-    _prevSensibilite(s).map(function(x){
-      return '<tr' + (x.cle === 'central' ? ' class="sous"' : '') + '><td>' + x.lib + '<div style="font-size:10px;opacity:.7;">' + x.desc + '</div></td><td class="num">' + _prevF((x.CA)) + '</td><td class="num">' + _prevF((x.rNet)) + '</td>'
-        + '<td class="num">' + _prevF((x.van)) + '</td><td class="num">' + fp(x.tri) + '</td><td class="num">' + _prevF((x.tresoMin)) + '</td><td class="num">' + (x.dscrMin === null ? '—' : x.dscrMin.toFixed(2)) + '</td></tr>';
+    _prevSensibilite(s, c).map(function(x){
+      return '<tr' + (x.cle === 'central' ? ' class="sous"' : '') + '><td>' + x.lib + '<div style="font-size:10px;opacity:.7;">' + x.desc + '</div></td><td class="num">' + fmtF((x.CA)) + '</td><td class="num">' + fmtF((x.rNet)) + '</td>'
+        + '<td class="num">' + fmtF((x.van)) + '</td><td class="num">' + _prevPct(x.tri) + '</td><td class="num">' + fmtF((x.tresoMin)) + '</td><td class="num">' + (x.dscrMin === null ? '—' : x.dscrMin.toFixed(2)) + '</td></tr>';
     }).join(''));
 }
 function _prevSyntheseHTML(s, c) {
-  var r = c.ratios, h = _prevNormaliser(s).hyp, f = _prevNormaliser(s).fin, fp = function(v){ return v === null ? 'n.d.' : (v * 100).toFixed(1) + ' %'; };
+  var n = _prevNormaliser(s), r = c.ratios, h = n.hyp, f = n.fin;
   var L = function(a, b){ return '<tr><th style="width:55%;">' + a + '</th><td class="num">' + b + '</td></tr>'; };
   return '<table><tbody>'
     + L('Prix moyen d\'un lot / lots vendus la 1re année', fcfa(h.prix_lot) + ' / ' + h.lots_par_an + (h.lots_max ? ' (plafond ' + h.lots_max + ' lots)' : ''))
@@ -98201,14 +98223,15 @@ function _prevSyntheseHTML(s, c) {
     + L('Emprunt / taux / durée (dont différé)', fcfa(f.emp_montant) + ' / ' + f.emp_taux + ' % / ' + f.emp_duree + ' mois (' + f.emp_differe + ')')
     + L('Chiffre d\'affaires cumulé (' + c.H + ' ans, ' + c.totals.lots.toFixed(0) + ' lots)', fcfa(c.totals.CA))
     + L('Résultat net cumulé / marge nette', fcfa(c.totals.rNet) + ' / ' + r.margeNettePct.toFixed(1) + ' %')
-    + L('VAN (' + (r.tauxActu * 100).toFixed(0) + ' %) / TRI / délai de récupération', fcfa(r.van) + ' / ' + fp(r.tri) + ' / ' + (r.payback ? 'année ' + r.payback : '> ' + c.H + ' ans'))
+    + L('VAN (' + (r.tauxActu * 100).toFixed(0) + ' %) / TRI / délai de récupération', fcfa(r.van) + ' / ' + _prevPct(r.tri) + ' / ' + (r.payback ? 'année ' + r.payback : '> ' + c.H + ' ans'))
     + L('DSCR minimum (année)', r.dscrMin === null ? '—' : r.dscrMin.toFixed(2) + ' (' + r.dscrMinAn + ')')
     + L('Trésorerie minimum (mois)', fcfa(r.tresoMin) + ' (' + r.tresoMinMois + ')')
     + L('Seuil de rentabilité ' + r.seuilAn + ' (charges fixes, dotations et intérêts inclus)', r.seuilRentab === null ? 'non atteignable' : fcfa(r.seuilRentab))
     + L('Créances acheteurs restant à encaisser en fin d\'horizon', fcfa(c.creancesFin))
     + '</tbody></table>';
 }
-var PREV_CSS = 'td.num,th.num{text-align:right;white-space:nowrap;}tr.total td{font-weight:700;border-top:2px solid currentColor;}tr.sous td{font-weight:600;}tr.neg td{color:#dc2626;}';
+function _prevCss(p) { p = p || ''; return p + 'table{width:100%;}' + p + 'td.num,' + p + 'th.num{text-align:right;white-space:nowrap;}' + p + 'tr.total td{font-weight:700;border-top:2px solid currentColor;}' + p + 'tr.sous td{font-weight:600;}' + p + 'tr.neg td{color:#dc2626;}'; }
+var PREV_CSS = _prevCss(), PREV_CSS_ECRAN = _prevCss('#prev-results ') + '#prev-results table{font-size:12px;}';
 
 /* ---- Rendu écran ---- */
 function prevRender() {
@@ -98222,8 +98245,7 @@ function prevRender() {
       + '</div><div class="kpi-value" style="font-size:17px;color:' + (color || 'var(--blanc)') + ';">' + val + '</div>'
       + (sub ? '<div style="font-size:10px;color:var(--blanc-dim);margin-top:2px;">' + sub + '</div>' : '') + '</div>';
   }
-  var fpct = function(x){ return (x * 100).toFixed(1) + '%'; };
-  var triTxt = r.tri === null ? 'n.d.' : fpct(r.tri), paybackTxt = r.payback ? 'An ' + r.payback : '> ' + c.H + ' ans';
+  var fpct = _prevPct, triTxt = _prevPct(r.tri), paybackTxt = r.payback ? 'An ' + r.payback : '> ' + c.H + ' ans';
   var vCol = v.niveau === 'ok' ? 'var(--vert)' : (v.niveau === 'moyen' ? 'var(--or)' : 'var(--rouge)');
   var verdict = '<div data-prev-verdict="' + v.niveau + '" style="display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:16px 18px;border-radius:12px;margin-bottom:16px;'
     + 'background:linear-gradient(135deg,' + vCol + '22,' + vCol + '08);border:1px solid ' + vCol + '55;">'
@@ -98233,18 +98255,18 @@ function prevRender() {
     + v.criteres.map(function(x){ return '<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:' + (x.ok ? 'rgba(74,196,122,.16);color:var(--vert)' : 'rgba(239,68,68,.14);color:var(--rouge)') + ';">' + (x.ok ? '✓ ' : '✗ ') + x.txt + '</span>'; }).join('')
     + '</div></div>';
   var alertes = [];
-  if (c.plafondAtteint) alertes.push('Plafond de ' + _gn('prev-lots-max') + ' lots atteint : les ventes s\'arrêtent avant la fin de l\'horizon.');
-  if (r.tresoMin < 0) alertes.push('Trésorerie négative au plus bas de ' + _prevF((r.tresoMin)) + ' F (' + r.tresoMinMois + ') : financement complémentaire, différé plus long ou apport acheteur plus élevé.');
-  if (c.creancesFin > 0) alertes.push(_prevF((c.creancesFin)) + ' F d\'échéances acheteurs tombent après l\'horizon : comptées dans la VAN, absentes de la trésorerie affichée.');
+  if (c.plafondAtteint) alertes.push('Plafond de ' + s.hyp.lots_max + ' lots atteint : les ventes s\'arrêtent avant la fin de l\'horizon.');
+  if (r.tresoMin < 0) alertes.push('Trésorerie négative au plus bas de ' + fmtF((r.tresoMin)) + ' F (' + r.tresoMinMois + ') : financement complémentaire, différé plus long ou apport acheteur plus élevé.');
+  if (c.creancesFin > 0) alertes.push(fmtF((c.creancesFin)) + ' F d\'échéances acheteurs tombent après l\'horizon : comptées dans la VAN, absentes de la trésorerie affichée.');
   var kpis = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:16px;">'
-    + kpi('CA cumulé (' + c.H + ' ans)', _prevF((c.totals.CA)) + ' F', 'var(--vert)', c.totals.lots.toFixed(0) + ' lots')
-    + kpi('Résultat net cumulé', _prevF((c.totals.rNet)) + ' F', c.totals.rNet >= 0 ? 'var(--vert)' : 'var(--rouge)', 'Marge ' + r.margeNettePct.toFixed(1) + '%')
-    + kpi('VAN', _prevF((r.van)) + ' F', r.van >= 0 ? 'var(--vert)' : 'var(--rouge)', 'actualisée à ' + fpct(r.tauxActu))
+    + kpi('CA cumulé (' + c.H + ' ans)', fmtF((c.totals.CA)) + ' F', 'var(--vert)', c.totals.lots.toFixed(0) + ' lots')
+    + kpi('Résultat net cumulé', fmtF((c.totals.rNet)) + ' F', c.totals.rNet >= 0 ? 'var(--vert)' : 'var(--rouge)', 'Marge ' + r.margeNettePct.toFixed(1) + '%')
+    + kpi('VAN', fmtF((r.van)) + ' F', r.van >= 0 ? 'var(--vert)' : 'var(--rouge)', 'actualisée à ' + fpct(r.tauxActu))
     + kpi('TRI', triTxt, (r.tri !== null && r.tri >= r.tauxActu) ? 'var(--vert)' : 'var(--or)', 'cible ≥ ' + fpct(r.tauxActu))
     + kpi('Délai de récupération', paybackTxt, 'var(--violet)', 'flux économique cumulé > 0')
     + kpi('DSCR minimum', r.dscrMin === null ? '—' : r.dscrMin.toFixed(2) + (r.dscrMin >= 1.2 ? ' ✔' : ' ⚠'), r.dscrMin === null || r.dscrMin >= 1.2 ? 'var(--vert)' : 'var(--or)', r.dscrMinAn ? 'année ' + r.dscrMinAn + ' · cible ≥ 1,20' : 'pas d\'emprunt')
-    + kpi('Trésorerie minimum', _prevF((r.tresoMin)) + ' F', r.tresoMin >= 0 ? 'var(--vert)' : 'var(--rouge)', r.tresoMinMois)
-    + kpi('Seuil de rentabilité ' + r.seuilAn, r.seuilRentab === null ? 'non atteignable' : _prevF((r.seuilRentab)) + ' F', 'var(--bleu)', 'CA minimum, toutes charges fixes')
+    + kpi('Trésorerie minimum', fmtF((r.tresoMin)) + ' F', r.tresoMin >= 0 ? 'var(--vert)' : 'var(--rouge)', r.tresoMinMois)
+    + kpi('Seuil de rentabilité ' + r.seuilAn, r.seuilRentab === null ? 'non atteignable' : fmtF((r.seuilRentab)) + ' F', 'var(--bleu)', 'CA minimum, toutes charges fixes')
     + '</div>';
   var maxCA = Math.max.apply(null, c.years.map(function(a){ return Math.abs(a.CA); }).concat([1]));
   var chartCA = '<div class="card" style="margin-bottom:16px;"><div class="card-title">Chiffre d\'affaires & résultat net par année</div>'
@@ -98258,10 +98280,10 @@ function prevRender() {
       }).join('')
     + '</div></div>';
   var section = function(t, coul, html){ return '<div class="form-section-title" style="margin-top:18px;color:' + coul + ';">' + t + '</div><div class="table-wrap">' + html + '</div>'; };
-  box.innerHTML = '<style>#prev-results table{width:100%;font-size:12px;}' + PREV_CSS.replace(/(^|})([^{}]+){/g, function(m0, a, sel){ return a + sel.split(',').map(function(x){ return '#prev-results ' + x; }).join(',') + '{'; }) + '</style>'
+  box.innerHTML = '<style>' + PREV_CSS_ECRAN + '</style>'
     + verdict + (alertes.length ? '<div class="alert alert-warning" style="margin-bottom:12px;font-size:12px;">' + alertes.map(function(x){ return '⚠ ' + x; }).join('<br>') + '</div>' : '')
     + kpis + chartCA
-    + section('Sensibilité : trois scénarios', 'var(--violet)', _prevSensibiliteHTML(s))
+    + section('Sensibilité : trois scénarios', 'var(--violet)', _prevSensibiliteHTML(s, c))
     + section('① Compte d\'exploitation prévisionnel (soldes de gestion SYSCOHADA)', 'var(--or)', _prevExploitHTML(c))
     + section('② Compte de résultat prévisionnel', 'var(--bleu)', _prevResultatHTML(c))
     + section('③ Plan de financement prévisionnel', 'var(--vert)', _prevPlanHTML(c))
@@ -98275,7 +98297,7 @@ function prevRenderVersions(s) {
   box.innerHTML = '<div class="card-title">📌 Versions figées (envoyées à la banque)</div>'
     + (vs.length ? '<div class="table-wrap"><table style="width:100%;font-size:12px;"><thead><tr><th>Version</th><th>Figée le</th><th>Par</th><th style="text-align:right;">VAN</th><th style="text-align:right;">Trésorerie min.</th><th></th></tr></thead><tbody>'
       + vs.map(function(v){ return '<tr data-prev-version="' + v.id + '"><td>' + escHtml(v.libelle) + (cour && cour.id === v.id ? ' <span class="badge" style="color:var(--vert);">affichée</span>' : '') + '</td><td>' + dateShort(v.le) + '</td><td>' + escHtml(v.par || '') + '</td>'
-        + '<td style="text-align:right;">' + _prevF((v.synthese.van)) + '</td><td style="text-align:right;">' + _prevF((v.synthese.tresoMin)) + '</td>'
+        + '<td style="text-align:right;">' + fmtF((v.synthese.van)) + '</td><td style="text-align:right;">' + fmtF((v.synthese.tresoMin)) + '</td>'
         + '<td><button class="btn btn-secondary btn-sm" onclick="prevRestaurerVersion(\'' + v.id + '\')">↺ Recharger</button></td></tr>'; }).join('') + '</tbody></table></div>'
       : '<div style="font-size:12px;color:var(--blanc-dim);">Aucune version figée. Avant d\'envoyer le dossier à une banque, cliquez « 📌 Figer pour la banque » : les hypothèses et la synthèse sont conservées telles quelles.</div>');
 }
@@ -98300,7 +98322,7 @@ function etatPrevTresorerie() { var s = prevReadForm(), c = _prevCompute(s); _pr
 function etatDossierBancaire() {
   var s = prevReadForm(), c = _prevCompute(s), v = _prevVerdict(c);
   var contenu = '<h3>Synthèse du projet — ' + v.lib + ' (' + v.nbOk + '/' + v.criteres.length + ' critères)</h3>' + _prevSyntheseHTML(s, c)
-    + '<h3>Sensibilité</h3>' + _prevSensibiliteHTML(s)
+    + '<h3>Sensibilité</h3>' + _prevSensibiliteHTML(s, c)
     + '<div class="pb"></div><h3>① Compte d\'exploitation prévisionnel</h3>' + _prevExploitHTML(c)
     + '<div class="pb"></div><h3>② Compte de résultat prévisionnel</h3>' + _prevResultatHTML(c)
     + '<div class="pb"></div><h3>③ Plan de financement prévisionnel</h3>' + _prevPlanHTML(c)
