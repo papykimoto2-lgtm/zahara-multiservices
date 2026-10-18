@@ -75,7 +75,10 @@ test('écran : copie de travail, versions figées, Budget, pré-remplissage, PDF
       o.relu = val('prev-prix-lot');
       await prevFigerVersion();
       o.version = [DATA.previsionnels[0].versions.length, DATA.previsionnels[0].versions[0].libelle, !!document.querySelector('[data-prev-version]')];
+      saisir('prev-commentaire', 'Garantie <b>hypothèque</b>\nRéférences'); o.dirtyCom = document.getElementById('prev-dirty').style.display;
       etatDossierBancaire();
+      o.graph = [(pdf[0].contenu.match(/<svg /g) || []).length, /Analyse et commentaire/.test(pdf[0].contenu), /Mot du promoteur<\/b><br>Garantie &lt;b&gt;hypothèque&lt;\/b&gt;<br>Références/.test(pdf[0].contenu),
+        /<b>Financement et trésorerie\.<\/b>/.test(pdf[0].contenu), /Besoin maximal de trésorerie/.test(pdf[0].contenu), /NaN|undefined/.test(pdf[0].contenu)];
       o.pdf = [/version figée « Dossier banque test »/.test(pdf[0].sousTitre), /VALEUR AJOUTÉE/.test(pdf[0].contenu), /Marketing/.test(pdf[0].contenu), /Pessimiste/.test(pdf[0].contenu), /Hausse du stock/.test(pdf[0].contenu)];
       const d = document.createElement('div'); d.innerHTML = _prevExploitHTML(_prevCompute(prevReadForm())); o.ecranPdf = document.getElementById('prev-results').textContent.indexOf(d.textContent) !== -1;
       saisir('prev-prix-lot', '20000000'); etatPrevResultat();
@@ -101,6 +104,8 @@ test('écran : copie de travail, versions figées, Budget, pré-remplissage, PDF
     assert.equal(r.relu, '15000000');
     assert.deepEqual(r.version, [1, 'Dossier banque test', true]);
     assert.deepEqual(r.pdf, [true, true, true, true, true]);
+    assert.equal(r.dirtyCom, '');
+    assert.deepEqual(r.graph, [3, true, true, true, true, false]);
     assert.equal(r.ecranPdf, true);
     assert.equal(r.travail, true);
     assert.deepEqual(r.budget, ['200000', '2000000', '500000', '900000']);
