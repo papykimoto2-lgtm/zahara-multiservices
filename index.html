@@ -13225,6 +13225,10 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
         </div>
 
         <div class="card" style="margin-bottom:16px;">
+          <div class="form-group" style="margin-bottom:10px;">
+            <label for="prev-commentaire">💬 Mot du promoteur (repris en tête de l'analyse du dossier bancaire)</label>
+            <textarea class="form-control" id="prev-commentaire" rows="3" maxlength="2000" oninput="prevRender()" placeholder="Contexte du projet, références, garanties proposées… L'analyse chiffrée et les graphiques sont ajoutés automatiquement au PDF."></textarea>
+          </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-secondary btn-sm" onclick="etatPrevExploitation()">🖨️ Exploitation PDF</button>
             <button class="btn btn-secondary btn-sm" onclick="etatPrevResultat()">🖨️ Résultat PDF</button>
@@ -97998,7 +98002,7 @@ function loadPrevisionnel() {
 /* Empreinte des hypothèses ; avec l'identité (nom, programme) pour l'indicateur « non enregistré », sans pour reconnaître une version figée. */
 function _prevEmpreinte(s, sansIdentite) {
   var o = _prevNormaliser(s), base = [o.date_debut, +o.horizon_annees, o.hyp, o.fin];
-  return JSON.stringify(sansIdentite ? base : [o.nom || '', o.programme_id || ''].concat(base));
+  return JSON.stringify(sansIdentite ? base : [o.nom || '', o.programme_id || '', o.commentaire || ''].concat(base));
 }
 function prevSelectScenario() {
   var id = document.getElementById('prev-select').value;
@@ -98029,6 +98033,7 @@ function prevReadForm() {
   var s = APP._prevCurrent || _prevDefaut();
   s.nom = _gv('prev-nom').trim() || 'Prévisionnel';
   s.programme_id = _gv('prev-programme');
+  s.commentaire = _gv('prev-commentaire');
   s.date_debut = _gv('prev-date') || s.date_debut;
   s.horizon_annees = Math.max(3, Math.min(5, parseInt(_gv('prev-horizon')) || 3));
   s.hyp = {}; Object.keys(PREV_CHAMPS_HYP).forEach(function(k){ s.hyp[k] = _gn(PREV_CHAMPS_HYP[k]); });
@@ -98040,7 +98045,7 @@ function prevReadForm() {
 function _sv(id, v) { var e = document.getElementById(id); if (e) e.value = (v === undefined || v === null) ? '' : v; }
 function prevFillForm(s) {
   s = _prevNormaliser(s);
-  _sv('prev-nom', s.nom); _sv('prev-programme', s.programme_id); _sv('prev-date', s.date_debut); _sv('prev-horizon', s.horizon_annees);
+  _sv('prev-nom', s.nom); _sv('prev-commentaire', s.commentaire || ''); _sv('prev-programme', s.programme_id); _sv('prev-date', s.date_debut); _sv('prev-horizon', s.horizon_annees);
   Object.keys(PREV_CHAMPS_HYP).forEach(function(k){ _sv(PREV_CHAMPS_HYP[k], s.hyp[k]); });
   Object.keys(PREV_CHAMPS_FIN).forEach(function(k){ _sv(PREV_CHAMPS_FIN[k], s.fin[k]); });
   _prevSetMasseAuto(s.hyp.masse_salariale_auto);
@@ -98142,7 +98147,8 @@ async function prevDeleteScenario() {
 }
 
 /* ---- États (écran et PDF partagent les mêmes tableaux : ce qui est imprimé est ce qui est affiché) ---- */
-function _prevPct(v) { return v === null || v === undefined ? 'n.d.' : (v * 100).toFixed(1) + ' %'; }
+function _prevPct(v) { return v === null || v === undefined ? 'n.d.' : (v * 100).toFixed(1).replace('.', ',') + ' %'; }
+function _prevDec(v, n) { return v === null || v === undefined ? '—' : v.toFixed(n).replace('.', ','); }
 function _prevTable(head, corps) { return '<table><thead><tr>' + head + '</tr></thead><tbody>' + corps + '</tbody></table>'; }
 function _prevLignesAns(c, defs, cols) {
   return defs.map(function(d){
@@ -98210,24 +98216,25 @@ function _prevSensibiliteHTML(s, c) {
   return _prevTable('<th>Scénario</th><th class="num">CA cumulé</th><th class="num">Résultat net cumulé</th><th class="num">VAN</th><th class="num">TRI</th><th class="num">Trésorerie minimum</th><th class="num">DSCR minimum</th>',
     _prevSensibilite(s, c).map(function(x){
       return '<tr' + (x.cle === 'central' ? ' class="sous"' : '') + '><td>' + x.lib + '<div style="font-size:10px;opacity:.7;">' + x.desc + '</div></td><td class="num">' + fmtF((x.CA)) + '</td><td class="num">' + fmtF((x.rNet)) + '</td>'
-        + '<td class="num">' + fmtF((x.van)) + '</td><td class="num">' + _prevPct(x.tri) + '</td><td class="num">' + fmtF((x.tresoMin)) + '</td><td class="num">' + (x.dscrMin === null ? '—' : x.dscrMin.toFixed(2)) + '</td></tr>';
+        + '<td class="num">' + fmtF((x.van)) + '</td><td class="num">' + _prevPct(x.tri) + '</td><td class="num">' + fmtF((x.tresoMin)) + '</td><td class="num">' + _prevDec(x.dscrMin, 2) + '</td></tr>';
     }).join(''));
 }
+function _prevFcfa(v) { return fcfa(Math.round(+v || 0) + 0); }
 function _prevSyntheseHTML(s, c) {
   var n = _prevNormaliser(s), r = c.ratios, h = n.hyp, f = n.fin;
   var L = function(a, b){ return '<tr><th style="width:55%;">' + a + '</th><td class="num">' + b + '</td></tr>'; };
   return '<table><tbody>'
-    + L('Prix moyen d\'un lot / lots vendus la 1re année', fcfa(h.prix_lot) + ' / ' + h.lots_par_an + (h.lots_max ? ' (plafond ' + h.lots_max + ' lots)' : ''))
+    + L('Prix moyen d\'un lot / lots vendus la 1re année', _prevFcfa(h.prix_lot) + ' / ' + h.lots_par_an + (h.lots_max ? ' (plafond ' + h.lots_max + ' lots)' : ''))
     + L('Foncier payé avant la vente / durée des travaux', h.foncier_avance_mois + ' mois / ' + h.travaux_duree_mois + ' mois')
     + L('Apport acheteur / crédit acheteur', h.apport + ' % / ' + h.credit_mois + ' mois')
-    + L('Emprunt / taux / durée (dont différé)', fcfa(f.emp_montant) + ' / ' + f.emp_taux + ' % / ' + f.emp_duree + ' mois (' + f.emp_differe + ')')
-    + L('Chiffre d\'affaires cumulé (' + c.H + ' ans, ' + c.totals.lots.toFixed(0) + ' lots)', fcfa(c.totals.CA))
-    + L('Résultat net cumulé / marge nette', fcfa(c.totals.rNet) + ' / ' + r.margeNettePct.toFixed(1) + ' %')
-    + L('VAN (' + (r.tauxActu * 100).toFixed(0) + ' %) / TRI / délai de récupération', fcfa(r.van) + ' / ' + _prevPct(r.tri) + ' / ' + (r.payback ? 'année ' + r.payback : '> ' + c.H + ' ans'))
-    + L('DSCR minimum (année)', r.dscrMin === null ? '—' : r.dscrMin.toFixed(2) + ' (' + r.dscrMinAn + ')')
-    + L('Trésorerie minimum (mois)', fcfa(r.tresoMin) + ' (' + r.tresoMinMois + ')')
-    + L('Seuil de rentabilité ' + r.seuilAn + ' (charges fixes, dotations et intérêts inclus)', r.seuilRentab === null ? 'non atteignable' : fcfa(r.seuilRentab))
-    + L('Créances acheteurs restant à encaisser en fin d\'horizon', fcfa(c.creancesFin))
+    + L('Emprunt / taux / durée (dont différé)', _prevFcfa(f.emp_montant) + ' / ' + f.emp_taux + ' % / ' + f.emp_duree + ' mois (' + f.emp_differe + ')')
+    + L('Chiffre d\'affaires cumulé (' + c.H + ' ans, ' + c.totals.lots.toFixed(0) + ' lots)', _prevFcfa(c.totals.CA))
+    + L('Résultat net cumulé / marge nette', _prevFcfa(c.totals.rNet) + ' / ' + _prevDec(r.margeNettePct, 1) + ' %')
+    + L('VAN (' + (r.tauxActu * 100).toFixed(0) + ' %) / TRI / délai de récupération', _prevFcfa(r.van) + ' / ' + _prevPct(r.tri) + ' / ' + (r.payback ? 'année ' + r.payback : '> ' + c.H + ' ans'))
+    + L('DSCR minimum (année)', r.dscrMin === null ? '—' : _prevDec(r.dscrMin, 2) + ' (' + r.dscrMinAn + ')')
+    + L('Trésorerie minimum (mois)', _prevFcfa(r.tresoMin) + ' (' + r.tresoMinMois + ')')
+    + L('Seuil de rentabilité ' + r.seuilAn + ' (charges fixes, dotations et intérêts inclus)', r.seuilRentab === null ? 'non atteignable' : _prevFcfa(r.seuilRentab))
+    + L('Créances acheteurs restant à encaisser en fin d\'horizon', _prevFcfa(c.creancesFin))
     + '</tbody></table>';
 }
 function _prevCss(p) { p = p || ''; return p + 'table{width:100%;}' + p + 'td.num,' + p + 'th.num{text-align:right;white-space:nowrap;}' + p + 'tr.total td{font-weight:700;border-top:2px solid currentColor;}' + p + 'tr.sous td{font-weight:600;}' + p + 'tr.neg td{color:#dc2626;}'; }
@@ -98319,9 +98326,122 @@ function etatPrevPlanFinancement() { var s = prevReadForm(); _prevEtat('Plan de 
 function etatPrevTresorerie() { var s = prevReadForm(), c = _prevCompute(s); _prevEtat('Trésorerie prévisionnelle', '#dc2626', _prevTresoHTML(c), s, ' · ' + c.N + ' mois'); }
 
 /* ---- Dossier bancaire complet (un seul PDF) ---- */
+/* ---- Dossier bancaire : graphiques SVG (impression) et commentaire d'analyse ---- */
+var PREV_VIZ = { s1: '#2a78d6', s2: '#eb6834', texte: '#0b0b0b', texte2: '#52514e', grille: '#e6e5e1', axe: '#8a8984', critique: '#c62828' };
+function _prevM(v) { return Math.abs(v) < 1e7 ? (v / 1e6).toFixed(1).replace('.', ',').replace(/^-?0,0$/, '0') + ' M' : fmtF(v / 1e6) + ' M'; }
+/* Barre arrondie (4 px) du côté de la valeur, base droite sur l'axe */
+function _prevBarre(x, y0, y1, w, coul, titre) {
+  var h = Math.abs(y1 - y0); if (h < 0.5) return '';
+  var r = Math.min(4, h, w / 2), haut = y1 < y0, y = Math.min(y0, y1), d;
+  d = haut ? 'M' + x + ',' + (y + h) + 'V' + (y + r) + 'Q' + x + ',' + y + ' ' + (x + r) + ',' + y + 'H' + (x + w - r) + 'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h) + 'Z'
+    : 'M' + x + ',' + y + 'V' + (y + h - r) + 'Q' + x + ',' + (y + h) + ' ' + (x + r) + ',' + (y + h) + 'H' + (x + w - r) + 'Q' + (x + w) + ',' + (y + h) + ' ' + (x + w) + ',' + (y + h - r) + 'V' + y + 'Z';
+  return '<path d="' + d + '" fill="' + coul + '"><title>' + titre + '</title></path>';
+}
+function _prevEchelle(min, max, haut, bas) {
+  min = Math.min(0, min); max = Math.max(0, max); if (max === min) max = min + 1;
+  return function(v){ return haut + (max - v) / (max - min) * (bas - haut); };
+}
+function _prevGraduations(min, max, n) {
+  min = Math.min(0, min); max = Math.max(0, max);
+  var pas = Math.pow(10, Math.floor(Math.log10(Math.max(1, (max - min) / n)))), t = [];
+  [1, 2, 2.5, 5, 10].some(function(k){ if ((max - min) / (pas * k) <= n) { pas *= k; return true; } return false; });
+  for (var v = Math.ceil(min / pas) * pas; v <= max + 1e-6; v += pas) t.push(v);
+  return t;
+}
+function _prevSvg(l, h, corps, titre) {
+  return '<svg role="img" aria-label="' + titre + '" viewBox="0 0 ' + l + ' ' + h + '" width="100%" style="max-width:' + l + 'px;font-family:Arial,sans-serif;display:block;margin:6px 0 4px;">' + corps + '</svg>';
+}
+function _prevAxeY(Y, ticks, x0, x1) {
+  return ticks.map(function(v){ var y = Y(v);
+    return '<line x1="' + x0 + '" x2="' + x1 + '" y1="' + y + '" y2="' + y + '" stroke="' + (v === 0 ? PREV_VIZ.axe : PREV_VIZ.grille) + '" stroke-width="1"/>'
+      + '<text x="' + (x0 - 6) + '" y="' + (y + 3) + '" text-anchor="end" font-size="10" fill="' + PREV_VIZ.texte2 + '">' + _prevM(v) + '</text>'; }).join('');
+}
+/* 1. CA et résultat net par année : barres groupées, une seule échelle (F), légende + valeurs */
+function _prevSvgCaResultat(c) {
+  var L = 640, H = 250, x0 = 70, x1 = L - 16, yH = 34, yB = H - 28;
+  var vals = []; c.years.forEach(function(a){ vals.push(a.CA, a.rNet); });
+  var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals), Y = _prevEchelle(min, max, yH, yB);
+  var g = (x1 - x0) / c.years.length, w = Math.min(46, g / 3), out = _prevAxeY(Y, _prevGraduations(min, max, 5), x0, x1);
+  c.years.forEach(function(a, k){
+    var cx = x0 + g * k + g / 2;
+    [[a.CA, PREV_VIZ.s1, 'Chiffre d\'affaires', -w - 1], [a.rNet, PREV_VIZ.s2, 'Résultat net', 1]].forEach(function(b){
+      out += _prevBarre(cx + b[3], Y(0), Y(b[0]), w, b[1], b[2] + ' ' + a.an + ' : ' + fmtF(b[0]) + ' F');
+      out += '<text x="' + (cx + b[3] + w / 2) + '" y="' + (b[0] >= 0 ? Y(b[0]) - 4 : Y(b[0]) + 12) + '" text-anchor="middle" font-size="10" fill="' + PREV_VIZ.texte + '">' + _prevM(b[0]) + '</text>';
+    });
+    out += '<text x="' + cx + '" y="' + (H - 10) + '" text-anchor="middle" font-size="11" font-weight="bold" fill="' + PREV_VIZ.texte + '">' + a.an + '</text>';
+  });
+  out += '<rect x="' + x0 + '" y="8" width="10" height="10" rx="2" fill="' + PREV_VIZ.s1 + '"/><text x="' + (x0 + 14) + '" y="17" font-size="11" fill="' + PREV_VIZ.texte + '">Chiffre d\'affaires</text>'
+    + '<rect x="' + (x0 + 130) + '" y="8" width="10" height="10" rx="2" fill="' + PREV_VIZ.s2 + '"/><text x="' + (x0 + 144) + '" y="17" font-size="11" fill="' + PREV_VIZ.texte + '">Résultat net</text>';
+  return _prevSvg(L, H, out, 'Chiffre d\'affaires et résultat net par année');
+}
+/* 2. Trésorerie cumulée mois par mois : une courbe, axe zéro marqué, point bas annoté */
+function _prevSvgTresorerie(c) {
+  var L = 640, H = 240, x0 = 70, x1 = L - 16, yH = 34, yB = H - 30, t = c.treso, n = t.length;
+  var vals = t.map(function(x){ return x.cumul; }), min = Math.min.apply(null, vals), max = Math.max.apply(null, vals), Y = _prevEchelle(min, max, yH, yB);
+  var X = function(k){ return x0 + (n > 1 ? k / (n - 1) : 0) * (x1 - x0); }, out = _prevAxeY(Y, _prevGraduations(min, max, 5), x0, x1);
+  t.forEach(function(x, k){ if (k % 6 === 0 || k === n - 1) out += '<text x="' + X(k) + '" y="' + (H - 12) + '" text-anchor="' + (k === n - 1 ? 'end' : (k === 0 ? 'start' : 'middle')) + '" font-size="10" fill="' + PREV_VIZ.texte2 + '">' + x.label + '</text>'; });
+  out += '<polyline fill="none" stroke="' + PREV_VIZ.s1 + '" stroke-width="2" stroke-linejoin="round" points="' + t.map(function(x, k){ return X(k).toFixed(1) + ',' + Y(x.cumul).toFixed(1); }).join(' ') + '"/>';
+  var kMin = vals.indexOf(min), coulMin = min < 0 ? PREV_VIZ.critique : PREV_VIZ.s1;
+  out += '<circle cx="' + X(kMin) + '" cy="' + Y(min) + '" r="4.5" fill="' + coulMin + '" stroke="#fff" stroke-width="2"><title>' + t[kMin].label + ' : ' + fmtF(min) + ' F</title></circle>'
+    + '<circle cx="' + (x0 + 5) + '" cy="13" r="4.5" fill="' + coulMin + '"/><text x="' + (x0 + 14) + '" y="17" font-size="11" font-weight="bold" fill="' + PREV_VIZ.texte + '">'
+    + (min < 0 ? '⚠ Besoin maximal de trésorerie : ' : 'Point bas : ') + _prevM(min) + ' F (' + t[kMin].label + ')</text>';
+  return _prevSvg(L, H, out, 'Trésorerie cumulée mois par mois');
+}
+/* 3. VAN des trois scénarios : barres horizontales autour de zéro, valeur à côté */
+function _prevSvgSensibilite(sens) {
+  var L = 640, rangH = 34, H = sens.length * rangH + 24, x0 = 150, x1 = L - 90;
+  var vals = sens.map(function(x){ return x.van; }), min = Math.min(0, Math.min.apply(null, vals)), max = Math.max(0, Math.max.apply(null, vals)); if (max === min) max = min + 1;
+  var X = function(v){ return x0 + (v - min) / (max - min) * (x1 - x0); }, out = '<line x1="' + X(0) + '" x2="' + X(0) + '" y1="4" y2="' + (H - 18) + '" stroke="' + PREV_VIZ.axe + '"/>';
+  sens.forEach(function(x, k){
+    var y = 8 + k * rangH, h = 20, a = X(0), b = X(x.van), gauche = Math.min(a, b), w = Math.abs(b - a), r = Math.min(4, w / 2);
+    out += '<text x="' + (x0 - 8) + '" y="' + (y + 14) + '" text-anchor="end" font-size="11" fill="' + PREV_VIZ.texte + '">' + x.lib + '</text>';
+    if (w >= 0.5) out += '<rect x="' + gauche + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + r + '" fill="' + PREV_VIZ.s1 + '"><title>VAN ' + x.lib + ' : ' + fmtF(x.van) + ' F</title></rect>';
+    var dedans = x.van < 0 && w > 70, lx = x.van >= 0 ? b + 6 : (dedans ? b + 6 : a + 6);
+    out += '<text x="' + lx + '" y="' + (y + 14) + '" text-anchor="start" font-size="11" font-weight="bold" fill="' + (dedans ? '#fff' : PREV_VIZ.texte) + '">' + _prevM(x.van) + ' F</text>';
+  });
+  out += '<text x="' + X(0) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="10" fill="' + PREV_VIZ.texte2 + '">VAN = 0</text>';
+  return _prevSvg(L, H, out, 'VAN selon le scénario');
+}
+/* Commentaire d'analyse rédigé à partir des chiffres (aucune donnée inventée). */
+function _prevCommentaireAuto(s, c, sens) {
+  var r = c.ratios, v = _prevVerdict(c), y1 = c.years[0], yN = c.years[c.H - 1], pct = _prevPct;
+  var fin = _prevNormaliser(s).fin, pess = sens.filter(function(x){ return x.cle === 'pess'; })[0], out = [];
+  var croiss = y1.CA > 0 ? (yN.CA / y1.CA - 1) : 0;
+  out.push(['Activité', 'Le programme prévoit ' + c.totals.lots.toFixed(0) + ' lots vendus sur ' + c.H + ' ans pour un chiffre d\'affaires cumulé de ' + _prevFcfa(c.totals.CA)
+    + ', de ' + _prevFcfa(y1.CA) + ' la première année à ' + _prevFcfa(yN.CA) + ' en ' + yN.an + (croiss ? ' (' + (croiss >= 0 ? '+' : '') + pct(croiss) + ')' : '') + '.'
+    + (c.plafondAtteint ? ' Le stock de lots disponibles est entièrement vendu avant la fin de l\'horizon.' : '')]);
+  out.push(['Rentabilité', 'Le résultat net cumulé atteint ' + _prevFcfa(c.totals.rNet) + ', soit une marge nette de ' + _prevDec(r.margeNettePct, 1) + ' %. '
+    + 'La VAN au taux de ' + pct(r.tauxActu) + ' est ' + (r.van >= 0 ? 'positive (' : 'négative (') + _prevFcfa(r.van) + ')'
+    + (r.tri === null ? ' et le TRI n\'est pas calculable sur l\'horizon.' : ', pour un TRI de ' + pct(r.tri) + (r.tri >= r.tauxActu ? ', supérieur' : ', inférieur') + ' au taux exigé.')
+    + (r.seuilRentab ? ' Le seuil de rentabilité ' + r.seuilAn + ' est de ' + _prevFcfa(r.seuilRentab) + ' de chiffre d\'affaires' + (y1.CA >= r.seuilRentab ? ', dépassé dès la première année.' : ', non atteint la première année.') : '')]);
+  var fTotal = (+fin.emp_montant || 0) + (+fin.apports || 0) + (+fin.subventions || 0);
+  out.push(['Financement et trésorerie', 'Le plan mobilise ' + _prevFcfa(fTotal) + ' (emprunt ' + _prevFcfa(+fin.emp_montant || 0) + ', apports ' + _prevFcfa(+fin.apports || 0) + (+fin.subventions ? ', subventions ' + _prevFcfa(+fin.subventions) : '') + '). '
+    + (r.tresoMin < 0 ? 'La trésorerie descend au plus bas à ' + _prevFcfa(r.tresoMin) + ' en ' + r.tresoMinMois + ' : un financement complémentaire d\'au moins ' + _prevFcfa(Math.ceil(-r.tresoMin / 1e6) * 1e6) + ' est nécessaire (ou un apport acheteur plus élevé, un crédit acheteur plus court, un différé plus long).'
+      : 'La trésorerie reste positive sur toute la période (point bas ' + _prevFcfa(r.tresoMin) + ' en ' + r.tresoMinMois + ').')
+    + (c.creancesFin > 0 ? ' À la fin de l\'horizon, ' + _prevFcfa(c.creancesFin) + ' d\'échéances acheteurs restent à encaisser.' : '')]);
+  if (+fin.emp_montant) out.push(['Remboursement de la dette', r.dscrMin === null ? 'Aucune échéance de capital sur l\'horizon.'
+    : 'Le ratio de couverture du service de la dette (DSCR) est au minimum de ' + _prevDec(r.dscrMin, 2) + ' en ' + r.dscrMinAn + (r.dscrMin >= 1.2 ? ', au-dessus du seuil bancaire usuel de 1,20.' : ', sous le seuil bancaire usuel de 1,20 : allonger la durée ou le différé de l\'emprunt.')]);
+  if (pess) out.push(['Risques', 'Dans le scénario pessimiste (' + pess.desc + '), la VAN serait de ' + _prevFcfa(pess.van) + ' et la trésorerie descendrait à ' + _prevFcfa(pess.tresoMin)
+    + (pess.rNet < 0 ? ', avec une perte cumulée de ' + _prevFcfa(-pess.rNet) + '.' : ', le résultat restant positif (' + _prevFcfa(pess.rNet) + ').')
+    + ' Les principaux leviers de sécurité sont le rythme des ventes et la maîtrise des coûts de production.']);
+  out.push(['Conclusion', v.lib.replace(/^[^ ]+ /, '') + ' : ' + v.nbOk + ' critère(s) bancaire(s) sur ' + v.criteres.length + ' satisfait(s)'
+    + (v.criteres.some(function(x){ return !x.ok; }) ? ' ; à renforcer : ' + v.criteres.filter(function(x){ return !x.ok; }).map(function(x){ return x.txt.toLowerCase(); }).join(', ') + '.' : '.')]);
+  return out;
+}
+function _prevCommentaireHTML(s, c, sens) {
+  var libre = String(_prevNormaliser(s).commentaire || '').trim();
+  return (libre ? '<div style="border-left:3px solid #1D4ED8;padding:6px 10px;margin:6px 0 10px;background:#f5f7fb;"><b>Mot du promoteur</b><br>' + escHtml(libre).replace(/\n/g, '<br>') + '</div>' : '')
+    + _prevCommentaireAuto(s, c, sens).map(function(p){ return '<p style="margin:6px 0;"><b>' + p[0] + '.</b> ' + p[1] + '</p>'; }).join('');
+}
+
 function etatDossierBancaire() {
-  var s = prevReadForm(), c = _prevCompute(s), v = _prevVerdict(c);
+  var s = prevReadForm(), c = _prevCompute(s), v = _prevVerdict(c), sens = _prevSensibilite(s, c);
   var contenu = '<h3>Synthèse du projet — ' + v.lib + ' (' + v.nbOk + '/' + v.criteres.length + ' critères)</h3>' + _prevSyntheseHTML(s, c)
+    + '<h3>Analyse et commentaire</h3>' + _prevCommentaireHTML(s, c, sens)
+    + '<div class="pb"></div><h3>Graphiques</h3>'
+    + '<h4>Chiffre d\'affaires et résultat net par année</h4>' + _prevSvgCaResultat(c)
+    + '<h4>Trésorerie cumulée, mois par mois</h4>' + _prevSvgTresorerie(c)
+    + '<h4>VAN selon le scénario (actualisée à ' + _prevPct(c.ratios.tauxActu) + ')</h4>' + _prevSvgSensibilite(sens)
     + '<h3>Sensibilité</h3>' + _prevSensibiliteHTML(s, c)
     + '<div class="pb"></div><h3>① Compte d\'exploitation prévisionnel</h3>' + _prevExploitHTML(c)
     + '<div class="pb"></div><h3>② Compte de résultat prévisionnel</h3>' + _prevResultatHTML(c)
