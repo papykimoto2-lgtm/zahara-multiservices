@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+<script>
+/* Rapport CSP (mode observation) : les violations sont gardées dans le navigateur (50 dernières) et visibles via cspRapport(). */
+(function(){ var K = 'csp_violations'; window.cspRapport = function(){ try { return JSON.parse(localStorage.getItem(K) || '[]'); } catch (e) { return []; } };
+  document.addEventListener('securitypolicyviolation', function(e){ var l = window.cspRapport(); l.push({ date: new Date().toISOString(), directive: e.violatedDirective, bloque: e.blockedURI, page: e.documentURI, ligne: e.lineNumber || 0, mode: e.disposition });
+    try { localStorage.setItem(K, JSON.stringify(l.slice(-50))); } catch (x) {} try { console.warn('[CSP]', e.violatedDirective, e.blockedURI); } catch (x) {} }); })();
+</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="Espace souscripteur et apporteur d’affaires : consultez nos biens et programmes, suivez votre dossier, faites une demande de souscription ou de réservation.">
