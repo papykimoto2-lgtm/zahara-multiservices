@@ -139663,6 +139663,44 @@ function caisseRenderMesDemandes() {
   box.innerHTML = html;
 }
 
+
+/* ── Arborescence des tableaux de la caisse : Caisse ▸ Mois ▸ lignes (repliable, état mémorisé) ── */
+var CAISSE_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+function caisseLibMois(m) { var p = String(m || '').split('-'); return p.length === 2 && CAISSE_MOIS[parseInt(p[1], 10) - 1] ? CAISSE_MOIS[parseInt(p[1], 10) - 1] + ' ' + p[0] : 'Sans date'; }
+function caisseArboMemo(el) { APP._caArbo = APP._caArbo || {}; APP._caArbo[el.getAttribute('data-caid')] = el.open; }
+function caisseArboTout(cle, ouvert) { document.querySelectorAll('[data-caarbo="' + cle + '"] details').forEach(function(d){ d.open = ouvert; caisseArboMemo(d); }); }
+function caisseArboTableau(cle, items, fCaisse, fDate, fLigne, thead, fResume) {
+  APP._caArbo = APP._caArbo || {};
+  var parC = {}, ordreC = [], gros = items.length > 15;
+  items.forEach(function(x){ var k = fCaisse(x) || ''; if (!parC[k]) { parC[k] = []; ordreC.push(k); } parC[k].push(x); });
+  var nom = function(k){ var c = (DATA.caisses || []).find(function(x){ return x.id === k; }); return c ? c.nom : (k || '—'); };
+  var etat = function(id, def){ var v = APP._caArbo[cle + '|' + id]; return v === undefined ? def : v; };
+  var petit = function(t){ return '<span style="font-weight:400;font-size:11px;color:var(--blanc-dim);margin-left:6px;">' + t + '</span>'; };
+  ordreC.sort(function(a, b){ return nom(a).localeCompare(nom(b)); });
+  var h = '<div data-caarbo="' + cle + '">'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="caisseArboTout(\'' + cle + '\',true)">▾ Tout déployer</button><button type="button" class="btn btn-secondary btn-sm" onclick="caisseArboTout(\'' + cle + '\',false)">▸ Tout réduire</button></div>';
+  ordreC.forEach(function(k){
+    var l = parC[k], parM = {}, ordreM = [];
+    l.forEach(function(x){ var m = String(fDate(x) || '').slice(0, 7); if (!parM[m]) { parM[m] = []; ordreM.push(m); } parM[m].push(x); });
+    ordreM.sort().reverse();
+    h += '<details data-caid="' + cle + '|' + escHtml(k) + '"' + (etat(k, !gros || ordreC.length === 1) ? ' open' : '') + ' ontoggle="caisseArboMemo(this)" style="border:1px solid var(--bord,rgba(0,0,0,.12));border-radius:8px;margin:6px 0;">'
+      + '<summary style="cursor:pointer;padding:8px 10px;font-weight:700;">🏦 ' + escHtml(nom(k)) + ' <span style="background:var(--card2,#eee);border-radius:9px;padding:1px 8px;font-size:11px;">' + l.length + '</span>' + petit(fResume(l)) + '</summary><div style="padding:0 8px 8px;">';
+    ordreM.forEach(function(m, i){
+      var lm = parM[m];
+      h += '<details data-caid="' + cle + '|' + escHtml(k) + '|' + m + '"' + (etat(k + '|' + m, i === 0) ? ' open' : '') + ' ontoggle="caisseArboMemo(this)" style="margin:4px 0 4px 10px;">'
+        + '<summary style="cursor:pointer;font-size:12px;font-weight:600;padding:4px 0;">📅 ' + caisseLibMois(m) + ' — ' + lm.length + ' ligne(s)' + petit(fResume(lm)) + '</summary>'
+        + '<div style="overflow-x:auto;"><table class="data-table"><thead>' + thead + '</thead><tbody>' + lm.map(fLigne).join('') + '</tbody></table></div></details>';
+    });
+    h += '</div></details>';
+  });
+  return h + '</div>';
+}
+function caisseResumeMvts(l) {
+  var e = 0, s = 0; l.forEach(function(m){ var v = parseFloat(m.montant) || 0; if (m.type === 'sortie') s += v; else e += v; });
+  return (e ? '↑ ' + fmtF(e) + ' F' : '') + (e && s ? ' · ' : '') + (s ? '↓ ' + fmtF(s) + ' F' : '');
+}
+function caisseResumeNet(l, f) { var n = l.reduce(function(a, x){ return a + (parseFloat(f(x)) || 0); }, 0); return 'net ' + (n > 0 ? '+' : '') + fmtF(n) + ' F'; }
+
 function caisseRenderValidations() {
   var box = document.getElementById('caisse-validation-box');
   if (!box) return;
@@ -139696,14 +139734,15 @@ function caisseRenderValidations() {
     + '<div style="font-size:11px;color:var(--blanc-dim);">Votre plafond de validation : <strong>' + (isFinite(monPlafond) ? fmtF(monPlafond) + ' FCFA' : 'illimité') + '</strong></div>'
     + '</div>'
     + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:10px;">' + nbSorties + ' sortie(s) et ' + nbEntrees + ' entrée(s) — aucune ne compte encore dans le solde de caisse tant qu\'elle n\'a pas été approuvée par un responsable habilité (plafond suffisant).</div>'
-    + '<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Type</th><th>Date</th><th>Caisse</th><th>N°</th><th>Motif</th><th>Bénéficiaire</th><th style="text-align:right;">Montant</th><th>Demandé par</th><th></th></tr></thead><tbody>';
+    ;
+  var _thV = '<tr><th>Type</th><th>Date</th><th>Caisse</th><th>N°</th><th>Motif</th><th>Bénéficiaire</th><th style="text-align:right;">Montant</th><th>Demandé par</th><th></th></tr>', _rowsV = {};
 
   liste.forEach(function(m) {
     var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
     var montant = parseFloat(m.montant) || 0;
     var habiliteMontant = jePeuxValider && (!isFinite(monPlafond) || montant <= monPlafond);
     var estSortie = m.type === 'sortie';
-    html += '<tr>'
+    _rowsV[m.id] = '<tr>'
       + '<td><span class="badge" style="background:' + (estSortie?'rgba(220,53,69,0.15);color:var(--rouge)':'rgba(16,163,74,0.15);color:var(--vert)') + ';">' + (estSortie?'↓ Sortie':'↑ Entrée') + '</span></td>'
       + '<td>' + (m.date||'').slice(0,10) + '</td>'
       + '<td>' + escHtml(c ? c.nom : '') + '</td>'
@@ -139720,7 +139759,7 @@ function caisseRenderValidations() {
       + '</td></tr>';
   });
 
-  html += '</tbody></table></div></div>';
+  html += caisseArboTableau('val', liste, function(m){ return m.caisse_id; }, function(m){ return m.date; }, function(m){ return _rowsV[m.id]; }, _thV, caisseResumeMvts) + '</div>';
   box.innerHTML = html;
 }
 
@@ -139942,6 +139981,8 @@ async function caisseValiderDecaissement(mvtId) {
   var mvt = (DATA.caisse_mouvements || []).find(function(m){ return m.id === mvtId; });
   if (!mvt) return;
   if (!exigerDroit('Caisse', 'v', 'la validation de ce décaissement')) return;
+  if (mvt.rejete) { toast('⛔ Ce bon a été rejeté par ' + (mvt.rejete_par || 'un responsable') + ' : il ne peut plus être validé.', 'error', 8000); caisseRenderValidations(); return; }
+  if (mvt.valide === true) { toast('Ce bon est déjà validé.', 'info'); caisseRenderValidations(); return; }
   if (caisseEstMemeDemandeur(mvt)) { toast('⛔ Vous ne pouvez pas valider votre propre demande : un autre validateur doit la valider.', 'error', 7000); return; }
   var montant = parseFloat(mvt.montant) || 0;
   if (!exigerPlafond(montant, 'Cette validation')) return;
@@ -140008,6 +140049,10 @@ async function caisseRejeterDecaissement(mvtId) {
   var mvt = (DATA.caisse_mouvements || []).find(function(m){ return m.id === mvtId; });
   if (!mvt) return;
   if (!exigerDroit('Caisse', 'v', 'le rejet de ce décaissement')) return;
+  /* [FIX écarts 2026-10-18] Un bon déjà validé (argent sorti ou entré) ne se rejette plus : il restait compté dans le solde
+     tout en étant marqué rejeté (cas réel : BS-571-20260904-004, validé à 11:49 puis rejeté à 11:50 par un second poste). */
+  if (mvt.valide === true) { toast('⛔ Ce bon a déjà été validé par ' + (mvt.valide_par || 'un responsable') + ' : il ne peut plus être rejeté. Saisissez un bon inverse (contre-passation) pour l\'annuler.', 'error', 8000); caisseRenderValidations(); return; }
+  if (mvt.rejete) { toast('Ce bon est déjà rejeté.', 'info'); caisseRenderValidations(); return; }
   var montant = parseFloat(mvt.montant) || 0;
   if (!exigerPlafond(montant, 'Ce rejet')) return;
   var jumeau = _caisseMvtJumeau(mvt);
@@ -140617,16 +140662,17 @@ function caisseRupturesAJustifier() {
 }
 function caisseHtmlRuptures(l) {
   if (!l.length) return '';
+  var th = '<tr><th>Date</th><th>Caisse</th><th>Ouverte par</th><th>Comptage veille</th><th>Fond saisi</th><th>Différence</th><th></th></tr>';
+  var ligne = function(r){ var s = r.session;
+    return '<tr><td>' + escHtml(String(s.date || '').slice(0,10)) + '</td><td>' + escHtml(r.caisse.nom || '') + '</td><td>' + escHtml(s.ouverte_par || '—') + '</td>'
+      + '<td style="text-align:right;">' + fmtF(r.precedente.fond_cloture_reel) + '</td><td style="text-align:right;">' + fmtF(s.fond_ouverture) + '</td>'
+      + '<td style="text-align:right;font-weight:700;color:' + (r.diff > 0 ? 'var(--vert)' : 'var(--rouge)') + ';">' + (r.diff > 0 ? '+' : '') + fmtF(r.diff) + '</td>'
+      + '<td><button class="btn btn-secondary btn-sm" onclick="caisseJustifierRupture(\'' + s.id + '\')">📝 Justifier</button></td></tr>'; };
   return '<div class="card" style="padding:16px;border-left:3px solid var(--or,#B87333);margin-top:12px;">'
     + '<div style="font-weight:800;font-size:15px;margin-bottom:6px;">🔗 Fonds d\'ouverture à justifier <span style="color:var(--or,#B87333);">(' + l.length + ')</span></div>'
     + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:10px;">Le fond saisi à l\'ouverture diffère du comptage de la clôture précédente, sans motif. Chaque différence est de l\'argent entré ou sorti hors bon : indiquez ce qui s\'est passé.</div>'
-    + '<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Date</th><th>Caisse</th><th>Ouverte par</th><th>Comptage veille</th><th>Fond saisi</th><th>Différence</th><th></th></tr></thead><tbody>'
-    + l.map(function(r){ var s = r.session;
-        return '<tr><td>' + escHtml(String(s.date || '').slice(0,10)) + '</td><td>' + escHtml(r.caisse.nom || '') + '</td><td>' + escHtml(s.ouverte_par || '—') + '</td>'
-          + '<td style="text-align:right;">' + fmtF(r.precedente.fond_cloture_reel) + '</td><td style="text-align:right;">' + fmtF(s.fond_ouverture) + '</td>'
-          + '<td style="text-align:right;font-weight:700;color:' + (r.diff > 0 ? 'var(--vert)' : 'var(--rouge)') + ';">' + (r.diff > 0 ? '+' : '') + fmtF(r.diff) + '</td>'
-          + '<td><button class="btn btn-secondary btn-sm" onclick="caisseJustifierRupture(\'' + s.id + '\')">📝 Justifier</button></td></tr>'; }).join('')
-    + '</tbody></table></div></div>';
+    + caisseArboTableau('rupture', l, function(r){ return r.caisse.id; }, function(r){ return r.session.date; }, ligne, th, function(x){ return caisseResumeNet(x, function(r){ return r.diff; }); })
+    + '</div>';
 }
 async function caisseJustifierRupture(sessionId) {
   if (!exigerDroit('Caisse', 'v', 'la justification d\'un fond d\'ouverture')) return;
@@ -140680,14 +140726,13 @@ function caisseRenderEcarts(){
       + '<strong>Net par caisse (écarts non régularisés) :</strong><br>'
       + _caisseResumeEcarts(liste).map(function(r){ return escHtml(r.nom) + ' : ' + r.n + ' écart(s), excédents +' + fmtF(r.plus) + ', manquants ' + fmtF(r.moins) + ', <strong>net ' + (r.net>0?'+':'') + fmtF(r.net) + ' FCFA</strong>'; }).join('<br>')
       + '<br><span style="color:var(--blanc-dim);">Avant toute écriture, vérifiez que ces écarts ne se compensent pas (clôture tardive, mouvement validé après la clôture) et conservez les pièces justificatives.</span></div>'
-    + '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>'
-      + '<th>Date</th><th>Caisse</th><th>Théorique</th><th>Réel compté</th><th>Écart</th><th>Sens</th><th></th>'
-    + '</tr></thead><tbody>';
+    ;
+  var _thE = '<tr><th>Date</th><th>Caisse</th><th>Théorique</th><th>Réel compté</th><th>Écart</th><th>Sens</th><th></th></tr>', _rowsE = {};
 
   liste.forEach(function(s){
     var c = (DATA.caisses||[]).find(function(x){ return x.id===s.caisse_id; });
     var ec = parseFloat(s.ecart)||0, exc = ec>0;
-    html += '<tr>'
+    _rowsE[s.id] = '<tr>'
       + '<td>'+(s.date||'')+'</td>'
       + '<td>'+escHtml(c?c.nom:'')+'</td>'
       + '<td style="text-align:right;">'+fmtF(s.fond_cloture_theorique)+'</td>'
@@ -140697,7 +140742,7 @@ function caisseRenderEcarts(){
       + '<td><button class="btn btn-primary btn-sm" onclick="caisseRegulariserEcart(\''+s.id+'\')">✅ Régulariser</button></td>'
     + '</tr>';
   });
-  html += '</tbody></table></div></div>';
+  html += caisseArboTableau('ecart', liste, function(s){ return s.caisse_id; }, function(s){ return s.date; }, function(s){ return _rowsE[s.id]; }, _thE, function(l){ return caisseResumeNet(l, function(s){ return s.ecart; }); }) + '</div>';
   box.innerHTML = html + caisseHtmlRuptures(_rupt);
 }
 

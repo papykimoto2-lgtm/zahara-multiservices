@@ -85,3 +85,19 @@ test('validation d\'une sortie au-delà du solde disponible : refusée', async (
     assert.deepEqual(r, [false, 1000]);
   } finally { await app.fermer(); }
 });
+
+test('bon validé : ne peut plus être rejeté ; bon rejeté : ne peut plus être validé', async () => {
+  const app = await ouvrirApp();
+  try {
+    await amorcer(app.page, true);
+    const r = await app.page.evaluate(async () => {
+      APP.currentUser = { id: 'v', nom: 'Valideur', role: 'admin' }; window.confirm = () => true; window.prompt = () => 'erreur'; window.exigerDroit = () => true; window.exigerPlafond = () => true;
+      const a = { id: 'ma', session_id: 's2', caisse_id: 'c1', type: 'sortie', montant: 100, requiert_validation: true, valide: true, valide_par: 'X', numero: 'SA' };
+      const b = { id: 'mb', session_id: 's2', caisse_id: 'c1', type: 'sortie', montant: 100, requiert_validation: true, valide: false, rejete: true, rejete_par: 'Y', numero: 'SB', cree_par_id: 'autre' };
+      DATA.caisse_mouvements.push(a, b);
+      await caisseRejeterDecaissement('ma'); await caisseValiderDecaissement('mb');
+      return [!!a.rejete, b.valide, caisseSoldeSession(DATA.caisse_sessions[1])];
+    });
+    assert.deepEqual(r, [false, false, 900]);
+  } finally { await app.fermer(); }
+});
