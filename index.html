@@ -13002,11 +13002,15 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
 
         <div id="caisse-liste" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:20px;"></div>
 
-        <div id="caisse-validation-box" style="margin-bottom:20px;"></div>
+        <div id="caisse-suivi" style="margin-bottom:20px;">
+          <div id="caisse-suivi-tabs" class="etape-btns" style="display:none;margin-bottom:10px;"></div>
+          <div id="caisse-validation-box"></div>
+          <div id="caisse-ecarts-box"></div>
+          <div id="caisse-ruptures-box"></div>
+        </div>
 
         <div id="caisse-brouillard-box"></div>
 
-        <div id="caisse-ecarts-box" style="margin-top:24px;"></div>
 
         <div class="caisse-tabs-header" style="margin-top:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
           <div class="etape-btns">
@@ -139701,7 +139705,33 @@ function caisseResumeMvts(l) {
 }
 function caisseResumeNet(l, f) { var n = l.reduce(function(a, x){ return a + (parseFloat(f(x)) || 0); }, 0); return 'net ' + (n > 0 ? '+' : '') + fmtF(n) + ' F'; }
 
+/* Validations, écarts et fonds d'ouverture à justifier : un onglet par tableau, le choix est mémorisé. */
+var CAISSE_SUIVI = [['val', 'caisse-validation-box', '🔐 Validations'], ['ecart', 'caisse-ecarts-box', '⚖️ Écarts'], ['rupture', 'caisse-ruptures-box', '🔗 Fonds d\'ouverture']];
+function caisseSuiviPlanifier() {
+  if (APP._caSuiviPlan) return;
+  APP._caSuiviPlan = true;
+  Promise.resolve().then(function(){ APP._caSuiviPlan = false; caisseRenderSuiviTabs(); });
+}
+function caisseSuiviOnglet(k) { APP._caSuivi = k; caisseRenderSuiviTabs(); }
+function caisseRenderSuiviTabs() {
+  var bar = document.getElementById('caisse-suivi-tabs');
+  if (!bar) return null;
+  var t = CAISSE_SUIVI.map(function(x){
+    var b = document.getElementById(x[1]), c = b && b.firstElementChild;
+    return { k: x[0], b: b, lib: x[2], plein: !!c, n: c ? (parseInt(c.getAttribute('data-n'), 10) || 0) : 0 };
+  }).filter(function(x){ return x.b; });
+  var pleins = t.filter(function(x){ return x.plein; });
+  var act = pleins.some(function(x){ return x.k === APP._caSuivi; }) ? APP._caSuivi : (pleins[0] || {}).k;
+  t.forEach(function(x){ x.b.style.display = x.k === act ? '' : 'none'; });
+  bar.style.display = pleins.length > 1 ? '' : 'none';
+  bar.innerHTML = pleins.map(function(x){
+    return '<button class="tab-btn' + (x.k === act ? ' active' : '') + '" data-cs="' + x.k + '" onclick="caisseSuiviOnglet(\'' + x.k + '\')">' + x.lib
+      + ' <span style="background:var(--rouge);color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;">' + x.n + '</span></button>';
+  }).join('');
+  return act || null;
+}
 function caisseRenderValidations() {
+  caisseSuiviPlanifier();
   var box = document.getElementById('caisse-validation-box');
   if (!box) return;
   var liste = caisseDecaissementsEnAttente();
@@ -139728,7 +139758,7 @@ function caisseRenderValidations() {
   var nbSorties = liste.filter(function(m){ return m.type==='sortie'; }).length;
   var nbEntrees = liste.filter(function(m){ return m.type==='entree'; }).length;
 
-  var html = '<div class="card" style="padding:16px;border-left:3px solid var(--or);">'
+  var html = '<div class="card" data-n="' + liste.length + '" style="padding:16px;border-left:3px solid var(--or);">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
     + '<div style="font-weight:800;font-size:15px;">🔐 Mouvements en attente de validation <span style="background:var(--rouge);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px;">' + liste.length + '</span></div>'
     + '<div style="font-size:11px;color:var(--blanc-dim);">Votre plafond de validation : <strong>' + (isFinite(monPlafond) ? fmtF(monPlafond) + ' FCFA' : 'illimité') + '</strong></div>'
@@ -140668,7 +140698,7 @@ function caisseHtmlRuptures(l) {
       + '<td style="text-align:right;">' + fmtF(r.precedente.fond_cloture_reel) + '</td><td style="text-align:right;">' + fmtF(s.fond_ouverture) + '</td>'
       + '<td style="text-align:right;font-weight:700;color:' + (r.diff > 0 ? 'var(--vert)' : 'var(--rouge)') + ';">' + (r.diff > 0 ? '+' : '') + fmtF(r.diff) + '</td>'
       + '<td><button class="btn btn-secondary btn-sm" onclick="caisseJustifierRupture(\'' + s.id + '\')">📝 Justifier</button></td></tr>'; };
-  return '<div class="card" style="padding:16px;border-left:3px solid var(--or,#B87333);margin-top:12px;">'
+  return '<div class="card" data-n="' + l.length + '" style="padding:16px;border-left:3px solid var(--or,#B87333);">'
     + '<div style="font-weight:800;font-size:15px;margin-bottom:6px;">🔗 Fonds d\'ouverture à justifier <span style="color:var(--or,#B87333);">(' + l.length + ')</span></div>'
     + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:10px;">Le fond saisi à l\'ouverture diffère du comptage de la clôture précédente, sans motif. Chaque différence est de l\'argent entré ou sorti hors bon : indiquez ce qui s\'est passé.</div>'
     + caisseArboTableau('rupture', l, function(r){ return r.caisse.id; }, function(r){ return r.session.date; }, ligne, th, function(x){ return caisseResumeNet(x, function(r){ return r.diff; }); })
@@ -140706,14 +140736,18 @@ function caisseAlerteQuotidienne() {
 }
 
 function caisseRenderEcarts(){
+  caisseSuiviPlanifier();
   var box = document.getElementById('caisse-ecarts-box');
   if (!box) return;
-  if (!caisseRoleAdminLike()) { box.innerHTML = ''; return; }
+  var boxR = document.getElementById('caisse-ruptures-box');
+  if (!caisseRoleAdminLike()) { box.innerHTML = ''; if (boxR) boxR.innerHTML = ''; return; }
 
-  var liste = _caisseEcartsEnAttente(), _rupt = caisseRupturesAJustifier();
-  if (!liste.length) { box.innerHTML = caisseHtmlRuptures(_rupt); return; }
+  var liste = _caisseEcartsEnAttente(), _rupt = caisseRupturesAJustifier(), htmlR = caisseHtmlRuptures(_rupt);
+  if (boxR) boxR.innerHTML = htmlR;
+  var suite = boxR ? '' : htmlR;
+  if (!liste.length) { box.innerHTML = suite; return; }
 
-  var html = '<div class="card" style="padding:16px;border-left:3px solid var(--rouge);">'
+  var html = '<div class="card" data-n="' + liste.length + '" style="padding:16px;border-left:3px solid var(--rouge);">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
       + '<div style="font-weight:800;font-size:15px;">⚖️ Écarts de caisse à régulariser</div>'
       + '<button class="btn btn-secondary btn-sm" onclick="caisseRegulariserTousEcarts()">⚡ Tout régulariser</button>'
@@ -140743,7 +140777,7 @@ function caisseRenderEcarts(){
     + '</tr>';
   });
   html += caisseArboTableau('ecart', liste, function(s){ return s.caisse_id; }, function(s){ return s.date; }, function(s){ return _rowsE[s.id]; }, _thE, function(l){ return caisseResumeNet(l, function(s){ return s.ecart; }); }) + '</div>';
-  box.innerHTML = html + caisseHtmlRuptures(_rupt);
+  box.innerHTML = html + suite;
 }
 
 async function genererEcritureEcartCaisse(session, motif){
