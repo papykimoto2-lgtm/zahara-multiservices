@@ -60080,6 +60080,49 @@ function fcHtmlDelaisReels() {
       : '<div style="color:var(--dim);padding:8px;">Aucune mission terminée ou en retard pour l\'instant.</div>') + '</div>';
 }
 
+/* ── Arborescence des dossiers : dossier global (parcelle mère) → titres individuels ── */
+function fcParentGlobal(d) {
+  if (!fcEstIndividuel(d)) return '';
+  if (d.dossier_global_id && fcDossier(d.dossier_global_id)) return d.dossier_global_id;
+  try { var tm = fcTitreMere(d.parcelle_id); return tm && tm.dossier_global ? tm.dossier_global.id : ''; } catch (e) { return ''; }
+}
+/* Racines = dossiers globaux et titres individuels dont le global n'est pas dans la liste filtrée ; enfants regroupés sous leur global. */
+function fcArbreDossiers(l) {
+  var ids = {}, enfants = {}, racines = [];
+  l.forEach(function(d){ ids[d.id] = d; });
+  l.forEach(function(d){ var p = fcParentGlobal(d); if (p && p !== d.id && ids[p]) (enfants[p] = enfants[p] || []).push(d); else racines.push(d); });
+  Object.keys(enfants).forEach(function(k){ enfants[k].sort(function(a, b){ return String(a.reference).localeCompare(String(b.reference)); }); });
+  return { racines: racines, enfants: enfants };
+}
+function fcArboReduit(id) { return !!((APP._fcArbo || {})[id]); }
+function fcArboAppliquer() {
+  var host = document.getElementById('fc-liste-corps'); if (!host) return;
+  [].forEach.call(host.querySelectorAll('tr[data-fcparent]'), function(tr){ tr.style.display = fcArboReduit(tr.getAttribute('data-fcparent')) ? 'none' : ''; });
+  [].forEach.call(host.querySelectorAll('tr[data-fcglob]'), function(tr){ var r = fcArboReduit(tr.getAttribute('data-fcglob')), s = tr.querySelector('.fc-arb-fl'); if (s) s.textContent = r ? '▸' : '▾'; var b = tr.querySelector('button[aria-expanded]'); if (b) b.setAttribute('aria-expanded', r ? 'false' : 'true'); });
+}
+function fcArboBascule(id) { APP._fcArbo = APP._fcArbo || {}; APP._fcArbo[id] = !APP._fcArbo[id]; fcArboAppliquer(); }
+function fcArboTout(ouvert) {
+  APP._fcArbo = APP._fcArbo || {};
+  [].forEach.call(document.querySelectorAll('#fc-liste-corps tr[data-fcglob]'), function(tr){ APP._fcArbo[tr.getAttribute('data-fcglob')] = !ouvert; });
+  fcArboAppliquer();
+}
+function fcLignesArbre(items, arbre, ctxR) {
+  var out = [];
+  items.forEach(function(d){
+    var kids = arbre.enfants[d.id] || [];
+    if (!kids.length) { out.push(fcLigneDossierHtml(d, ctxR)); return; }
+    var total = (DATA.dossiers_fonciers || []).filter(function(x){ return !x.archive && fcParentGlobal(x) === d.id; }).length, red = fcArboReduit(d.id);
+    out.push(fcLigneDossierHtml(d, ctxR, {
+      tr: ' class="fc-parent" data-fcglob="' + d.id + '" style="background:rgba(29,63,122,.06);"',
+      pre: '<button type="button" class="btn btn-secondary btn-sm" style="padding:0 7px;margin-right:4px;" aria-expanded="' + (red ? 'false' : 'true') + '" title="Déployer / réduire les titres individuels" onclick="fcArboBascule(\'' + d.id + '\')"><span class="fc-arb-fl">' + (red ? '▸' : '▾') + '</span></button>',
+      post: ' <span style="font-size:10px;background:#1D3F7A;color:#fff;border-radius:9px;padding:1px 8px;" title="Titres individuels rattachés à ce dossier global">🌳 ' + kids.length + (total > kids.length ? ' / ' + total : '') + ' titre' + (kids.length > 1 ? 's' : '') + ' individuel' + (kids.length > 1 ? 's' : '') + '</span>' }));
+    kids.forEach(function(k){
+      out.push(fcLigneDossierHtml(k, ctxR, { tr: ' class="fc-enfant" data-fcparent="' + d.id + '" style="background:rgba(184,115,51,.05);' + (red ? 'display:none;' : '') + '"', pre: '<span style="color:var(--dim);margin:0 6px 0 18px;" aria-hidden="true">└</span>' }));
+    });
+  });
+  return out.join('');
+}
+
 /* Onglets du dossier foncier : toutes les sections restent dans le DOM (les identifiants des panneaux et les mises à jour ciblées continuent de fonctionner), une seule est visible. */
 function fcOngletsHtml(sections) {
   var liste = sections.filter(function(x){ return String(x.h || '').replace(/<[^>]*>/g, '').trim() !== '' || x.k === 'synthese' || x.k === 'etapes'; });
@@ -63055,9 +63098,9 @@ function fcDossiersListe(ctx) {
   });
   return l.sort(tri ? function(a, b){ return score(b) - score(a) || (b.created_at || '').localeCompare(a.created_at || ''); } : function(a, b){ return (b.created_at || '').localeCompare(a.created_at || ''); });
 }
-function fcLigneDossierHtml(d, ctxR) {
+function fcLigneDossierHtml(d, ctxR, o) {
   var e = fcProchaineEtape(d), et = e ? fcEtatEcheance(e) : '';
-  return '<tr><td class="fc-c-ck"><input type="checkbox" class="fc-ck-d" value="' + d.id + '" ' + (APP._fcSelect && APP._fcSelect[d.id] ? 'checked ' : '') + 'onchange="fcCocherDossierUI(this.value,this.checked)"></td><td class="fc-c-ref" data-label="Référence"><strong>' + escHtml(d.reference) + '</strong>' + (d.archive ? ' <span style="font-size:10px;color:#6a5acd;">🗄 archivé</span>' : '') + fcBadgeRisque(fcScoreRisque(d, fcAuj(), ctxR)) + (fcEstIndividuel(d) ? '<br><span style="font-size:10px;color:#B87333;">Titre individuel</span>' : '') + '</td><td data-label="Parcelle">' + escHtml(fcLibelleParcelle(d.parcelle_id)) + (fcEstIndividuel(d) ? '<br><span style="font-size:11px;color:var(--dim);">lot ' + escHtml((d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ')) + ' · ' + escHtml((d.client_ids || [d.client_id]).map(function(id){ return (fcClient(id) || {}).nom || id; }).join(', ')) + '</span>' : '') + '</td><td data-label="Procédure">' + escHtml(FC_PROCEDURES[d.type_procedure] || d.type_procedure) + '</td><td data-label="Statut">' + escHtml(d.statut) + '</td>'
+  return '<tr' + ((o && o.tr) || '') + '><td class="fc-c-ck"><input type="checkbox" class="fc-ck-d" value="' + d.id + '" ' + (APP._fcSelect && APP._fcSelect[d.id] ? 'checked ' : '') + 'onchange="fcCocherDossierUI(this.value,this.checked)"></td><td class="fc-c-ref" data-label="Référence">' + ((o && o.pre) || '') + '<strong>' + escHtml(d.reference) + '</strong>' + ((o && o.post) || '') + (d.archive ? ' <span style="font-size:10px;color:#6a5acd;">🗄 archivé</span>' : '') + fcBadgeRisque(fcScoreRisque(d, fcAuj(), ctxR)) + (fcEstIndividuel(d) ? '<br><span style="font-size:10px;color:#B87333;">Titre individuel</span>' : '') + '</td><td data-label="Parcelle">' + escHtml(fcLibelleParcelle(d.parcelle_id)) + (fcEstIndividuel(d) ? '<br><span style="font-size:11px;color:var(--dim);">lot ' + escHtml((d.lots_ids || [d.lot_id]).map(function(id){ return fcLibelleLot((DATA.lots || []).find(function(l){ return l.id === id; })); }).join(', ')) + ' · ' + escHtml((d.client_ids || [d.client_id]).map(function(id){ return (fcClient(id) || {}).nom || id; }).join(', ')) + '</span>' : '') + '</td><td data-label="Procédure">' + escHtml(FC_PROCEDURES[d.type_procedure] || d.type_procedure) + '</td><td data-label="Statut">' + escHtml(d.statut) + '</td>'
     + '<td data-label="Étape courante">' + (e ? escHtml(e.libelle) + '<br>' + fcBadgeStatut(e.statut) : '—') + '</td><td data-label="Responsable">' + escHtml(fcNomUtilisateur((e && e.responsable_id) || d.responsable_id)) + '</td>'
     + '<td data-label="Échéance">' + escHtml((e && e.date_cible) || d.date_cible || '—') + (et ? '<br><span style="color:#c0392b;font-size:11px;">' + (et === 'retard_interne' ? 'Retard interne' : 'Délai administratif dépassé') + '</span>' : '') + '</td>'
     + '<td class="fc-c-act" style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="fcOuvrirDetail(\'' + d.id + '\')">Ouvrir</button> <button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer</button>' + (fcEstAdmin() ? ' <button class="btn btn-secondary btn-sm" style="color:#c0392b;" title="Supprimer le dossier" onclick="fcSupprimerDossierUI(\'' + d.id + '\')">🗑 Supprimer</button>' : '') + '</td></tr>';
@@ -63101,10 +63144,11 @@ async function fcSupprimerDossierUI(id) {
 }
 function fcRenderListeCorps() {
   var host = document.getElementById('fc-liste-corps'); if (!host) return;
-  var ctxR = fcContexteRisque(), l = fcDossiersListe(ctxR), tous = (DATA.dossiers_fonciers || []).length, pg = fcPaginer(l, 'dossiers');
+  var ctxR = fcContexteRisque(), l = fcDossiersListe(ctxR), tous = (DATA.dossiers_fonciers || []).length, arbre = fcArbreDossiers(l), pg = fcPaginer(arbre.racines, 'dossiers'), avecEnfants = Object.keys(arbre.enfants).length > 0;
   host.innerHTML = !tous ? '<div style="color:var(--dim);padding:10px;">Aucun dossier. Ouvrez-en un à partir d\'une parcelle.</div>'
     : (!l.length ? '<div style="color:var(--dim);padding:10px;">Aucun dossier ne correspond à la recherche (' + tous + ' dossier(s) au total).</div>'
-    : '<div class="table-wrap"><table><thead><tr><th><input type="checkbox" title="Sélectionner la page" onchange="fcCocherPageUI(this.checked)"></th><th>Référence</th><th>Parcelle</th><th>Procédure</th><th>Statut</th><th>Étape courante</th><th>Responsable</th><th>Échéance</th><th></th></tr></thead><tbody>' + pg.items.map(function(d){ return fcLigneDossierHtml(d, ctxR); }).join('') + '</tbody></table></div>'
+    : (avecEnfants ? '<div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><button type="button" class="btn btn-secondary btn-sm" onclick="fcArboTout(true)">▾ Tout déployer</button><button type="button" class="btn btn-secondary btn-sm" onclick="fcArboTout(false)">▸ Tout réduire</button><span style="font-size:11px;color:var(--dim);">🌳 Dossier global ▸ titres individuels rattachés</span></div>' : '')
+    + '<div class="table-wrap"><table><thead><tr><th><input type="checkbox" title="Sélectionner la page" onchange="fcCocherPageUI(this.checked)"></th><th>Référence</th><th>Parcelle</th><th>Procédure</th><th>Statut</th><th>Étape courante</th><th>Responsable</th><th>Échéance</th><th></th></tr></thead><tbody>' + fcLignesArbre(pg.items, arbre, ctxR) + '</tbody></table></div>'
     + fcHtmlPagination(pg, 'dossiers', 'fcRenderListeCorps'));
   var c = document.getElementById('fc-liste-compte'); if (c) c.textContent = l.length === tous ? tous + ' dossier(s)' : l.length + ' sur ' + tous + ' dossier(s)';
   fcMajBarreGroupee();
