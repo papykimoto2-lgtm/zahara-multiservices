@@ -98212,9 +98212,9 @@ function _prevTresoHTML(c, nb) {
   return _prevTable('<th>Mois</th>' + cols.map(function(k){ return '<th class="num">' + k[1] + '</th>'; }).join(''),
     l.map(function(t){ return '<tr' + (t.cumul < 0 ? ' class="neg"' : '') + '><td>' + t.label + '</td>' + cols.map(function(k){ return '<td class="num">' + fmtF((t[k[0]])) + '</td>'; }).join('') + '</tr>'; }).join(''));
 }
-function _prevSensibiliteHTML(s, c) {
+function _prevSensibiliteHTML(s, c, sens) {
   return _prevTable('<th>Scénario</th><th class="num">CA cumulé</th><th class="num">Résultat net cumulé</th><th class="num">VAN</th><th class="num">TRI</th><th class="num">Trésorerie minimum</th><th class="num">DSCR minimum</th>',
-    _prevSensibilite(s, c).map(function(x){
+    (sens || _prevSensibilite(s, c)).map(function(x){
       return '<tr' + (x.cle === 'central' ? ' class="sous"' : '') + '><td>' + x.lib + '<div style="font-size:10px;opacity:.7;">' + x.desc + '</div></td><td class="num">' + fmtF((x.CA)) + '</td><td class="num">' + fmtF((x.rNet)) + '</td>'
         + '<td class="num">' + fmtF((x.van)) + '</td><td class="num">' + _prevPct(x.tri) + '</td><td class="num">' + fmtF((x.tresoMin)) + '</td><td class="num">' + _prevDec(x.dscrMin, 2) + '</td></tr>';
     }).join(''));
@@ -98275,22 +98275,19 @@ function prevRender() {
     + kpi('Trésorerie minimum', fmtF((r.tresoMin)) + ' F', r.tresoMin >= 0 ? 'var(--vert)' : 'var(--rouge)', r.tresoMinMois)
     + kpi('Seuil de rentabilité ' + r.seuilAn, r.seuilRentab === null ? 'non atteignable' : fmtF((r.seuilRentab)) + ' F', 'var(--bleu)', 'CA minimum, toutes charges fixes')
     + '</div>';
-  var maxCA = Math.max.apply(null, c.years.map(function(a){ return Math.abs(a.CA); }).concat([1]));
-  var chartCA = '<div class="card" style="margin-bottom:16px;"><div class="card-title">Chiffre d\'affaires & résultat net par année</div>'
-    + '<div style="display:flex;align-items:flex-end;gap:18px;height:150px;padding:10px 4px 0;">'
-    + c.years.map(function(a){
-        var hCA = Math.max(2, Math.round(Math.abs(a.CA) / maxCA * 120)), hRN = Math.max(2, Math.round(Math.abs(a.rNet) / maxCA * 120));
-        return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;"><div style="display:flex;align-items:flex-end;gap:4px;height:124px;">'
-          + '<div title="CA" style="width:22px;height:' + hCA + 'px;background:var(--vert);border-radius:4px 4px 0 0;"></div>'
-          + '<div title="Résultat net" style="width:22px;height:' + hRN + 'px;background:' + (a.rNet >= 0 ? 'var(--bleu)' : 'var(--rouge)') + ';border-radius:4px 4px 0 0;"></div>'
-          + '</div><div style="font-size:11px;font-weight:600;">' + a.an + '</div></div>';
-      }).join('')
+  /* Mêmes graphiques que le dossier bancaire, sur fond clair (couleurs d'impression lisibles en thème sombre) */
+  var sens = _prevSensibilite(s, c), cadre = function(t, svg){ return '<div style="flex:1 1 320px;min-width:0;"><div style="font-size:12px;font-weight:700;color:#0b0b0b;margin-bottom:2px;">' + t + '</div>' + svg + '</div>'; };
+  var graphes = '<div class="card" data-prev-graphes style="margin-bottom:16px;background:#fcfcfb;color:#0b0b0b;"><div class="card-title" style="color:#0b0b0b;">Graphiques (repris dans le dossier bancaire)</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:18px;">'
+    + cadre('Chiffre d\'affaires et résultat net par année', _prevSvgCaResultat(c))
+    + cadre('Trésorerie cumulée, mois par mois', _prevSvgTresorerie(c))
+    + cadre('VAN selon le scénario', _prevSvgSensibilite(sens))
     + '</div></div>';
   var section = function(t, coul, html){ return '<div class="form-section-title" style="margin-top:18px;color:' + coul + ';">' + t + '</div><div class="table-wrap">' + html + '</div>'; };
   box.innerHTML = '<style>' + PREV_CSS_ECRAN + '</style>'
     + verdict + (alertes.length ? '<div class="alert alert-warning" style="margin-bottom:12px;font-size:12px;">' + alertes.map(function(x){ return '⚠ ' + x; }).join('<br>') + '</div>' : '')
-    + kpis + chartCA
-    + section('Sensibilité : trois scénarios', 'var(--violet)', _prevSensibiliteHTML(s, c))
+    + kpis + graphes
+    + section('Sensibilité : trois scénarios', 'var(--violet)', _prevSensibiliteHTML(s, c, sens))
     + section('① Compte d\'exploitation prévisionnel (soldes de gestion SYSCOHADA)', 'var(--or)', _prevExploitHTML(c))
     + section('② Compte de résultat prévisionnel', 'var(--bleu)', _prevResultatHTML(c))
     + section('③ Plan de financement prévisionnel', 'var(--vert)', _prevPlanHTML(c))
@@ -98442,7 +98439,7 @@ function etatDossierBancaire() {
     + '<h4>Chiffre d\'affaires et résultat net par année</h4>' + _prevSvgCaResultat(c)
     + '<h4>Trésorerie cumulée, mois par mois</h4>' + _prevSvgTresorerie(c)
     + '<h4>VAN selon le scénario (actualisée à ' + _prevPct(c.ratios.tauxActu) + ')</h4>' + _prevSvgSensibilite(sens)
-    + '<h3>Sensibilité</h3>' + _prevSensibiliteHTML(s, c)
+    + '<h3>Sensibilité</h3>' + _prevSensibiliteHTML(s, c, sens)
     + '<div class="pb"></div><h3>① Compte d\'exploitation prévisionnel</h3>' + _prevExploitHTML(c)
     + '<div class="pb"></div><h3>② Compte de résultat prévisionnel</h3>' + _prevResultatHTML(c)
     + '<div class="pb"></div><h3>③ Plan de financement prévisionnel</h3>' + _prevPlanHTML(c)
