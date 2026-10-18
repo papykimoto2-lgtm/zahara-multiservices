@@ -13,7 +13,7 @@ async function amorcer(page) {
   });
 }
 
-test('validation après clôture : le bon est marqué, la session recalculée, la bannière et le badge apparaissent', async () => {
+test('validation après clôture, tiroir compté sans le bon : session close intacte, bon en attente de la prochaine session, bannière et badge', async () => {
   const app = await ouvrirApp();
   try {
     await amorcer(app.page);
@@ -23,13 +23,14 @@ test('validation après clôture : le bon est marqué, la session recalculée, l
       m.valide = true; m.valide_le = new Date().toISOString();
       await caisseRecalculerSiCloturee(m);
       const s = DATA.caisse_sessions[0];
-      return { marque: m.valide_apres_cloture, theo: s.fond_cloture_theorique, ecart: s.ecart,
+      return { marque: m.valide_apres_cloture, theo: s.fond_cloture_theorique, ecart: s.ecart, session: m.session_id, attente: m.en_attente_session, prec: m.session_precedente,
         badge: caisseBadgeApresCloture(m).indexOf('après clôture') !== -1, banniere: caisseBanniereApresCloture().indexOf('après la clôture') !== -1,
         sansBadge: caisseBadgeApresCloture({ id: 'x' }) };
     });
     assert.equal(r.marque, true);
-    assert.equal(r.theo, 600);
-    assert.equal(r.ecart, 400);
+    assert.equal(r.theo, 1000);
+    assert.equal(r.ecart, 0);
+    assert.deepEqual([r.session, r.attente, r.prec], ['', true, 's1']);
     assert.equal(r.badge, true);
     assert.equal(r.banniere, true);
     assert.equal(r.sansBadge, '');
