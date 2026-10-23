@@ -55,3 +55,26 @@ test('réappro : onglets, tuiles, retard, détail, arborescence de l\'historique
     assert.deepEqual(app.etat.erreursPage, []);
   } finally { await app.fermer(); }
 });
+
+test('réappro : « servie » dont les bons ne sont pas validés signale que les fonds ne sont pas effectifs', async () => {
+  const app = await ouvrirApp();
+  try {
+    const r = await app.page.evaluate(() => {
+      APP.currentUser = { id: 'dir', nom: 'Directeur', role: 'admin' }; APP._reapOnglet = 'histo'; APP._reapFiltre = null; APP._reapOuvert = {}; APP._caArbo = {};
+      DATA.caisses = [{ id: 'c1', nom: 'A' }, { id: 'c2', nom: 'B' }];
+      DATA.caisse_mouvements = [
+        { id: 'e1', requiert_validation: true, valide: false }, { id: 's1', requiert_validation: true, valide: false },
+        { id: 'e2', requiert_validation: true, valide: true }, { id: 's2', requiert_validation: true, valide: true }];
+      const base = { statut: 'servie', caisse_id: 'c1', montant_demande: 1000, servi_le: new Date().toISOString(), demande_le: new Date().toISOString() };
+      DATA.demandes_reappro = [
+        Object.assign({ id: 'a', numero: 'R-A', mouvement_id: 'e1', mouvement_source_id: 's1' }, base),
+        Object.assign({ id: 'b', numero: 'R-B', mouvement_id: 'e2', mouvement_source_id: 's2' }, base)];
+      document.getElementById('caisse-reappro-box') || document.body.insertAdjacentHTML('beforeend', '<div id="caisse-reappro-box"></div>');
+      reapRender();
+      const box = document.getElementById('caisse-reappro-box');
+      return [reapEtatFonds(DATA.demandes_reappro[0]), reapEtatFonds(DATA.demandes_reappro[1]),
+        /bons à valider/.test(box.querySelector('tr[data-reap="a"]').textContent), /bons à valider/.test(box.querySelector('tr[data-reap="b"]').textContent)];
+    });
+    assert.deepEqual(r, ['attente', 'effectif', true, false]);
+  } finally { await app.fermer(); }
+});
