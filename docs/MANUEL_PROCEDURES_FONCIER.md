@@ -197,6 +197,73 @@ Toute modification de paramètre est **annoncée aux équipes** avant applicatio
 4. **Données sensibles** : ne pas diffuser un document interne ; les pièces confidentielles ne sont jamais publiées.
 5. **Pièces et fichiers** : stockés dans un espace privé ; ouverture par lien signé de durée courte (60 secondes).
 
+### PRO-19 — Immatriculer une parcelle rurale (AFOR / agriculture)
+**Déclencheur** : terrain situé en domaine rural, à immatriculer par la voie de l'agriculture puis de l'AFOR. **Responsable** : Resp. dossier. **Procédure source** : texte fourni par le promoteur, non vérifié par l'ERP ; à valider par un juriste ou un géomètre-expert. Le foncier rural suit une procédure **distincte** du foncier urbain (PRO-01 et procédure urbaine).
+1. Foncier › 2.2 › **Ouvrir un dossier** › assistant d'ouverture, question 1 : situation du terrain **« Parcelle rurale »**, puis **Appliquer au formulaire**. La procédure « Immatriculation d'une parcelle rurale (AFOR / agriculture) » est proposée avec ses 31 étapes (+ création et clôture du dossier).
+2. Choisir la parcelle et le responsable, puis **Ouvrir le dossier** (suite comme PRO-01).
+3. Dérouler les étapes dans l'ordre du tableau ci-dessous (onglet **Étapes** du dossier). Les étapes et phases de la procédure rurale sont repérées en **bleu** (l'urbain est en rouge).
+4. Phase 1 — recherche, repérage, démarche coutumière, délimitation et levé topographique de la parcelle.
+5. Phase 2 — enquête foncière, procès-verbaux de famille et enquête auprès de la chefferie et des sachants, intervention du commissaire de justice (consolidation des déclarations des propriétaires terriens, désignation du représentant légal / gestionnaire), convention notariée suivie du versement de la donation (compensation en nature).
+6. Phase 3 — achat des deux liasses, dépôt à l'agriculture, nomination du commissaire enquêteur, frais d'ouverture d'enquête et de siège du comité villageois, **enquête villageoise d'un mois**, bornage par le géomètre expert, clôture de l'enquête en présence des voisins (frais de déplacement à régler), traitement par l'agriculture, réunion de validation présidée par le sous-préfet, **certificat foncier**, frais de publication au journal officiel.
+7. Phase 4 — dossier d'immatriculation déposé à l'AFOR, transmis à la conservation foncière du chef-lieu, au cadastre pour le bornage contradictoire (frais à payer), puis à la conservation pour la création du titre foncier, à l'AFOR, au ministère de l'agriculture pour validation, et enfin **retrait du titre foncier**.
+8. Joindre à chaque étape à justificatif le document correspondant (récépissé, procès-verbal, quittance de frais, certificat). Les paiements de frais se rapprochent des écritures comptables correspondantes.
+
+**Contrôles** : une étape ne démarre ni ne se termine avant ses étapes préalables **[bloquant]**, sauf dérogation motivée du responsable du dossier (journalisée) ; la clôture du dossier exige le **retrait du titre foncier** ; étape à justificatif : preuve obligatoire. « Terminé » ne signifie pas « accordé » : la décision de l'administration (certificat, titre) se prouve par le document officiel reçu.
+**Preuve** : événement « Dossier ouvert » ; événement par changement de statut ; pièces jointes ; certificat foncier et titre foncier archivés au dossier. **Délais** : les délais indiqués sont des valeurs indicatives de l'ERP (total 618 jours), à ajuster dans Modèles de dossier ; la procédure ne fixe aucun délai, hors l'enquête villageoise d'un mois.
+
+**Tableau des étapes de la procédure rurale** (31 étapes ; l'ERP ajoute « Création du dossier » au début et « Clôture » à la fin)
+
+**Rural — Phase 1 : recherche, délimitation et levé de la parcelle**
+
+| N° | Étape | Intervenants extérieurs | Exécute (ERP) | Valide | Justificatif | Visible souscripteur | Délai indicatif |
+|---|---|---|---|---|---|---|---|
+| 1 | Recherche de la parcelle rurale | Demandeur ou propriétaire | Service foncier | — | — | — | 30 j |
+| 2 | Repérage et visite de la parcelle | Demandeur ou propriétaire ; Propriétaires terriens (famille) | Service foncier | — | — | — | 7 j |
+| 3 | Démarche coutumière | Demandeur ou propriétaire ; Chef de village ou sachants du village ; Propriétaires terriens (famille) | Service foncier | Direction | oui | — | 14 j |
+| 4 | Délimitation de la parcelle | Géomètre-expert ou professionnel habilité ; Propriétaires terriens (famille) ; Voisins de la parcelle | Technique et aménagement | — | — | — | 7 j |
+| 5 | Levé topographique | Géomètre-expert ou professionnel habilité | Technique et aménagement | — | oui | — | 14 j |
+
+**Rural — Phase 2 : enquête foncière et accord des propriétaires terriens**
+
+| N° | Étape | Intervenants extérieurs | Exécute (ERP) | Valide | Justificatif | Visible souscripteur | Délai indicatif |
+|---|---|---|---|---|---|---|---|
+| 6 | Enquête foncière | Demandeur ou propriétaire ; Direction départementale ou régionale de l'agriculture (DD / DR) | Service foncier | — | — | — | 21 j |
+| 7 | Établissement du ou des procès-verbaux de famille | Propriétaires terriens (famille) | Juridique et conformité | — | oui | — | 14 j |
+| 8 | Enquête sur le procès-verbal de famille auprès de la chefferie et des sachants | Chef de village ou sachants du village ; Propriétaires terriens (famille) | Juridique et conformité | — | oui | — | 14 j |
+| 9 | Intervention du commissaire de justice : consolidation des déclarations des propriétaires terriens et désignation du représentant légal (le gestionnaire) | Commissaire de justice ; Propriétaires terriens (famille) | Juridique et conformité | Direction | oui | — | 14 j |
+| 10 | Convention notariée suivie du versement de la donation (compensation en nature) | Notaire (ou professionnel habilité pour la mutation) ; Propriétaires terriens (famille) ; Demandeur ou propriétaire | Juridique et conformité | Direction | oui | oui | 30 j |
+
+**Rural — Phase 3 : enquête villageoise et certificat foncier (agriculture)**
+
+| N° | Étape | Intervenants extérieurs | Exécute (ERP) | Valide | Justificatif | Visible souscripteur | Délai indicatif |
+|---|---|---|---|---|---|---|---|
+| 11 | Achat de deux liasses (une ou plusieurs pour les propriétaires terriens, une pour la société) | Demandeur ou propriétaire ; Direction départementale ou régionale de l'agriculture (DD / DR) | Assistance et courrier | — | oui | — | 7 j |
+| 12 | Renseignement des liasses et dépôt à l'agriculture pour l'ouverture de l'enquête | Demandeur ou propriétaire ; Direction départementale ou régionale de l'agriculture (DD / DR) | Service foncier | — | oui | oui | 7 j |
+| 13 | Nomination d'un commissaire enquêteur par le DD ou le DR de l'agriculture | Direction départementale ou régionale de l'agriculture (DD / DR) ; Commissaire enquêteur nommé par l'agriculture | Service foncier | — | oui | — | 30 j |
+| 14 | Paiement des frais d'ouverture d'enquête par dossier à l'agriculture | Demandeur ou propriétaire ; Direction départementale ou régionale de l'agriculture (DD / DR) | Finance et comptabilité | — | oui | — | 7 j |
+| 15 | Paiement des frais de siège du comité villageois | Demandeur ou propriétaire ; Comité villageois (comité foncier) | Finance et comptabilité | — | oui | — | 7 j |
+| 16 | Ouverture de l'enquête villageoise auprès du chef de village, du comité foncier et des agents de l'agriculture (durée : un mois à compter de l'ouverture) | Commissaire enquêteur nommé par l'agriculture ; Chef de village ou sachants du village ; Comité villageois (comité foncier) ; Direction départementale ou régionale de l'agriculture (DD / DR) | Service foncier | — | oui | oui | 30 j |
+| 17 | Délimitation et bornage exécutés par le géomètre expert (par son topographe) | Géomètre-expert ou professionnel habilité | Technique et aménagement | — | oui | — | 14 j |
+| 18 | Clôture de l'enquête avec confirmation des limites en présence des voisins | Commissaire enquêteur nommé par l'agriculture ; Voisins de la parcelle ; Géomètre-expert ou professionnel habilité | Service foncier | — | oui | — | 7 j |
+| 19 | Règlement des frais de déplacement des voisins | Demandeur ou propriétaire ; Voisins de la parcelle | Finance et comptabilité | — | oui | — | 7 j |
+| 20 | Traitement du dossier par l'agriculture, en attente de validation (s'il n'y a pas d'opposition) | Direction départementale ou régionale de l'agriculture (DD / DR) | Service foncier | — | — | — | 60 j |
+| 21 | Réunion de validation sous la présidence du sous-préfet | Sous-préfet ; Direction départementale ou régionale de l'agriculture (DD / DR) ; Comité villageois (comité foncier) | Service foncier | — | oui | — | 30 j |
+| 22 | Délivrance du certificat foncier | Direction départementale ou régionale de l'agriculture (DD / DR) ; Demandeur ou propriétaire | Service foncier | Direction | oui | oui | 30 j |
+| 23 | Paiement des frais de publication au journal officiel | Demandeur ou propriétaire | Finance et comptabilité | — | oui | — | 15 j |
+
+**Rural — Phase 4 : titre foncier (conservation foncière, cadastre, AFOR)**
+
+| N° | Étape | Intervenants extérieurs | Exécute (ERP) | Valide | Justificatif | Visible souscripteur | Délai indicatif |
+|---|---|---|---|---|---|---|---|
+| 24 | Constitution du dossier de demande d'immatriculation (titre foncier) et dépôt à l'AFOR | Demandeur ou propriétaire ; AFOR — Agence foncière rurale | Service foncier | Direction | oui | oui | 15 j |
+| 25 | Dossier transmis à la conservation foncière du chef-lieu | AFOR — Agence foncière rurale ; Conservation foncière (DGI) | Assistance et courrier | — | — | — | 15 j |
+| 26 | Dossier transmis au cadastre pour le bornage contradictoire | Conservation foncière (DGI) ; Services du cadastre | Assistance et courrier | — | — | — | 15 j |
+| 27 | Paiement des frais du bornage contradictoire | Demandeur ou propriétaire ; Services du cadastre | Finance et comptabilité | — | oui | — | 7 j |
+| 28 | Dossier transmis à la conservation pour la création du titre foncier | Conservation foncière (DGI) | Service foncier | — | oui | oui | 60 j |
+| 29 | Dossier transmis à l'AFOR | Conservation foncière (DGI) ; AFOR — Agence foncière rurale | Assistance et courrier | — | — | — | 15 j |
+| 30 | Dossier transmis au ministère de l'agriculture pour validation du titre foncier | AFOR — Agence foncière rurale ; Ministère de l'agriculture | Service foncier | — | oui | — | 60 j |
+| 31 | Retrait du titre foncier | Demandeur ou propriétaire ; AFOR — Agence foncière rurale | Assistance et courrier | Direction | oui | oui | 15 j |
+
 ---
 
 ## 4. Référentiel des numéros et preuves
@@ -240,3 +307,4 @@ Version, date et auteur sont à renseigner à chaque révision ; toute modificat
 | Version | Date | Auteur | Modifications |
 |---|---|---|---|
 | 1.0 | À renseigner | À renseigner | Première édition |
+| 1.1 | 25/10/2026 | À renseigner | PRO-19 : immatriculation d'une parcelle rurale (AFOR / agriculture), étapes repérées en bleu |
