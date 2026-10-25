@@ -2,6 +2,8 @@
   "name": "zahara-multiservices",
   "private": true,
   "scripts": {
-    "test:caisse": "node --test tests-caisse/*.test.js"
+    "test:caisse": "node --test tests-caisse/*.test.js",
+    "test:compta": "node --test tests-compta/*.test.js",
+    "test": "npm run test:caisse && npm run test:compta"
   }
 }

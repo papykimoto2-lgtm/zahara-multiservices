@@ -25318,7 +25318,48 @@ function dbCount(store) {
    changement est rétrocompatible — mais il permet désormais aux écritures
    critiques (ex. import du plan comptable) de VÉRIFIER que la base a
    réellement été impactée plutôt que de supposer un succès silencieux. */
+/* ── Intangibilité des écritures (visa) et des exercices clos ─────────────────
+   Tout générateur automatique (versement, vente, dotation, paie…) reconstruit
+   son écriture par identifiant déterministe puis l'écrit : sans garde, la pièce
+   visée perdait son visa (valide_le) en silence, et une pièce d'un exercice clos
+   disparaissait de la mémoire. On compare donc à la copie PERSISTÉE : si elle est
+   visée (ou datée d'un exercice clos), l'écriture est refusée, la copie
+   persistée est remise en mémoire, et l'objet refusé est marqué `_rejete` pour
+   que la synchronisation cloud l'ignore. Seule la dévalidation explicite
+   (opts.forceVisa) lève un visa. */
+function _ecrAncienIDB(id) {
+  return new Promise(function(resolve) {
+    try {
+      var rq = db.transaction('ecritures', 'readonly').objectStore('ecritures').get(id);
+      rq.onsuccess = function() { resolve(rq.result || null); };
+      rq.onerror = function() { resolve(null); };
+    } catch (e) { resolve(null); }
+  });
+}
 function dbPut(store, obj, opts) {
+  opts = opts || {};
+  if (store !== 'ecritures' || !obj || obj.id === undefined || _pulling || obj._forceCloture
+      || !db || !db.objectStoreNames.contains('ecritures')) return _dbPutBrut(store, obj, opts);
+  return _ecrAncienIDB(obj.id).then(function(old) {
+    if (old) {
+      var viseeEcrasee = !!old.valide_le && !obj.valide_le && !opts.forceVisa;
+      var exerciceClos = !!old.date && typeof exerciceEstClos === 'function' && exerciceEstClos(old.date) && !opts.forceCloture;
+      if (viseeEcrasee || exerciceClos) {
+        obj._rejete = true;
+        if (Array.isArray(DATA.ecritures)) {
+          var i = DATA.ecritures.findIndex(function(x){ return x.id === old.id; });
+          if (i >= 0) DATA.ecritures[i] = old; else DATA.ecritures.push(old);
+        }
+        try { if (typeof toast === 'function') toast(viseeEcrasee
+          ? '🔒 Pièce visée le ' + String(old.valide_le).slice(0,10) + ' — modification refusée (' + (old.libelle || old.id) + '). Passez une contre-passation.'
+          : '🔒 Exercice ' + new Date(old.date).getFullYear() + ' clôturé — modification refusée (' + (old.libelle || old.id) + ').', 'error'); } catch (e2) {}
+        return false;
+      }
+    }
+    return _dbPutBrut(store, obj, opts);
+  });
+}
+function _dbPutBrut(store, obj, opts) {
   opts = opts || {};
   /* Verrou de rôle création/modification — même principe que le verrou de
      suppression de deleteRecord() : jusqu'ici, seul « supprimer » était
@@ -25358,7 +25399,7 @@ function dbPut(store, obj, opts) {
   /* ── Verrou clôture : bloque toute écriture (manuelle ou automatique — versement,
      commission, achat, stock, paie…) datée dans un exercice déjà clôturé.
      _pulling=true = réplication venant du cloud (ex. clôture faite sur un autre poste) → laissé passer. */
-  if (store === 'ecritures' && obj && obj.date && !_pulling && !obj._forceCloture
+  if (store === 'ecritures' && obj && obj.date && !_pulling && !obj._forceCloture && !opts.forceCloture
       && typeof exerciceEstClos === 'function' && exerciceEstClos(obj.date)) {
     if (Array.isArray(DATA.ecritures) && obj.id !== undefined) {
       DATA.ecritures = DATA.ecritures.filter(function(x){ return x.id !== obj.id; });
@@ -26696,7 +26737,7 @@ function _stableStr(v) {
    synchro) ? Sert à écarter les faux conflits : un horodatage distant plus
    récent mais un contenu identique à ce qu'on écrit n'est pas un conflit. */
 function _memeContenu(a, b) {
-  var META = { _modifie:1, _baseModifie:1, _forceCloture:1, _dirty:1, updated_at:1 };
+  var META = { _modifie:1, _baseModifie:1, _forceCloture:1, _dirty:1, updated_at:1, _rejete:1 };
   function strip(o){ var r={}; Object.keys(o||{}).forEach(function(k){ if(!META[k]) r[k]=o[k]; }); return r; }
   return _stableStr(strip(a)) === _stableStr(strip(b));
 }
@@ -26912,8 +26953,9 @@ function _envoiBloqueParTombstone(table, obj) {
 }
 
 async function syncToSupabase(table, obj, opts) {
+  if (obj && obj._rejete) return false;   /* écriture refusée par dbPut (pièce visée / exercice clos) : jamais envoyée au cloud */
   if (_envoiBloqueParTombstone(table, obj)) return true;   /* rien à envoyer : traité comme fait */
-  if (table === 'pi_ecritures' && obj && obj.date && !_pulling && !obj._forceCloture
+  if (table === 'pi_ecritures' && obj && obj.date && !_pulling && !obj._forceCloture && !(opts && opts.forceCloture)
       && typeof exerciceEstClos === 'function' && exerciceEstClos(obj.date)) {
     console.warn('[VERROU CLOTURE] Sync cloud bloquée — exercice clos:', obj);
     return false;
@@ -35194,14 +35236,16 @@ async function resilierConfirmer(){
     var compteDette = requireCompteDefaut('resiliation_dette');
     var ecrR = { id:'ecr_resil_dette_'+clientId+'_'+Date.now(), ref:'RESIL-'+clientId, date:dat, piece:'RESIL-'+(c.dossier||clientId),
       libelle:'Résiliation — dette de remboursement — '+((c.nom||'')+' '+(c.prenoms||'')).trim(),
-      compte:compteDette, compte_debit:compteClientLots, compte_credit:compteDette, montant:rembourse, type:'passif', created_at:dat };
+      compte:compteDette, compte_debit:compteClientLots, compte_credit:compteDette, montant:rembourse, type:'passif', created_at:dat,
+      client_id:clientId, lignes:[ { compte:compteClientLots, sens:'D', montant:rembourse, tiers_id:clientId }, { compte:compteDette, sens:'C', montant:rembourse } ] };
     DATA.ecritures.push(ecrR); await dbPut('ecritures', ecrR); if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', ecrR);
   }
   if (retenu > 0) {
     var compteProduit = requireCompteDefaut('resiliation_produit');
     var ecrP = { id:'ecr_resil_produit_'+clientId+'_'+Date.now(), ref:'RESIL-'+clientId, date:dat, piece:'RESIL-'+(c.dossier||clientId),
       libelle:'Résiliation — retenue conservée — '+((c.nom||'')+' '+(c.prenoms||'')).trim(),
-      compte:compteProduit, compte_debit:compteClientLots, compte_credit:compteProduit, montant:retenu, type:'produit', created_at:dat };
+      compte:compteProduit, compte_debit:compteClientLots, compte_credit:compteProduit, montant:retenu, type:'produit', created_at:dat,
+      client_id:clientId, lignes:[ { compte:compteClientLots, sens:'D', montant:retenu, tiers_id:clientId }, { compte:compteProduit, sens:'C', montant:retenu } ] };
     DATA.ecritures.push(ecrP); await dbPut('ecritures', ecrP); if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', ecrP);
   }
   if (typeof buildBalance==='function') buildBalance();
@@ -35625,6 +35669,13 @@ function getCompteCommission(typeB, sens) {
 /** Génère les 2 écritures SYSCOHADA pour une commission (charge + provision) */
 async function comptabiliserCommission(comm, silencieux) {
   if (!comm) return;
+  /* Une commission annulée ne se comptabilise jamais : elle n'est plus due (et son écriture, si elle a
+     existé, a été extournée ou supprimée). Sans ce garde-fou, « Comptabiliser toutes » ou le bouton de
+     la ligne recréait une charge pour une commission annulée dont l'écriture avait disparu. */
+  if (comm.statut === 'annulee') {
+    if (!silencieux) toast('Commission annulée : aucune écriture à générer.', 'info');
+    return;
+  }
   if (comm.ecriture_id) {
     if (!silencieux) toast('Déjà comptabilisée (réf. ' + comm.ecriture_id + ').', 'info');
     return;
@@ -35729,7 +35780,7 @@ async function comptabiliserPaiementCommission(comm, modePaiement) {
 
 /** Comptabiliser TOUTES les commissions non encore comptabilisées */
 async function comptabiliserToutesCommissions() {
-  var nonComptab = (DATA.commissions||[]).filter(function(c){ return !c.ecriture_id; });
+  var nonComptab = (DATA.commissions||[]).filter(function(c){ return !c.ecriture_id && c.statut !== 'annulee'; });
   if (!nonComptab.length) { toast('Toutes les commissions sont déjà comptabilisées.', 'info'); return; }
   if (!confirm('Générer les écritures comptables pour ' + nonComptab.length + ' commission(s) non comptabilisée(s) ?')) return;
   var nb = 0;
@@ -35744,6 +35795,9 @@ async function comptabiliserToutesCommissions() {
 
 /** Badge comptabilité sur une commission */
 function badgeComptaComm(comm) {
+  if (comm.statut === 'annulee') {
+    return '<span style="background:#F1F5F9;color:#64748B;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:600;" title="Commission annulée : aucune écriture à générer">✗ Annulée</span>';
+  }
   if (comm.ecriture_id) {
     return '<span style="background:#ECFDF5;color:#059669;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:600;" title="Écriture : '+escHtml(comm.ecriture_ref||'')+'">✓ Comptabilisée</span>';
   }
@@ -35884,6 +35938,8 @@ async function loadCommissions() {
 async function payerCommission(id) {
   var comm = (DATA.commissions||[]).find(function(c){ return c.id===id; });
   if (!comm) return;
+  /* Seule une commission « à payer » se règle : une annulée repasserait sinon « payée » et serait décaissée. */
+  if (comm.statut !== 'a_payer') { toast(comm.statut === 'annulee' ? 'Commission annulée : paiement impossible.' : 'Cette commission n\'est pas à payer (statut : ' + (comm.statut || '—') + ').', 'error'); return; }
   var ref = prompt('Référence de paiement (ex: virement SGCI) :', '');
   if (ref === null) return;
 
@@ -36329,6 +36385,13 @@ async function genererEcritureVersement(versement) {
     compte: compteTreso,
     compte_debit: compteTreso,
     compte_credit: compteCredit,
+    client_id: versement.client_id,
+    /* Ligne client rattachée à son tiers (lettrage, postes ouverts, FEC) ;
+       les frais de souscription sont un produit : pas de tiers. */
+    lignes: [
+      { compte: compteTreso, sens: 'D', montant: parseFloat(versement.montant) || 0 },
+      { compte: compteCredit, sens: 'C', montant: parseFloat(versement.montant) || 0, tiers_id: estFrais ? undefined : versement.client_id }
+    ],
     division: (progClient && progClient.division_id) || '',
     montant: parseFloat(versement.montant) || 0,
     type: 'actif',
@@ -36386,7 +36449,7 @@ async function comptabiliserVenteTerrain(lot) {
   var lib = 'Vente parcelle ' + (lot.numero || '') + (prog ? ' — ' + prog.nom : '') + (nomCli ? ' (' + nomCli + ')' : '');
 
   var lignes = [];
-  lignes.push({ compte: cClient, sens: 'D', montant: ttc, libelle: lib });
+  lignes.push({ compte: cClient, sens: 'D', montant: ttc, libelle: lib, tiers_id: cli ? cli.id : undefined });
   lignes.push({ compte: cProduit, sens: 'C', montant: ht, libelle: lib + (viab ? ' (HT)' : '') });
   if (tva > 0) lignes.push({ compte: requireCompteDefaut('terrain_tva_collectee'), sens: 'C', montant: tva, libelle: 'TVA ' + Math.round(taux*100) + '% — ' + lib });
 
@@ -36404,6 +36467,7 @@ async function comptabiliserVenteTerrain(lot) {
     piece: 'VT-' + (lot.numero || ''),
     libelle: lib,
     lignes: lignes,
+    client_id: cli ? cli.id : undefined,
     compte_debit: cClient,
     compte_credit: cProduit,
     montant: ttc,
@@ -36463,9 +36527,10 @@ async function comptabiliserVenteLogement(lot) {
     piece: 'VL-' + (lot.numero || ''),
     libelle: lib,
     lignes: [
-      { compte: cClient,  sens: 'D', montant: prix, libelle: lib },
+      { compte: cClient,  sens: 'D', montant: prix, libelle: lib, tiers_id: cli ? cli.id : undefined },
       { compte: cProduit, sens: 'C', montant: prix, libelle: lib }
     ],
+    client_id: cli ? cli.id : undefined,
     compte_debit: cClient,
     compte_credit: cProduit,
     montant: prix,
@@ -37054,6 +37119,31 @@ function vrsTypeSuspect(clientId, type, montant) {
   return '⚠️ Ce versement de ' + fmtF(montant) + ' F est enregistré en « Frais de souscription » (non remboursable, hors prix du bien), alors que ' + (fp > 0 ? 'les frais prévus sont de ' + fmtF(fp) + ' F' : 'le montant dépasse 5 % du contrat') + '.\n\nS\'il s\'agit d\'un paiement sur le prix, annulez et choisissez « Apport » ou « Mensualité ».\n\nConfirmer quand même en frais de souscription ?';
 }
 
+/* Un versement porte une écriture comptable (id ecr_vrs_<id>). Si cette écriture est visée,
+   ou si elle (ou la nouvelle date) tombe dans un exercice clos, le versement ne peut ni être
+   modifié ni supprimé : sinon le versement et la comptabilité divergent en silence
+   (l'écriture refusée par le verrou n'était pas relue par l'appelant). Retourne le motif, ou ''. */
+function vrsEcritureVerrouillee(versementId, nouvelleDate) {
+  var e = (DATA.ecritures || []).find(function(x){ return x.id === 'ecr_vrs_' + versementId; });
+  if (e && ecrEstValidee(e)) return 'son écriture comptable ' + (e.ref || '') + ' est visée depuis le ' + dateShort(e.valide_le);
+  if (e && e.date && exerciceEstClos(e.date)) return 'son écriture comptable est dans l\'exercice ' + new Date(e.date).getFullYear() + ' clôturé';
+  if (nouvelleDate && exerciceEstClos(nouvelleDate)) return 'la nouvelle date tombe dans l\'exercice ' + new Date(nouvelleDate).getFullYear() + ' clôturé';
+  return '';
+}
+
+/* Garde commune des opérations sources (paie, cessions, dotations…) : peut-on modifier ou supprimer
+   ces écritures ? Une pièce visée, ou d'un exercice clos, ne bouge plus (contre-passation seule).
+   Retourne le motif, ou '' si tout est libre. `dateNouvelle` : date que prendrait la nouvelle écriture. */
+function ecrsVerrouillees(list, dateNouvelle) {
+  list = (list || []).filter(Boolean);
+  var visees = list.filter(function(e){ return ecrEstValidee(e); });
+  if (visees.length) return visees.length + ' écriture(s) visée(s) (ex. ' + (visees[0].ref || visees[0].piece || visees[0].id) + ')';
+  var clos = list.filter(function(e){ return e.date && exerciceEstClos(e.date); });
+  if (clos.length) return clos.length + ' écriture(s) dans l\'exercice ' + new Date(clos[0].date).getFullYear() + ' clôturé';
+  if (dateNouvelle && exerciceEstClos(dateNouvelle)) return 'la date ' + dateShort(dateNouvelle) + ' tombe dans l\'exercice ' + new Date(dateNouvelle).getFullYear() + ' clôturé';
+  return '';
+}
+
 async function savePaiement() {
   var cid = document.getElementById('v-client').value;
   var montant = parseFloat(document.getElementById('v-montant').value);
@@ -37096,6 +37186,12 @@ async function savePaiement() {
         toast('🔒 Ce versement est rattaché au bon de caisse ' + (_mvtLie.numero||'') + ' d\'une session déjà clôturée : montant, mode et client ne peuvent plus changer. Régularisez par un bon en caisse.', 'error', 9000);
         return;
       }
+      var _touchCompta = _touche || date !== vEdit.date || document.getElementById('v-type').value !== vEdit.type;
+      var _verrouCompta = _touchCompta ? vrsEcritureVerrouillee(vEdit.id, date) : '';
+      if (_verrouCompta) {
+        toast('🔒 Versement non modifiable : ' + _verrouCompta + '. Contre-passez l\'écriture (Comptabilité › Journal), puis saisissez le versement correct.', 'error', 9000);
+        return;
+      }
       var _creerBon = !_mvtLie && _modeSaisi === 'especes' && vEdit.mode !== 'especes';
       if (_creerBon && !_caisseSaisie) { toast('Choisissez la caisse qui reçoit les espèces.', 'error'); return; }
       if (_creerBon) { var _dgE = _vrsDiagSession(_caisseSaisie, date); if (!_dgE.ok) { toast('Bon de caisse impossible : ' + _dgE.raison + '.', 'error', 7000); return; } }
@@ -37114,7 +37210,7 @@ async function savePaiement() {
       if (typeof syncToSupabase === 'function') syncToSupabase('pi_versements', vEdit);
       await logAudit('versements', vEdit.id, 'update', _vAvant, vEdit);
       await reimpacterCommissionsVersement(vEdit);
-      await genererEcritureVersement(vEdit);
+      if (_touchCompta) await genererEcritureVersement(vEdit);
       if (_mvtLie && vEdit.mode === 'especes') await _vrsMajBonCaisse(vEdit, _mvtLie);
       else if (_mvtLie) await _caisseDelMvt(_mvtLie, { depuisVersement: true });
       else if (_creerBon) await _vrsCreerBonCaisse(vEdit, _caisseSaisie);
@@ -37533,6 +37629,11 @@ async function deleteVersement(id, skipConfirm) {
       toast('🔒 Versement rattaché au bon de caisse ' + (_mvtLieDel.numero||'') + ' d\'une session clôturée : suppression impossible. Régularisez par un bon de sortie en caisse, puis contactez le comptable.', 'error', 9000);
       return;
     }
+  }
+  var _verrouDel = vrsEcritureVerrouillee(id);
+  if (_verrouDel) {
+    toast('🔒 Suppression impossible : ' + _verrouDel + '. Contre-passez l\'écriture (Comptabilité › Journal) pour annuler ce versement.', 'error', 9000);
+    return;
   }
   if (!skipConfirm && !confirm('Supprimer ce versement ?' + (_mvtLieDel ? '\n\nLe bon de caisse ' + (_mvtLieDel.numero||'') + ' rattaché sera supprimé aussi.' : ''))) return;
   var v = DATA.versements.find(function(x){ return x.id === id; });
@@ -41869,9 +41970,35 @@ function ecrSupprimerLigne(i) {
   ecrRenderLignes();
 }
 
+/* Tiers auxiliaires proposés à la saisie : souscripteurs, fournisseurs, tiers comptables. */
+function ecrTiersListe() {
+  var out = [];
+  (DATA.clients || []).forEach(function(c){ if (c && c.id) out.push({ id: c.id, label: (((c.nom || '') + ' ' + (c.prenoms || '')).trim() || c.id) + (c.dossier ? ' [' + c.dossier + ']' : '') }); });
+  (DATA.cessions_foncieres || []).forEach(function(c){ if (c && c.id) out.push({ id: c.id, label: (c.acquereur || c.id) + ' [' + (c.dossier || 'cession') + ']' }); });
+  (DATA.fournisseurs || []).forEach(function(f){ if (f && f.id) out.push({ id: f.id, label: (f.raison_sociale || f.nom || f.id) + ' [fournisseur]' }); });
+  (DATA.tiers_comptables || []).forEach(function(t){ if (t && t.id) out.push({ id: t.id, label: (t.nom || t.libelle || t.code || t.id) + (t.code ? ' [' + t.code + ']' : '') }); });
+  return out;
+}
+function ecrTiersLibelle(id) {
+  if (!id) return '';
+  var t = ecrTiersListe().find(function(x){ return x.id === id; });
+  return t ? t.label : String(id);
+}
+function ecrUpdateTiers(i, val) {
+  if (!_ecrLignes[i]) return;
+  var v = String(val || '').trim();
+  var t = ecrTiersListe().find(function(x){ return x.label === v || x.id === v; });
+  _ecrLignes[i].tiers_id = t ? t.id : v;   /* un code libre reste accepté */
+}
+
 function ecrUpdateLigne(i, field, val) {
   if (!_ecrLignes[i]) return;
+  var _avant = (typeof _lettRacine === 'function') && !!_lettRacine(_ecrLignes[i].compte);
   _ecrLignes[i][field] = field === 'montant' ? val : val;
+  if (field === 'compte') {
+    var _apres = (typeof _lettRacine === 'function') && !!_lettRacine(_ecrLignes[i].compte);
+    if (_avant !== _apres) { if (!_apres) _ecrLignes[i].tiers_id = ''; ecrRenderLignes(); return; }   /* la colonne « Tiers » apparaît / disparaît */
+  }
   ecrCheckEquilibre();
 }
 
@@ -41879,14 +42006,20 @@ function ecrRenderLignes() {
   var wrap = document.getElementById('ecr-lignes-wrap');
   if (!wrap) return;
   if (typeof populateDatalistPlanComptable === 'function') populateDatalistPlanComptable();
-  wrap.innerHTML = _ecrLignes.map(function(l, i){
-    return '<div style="display:grid;grid-template-columns:2fr 90px 140px 1.3fr 34px;gap:6px;margin-bottom:6px;align-items:center;">'
+  var _tiersOpts = '<datalist id="dl-tiers-ecr">' + ecrTiersListe().map(function(t){ return '<option value="' + escHtml(t.label) + '"></option>'; }).join('') + '</datalist>';
+  wrap.innerHTML = _tiersOpts + _ecrLignes.map(function(l, i){
+    var _collectif = (typeof _lettRacine === 'function') && !!_lettRacine(l.compte);
+    var _caseTiers = _collectif
+      ? '<input type="text" class="form-control" list="dl-tiers-ecr" value="' + escHtml(ecrTiersLibelle(l.tiers_id)) + '" placeholder="Tiers (client, fournisseur…)" onchange="ecrUpdateTiers(' + i + ',this.value)" style="font-size:12px;" title="Tiers auxiliaire de cette ligne — indispensable au lettrage et au FEC">'
+      : '<span></span>';
+    return '<div style="display:grid;grid-template-columns:2fr 80px 120px 1.1fr 1.6fr 34px;gap:6px;margin-bottom:6px;align-items:center;">'
       + '<input type="text" class="form-control" list="dl-plan-comptable" value="' + escHtml(l.compte||'') + '" placeholder="Code ou libellé du compte…" onchange="ecrUpdateLigne(' + i + ',\'compte\',this.value);ecrDetectType();" style="font-size:12px;">'
       + '<select class="form-control" onchange="ecrUpdateLigne(' + i + ',\'sens\',this.value);ecrDetectType();" style="font-size:12px;font-weight:700;color:' + (l.sens==='D'?'var(--rouge)':'var(--vert)') + ';">'
       + '<option value="D"' + (l.sens==='D'?' selected':'') + '>Débit</option>'
       + '<option value="C"' + (l.sens==='C'?' selected':'') + '>Crédit</option></select>'
       + '<input type="number" class="form-control" value="' + (l.montant||'') + '" placeholder="Montant" oninput="ecrUpdateLigne(' + i + ',\'montant\',parseFloat(this.value)||0)" style="font-size:12px;">'
       + '<input type="text" class="form-control" value="' + escHtml(l.libelle||'') + '" placeholder="Libellé ligne (optionnel)" oninput="ecrUpdateLigne(' + i + ',\'libelle\',this.value)" style="font-size:12px;">'
+      + _caseTiers
       + '<button type="button" class="btn btn-danger btn-sm btn-icon" onclick="ecrSupprimerLigne(' + i + ')">🗑</button>'
       + '</div>';
   }).join('');
@@ -42130,6 +42263,48 @@ function ecrLignes(e) {
   if (cd) out.push({ compte:cd, sens:'D', montant:m, libelle:e.libelle });
   if (cc) out.push({ compte:cc, sens:'C', montant:m, libelle:e.libelle });
   return out;
+}
+
+/* ═══ TIERS AUXILIAIRE DES ÉCRITURES DE SOUSCRIPTEURS ═══
+   Une ligne de compte client (411…) doit porter son tiers : sans lui, le
+   lettrage, les postes ouverts, le bilan (non-compensation) et le FEC
+   (CompAuxNum) travaillent sur le compte entier et mélangent les clients.
+   Les générateurs posent désormais `tiers_id` sur la ligne ; ce résolveur
+   couvre les écritures plus anciennes (format 2 comptes, sans tiers) à partir
+   de leur identifiant déterministe, SANS les modifier (une pièce visée ou
+   d'un exercice clos reste intacte). */
+var _idxTiersEcr = { sig: '', vrs: {}, lot: {} };
+function _ecrIndexTiers() {
+  var V = DATA.versements || [], C = DATA.clients || [];
+  var sig = V.length + ':' + C.length;
+  if (_idxTiersEcr.sig === sig) return _idxTiersEcr;
+  var vrs = {}, lot = {};
+  V.forEach(function(v){ if (v && v.id) vrs[v.id] = v.client_id; });
+  C.forEach(function(c){
+    if (!c) return;
+    if (c.lot_id && !lot[c.lot_id]) lot[c.lot_id] = c.id;
+    (c.lot_ids || []).forEach(function(l){ if (l && !lot[l]) lot[l] = c.id; });
+  });
+  _idxTiersEcr = { sig: sig, vrs: vrs, lot: lot };
+  return _idxTiersEcr;
+}
+function ecrClientIdDe(e) {
+  if (!e) return '';
+  if (e.client_id) return e.client_id;
+  if (e.cession_id) return e.cession_id;   /* cession foncière : un tiers par cession (vente, encaissements, recouvrements) */
+  var id = String(e.id || ''), ix = _ecrIndexTiers(), r;
+  if (id.indexOf('ecr_vrs_') === 0) return ix.vrs[id.slice(8)] || '';
+  if (id.indexOf('ecr_vente_terrain_') === 0) return ix.lot[id.slice(18)] || '';
+  if (id.indexOf('ecr_vente_logement_') === 0) return ix.lot[id.slice(19)] || '';
+  r = /^ecr_resil_(?:dette|produit)_(.+)_\d{10,}$/.exec(id);
+  return r ? r[1] : '';
+}
+function ecrTiersLigne(e, l) {
+  if (!l) return '';
+  if (l.tiers_id) return l.tiers_id;
+  if (l.compte_aux) return l.compte_aux;   /* écritures importées (FEC) : le compte auxiliaire du fichier fait office de tiers */
+  if (typeof _lettRacine === 'function' && _lettRacine(l.compte) === '411') return ecrClientIdDe(e) || '';
+  return '';
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -42396,7 +42571,7 @@ function openEcritureModal(id) {
       setSelectValue('e-journal', e.journal || 'auto');
       setSelectValue('e-division', e.division || '');
       APP._ecrBaseModifie = e._modifie || null;
-      _ecrLignes = ecrLignes(e).map(function(l){ return { compte:l.compte, sens:l.sens, montant:l.montant, libelle:l.libelle||'' }; });
+      _ecrLignes = ecrLignes(e).map(function(l){ return { compte:l.compte, sens:l.sens, montant:l.montant, libelle:l.libelle||'', tiers_id:l.tiers_id || ecrTiersLigne(e, l) || '', lettrage:l.lettrage, lettrage_le:l.lettrage_le }; });
     }
   } else {
     document.getElementById('modal-ecr-title').textContent = 'Nouvelle Écriture Comptable';
@@ -42730,7 +42905,7 @@ async function devaliderPerimetre() {
     var e = list[i];
     e.devalide_historique = (e.devalide_historique || []).concat([{ le: quand, par: (APP.currentUser && APP.currentUser.nom) || '', motif: motif, visa_leve: e.valide_le }]);
     delete e.valide_le; delete e.valide_par; e.statut_ecr = 'brouillard'; e._modifie = quand;
-    await dbPut('ecritures', e);
+    await dbPut('ecritures', e, { forceVisa: true });
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', e);
   }
   if (typeof logAction === 'function') { try { logAction('DEVISA', list.length + ' écriture(s) dévalidée(s) — motif : ' + motif); } catch(err){} }
@@ -42770,12 +42945,12 @@ async function contrePasserEcriture(id) {
     id: uid(), date: d, journal: src.journal || 'OD', type: src.type || 'od',
     piece: 'CP-' + (src.piece || src.ref || String(src.id).slice(-6)),
     libelle: 'Contre-passation — ' + (src.libelle || '') + ' — ' + motif,
-    division: src.division, entite: src.entite, programme_id: src.programme_id,
+    division: src.division, entite: src.entite, programme_id: src.programme_id, client_id: ecrClientIdDe(src) || undefined,
     /* Inversion du sens ligne à ligne : l'équilibre de la pièce d'origine
        garantit celui de la contre-passation. */
     lignes: lignes.map(function(l){
       return { compte: l.compte, sens: (l.sens === 'D' ? 'C' : 'D'),
-        montant: parseFloat(l.montant) || 0, tiers_id: l.tiers_id,
+        montant: parseFloat(l.montant) || 0, tiers_id: l.tiers_id || ecrTiersLigne(src, l) || undefined,
         libelle: 'CP — ' + (l.libelle || src.libelle || '') };
     }),
     contrepassation_de: src.id,
@@ -42796,8 +42971,10 @@ async function contrePasserEcriture(id) {
   src.contrepassee_par = inv.piece;
   src.contrepassee_le = new Date().toISOString();
   src._modifie = src.contrepassee_le;
-  await dbPut('ecritures', src);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', src);
+  /* forceCloture : on trace l'annulation même sur une pièce d'un exercice clos
+     (c'est le cas d'usage normal de la contre-passation) ; montants et comptes intacts. */
+  await dbPut('ecritures', src, { forceCloture: true });
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', src, { forceCloture: true });
 
   if (typeof logAction === 'function') { try { logAction('CONTREPASSATION', 'Pièce ' + (src.piece || src.id) + ' → ' + inv.piece + ' — ' + motif); } catch(e){} }
   if (typeof renderEcritures === 'function') renderEcritures();
@@ -43211,6 +43388,11 @@ async function saveEcriture() {
   var libelle = document.getElementById('e-libelle').value.trim();
   var date = document.getElementById('e-date').value;
   if (!libelle || !date) { toast('Libellé et date sont obligatoires.', 'error'); return; }
+  var _exist = APP.editingId ? (DATA.ecritures || []).find(function(x){ return x.id === APP.editingId; }) : null;
+  if (_exist && (_exist.lettrage || (Array.isArray(_exist.lignes) && _exist.lignes.some(function(x){ return x && x.lettrage; })))) {
+    toast('🔒 Écriture lettrée : délettrez-la (Tiers › Délettrage) avant de la modifier, sinon le lettrage ne correspondrait plus aux montants.', 'error', 8000);
+    return;
+  }
 
   var lignesValides = _ecrLignes.filter(function(l){ return l.compte && parseFloat(l.montant) > 0; });
   if (lignesValides.length < 2) { toast('Minimum 2 lignes valides (compte + montant).', 'error'); return; }
@@ -43236,6 +43418,11 @@ async function saveEcriture() {
   var hasC = lignesValides.some(function(l){ return l.sens==='C'; });
   if (!hasD || !hasC) { toast('Au moins 1 ligne débit et 1 ligne crédit requis.', 'error'); return; }
 
+  /* Compte de tiers (client, fournisseur, personnel…) sans tiers auxiliaire : la ligne ne se
+     lettre pas par tiers et sort sans CompAuxNum au FEC. */
+  var sansTiers = lignesValides.filter(function(l){ return typeof _lettRacine === 'function' && _lettRacine(l.compte) && !l.tiers_id; });
+  if (sansTiers.length && !confirm('⚠️ ' + sansTiers.length + ' ligne(s) de compte de tiers (' + sansTiers.map(function(l){ return l.compte; }).filter(function(c,i,a){ return a.indexOf(c)===i; }).join(', ') + ') sans tiers auxiliaire.\n\nSans tiers, le lettrage et les postes ouverts mélangent tous les tiers de ce compte, et le FEC sort sans compte auxiliaire.\n\nEnregistrer quand même ?')) return;
+
   var regroupements = lignesValides.map(function(l){ return l.compte; })
     .filter(function(c,i,a){ return a.indexOf(c)===i; })
     .filter(function(c){ return compteEstParent(c); });
@@ -43256,7 +43443,8 @@ async function saveEcriture() {
 
   var id = APP.editingId || uid();
   var an = new Date(date).getFullYear();
-  var ref = 'JL-' + an + '-' + prochainNumeroRef('ecritures','JL',an,5);
+  /* La référence ne change pas à la modification (et ne consomme pas de numéro : trou dans la séquence JL-). */
+  var ref = (_exist && _exist.ref) ? _exist.ref : ('JL-' + an + '-' + prochainNumeroRef('ecritures','JL',an,5));
 
   var lignesDebit = lignesValides.filter(function(l){ return l.sens==='D'; });
   var lignesCredit = lignesValides.filter(function(l){ return l.sens==='C'; });
@@ -43272,12 +43460,12 @@ async function saveEcriture() {
 
   var ecriture = {
     id: id,
-    ref: APP.editingId ? ((DATA.ecritures.find(function(e) { return e.id === id; }) || {}).ref || ref) : ref,
+    ref: ref,
     date: date,
     piece: document.getElementById('e-piece').value.trim(),
     type: typeAuto,
     libelle: libelle,
-    lignes: lignesValides.map(function(l){ return { compte:l.compte, sens:l.sens, montant:parseFloat(l.montant), libelle:l.libelle||'' }; }),
+    lignes: lignesValides.map(function(l){ var o = { compte:l.compte, sens:l.sens, montant:parseFloat(l.montant), libelle:l.libelle||'' }; if (l.tiers_id) o.tiers_id = l.tiers_id; return o; }),
     /* Champs legacy dérivés — 1ère ligne D/C — pour compatibilité affichage/print/lettrage secondaires */
     compte: lignesDebit[0].compte,
     compte_debit: lignesDebit[0].compte,
@@ -43295,6 +43483,9 @@ async function saveEcriture() {
      sinon (mode "Auto"), on le déduit des comptes mouvementés et il restera
      recalculable dynamiquement (getEcritureJournal) si les comptes changent. */
   ecriture.journal = (journalChoisi && journalChoisi !== 'auto') ? journalChoisi : detectJournalCode(ecriture);
+  /* En modification, on part de l'écriture existante : les champs que le formulaire ne montre pas
+     (source, client_id, contre-passation, tiers…) ne doivent pas disparaître. */
+  if (_exist) { delete ecriture.created_at; ecriture = Object.assign({}, _exist, ecriture); }
 
   if (APP.editingId) {
     var idx = DATA.ecritures.findIndex(function(e) { return e.id === id; });
@@ -44051,9 +44242,11 @@ function epExportCSV(){
 ════════════════════════════════════════════════════════════════════════ */
 function _lfSoldes(annee, divF) {
   var s = {};
+  var _depuis = ecrFiltreDepuisOuverture(parseInt(annee, 10), divF);
   (DATA.ecritures || []).forEach(function(e){
     if (divF && e.division !== divF) return;
     if (!e.date || e.date >= (parseInt(annee, 10) + 1) + '-01-01') return;
+    if (!_depuis(e)) return;
     ecrLignes(e).forEach(function(l){
       var c = String(l.compte || ''); if (!c) return;
       s[c] = (s[c] || 0) + (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant) || 0);
@@ -45490,6 +45683,11 @@ function genererEtatsDGI() {
 }
 
 function genererLiasseFiscale() {
+  /* La liasse est bâtie sur la numérotation SYSCOHADA révisé (22 terrains, 23 bâtiments, 66 personnel…).
+     Avec le plan d'origine (numérotation de type PCG), certaines rubriques seraient mal classées :
+     on le dit avant d'éditer un document destiné à l'administration fiscale. */
+  if (typeof referentielCompta === 'function' && referentielCompta() === 'pcg'
+      && !confirm('⚠️ Votre plan comptable suit la numérotation du plan d\'origine (de type plan comptable français), pas le SYSCOHADA révisé sur lequel la liasse est bâtie.\n\nLes rubriques de la liasse (immobilisations, charges de personnel, impôts…) peuvent être mal classées.\n\nÀ faire valider par votre expert-comptable avant tout dépôt. Générer quand même ?')) return;
   var annee = parseInt(((document.getElementById('filter-annee-compta') || {}).value) || new Date().getFullYear(), 10);
   var divF = (typeof _comptaDivisionFilter === 'function') ? _comptaDivisionFilter() : '';
   var N = _lfCalc2(annee, divF), P = _lfCalc2(annee - 1, divF);
@@ -45730,153 +45928,156 @@ function genererLiasseFiscale() {
   else toast('Autorisez les fenêtres pop-up pour afficher la liasse.', 'error');
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   BILAN — SOURCE DE CALCUL UNIQUE (écran, impression, contrôles)
+   Principe : chaque poste (compte, ou compte + tiers pour les comptes
+   collectifs) est classé à l'ACTIF s'il est débiteur, au PASSIF s'il est
+   créditeur (non-compensation des tiers, SYSCOHADA). Les comptes de
+   gestion (classes 6, 7 et 8) alimentent le résultat de l'exercice. Aucun
+   compte de classe 1 à 5 ne peut donc échapper au bilan : Actif − Passif
+   vaut exactement le déséquilibre des écritures (0 si toutes sont
+   équilibrées).
+   Soldes en D − C : un produit est négatif, une charge positive.
+   Résultat = −(classes 6 + 7 + 8).
+════════════════════════════════════════════════════════════════════════ */
+/* Depuis quand cumuler les soldes ? Un exercice clôturé laisse des à-nouveaux (type
+   `a_nouveau`, datés du 01/01) qui REPRENNENT tous les soldes de bilan : cumuler en plus
+   l'historique antérieur compterait deux fois chaque créance, dette et trésorerie. Pour une
+   division, on part de son dernier à-nouveau ; en vue consolidée, du dernier à-nouveau
+   consolidé ou de celui de la division de l'écriture. Sans à-nouveau (jamais clôturé,
+   ou reprise par bilan d'ouverture), tout l'historique est cumulé comme avant. */
+function ecrFiltreDepuisOuverture(an, divF) {
+  var kCons = 0, kDiv = {};
+  (DATA.ecritures || []).forEach(function(e){
+    if ((e.type !== 'a_nouveau' && !/^(AN|RAN|ANO)$/i.test(e.journal || '')) || !e.date) return;   /* à-nouveaux de l'ERP ou journal d'à-nouveaux d'un FEC importé */
+    var k = parseInt(String(e.date).slice(0, 4), 10);
+    if (!(k <= an)) return;
+    var d = e.division || '';
+    if (d) kDiv[d] = Math.max(kDiv[d] || 0, k); else kCons = Math.max(kCons, k);
+  });
+  return function(e) {
+    var y = parseInt(String(e.date).slice(0, 4), 10);
+    var d = e.division || '';
+    var depuis = Math.max(divF ? 0 : kCons, d ? (kDiv[d] || 0) : 0);
+    return y >= depuis;
+  };
+}
+
+function calcBilan(year, divF) {
+  var an = parseInt(year, 10) || new Date().getFullYear();
+  var soldes = {}, postes = {};
+  var _depuis = ecrFiltreDepuisOuverture(an, divF);
+  (DATA.ecritures || []).forEach(function(e){
+    if (!e.date || e.date >= ((an + 1) + '-01-01')) return;
+    if (divF && e.division !== divF) return;
+    if (!_depuis(e)) return;
+    ecrLignes(e).forEach(function(l){
+      if (!l.compte) return;
+      var c = String(l.compte);
+      var m = (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant) || 0);
+      soldes[c] = (soldes[c] || 0) + m;
+      var collectif = (typeof _lettRacine === 'function') ? !!_lettRacine(c) : false;
+      var tid = collectif ? ecrTiersLigne(e, l) : '';
+      var cle = tid ? (c + '§' + tid) : c;
+      postes[cle] = (postes[cle] || 0) + m;
+    });
+  });
+  var B = { year: an, soldes: soldes,
+    immoBrut: 0, amort: 0, stocks: 0, creances: 0, tresoActif: 0,
+    capitaux: 0, resultat: 0, liaison: 0, dettesFin: 0, fournisseurs: 0, fiscal: 0, personnel: 0, diverses: 0, tresoPassif: 0 };
+  Object.keys(postes).forEach(function(k){
+    var s = postes[k];
+    if (!s) return;
+    var c = k.split('§')[0], p2 = c.slice(0, 2), cl = c.charAt(0);
+    if (cl === '1') {
+      if (p2 <= '15') B.capitaux -= s; else B.dettesFin -= s;
+    } else if (cl === '2') {
+      if (p2 === '28' || p2 === '29') B.amort += s; else B.immoBrut += s;
+    } else if (cl === '3') {
+      B.stocks += s;
+    } else if (cl === '4') {
+      if (p2 === '49' || s > 0) B.creances += s;
+      else if (p2 === '40') B.fournisseurs -= s;
+      else if (p2 === '42') B.personnel -= s;
+      else if (p2 === '43' || p2 === '44') B.fiscal -= s;
+      else B.diverses -= s;
+    } else if (cl === '5') {
+      if (p2 === '59' || s > 0) B.tresoActif += s; else B.tresoPassif -= s;
+    } else if (c === '890') {
+      B.liaison -= s;   /* compte technique des à-nouveaux / du bilan d'ouverture : ce n'est pas un résultat */
+    } else if (cl === '6' || cl === '7' || cl === '8') {
+      B.resultat -= s;
+    }
+  });
+  B.totalActif = B.immoBrut + B.amort + B.stocks + B.creances + B.tresoActif;
+  B.totalPassif = B.capitaux + B.resultat + B.liaison + B.dettesFin + B.fournisseurs + B.fiscal + B.personnel + B.diverses + B.tresoPassif;
+  B.ecart = Math.round((B.totalActif - B.totalPassif) * 100) / 100;
+  B.equilibre = Math.abs(B.ecart) < 1;
+  return B;
+}
+
 function buildBilan() {
   var box = document.getElementById('bilan-box');
   if (!box) return;
   var year = document.getElementById('filter-annee-compta').value || new Date().getFullYear();
+  var B = calcBilan(year, _comptaDivisionFilter());
+  var soldes = B.soldes;
 
-  var soldes = {};
-  var divFBilan = _comptaDivisionFilter();
-  DATA.ecritures.filter(function(e){ return e.date && e.date < (year+1+'-01-01') && (!divFBilan || e.division === divFBilan); }).forEach(function(e) {
-    ecrLignes(e).forEach(function(l){
-      if (!l.compte) return;
-      if (!soldes[l.compte]) soldes[l.compte] = 0;
-      soldes[l.compte] += (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant)||0);
-    });
-  });
-
-  /* [FIX structurel] Même défaut que celui corrigé dans buildDashTabCompta() :
-     itérait sur APP.planComptable (≈158 comptes "courants") au lieu des
-     comptes RÉELLEMENT postés dans les écritures. Tout sous-compte utilisé en
-     pratique mais absent de cette liste curatée (4451/4453/4454/4455/4456 —
-     confirmés utilisés par le décompte à l'avancement, une opération
-     courante pour un promoteur) contribuait pour zéro au Bilan, quel que
-     soit le préfixe demandé. Les 4 bilans d'ouverture déjà saisis restent
-     corrects (comptes tous dans la liste curatée), mais le Bilan se serait
-     déséquilibré dès la première vraie transaction sur un de ces sous-comptes. */
-  function getSolde(codes) {
-    var tot = 0;
-    for (var code in soldes) {
-      if (codes.some(function(p){ return code.indexOf(p) === 0; })) tot += soldes[code] || 0;
-    }
-    return tot;
-  }
-
-  // ACTIF
-  var actifImmo = getSolde(['21','22','23','24','27']);
-  var stocks = getSolde(['31','32','33','34','35','36']);
-  /* [FIX] Le "FIX SYSCOHADA" précédent (retiré ci-dessous) supposait la
-     numérotation SYSCOHADA standard où 445 = TVA récupérable — vérification
-     faite contre LE plan comptable réel de ce logiciel : ici 444 = TVA
-     récupérable (actif, jusqu'ici absent de tout le Bilan) et 445 = TVA À
-     DÉCAISSER (passif réel — une dette, pas une créance). Même défaut sur
-     441 "État — Impôts et taxes", tagué passif dans le plan, pas débiteur.
-     409 (Fournisseurs débiteurs — avances données, un actif réel) ajouté au
-     passage, absent lui aussi jusqu'ici. */
-  var creances = getSolde(['411','412','418','409','421','423','444','461','471']);
-  var tresorerie = getSolde(['51','52','53','55','57']);
-  var totalActif = actifImmo + stocks + creances + tresorerie;
-
-  // PASSIF
-  /* [FIX] Ancienne formule : capitaux = getSolde(['101','106','111']) — brute,
-     sans redressement de signe. Un capital exceptionnellement négatif (posté
-     en débit, cas réel rencontré) était traité identiquement à un capital
-     positif, et surtout : AUCUN compte de résultat cumulé (121 bénéfice, 129
-     perte, 109, 119) n'était pris en compte — une perte reportée à l'ouverture
-     n'apparaissait nulle part dans le Bilan, ni comme actif ni comme réduction
-     des capitaux propres. Formule validée par simulation numérique sur 4
-     structures réelles du groupe (bilans d'ouverture 2026) avant déploiement :
-     les comptes normalement créditeurs (101 Capital, 106 Réserves, 109, 111
-     Report à nouveau créditeur, 121 Bénéfice) contribuent positivement une
-     fois leur signe inversé (et non passés en Math.abs(), qui écraserait à
-     tort un capital réellement négatif) ; les comptes normalement débiteurs
-     contraires (119 Report à nouveau débiteur, 129 Perte) sont soustraits. */
-  var capitauxCredit = -getSolde(['101','106','109','111','121']);
-  var capitauxDebitContra = getSolde(['119','129']);
-  var capitaux = capitauxCredit - capitauxDebitContra;
-  /* Résultat provisoire = solde net des comptes de gestion (classe 7 − classe 6),
-     strictement issu du grand livre — c'est la seule valeur qui garantit
-     l'égalité Actif = Passif avant clôture. Le Compte de Résultat affiche par
-     ailleurs un résultat net après IS ESTIMÉ (visée prévisionnelle, tant que
-     l'IS n'est pas réellement comptabilisé au 693) : les deux chiffres
-     diffèrent légitimement tant que l'IS estimé n'est pas posté — ce n'est pas
-     une incohérence à corriger, injecter cet IS estimé ici casserait l'équilibre
-     du Bilan puisqu'aucune écriture réelle ne le contrebalancerait au passif. */
-  var resultBrut = getSolde(['7']) - getSolde(['6']);
-  /* [FIX] Math.abs() manquant ici alors que TOUTES les autres catégories de
-     dettes ci-dessous l'utilisent — invisible tant qu'aucune entité du groupe
-     n'avait de solde réel sur les comptes 16-18 (emprunts, provisions),
-     démasqué par le premier cas réel rencontré (compte 168, MENKO SARL) :
-     Bilan déséquilibré de deux fois le montant de la provision. */
-  var dettesLT = Math.abs(getSolde(['16','17','18']));
-  var dettesFournisseurs = Math.abs(getSolde(['401','402','408']));
-  /* [FIX] 441 et 445 retirés d'ici (replacés dans creances par erreur d'un
-     fix précédent, voir commentaire ci-dessus) — ce sont bien des dettes
-     fiscales dans CE plan comptable, pas des créances. */
-  var dettesFiscalesSociales = Math.abs(getSolde(['431','432','441','443','445','447','448']));
-  var dettesPersonnel = Math.abs(getSolde(['422']));
-  /* [FIX] Comptes 419 (Clients créditeurs — avances reçues : LE compte crédité
-     par chaque versement encaissé via genererEcritureVersement — sans doute le
-     compte le plus utilisé de tout le logiciel, et pourtant absent du Bilan
-     jusqu'ici), 462 (Créditeurs divers), 467/468 (Commissions commerciaux/
-     apporteurs à payer), 472 (Comptes de régularisation passif), 4651
-     (Financeurs — apports reçus sur programmes) ajoutés — tous absents de
-     toute rubrique. Un versement client, l'opération la plus fréquente de ce
-     logiciel, ne s'affichait donc dans AUCUNE ligne du Bilan avant ce correctif.
-     Compte 45 (Associés/groupe, 451 dans ce plan) et 48 (dettes HAO) déjà
-     couverts par un fix antérieur, regroupés ici avec les autres. */
-  var dettesDiverses = Math.abs(getSolde(['419','45','462','467','468','472','48','4651']));
-  var totalPassif = capitaux + resultBrut + dettesLT + dettesFournisseurs + dettesFiscalesSociales + dettesPersonnel + dettesDiverses;
-
+  function sg(v) { return (v < 0 ? '−' : '') + fmtF(Math.abs(v)); }
   function bilanRow(label, val, color, detailHTML) {
     if (detailHTML) {
       return '<tr><td colspan="2" style="padding:0;border-bottom:1px solid var(--bord);">'
         + '<details><summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;">'
         + '<span>' + label + ' <span style="font-size:9px;color:var(--blanc-dim);">▾ voir comptes</span></span>'
-        + '<span style="font-weight:600;color:' + (color||'var(--blanc)') + ';">' + fmtF(Math.abs(val)) + '</span>'
+        + '<span style="font-weight:600;color:' + (color||'var(--blanc)') + ';">' + sg(val) + '</span>'
         + '</summary>'
         + '<table style="width:100%;margin:2px 0 8px;"><tbody>' + detailHTML + '</tbody></table>'
         + '</details></td></tr>';
     }
     return '<tr><td style="font-size:13px;">' + label + '</td>'
-      + '<td style="text-align:right;font-weight:600;color:' + (color||'var(--blanc)') + ';">' + fmtF(Math.abs(val)) + '</td></tr>';
+      + '<td style="text-align:right;font-weight:600;color:' + (color||'var(--blanc)') + ';">' + sg(val) + '</td></tr>';
   }
+  function titre(t) { return '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">' + t + '</td></tr>'; }
+  var D = _rubriqueDetailHTML;
 
   box.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">'
     // ACTIF
     + '<div><div class="form-section-title" style="color:var(--bleu);">ACTIF</div>'
     + '<table style="width:100%;font-size:13px;">'
     + '<thead><tr><th style="text-align:left;">Rubriques SYSCOHADA</th><th style="text-align:right;">Montant (FCFA)</th></tr></thead><tbody>'
-    + '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Actif Immobilisé (Cl. 2)</td></tr>'
-    + bilanRow('Immobilisations corporelles (terrains, bâtiments)', actifImmo, 'var(--blanc)', _rubriqueDetailHTML(['21','22','23','24','27'], soldes))
-    + '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Actif Circulant (Cl. 3-4)</td></tr>'
-    + bilanRow('Stocks (lots, travaux en cours)', stocks, 'var(--blanc)', _rubriqueDetailHTML(['31','32','33','34','35','36'], soldes))
-    + bilanRow('Créances clients, État (TVA récupérable) et débiteurs divers', creances, 'var(--blanc)', _rubriqueDetailHTML(['411','412','418','409','421','423','444','461','471'], soldes))
-    + '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Trésorerie (Cl. 5)</td></tr>'
-    + bilanRow('Banques, caisses, Mobile Money', tresorerie, 'var(--vert)', _rubriqueDetailHTML(['51','52','53','55','57'], soldes))
-    + '<tr style="font-weight:700;border-top:2px solid var(--bleu);"><td>TOTAL ACTIF</td><td style="text-align:right;color:var(--bleu);font-size:15px;">' + fmtF(totalActif) + '</td></tr>'
+    + titre('Actif Immobilisé (Cl. 2)')
+    + bilanRow('Immobilisations (valeur brute)', B.immoBrut, 'var(--blanc)', D(['20','21','22','23','24','25','26','27'], soldes))
+    + bilanRow('Amortissements et dépréciations (28-29)', B.amort, 'var(--blanc)', D(['28','29'], soldes))
+    + titre('Actif Circulant (Cl. 3-4)')
+    + bilanRow('Stocks (lots, travaux en cours)', B.stocks, 'var(--blanc)', D(['31','32','33','34','35','36','37','38','39'], soldes))
+    + bilanRow('Créances : clients, État (TVA récupérable), débiteurs divers', B.creances, 'var(--blanc)', D(['40','41','42','43','44','45','46','47','48','49'], soldes))
+    + titre('Trésorerie (Cl. 5)')
+    + bilanRow('Banques, caisses, Mobile Money', B.tresoActif, 'var(--vert)', D(['50','51','52','53','54','55','56','57','58','59'], soldes))
+    + '<tr style="font-weight:700;border-top:2px solid var(--bleu);"><td>TOTAL ACTIF</td><td style="text-align:right;color:var(--bleu);font-size:15px;">' + sg(B.totalActif) + '</td></tr>'
     + '</tbody></table></div>'
     // PASSIF
     + '<div><div class="form-section-title" style="color:var(--or);">PASSIF</div>'
     + '<table style="width:100%;font-size:13px;">'
     + '<thead><tr><th style="text-align:left;">Rubriques SYSCOHADA</th><th style="text-align:right;">Montant (FCFA)</th></tr></thead><tbody>'
-    + '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Capitaux Propres (Cl. 1)</td></tr>'
-    + bilanRow('Capitaux propres (net du résultat cumulé)', Math.abs(capitaux), 'var(--blanc)', _rubriqueDetailHTML(['101','106','109','111','119','121','129'], soldes))
-    + bilanRow('Résultat de l\'exercice ' + year, resultBrut, resultBrut >= 0 ? 'var(--vert)' : 'var(--rouge)')
-    + '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Dettes Financières (Cl. 1)</td></tr>'
-    + bilanRow('Emprunts et dettes à long terme', Math.abs(dettesLT), 'var(--blanc)', _rubriqueDetailHTML(['16','17','18'], soldes))
-    + '<tr><td colspan="2" style="padding:6px 0;font-weight:600;color:var(--blanc-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;">Dettes à Court Terme (Cl. 4)</td></tr>'
-    + bilanRow('Fournisseurs et comptes rattachés', dettesFournisseurs, 'var(--blanc)', _rubriqueDetailHTML(['401','402','408'], soldes))
-    + bilanRow('Dettes fiscales et sociales (CNPS, ITS, IS, TVA)', dettesFiscalesSociales, 'var(--blanc)', _rubriqueDetailHTML(['431','432','441','443','445','447','448'], soldes))
-    + bilanRow('Dettes envers le personnel', dettesPersonnel, 'var(--blanc)', _rubriqueDetailHTML(['422'], soldes))
-    + bilanRow('Avances clients, associés et dettes diverses', dettesDiverses, 'var(--blanc)', _rubriqueDetailHTML(['419','45','462','467','468','472','48','4651'], soldes))
-    + '<tr style="font-weight:700;border-top:2px solid var(--or);"><td>TOTAL PASSIF</td><td style="text-align:right;color:var(--or);font-size:15px;">' + fmtF(totalPassif) + '</td></tr>'
+    + titre('Capitaux Propres (Cl. 1)')
+    + bilanRow('Capitaux propres (avant résultat de l\'exercice)', B.capitaux, 'var(--blanc)', D(['10','11','12','13','14','15'], B.soldes))
+    + bilanRow('Résultat de l\'exercice ' + year, B.resultat, B.resultat >= 0 ? 'var(--vert)' : 'var(--rouge)')
+    + titre('Dettes Financières (Cl. 1)')
+    + bilanRow('Emprunts et dettes à long terme', B.dettesFin, 'var(--blanc)', D(['16','17','18','19'], soldes))
+    + titre('Dettes à Court Terme (Cl. 4-5)')
+    + bilanRow('Fournisseurs et comptes rattachés', B.fournisseurs, 'var(--blanc)', D(['40'], soldes))
+    + bilanRow('Dettes fiscales et sociales (CNPS, ITS, IS, TVA)', B.fiscal, 'var(--blanc)', D(['43','44'], soldes))
+    + bilanRow('Dettes envers le personnel', B.personnel, 'var(--blanc)', D(['42'], soldes))
+    + bilanRow('Avances clients, associés et dettes diverses', B.diverses, 'var(--blanc)', D(['41','45','46','47','48'], soldes))
+    + bilanRow('Découverts bancaires et trésorerie passive', B.tresoPassif, 'var(--blanc)')
+    + (B.liaison ? bilanRow('Écart de reprise — compte de liaison 890 (à régulariser)', B.liaison, 'var(--rouge)') : '')
+    + '<tr style="font-weight:700;border-top:2px solid var(--or);"><td>TOTAL PASSIF</td><td style="text-align:right;color:var(--or);font-size:15px;">' + sg(B.totalPassif) + '</td></tr>'
     + '</tbody></table></div>'
     + '</div>'
     + '<div style="margin-top:16px;padding:14px;border-radius:var(--radius);background:rgba(184,115,51,0.07);border:1px solid rgba(184,115,51,0.2);display:flex;justify-content:space-between;align-items:center;">'
     + '<span style="font-size:13px;color:var(--blanc-dim);">Équilibre Actif = Passif</span>'
-    + '<span style="font-size:20px;font-weight:700;color:' + (Math.abs(totalActif - totalPassif) < 100 ? 'var(--vert)' : 'var(--rouge)') + ';">'
-    + (Math.abs(totalActif - totalPassif) < 100 ? '✔ Bilan équilibré' : '⚠ Écart : ' + fmtF(Math.abs(totalActif - totalPassif)) + ' FCFA') + '</span></div>';
+    + '<span id="bilan-equilibre" style="font-size:20px;font-weight:700;color:' + (B.equilibre ? 'var(--vert)' : 'var(--rouge)') + ';">'
+    + (B.equilibre ? '✔ Bilan équilibré' : '⚠ Écart : ' + fmtF(Math.abs(B.ecart)) + ' FCFA — onglet Balance › « Diagnostiquer l\'écart »') + '</span></div>';
 }
 
 /* ── COMPTE DE RÉSULTAT SYSCOHADA ────────────────────── */
@@ -45937,31 +46138,31 @@ function dashEncaisseLots(filterFn, natureFilter) {
     .reduce(function(s,v){ return s + (parseFloat(v.montant)||0); }, 0);
 }
 
-/* Décaissements réels = somme des débits de classe 6 (charges),
-   indépendant du champ e.type qui n'est pas fiable selon le point d'entrée. */
+/* Charges réelles = solde net des comptes de classe 6 (débits − crédits : une
+   contre-passation ou un rabais réduit la charge), indépendant du champ e.type
+   qui n'est pas fiable selon le point d'entrée. */
 function dashDecaissements(filterFn) {
   var t = 0;
   _dashArr('ecritures').forEach(function(e){
     if (filterFn && !filterFn(e)) return;
     ecrLignes(e).forEach(function(l){
-      if (l.sens === 'D' && (l.compte||'').charAt(0) === '6') t += (parseFloat(l.montant)||0);
+      if ((l.compte||'').charAt(0) === '6') t += (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant)||0);
     });
   });
   return t;
 }
 
-/* Produits réels = somme des crédits de classe 7, pendant de dashDecaissements.
-   Même raison d'être : e.type n'est pas fiable selon le point d'entrée (il est
-   renseigné à la main par chaque générateur d'écriture, avec des valeurs
-   hétérogènes), et e.montant ne représente pas le total d'une écriture
-   multi-lignes. On raisonne donc par classe de compte sur les lignes, comme le
-   font déjà le Bilan et le Compte de Résultat via getSolde(). */
+/* Produits réels = solde net des comptes de classe 7 (crédits − débits), pendant
+   de dashDecaissements. Net, et non crédits seuls : une contre-passation ou un
+   avoir doit réduire le produit. Même raison d'être qu'avant : e.type n'est pas
+   fiable selon le point d'entrée, et e.montant ne représente pas le total d'une
+   écriture multi-lignes — on raisonne par classe de compte sur les lignes. */
 function dashProduits(filterFn) {
   var t = 0;
   _dashArr('ecritures').forEach(function(e){
     if (filterFn && !filterFn(e)) return;
     ecrLignes(e).forEach(function(l){
-      if (l.sens === 'C' && (l.compte||'').charAt(0) === '7') t += (parseFloat(l.montant)||0);
+      if ((l.compte||'').charAt(0) === '7') t += (l.sens === 'C' ? 1 : -1) * (parseFloat(l.montant)||0);
     });
   });
   return t;
@@ -47797,37 +47998,75 @@ function dashFinanceCore(pmin) {
   };
 }
 
+/* ═══ RÉFÉRENTIEL DU PLAN COMPTABLE ═══
+   Cible : SYSCOHADA révisé. Le plan fourni d'origine suit une numérotation de classes 6-7 de type
+   plan comptable français (64 personnel, 66 financier, 67 HAO, 693 IS) ; les comptes déjà utilisés
+   (pièces visées, exercices clos, FEC remis) ne sont JAMAIS renumérotés. Les états choisissent donc
+   leurs rubriques selon le référentiel du plan : paramètre `referentiel_comptable`
+   ('syscohada' | 'pcg') ou, à défaut, détection sur le libellé du compte 661 (rémunérations du
+   personnel en SYSCOHADA, intérêts en plan d'origine). */
+function referentielCompta() {
+  var p = DATA.params || {};
+  if (p.referentiel_comptable === 'syscohada' || p.referentiel_comptable === 'pcg') return p.referentiel_comptable;
+  var lib = function(c){ var x = (APP.planComptable || []).find(function(a){ return a && a.code === c && !a._horsPlan; }); return x ? String(x.label || '') : ''; };
+  /* SYSCOHADA : 66 = charges de personnel (661 rémunérations), 64 = impôts et taxes, 67 = frais financiers.
+     Plan d'origine : 64 = personnel, 66 = financier. Les libellés des plans importés sont souvent abrégés
+     (« REMU DIRECT VERS PERSL NATIONAL »), d'où plusieurs indices. */
+  var indicesSyscohada = /personnel|persl|r[ée]mu/i.test(lib('66')) || /r[ée]mu|persl|personnel/i.test(lib('661')) || /imp[oô]ts?|taxes/i.test(lib('64')) || /frais financ/i.test(lib('67'));
+  var indicesPcg = /personnel|salaire/i.test(lib('641')) || /financi|int[ée]r[êe]ts/i.test(lib('66')) && !/personnel/i.test(lib('66'));
+  return (indicesSyscohada && !indicesPcg) ? 'syscohada' : 'pcg';
+}
+function referentielMapCR() {
+  if (referentielCompta() === 'syscohada') return {
+    ventes: ['70'], stock: ['73'], autresProd: ['71','72','74','75'], prodFin: ['77'], reprises: ['78','79'], prodHAO: ['82','84','86','88'],
+    achats: ['60'], transports: ['61'], servExt: ['62','63'], impots: ['64'], personnel: ['66'], autresCh: ['65'],
+    chargesFin: ['67','69'], chargesHAO: ['81','83','85'], dotations: ['68'], participation: ['87'], is: ['89'] };
+  return {
+    ventes: ['70'], stock: ['71','72'], autresProd: ['73','74','75'], prodFin: ['76'], reprises: ['78','79'], prodHAO: ['77'],
+    achats: ['60'], transports: ['61'], servExt: ['62'], impots: ['63'], personnel: ['64'], autresCh: ['65'],
+    chargesFin: ['66'], chargesHAO: ['67'], dotations: ['68'], participation: ['691'], is: ['693'] };
+}
+
 function _calcResultat(year) {
   var divFCR = _comptaDivisionFilter();
   var ec = DATA.ecritures.filter(function(e){ return e.date && e.date.startsWith(year) && (!divFCR || e.division === divFCR); });
-  function deb(pfx){ var t=0; ec.forEach(function(e){ ecrLignes(e).forEach(function(l){ if (l.sens==='D' && pfx.some(function(p){ return (l.compte||'').indexOf(p)===0; })) t += (parseFloat(l.montant)||0); }); }); return t; }
-  function cre(pfx){ var t=0; ec.forEach(function(e){ ecrLignes(e).forEach(function(l){ if (l.sens==='C' && pfx.some(function(p){ return (l.compte||'').indexOf(p)===0; })) t += (parseFloat(l.montant)||0); }); }); return t; }
-  // Produits (crédits classe 7) — buckets exclusifs
-  var ventes      = cre(['70']);
-  /* Production stockée (71-72) = solde net crédit − débit, et non le seul crédit :
-     l'entrée en stock (crédit 712, ex. génération de lots part entreprise) augmente
-     ce produit, mais la sortie de stock (débit 712, ex. sortie à la cession) doit le
-     réduire d'autant — sinon la valeur du terrain cédé serait comptée deux fois
-     (une fois via 712 à l'entrée, une fois via 701 à la vente, sans jamais déduire
-     le stock consommé). */
-  var prodStockee = cre(['71','72']) - deb(['71','72']);
-  var autresProd  = cre(['73','74','75']);
-  var prodFin     = cre(['76']);
-  var prodHAO     = cre(['77']);
-  var reprises    = cre(['78']);
-  // Charges (débits classe 6) — buckets exclusifs
-  var achats      = deb(['60']);
-  var transports  = deb(['61']);
-  var servExt     = deb(['62']);
-  var impots      = deb(['63']);
-  var personnel   = deb(['64']);
-  var autresCh    = deb(['65']);
-  var chargesFin  = deb(['66']);
-  var chargesHAO  = deb(['67']);
-  var dotations   = deb(['68']);
-  var participation = deb(['691']);
-  var isComptab   = deb(['693']);
-  var tauxIS      = ((DATA.params && DATA.params.taux_is) || 25) / 100;
+  /* Soldes NETS : une charge = débits − crédits, un produit = crédits − débits.
+     Les anciens totaux bruts (débits seuls / crédits seuls) ignoraient toute
+     contre-passation, tout avoir et tout rabais : une vente annulée restait
+     au chiffre d'affaires. */
+  function deb(pfx){ var t=0; ec.forEach(function(e){ ecrLignes(e).forEach(function(l){ if (l.compte !== '890' && pfx.some(function(p){ return (l.compte||'').indexOf(p)===0; })) t += (l.sens==='D' ? 1 : -1) * (parseFloat(l.montant)||0); }); }); return t; }
+  function cre(pfx){ return 0 - deb(pfx); }
+  /* Rubriques par préfixes de comptes, selon le référentiel du plan (voir referentielCompta). */
+  var map = referentielMapCR();
+  var tauxIS = ((DATA.params && DATA.params.taux_is) || 25) / 100;
+  var _acc = { '6': 0, '7': 0, '8': 0 };      /* net (crédit − débit) déjà rangé par classe */
+  function chg(k){ var v = deb(map[k]); _acc[map[k][0].charAt(0)] -= v; return v; }
+  function prd(k){ var v = cre(map[k]); _acc[map[k][0].charAt(0)] += v; return v; }
+  var ventes      = prd('ventes');
+  /* Production stockée : solde net (crédit − débit) — l'entrée en stock augmente le produit,
+     la sortie de stock le réduit d'autant (sinon le terrain cédé serait compté deux fois). */
+  var prodStockee = prd('stock');
+  var autresProd  = prd('autresProd');
+  var prodFin     = prd('prodFin');
+  var prodHAO     = prd('prodHAO');
+  var reprises    = prd('reprises');
+  var achats      = chg('achats');
+  var transports  = chg('transports');
+  var servExt     = chg('servExt');
+  var impots      = chg('impots');
+  var personnel   = chg('personnel');
+  var autresCh    = chg('autresCh');
+  var chargesFin  = chg('chargesFin');
+  var chargesHAO  = chg('chargesHAO');
+  var dotations   = chg('dotations');
+  var participation = chg('participation');
+  var isComptab   = chg('is');
+  /* Comptes de gestion hors des rubriques ci-dessus : rangés en « autres » / HAO pour que le
+     résultat net égale TOUJOURS celui du Bilan (−(classes 6 + 7 + 8)), quel que soit le plan. */
+  autresCh   += -(cre(['6']) - _acc['6']);
+  autresProd += (cre(['7']) - _acc['7']);
+  var _res8 = cre(['8']) - _acc['8'];
+  if (_res8 >= 0) prodHAO += _res8; else chargesHAO += -_res8;
   // Soldes intermédiaires
   var production  = ventes + prodStockee;
   var consoTiers  = achats + transports + servExt;
@@ -47846,7 +48085,7 @@ function _calcResultat(year) {
     achats:achats, transports:transports, servExt:servExt, impots:impots, personnel:personnel, autresCh:autresCh,
     chargesFin:chargesFin, chargesHAO:chargesHAO, dotations:dotations, participation:participation, is:is, isComptab:isComptab, isEstime:isEstime, tauxIS:tauxIS,
     production:production, va:va, ebe:ebe, rExploit:rExploit, rFin:rFin, rHAO:rHAO, rAvantIS:rAvantIS, rNet:rNet,
-    totalProduits:totalProduits, totalCharges:totalCharges };
+    totalProduits:totalProduits, totalCharges:totalCharges, map:map, referentiel:referentielCompta() };
 }
 
 /* Mouvements débit/crédit par compte sur l'exercice — sert au détail par
@@ -47871,17 +48110,13 @@ function buildCompteResultat() {
   if (!box) return;
   var year = document.getElementById('filter-annee-compta').value || String(new Date().getFullYear());
   var R = _calcResultat(year);
-  var M = _crMvtMap(year);
-  /* Production stockée/immobilisée (71-72) : la rubrique se calcule en net
-     (crédit − débit, cf. _calcResultat) — le détail par compte doit donc
-     utiliser ce même net par compte, sinon le sous-total du détail ne
-     correspondrait pas au montant affiché sur la ligne de synthèse. */
-  var netProdStockee = {};
-  Object.keys(M.C).concat(Object.keys(M.D)).forEach(function(k){
-    if (k.indexOf('71') === 0 || k.indexOf('72') === 0) {
-      netProdStockee[k] = (M.C[k]||0) - (M.D[k]||0);
-    }
+  /* Détail par compte en soldes NETS, comme les rubriques (une contre-passation réduit le compte). */
+  var G = _crMvtMap(year), netCh = {}, netPr = {};
+  Object.keys(G.C).concat(Object.keys(G.D)).forEach(function(k){
+    var d = G.D[k] || 0, c = G.C[k] || 0;
+    netCh[k] = d - c; netPr[k] = c - d;
   });
+  var map = R.map, P = function(k){ return '(' + map[k].join(', ') + ')'; };
 
   function crRow(label, val, bold, color, detailHTML) {
     if (detailHTML) {
@@ -47902,27 +48137,27 @@ function buildCompteResultat() {
   box.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">'
     + '<div><div class="form-section-title" style="color:var(--rouge);">CHARGES \u2014 Classe 6</div>'
     + '<table style="width:100%;font-size:13px;"><tbody>'
-    + crRow('Achats (60)', R.achats, false, 'var(--rouge)', _rubriqueDetailHTML(['60'], M.D))
-    + crRow('Transports (61)', R.transports, false, 'var(--rouge)', _rubriqueDetailHTML(['61'], M.D))
-    + crRow('Services ext\u00e9rieurs (62)', R.servExt, false, 'var(--rouge)', _rubriqueDetailHTML(['62'], M.D))
-    + crRow('Imp\u00f4ts &amp; taxes (63)', R.impots, false, 'var(--rouge)', _rubriqueDetailHTML(['63'], M.D))
-    + crRow('Charges de personnel (64)', R.personnel, false, 'var(--rouge)', _rubriqueDetailHTML(['64'], M.D))
-    + crRow('Autres charges (65)', R.autresCh, false, 'var(--rouge)', _rubriqueDetailHTML(['65'], M.D))
-    + crRow('Charges financi\u00e8res (66)', R.chargesFin, false, 'var(--rouge)', _rubriqueDetailHTML(['66'], M.D))
-    + crRow('Charges HAO (67)', R.chargesHAO, false, 'var(--rouge)', _rubriqueDetailHTML(['67'], M.D))
-    + crRow('Dotations amortissements (68)', R.dotations, false, 'var(--rouge)', _rubriqueDetailHTML(['68'], M.D))
-    + crRow('Participation des travailleurs (691)', R.participation, false, 'var(--rouge)', _rubriqueDetailHTML(['691'], M.D))
-    + crRow('Imp\u00f4t sur les soci\u00e9t\u00e9s' + (R.isEstime ? ' (estim\u00e9 ' + Math.round(R.tauxIS*100) + '%)' : ' (693)'), R.is, false, 'var(--rouge)')
+    + crRow('Achats ' + P('achats'), R.achats, false, 'var(--rouge)', _rubriqueDetailHTML(map.achats, netCh))
+    + crRow('Transports ' + P('transports'), R.transports, false, 'var(--rouge)', _rubriqueDetailHTML(map.transports, netCh))
+    + crRow('Services ext\u00e9rieurs ' + P('servExt'), R.servExt, false, 'var(--rouge)', _rubriqueDetailHTML(map.servExt, netCh))
+    + crRow('Imp\u00f4ts &amp; taxes ' + P('impots'), R.impots, false, 'var(--rouge)', _rubriqueDetailHTML(map.impots, netCh))
+    + crRow('Charges de personnel ' + P('personnel'), R.personnel, false, 'var(--rouge)', _rubriqueDetailHTML(map.personnel, netCh))
+    + crRow('Autres charges ' + P('autresCh'), R.autresCh, false, 'var(--rouge)', _rubriqueDetailHTML(map.autresCh, netCh))
+    + crRow('Charges financi\u00e8res ' + P('chargesFin'), R.chargesFin, false, 'var(--rouge)', _rubriqueDetailHTML(map.chargesFin, netCh))
+    + crRow('Charges HAO ' + P('chargesHAO'), R.chargesHAO, false, 'var(--rouge)', _rubriqueDetailHTML(map.chargesHAO, netCh))
+    + crRow('Dotations amortissements ' + P('dotations'), R.dotations, false, 'var(--rouge)', _rubriqueDetailHTML(map.dotations, netCh))
+    + crRow('Participation des travailleurs ' + P('participation'), R.participation, false, 'var(--rouge)', _rubriqueDetailHTML(map.participation, netCh))
+    + crRow('Imp\u00f4t sur les soci\u00e9t\u00e9s' + (R.isEstime ? ' (estim\u00e9 ' + Math.round(R.tauxIS*100) + '%)' : ' ' + P('is')), R.is, false, 'var(--rouge)')
     + '<tr style="font-weight:700;border-top:2px solid var(--rouge);"><td>TOTAL CHARGES</td><td style="text-align:right;color:var(--rouge);font-size:15px;">' + fmtF(R.totalCharges) + '</td></tr>'
     + '</tbody></table></div>'
     + '<div><div class="form-section-title" style="color:var(--vert);">PRODUITS \u2014 Classe 7</div>'
     + '<table style="width:100%;font-size:13px;"><tbody>'
-    + crRow('Ventes lots / logements / travaux (70)', R.ventes, false, 'var(--vert)', _rubriqueDetailHTML(['70'], M.C))
-    + crRow('Production stock\u00e9e / immobilis\u00e9e (71-72)', R.prodStockee, false, 'var(--vert)', _rubriqueDetailHTML(['71','72'], netProdStockee))
-    + crRow('Autres produits d\'exploitation (73-75)', R.autresProd, false, 'var(--vert)', _rubriqueDetailHTML(['73','74','75'], M.C))
-    + crRow('Reprises (78)', R.reprises, false, 'var(--vert)', _rubriqueDetailHTML(['78'], M.C))
-    + crRow('Produits financiers (76)', R.prodFin, false, 'var(--vert)', _rubriqueDetailHTML(['76'], M.C))
-    + crRow('Produits HAO (77)', R.prodHAO, false, 'var(--vert)', _rubriqueDetailHTML(['77'], M.C))
+    + crRow('Ventes lots / logements / travaux ' + P('ventes'), R.ventes, false, 'var(--vert)', _rubriqueDetailHTML(map.ventes, netPr))
+    + crRow('Production stock\u00e9e / variation de stocks ' + P('stock'), R.prodStockee, false, 'var(--vert)', _rubriqueDetailHTML(map.stock, netPr))
+    + crRow('Autres produits d\'exploitation ' + P('autresProd'), R.autresProd, false, 'var(--vert)', _rubriqueDetailHTML(map.autresProd, netPr))
+    + crRow('Reprises ' + P('reprises'), R.reprises, false, 'var(--vert)', _rubriqueDetailHTML(map.reprises, netPr))
+    + crRow('Produits financiers ' + P('prodFin'), R.prodFin, false, 'var(--vert)', _rubriqueDetailHTML(map.prodFin, netPr))
+    + crRow('Produits HAO ' + P('prodHAO'), R.prodHAO, false, 'var(--vert)', _rubriqueDetailHTML(map.prodHAO, netPr))
     + '<tr style="font-weight:700;border-top:2px solid var(--vert);"><td>TOTAL PRODUITS</td><td style="text-align:right;color:var(--vert);font-size:15px;">' + fmtF(R.totalProduits) + '</td></tr>'
     + '</tbody></table>'
     + '<div class="form-section-title" style="margin-top:20px;color:var(--or);">SOLDES INTERM\u00c9DIAIRES DE GESTION</div>'
@@ -58478,7 +58713,7 @@ function _paieLignes(agg, C){
      ligne), agg.emp est absent — comportement inchangé, compte générique. */
   var compteNetIndividuel = (agg.emp && typeof _compteAuxiliaireEmploye === 'function') ? _compteAuxiliaireEmploye(agg.emp) : null;
   var compteNet = compteNetIndividuel || C.net;
-  if(agg.net>0) l.push({compte:compteNet,sens:'C',montant:Math.round(agg.net),libelle:'Net à payer'+(agg.emp?' — '+agg.emp.nom+(agg.emp.prenoms?' '+agg.emp.prenoms:''):'')});
+  if(agg.net>0) l.push({compte:compteNet,sens:'C',montant:Math.round(agg.net),libelle:'Net à payer'+(agg.emp?' — '+agg.emp.nom+(agg.emp.prenoms?' '+agg.emp.prenoms:''):''),tiers_id:agg.emp?agg.emp.id:undefined});
   var itsSal=(agg.itsSal!=null)?agg.itsSal:Math.max(0,(agg.its||0)-(agg.cmuSal||0));
   var patCnps=agg.cnpsPatSocial||0, patIts=agg.itsPat||0, patFdfp=agg.fdfp||0, patCmu=agg.cmuPat||0;
   /* Repli : si la ventilation patronale est absente (anciens agrégats), le
@@ -58546,6 +58781,10 @@ async function comptabiliserPaie(moisKey, opts){
     }
   }
 
+  /* Pièces de paie visées ou d'un exercice clos : on ne régénère pas en place (les anciennes ne
+     pourraient pas être supprimées et les nouvelles s'ajouteraient → paie comptée deux fois). */
+  var _verrPaie = ecrsVerrouillees(dept ? existantes.filter(function(e){ return e._paie_dept === deptTag; }) : existantes, date);
+  if (_verrPaie) return {ok:false, msg:'La paie de '+moisKey+' ne peut pas être régénérée : '+_verrPaie+'. Contre-passez les écritures concernées (Comptabilité › Journal), puis comptabilisez à nouveau.'};
   var toDel = dept
     ? existantes.filter(function(e){ return e._paie_dept === deptTag; }).map(function(e){return e.id;})
     : existantes.map(function(e){return e.id;}); /* run global : remplace tout, y compris d'anciens runs par département */
@@ -58586,14 +58825,26 @@ async function comptabiliserPaie(moisKey, opts){
   }
   if(regl){
     var a=_sumAgg(list);
-    var net=Math.round(a.net);
+    var net=Math.round(a.net), rlNets=[];
+    /* Mode détail : chaque salarié a son compte auxiliaire (421XXX) crédité du net à payer ; le
+       règlement doit donc le DÉBITER (sinon le compte individuel ne se solde jamais et le compte
+       générique de rémunérations dues reste débiteur). */
+    if(mode==='detail'){
+      net=0;
+      list.forEach(function(x){
+        var m=Math.round(x.net); if(!(m>0)) return;
+        var cptE=(typeof _compteAuxiliaireEmploye==='function' ? _compteAuxiliaireEmploye(x.emp) : null)||C.net;
+        rlNets.push({compte:cptE,sens:'D',montant:m,libelle:'Règlement net — '+x.emp.nom+(x.emp.prenoms?' '+x.emp.prenoms:''),tiers_id:x.emp.id}); net+=m;
+      });
+    }
     var _patCnps=a.cnpsPatSocial||0,_patIts=a.itsPat||0,_patFdfp=a.fdfp||0,_patCmu=a.cmuPat||0;
     var _patReste=Math.round((a.patronal||0)-(_patCnps+_patIts+_patFdfp+_patCmu));
     var cnps=Math.round((a.cnpsSal||0)+_patCnps+(a.cmuSal||0)+_patCmu+(_patReste>0?_patReste:0));
     var itsSal=(a.itsSal!=null)?a.itsSal:Math.max(0,(a.its||0)-(a.cmuSal||0));
     var its=Math.round(itsSal+_patIts+(_patReste<0?_patReste:0));
     var fdfp=Math.round(_patFdfp), rl=[];
-    if(net>0) rl.push({compte:C.net,sens:'D',montant:net,libelle:'Reglement net salaires'});
+    if(rlNets.length) rlNets.forEach(function(x){ rl.push(x); });
+    else if(net>0) rl.push({compte:C.net,sens:'D',montant:net,libelle:'Reglement net salaires'});
     if(cnps>0) rl.push({compte:C.cnps,sens:'D',montant:cnps,libelle:'Reversement CNPS + CMU'});
     if(its>0) rl.push({compte:C.its,sens:'D',montant:its,libelle:'Reversement ITS'});
     if(fdfp>0) rl.push({compte:C.fdfp,sens:'D',montant:fdfp,libelle:'Reversement FDFP'});
@@ -58608,7 +58859,10 @@ async function comptabiliserPaie(moisKey, opts){
   return {ok:true, count:created, nb:list.length};
 }
 async function decomptabiliserPaie(moisKey){
-  var ids=(DATA.ecritures||[]).filter(function(e){return e._paie_mois===moisKey;}).map(function(e){return e.id;});
+  var _ecrsPaie=(DATA.ecritures||[]).filter(function(e){return e._paie_mois===moisKey;});
+  var _verrD=ecrsVerrouillees(_ecrsPaie);
+  if(_verrD){ toast('🔒 Paie '+moisKey+' non décomptabilisable : '+_verrD+'. Contre-passez les écritures.','error',8000); return 0; }
+  var ids=_ecrsPaie.map(function(e){return e.id;});
   for(var i=0;i<ids.length;i++){ try{ await deleteRecord('ecritures', ids[i], {skipIntegrity:true}); }catch(e){} }
   if(typeof buildBalance==='function') buildBalance();
   if(typeof buildBilan==='function') buildBilan();
@@ -58676,7 +58930,7 @@ async function decomptabiliserPaieUI(){
   if(!confirm('Supprimer les '+n+' ecriture(s) de paie de '+moisKey+' ?')) return;
   var d=await decomptabiliserPaie(moisKey);
   paieComptaStatut(moisKey);
-  toast(d+' ecriture(s) de paie supprimee(s).','info');
+  if(d>0) toast(d+' ecriture(s) de paie supprimee(s).','info');
 }
 
 /* ── TAB 2 : Récapitulatif annuel (matrice employés × mois) ───────── */
@@ -75647,36 +75901,18 @@ function exportTiersEcheancesCSV() {
 window.exportTiersEcheancesCSV = exportTiersEcheancesCSV;
 
 function immoSocCalc(im, year) {
-  var dateAcq = new Date(im.date_acquisition);
-  var anneeAcq = dateAcq.getFullYear();
+  var bien = _amortAdapterImmo(im);                       /* même moteur que les biens du promoteur */
   var y = parseInt(year) || new Date().getFullYear();
-  var base = (parseFloat(im.valeur_acquisition)||0) - (parseFloat(im.valeur_residuelle)||0);
-  var duree = parseInt(im.duree_ans) || 5;
-  var methode = im.methode || 'lineaire';
+  var anneeAcq = new Date(bien.date_debut).getFullYear();
+  var base = bien.valeur_origine - bien.valeur_residuelle;
+  var duree = parseInt(bien.duree) || 5;
+  var dotationAnnuelle = calcAnnuite(bien, y);
+  var cumulAmort = calcAmortCumul(bien, y);
   var anneesEcoulees = Math.max(0, Math.min(duree, y - anneeAcq + 1));
-  var dotationAnnuelle, cumulAmort;
-  if (methode === 'degressif') {
-    var coeff = duree <= 4 ? 1.5 : (duree <= 6 ? 2 : 2.5); /* barème CGI CI usuel */
-    var vnc = base, cumul = 0, dotAnnee = 0;
-    for (var yy = anneeAcq; yy <= y && yy < anneeAcq + duree; yy++) {
-      var resteAns = duree - (yy - anneeAcq);
-      var tauxDeg = Math.min(1, (1/duree) * coeff);
-      var tauxLin = 1/resteAns;
-      var taux = Math.max(tauxDeg, tauxLin); /* bascule au linéaire quand plus favorable */
-      var dot = Math.round(vnc * taux);
-      if (yy === y) dotAnnee = dot;
-      cumul += dot; vnc -= dot;
-    }
-    dotationAnnuelle = dotAnnee; cumulAmort = Math.min(base, cumul);
-  } else {
-    dotationAnnuelle = duree > 0 ? Math.round(base / duree) : 0;
-    cumulAmort = Math.min(base, dotationAnnuelle * anneesEcoulees);
-  }
-  var vncFinale = (parseFloat(im.valeur_acquisition)||0) - cumulAmort;
-  var estAmortiPourAnnee = anneeAcq <= y && (y - anneeAcq) < duree;
+  var vncFinale = bien.valeur_origine - cumulAmort;
   var dejaGenere = (im.dotations_generees||[]).indexOf(y) !== -1;
   return { dotationAnnuelle:dotationAnnuelle, cumulAmort:cumulAmort, vnc:Math.max(0,vncFinale), anneesEcoulees:anneesEcoulees,
-    duree:duree, base:base, methode:methode, estAmortiPourAnnee:estAmortiPourAnnee, dejaGenere:dejaGenere, anneeAcq:anneeAcq };
+    duree:duree, base:base, methode:bien.methode, estAmortiPourAnnee:dotationAnnuelle > 0, dejaGenere:dejaGenere, anneeAcq:anneeAcq };
 }
 
 function renderImmoSociete() {
@@ -75836,6 +76072,7 @@ async function genererDotationsAnnuelles() {
   });
   if (!list.length) { toast('Aucune dotation à générer pour ' + year + '.', 'info'); return; }
   if (!confirm(list.length + ' immobilisation(s) à doter pour ' + year + '. Générer les écritures ?')) return;
+  var refusesDot = 0;
   for (var i = 0; i < list.length; i++) {
     var im = list[i];
     var c = immoSocCalc(im, year);
@@ -75856,14 +76093,19 @@ async function genererDotationsAnnuelles() {
     };
     var idxEc = DATA.ecritures.findIndex(function(e){ return e.id === ec.id; });
     if (idxEc >= 0) DATA.ecritures[idxEc] = ec; else DATA.ecritures.push(ec);
-    await dbPut('ecritures', ec);
+    var _okDot = await dbPut('ecritures', ec);
+    if (_okDot === false) {   /* pièce visée ou exercice clos : ni marquée « générée », ni envoyée au cloud */
+      var _iR = DATA.ecritures.findIndex(function(e){ return e.id === ec.id && e._rejete; });
+      if (_iR >= 0) DATA.ecritures.splice(_iR, 1);
+      refusesDot++; continue;
+    }
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', ec);
     im.dotations_generees = im.dotations_generees || []; if (im.dotations_generees.indexOf(year)===-1) im.dotations_generees.push(year);
     im.ecritures_dotation_ids = im.ecritures_dotation_ids || []; if (im.ecritures_dotation_ids.indexOf(ec.id)===-1) im.ecritures_dotation_ids.push(ec.id);
     await dbPut('immobilisations', im);
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_immobilisations', im);
   }
-  toast(list.length + ' dotation(s) générée(s) pour ' + year + '.', 'success');
+  toast((list.length - refusesDot) + ' dotation(s) générée(s) pour ' + year + '.' + (refusesDot ? ' · ⛔ ' + refusesDot + ' refusée(s) (pièce visée ou exercice clos).' : ''), refusesDot ? 'warning' : 'success');
   renderImmoSociete();
   if (typeof buildBalance === 'function') buildBalance();
   if (typeof buildCompteResultat === 'function') buildCompteResultat();
@@ -75909,12 +76151,7 @@ function renderClotureFEC() {
   var el = document.getElementById('cloture-fec-content'); if (!el) return;
   var annee = parseInt((document.getElementById('filter-annee-compta')||{}).value) || new Date().getFullYear();
   var selDiv = document.getElementById('filter-division-cloture');
-  if (selDiv && !selDiv.options.length) {
-    selDiv.innerHTML = '<option value="">— Toutes divisions (consolidé) —</option>'
-      + (DATA.divisions||[]).map(function(d){ return '<option value="'+d.id+'">'+escHtml(d.nom)+'</option>'; }).join('');
-    selDiv.onchange = function(){ renderClotureFEC(); };
-  }
-  var divF = selDiv ? selDiv.value : '';
+  var divF = selDiv ? selDiv.value : '';   /* périmètre choisi avant ce rendu : la page est reconstruite plus bas */
   var divLabel = divF ? (_nomDivision ? _nomDivision(divF) : divF) : 'Toutes divisions (consolidé)';
   var refSuffixe = divF ? ('-'+divF) : '';
   var ecr = (DATA.ecritures||[]).filter(function(e){
@@ -75983,7 +76220,7 @@ function renderClotureFEC() {
     +'</div>'
     +'<div style="font-size:12px;color:var(--blanc-dim);line-height:1.8;margin-bottom:14px;">'
     +'La clôture génère automatiquement :<br>'
-    +'1️⃣ Écriture de détermination du résultat — solde des classes 6 et 7 vers le compte <strong>13'+(resultat>=0?'1 (bénéfice)':'9 (perte)')+'</strong><br>'
+    +'1️⃣ Écriture de détermination du résultat — solde des classes 6, 7 et 8 vers le compte <strong>13'+(resultat>=0?'1 (bénéfice)':'9 (perte)')+'</strong><br>'
     +'2️⃣ Écritures d\'à-nouveaux au 01/01/'+(annee+1)+' — report des soldes bilan (classes 1 à 5)<br>'
     +'3️⃣ Verrouillage : les écritures '+annee+' ne seront plus modifiables'
     +'</div>'
@@ -75992,6 +76229,16 @@ function renderClotureFEC() {
       : '<button class="btn btn-cloture" onclick="cloturerExercice('+annee+',\''+divF+'\')">🔒 Clôturer l\'exercice '+annee+' — '+divLabel+'</button>')
     +'</div>'
     +'</div>';
+  /* Le périmètre est un NOUVEAU select à chaque rendu : on le remplit et on y remet la division choisie.
+     (Avant, il était rempli AVANT d'être remplacé par un select vide : impossible de choisir une division.) */
+  var selDiv2 = document.getElementById('filter-division-cloture');
+  if (selDiv2) {
+    selDiv2.innerHTML = '<option value="">— Toutes divisions (consolidé) —</option>'
+      + (DATA.divisions||[]).map(function(d){ return '<option value="'+d.id+'">'+escHtml(d.nom)+'</option>'; }).join('');
+    selDiv2.value = divF;
+    if (selDiv2.value !== divF) selDiv2.value = '';
+    selDiv2.onchange = function(){ renderClotureFEC(); };
+  }
 }
 
 /* ── Export FEC (format DGI 18 colonnes) ───────────────────── */
@@ -76017,9 +76264,14 @@ function exporterFEC(annee, divisionId) {
     num++;
     var d = (e.date||'').replace(/-/g,'');
     var lib = (e.libelle||'').replace(/[|\r\n]/g,' ');
-    var jr = e.journal||'OD';
-    var ref = e.reference||e.id||'';
-    var let_ = e.lettrage||'';
+    /* Journal : celui de l'écriture, sinon celui déduit de ses comptes (les écritures
+       automatiques ne stockent pas leur journal — tout sortait en « OD »). */
+    var jr = e.journal;
+    if (!jr && typeof getEcritureJournal === 'function') { try { jr = getEcritureJournal(e); } catch (errJ) { jr = ''; } }   /* un compte par défaut non paramétré ne doit pas faire échouer l'export */
+    jr = jr || 'OD';
+    /* PieceRef : la pièce justificative saisie, sinon la référence de l'écriture
+       (les saisies manuelles portent `piece` et `ref`, pas `reference`). */
+    var ref = e.piece||e.reference||e.ref||e.id||'';
     /* Une ligne FEC par ligne comptable réelle (ecrLignes couvre aussi bien le
        format legacy compte_debit/compte_credit que les écritures multi-lignes
        — l'ancienne version n'exportait que 2 lignes fixes par écriture, ce qui
@@ -76036,17 +76288,22 @@ function exporterFEC(annee, divisionId) {
       var libL = (l.libelle||lib).replace(/[|\r\n]/g,' ');
       var pc = (APP.planComptable||[]).find(function(c){ return c.code === l.compte; });
       var cptLib = (pc ? (pc.label||'') : '').replace(/[|\r\n]/g,' ');
-      var aux = l.tiers_id ? String(l.tiers_id) : '';
+      var tid = ecrTiersLigne(e, l);
+      var aux = tid ? String(tid) : '';
       var auxLib = '';
       if (aux) {
-        var t = (DATA.tiers_comptables||[]).find(function(x){ return x.id === l.tiers_id || x.code === l.tiers_id; })
-             || (DATA.clients||[]).find(function(x){ return x.id === l.tiers_id; })
-             || (DATA.fournisseurs||[]).find(function(x){ return x.id === l.tiers_id; });
-        if (t) { aux = t.code || aux; auxLib = String(t.nom || t.raison_sociale || t.libelle || '').replace(/[|\r\n]/g,' '); }
+        var t = (DATA.tiers_comptables||[]).find(function(x){ return x.id === tid || x.code === tid; })
+             || (DATA.clients||[]).find(function(x){ return x.id === tid; })
+             || (DATA.cessions_foncieres||[]).find(function(x){ return x.id === tid; })
+             || (DATA.fournisseurs||[]).find(function(x){ return x.id === tid; });
+        if (t && !t.nom && t.acquereur) t = { dossier: t.dossier, nom: t.acquereur };
+        if (t) { aux = t.code || t.dossier || aux; auxLib = String((((t.nom || '') + ' ' + (t.prenoms || '')).trim()) || t.raison_sociale || t.libelle || '').replace(/[|\r\n]/g,' '); }
       }
-      var letL = l.lettrage || let_ || '';
+      /* EcritureLet : la lettre de LA ligne — pas celle de l'écriture (la ligne
+         banque ou produit d'une écriture lettrée sur son compte client n'est pas lettrée). */
+      var letL = l.lettrage || ((!(Array.isArray(e.lignes) && e.lignes.length) && typeof _lettRacine === 'function' && _lettRacine(l.compte)) ? (e.lettrage || '') : '');
       var dLet = l.lettrage_le ? String(l.lettrage_le).slice(0,10).replace(/-/g,'') : '';
-      lignes.push([jr,'Journal '+jr,num,d,l.compte||'',cptLib,aux,auxLib,ref,d,libL,l.sens==='D'?m:'0',l.sens==='C'?m:'0',letL,dLet,vd,'',''].join('|'));
+      lignes.push([jr,((typeof journalInfo === 'function' ? journalInfo(jr).label : '') || ('Journal '+jr)).replace(/[|\r\n]/g,' '),num,d,l.compte||'',cptLib,aux,auxLib,ref,d,libL,l.sens==='D'?m:'0',l.sens==='C'?m:'0',letL,dLet,vd,'',''].join('|'));
     });
   });
 
@@ -76077,10 +76334,18 @@ function _lettRacine(compte) {
 }
 /* Clé auxiliaire : le tiers s'il est renseigné, sinon le compte complet.
    Sans cette clé, on solderait le compte d'un tiers avec le règlement d'un autre. */
-function _lettTiers(l) { return String((l && (l.tiers_id || l.tiers || l.auxiliaire)) || (l && l.compte) || ''); }
+function _lettTiers(l, e) { return String((l && (l.tiers_id || l.tiers || l.auxiliaire)) || ecrTiersLigne(e, l) || (l && l.compte) || ''); }
 
 function _lettGet(e, li) {
-  if (Array.isArray(e.lignes) && e.lignes[li]) return e.lignes[li].lettrage || e.lettrage || '';
+  if (Array.isArray(e.lignes) && e.lignes[li]) {
+    var lg = e.lignes[li];
+    if (lg.lettrage) return lg.lettrage;
+    /* Lettrage v2 : la lettre est portée par la LIGNE. Retomber sur la lettre de l'écriture
+       faisait passer pour « lettrée » toute autre ligne de tiers d'une écriture dont une
+       seule ligne l'était. Seules les écritures lettrées à l'ancienne (aucune ligne ne porte
+       de lettre) gardent la lettre de l'écriture. */
+    return e.lignes.some(function(x){ return x && x.lettrage; }) ? '' : (e.lettrage || '');
+  }
   return e.lettrage || '';
 }
 function _lettSet(e, li, code) {
@@ -76099,7 +76364,7 @@ function _lettItems(annee) {
     ecrLignes(e).forEach(function(l, li){
       var rac = _lettRacine(l.compte);
       if (!rac) return;
-      out.push({ e: e, li: li, rac: rac, tiers: _lettTiers(l), compte: String(l.compte || ''),
+      out.push({ e: e, li: li, rac: rac, tiers: _lettTiers(l, e), compte: String(l.compte || ''),
         sens: l.sens, mt: parseFloat(l.montant) || 0, date: e.date || '', lettre: _lettGet(e, li) });
     });
   });
@@ -76195,6 +76460,23 @@ function etatNonLettres(annee) {
     + '<div style="margin-top:6px;font-size:12px;">À recouvrer <strong style="color:var(--rouge);">' + fmtF(totD) + ' FCFA</strong> · À payer <strong style="color:var(--vert);">' + fmtF(totC) + ' FCFA</strong></div>';
 }
 
+/* ── Compte de résultat de l'exercice ─────────────────────────
+   131 (bénéfice) / 139 (perte) en SYSCOHADA ; 121 / 129 si c'est la numérotation du
+   plan de l'entreprise. À défaut, 131/139 sont créés au plan (comptes personnalisés)
+   — ils étaient auparavant postés hors plan, donc absents du Bilan. */
+async function _assurerCompteResultat(benefice) {
+  var code = benefice ? '131' : '139', alt = (typeof referentielCompta === 'function' && referentielCompta() === 'syscohada') ? '' : (benefice ? '121' : '129');   /* SYSCOHADA : 121/129 = report à nouveau, pas résultat */
+  var existe = function(c){ return (APP.planComptable||[]).some(function(x){ return x && x.code === c && !x._horsPlan; }); };
+  if (existe(code)) return code;
+  if (alt && existe(alt)) return alt;
+  DATA.params = DATA.params || {};
+  DATA.params.plan_comptable_custom = DATA.params.plan_comptable_custom || [];
+  DATA.params.plan_comptable_custom.push({ code: code, classe: '1', nature: benefice ? 'passif' : 'actif',
+    label: benefice ? 'Résultat net de l\'exercice : bénéfice' : 'Résultat net de l\'exercice : perte' });
+  try { if (typeof rebuildPlanComptable === 'function') rebuildPlanComptable(); } catch(e) {}
+  return code;
+}
+
 /* ── Clôture d'exercice ───────────────────────────────────── */
 async function cloturerExercice(annee, divisionId) {
   divisionId = divisionId || '';
@@ -76206,6 +76488,39 @@ async function cloturerExercice(annee, divisionId) {
   var _cvManq = (typeof _cvBonsSansVisaAnnee === 'function') ? _cvBonsSansVisaAnnee(annee) : [];
   if (_cvManq.length) {
     toast('🔒 Clôture impossible : ' + _cvManq.length + ' pièce(s) de caisse ' + annee + ' sans visa du Gérant Holding (Caisse → Visas Gérant).', 'error', 9000);
+    return;
+  }
+  /* Exercice déjà clos pour ce périmètre : une seconde clôture dupliquerait les à-nouveaux. */
+  if (exerciceEstClos(annee+'-12-31', divisionId || undefined)) {
+    toast('🔒 L\'exercice '+annee+' — '+divLabel+' est déjà clôturé. Rouvrez-le d\'abord (administrateur) si une correction est nécessaire.', 'error', 8000);
+    return;
+  }
+  /* Un bilan d'ouverture existe déjà pour l'exercice suivant : la clôture y ajouterait ses propres
+     à-nouveaux et l'ouverture serait comptée deux fois (le Bilan repart de l'ensemble des à-nouveaux). */
+  var _boSuivant = (DATA.ecritures||[]).filter(function(e){
+    return (e.reference||'') === 'BO-'+(annee+1) && (divisionId ? (e.division||'') === divisionId : !e.division);
+  });
+  if (_boSuivant.length) {
+    toast('🔒 Clôture impossible : un bilan d\'ouverture BO-'+(annee+1)+' existe déjà ('+_boSuivant.length+' ligne(s)). La clôture générerait de nouveaux à-nouveaux EN DOUBLE. Supprimez ce bilan d\'ouverture (Comptabilité › Bilan d\'ouverture) si la clôture doit le remplacer, ou ne clôturez pas '+annee+'.', 'error', 12000);
+    return;
+  }
+  /* Prérequis comptables (manuel COM-11) : on ne fige que des pièces justes et visées.
+     – une écriture déséquilibrée fausse le résultat et les à-nouveaux ;
+     – une pièce au brouillard sortirait au FEC sans date de validation (ValidDate vide). */
+  var _ecrAn = (DATA.ecritures||[]).filter(function(e){
+    return (e.date||'').startsWith(String(annee)) && (!divisionId || (e.division||'') === divisionId);
+  });
+  var _desequ = _ecrAn.filter(function(e){
+    var t = 0; ecrLignes(e).forEach(function(l){ t += (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant)||0); });
+    return Math.abs(t) >= 1;
+  });
+  if (_desequ.length) {
+    toast('🔒 Clôture impossible : '+_desequ.length+' écriture(s) déséquilibrée(s) en '+annee+' (ex. '+(_desequ[0].ref || _desequ[0].piece || _desequ[0].id)+'). Corrigez-les (Balance › Diagnostiquer l\'écart).', 'error', 9000);
+    return;
+  }
+  var _brouil = _ecrAn.filter(function(e){ return !ecrEstValidee(e); });
+  if (_brouil.length) {
+    toast('🔒 Clôture impossible : '+_brouil.length+' pièce(s) '+annee+' encore au brouillard. Visez-les d\'abord (Comptabilité › Visa des écritures), puis relancez la clôture.', 'error', 9000);
     return;
   }
   /* [FIX cohérence multi-exercices] Les à-nouveaux d'une clôture ne portent
@@ -76246,79 +76561,104 @@ async function cloturerExercice(annee, divisionId) {
     return (e.division||'') === divisionId;
   });
 
-  /* 1. Solde net par compte réel (D-C), sur TOUTES les lignes de chaque écriture
-        (ecrLignes gère aussi bien le format legacy compte_debit/compte_credit que
-        les écritures multi-lignes — contrairement à l'ancienne version qui ne
-        lisait que la 1ère ligne D et la 1ère ligne C, faussant résultat et
-        à-nouveaux dès qu'une écriture manuelle avait 3 lignes ou plus, ex. TVA). */
-  var soldesCptGestion = {};   // classes 6/7
-  var soldesCptBilan   = {};   // classes 1-5
+  /* 1. Soldes. Comptes de gestion (classes 6, 7 ET 8 : la classe 8 — HAO, impôt sur
+        le résultat — était oubliée) par compte. Comptes de bilan (classes 1 à 5) par
+        POSTE : le compte, et compte + tiers pour les comptes collectifs (411, 401…),
+        afin que chaque souscripteur retrouve son propre solde à l'ouverture (les
+        à-nouveaux agrégés par compte compensaient créances et avances de clients
+        différents et faisaient perdre le détail par tiers au FEC). */
+  var soldesCptGestion = {};
+  var postesBilan = {};
   ecr.forEach(function(e) {
     ecrLignes(e).forEach(function(l) {
       if (!l.compte) return;
       var m = (parseFloat(l.montant)||0) * (l.sens === 'D' ? 1 : -1);
       var cl = String(l.compte).charAt(0);
-      if (cl === '6' || cl === '7') soldesCptGestion[l.compte] = (soldesCptGestion[l.compte]||0) + m;
-      else if ('12345'.indexOf(cl) !== -1) soldesCptBilan[l.compte] = (soldesCptBilan[l.compte]||0) + m;
+      if (l.compte === '890') return;   /* compte technique de liaison : jamais un compte de gestion à solder */
+      if (cl === '6' || cl === '7' || cl === '8') soldesCptGestion[l.compte] = (soldesCptGestion[l.compte]||0) + m;
+      else if ('12345'.indexOf(cl) !== -1) {
+        var tid = (typeof _lettRacine === 'function' && _lettRacine(l.compte)) ? ecrTiersLigne(e, l) : '';
+        var cle = tid ? (l.compte + '§' + tid) : l.compte;
+        if (!postesBilan[cle]) postesBilan[cle] = { compte: l.compte, tiers: tid, solde: 0 };
+        postesBilan[cle].solde += m;
+      }
     });
   });
 
   var comptesGestion = Object.keys(soldesCptGestion).filter(function(c){ return Math.abs(soldesCptGestion[c]) >= 1; });
-  if (!comptesGestion.length) { toast('Aucun mouvement de gestion (classes 6/7) sur ' + annee + (divisionId?' — '+divLabel:'') + '.', 'error'); return; }
-
   var resultat = 0;
   comptesGestion.forEach(function(c){ resultat -= soldesCptGestion[c]; });
-  var cptResultat = resultat >= 0 ? '131' : '139';
+  var cptResultat = await _assurerCompteResultat(resultat >= 0);
   var refSuffixe = divisionId ? ('-'+divisionId) : '';   /* [Cloisonnement] refs distinctes par entité, pour ne jamais confondre/écraser les clôtures d'entités différentes sur la même année */
+  var qui = (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || 'Clôture';
+  var maintenant = new Date().toISOString();
 
-  /* 2. Écriture de clôture au 31/12 — une ligne par compte de gestion réellement
-        mouvementé (solde ramené à 0) + une ligne d'équilibrage vers le compte de
-        résultat (131 bénéfice / 139 perte). Comptes réels uniquement : plus de
-        placeholders "7XX-SOLDE"/"6XX-SOLDE" hors plan comptable qui polluaient
-        la balance, le grand livre et l'alerte "comptes hors plan", et qui ne
-        soldaient jamais réellement les comptes 601/701 etc. individuels
-        (d'où un résultat cumulé sur tout l'historique au Bilan dès le 2e exercice). */
-  var lignesClo = comptesGestion.map(function(c){
-    var s = soldesCptGestion[c];
-    return { compte: c, sens: s > 0 ? 'C' : 'D', montant: Math.abs(s), libelle: 'Solde clôture ' + c };
+  /* 2. Écriture de clôture au 31/12 : une ligne par compte de gestion mouvementé
+        (solde ramené à 0) + une ligne vers le compte de résultat. Les pièces de
+        clôture sont visées d'office (ValidDate renseigné au FEC). */
+  if (comptesGestion.length) {
+    var lignesClo = comptesGestion.map(function(c){
+      var sg = soldesCptGestion[c];
+      return { compte: c, sens: sg > 0 ? 'C' : 'D', montant: Math.abs(sg), libelle: 'Solde clôture ' + c };
+    });
+    lignesClo.push({ compte: cptResultat, sens: resultat >= 0 ? 'C' : 'D', montant: Math.abs(resultat), libelle: 'Résultat exercice ' + annee });
+    var ecritureResultat = {
+      id: uid(), date: annee+'-12-31',
+      libelle: 'Détermination du résultat exercice '+annee+(divisionId?' — '+divLabel:'')+' ('+(resultat>=0?'bénéfice':'perte')+')',
+      lignes: lignesClo,
+      compte: lignesClo[0].compte,
+      compte_debit: (lignesClo.find(function(l){return l.sens==='D';})||{}).compte,
+      compte_credit: (lignesClo.find(function(l){return l.sens==='C';})||{}).compte,
+      montant: Math.abs(resultat),
+      journal: 'CLO', ref: 'CLOTURE-'+annee+refSuffixe, reference: 'CLOTURE-'+annee+refSuffixe,
+      division: divisionId, type: 'cloture', verrouille: true,
+      valide_le: maintenant, valide_par: qui, statut_ecr: 'valide',
+      created_at: maintenant
+    };
+    DATA.ecritures.push(ecritureResultat);
+    await dbPut('ecritures', ecritureResultat);
+    if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', ecritureResultat);
+  }
+
+  /* 3. À-nouveaux au 01/01/N+1 : une écriture par compte de bilan, une ligne par poste
+        (par tiers pour les comptes collectifs), équilibrée par le compte de liaison 890.
+        Le résultat de l'exercice est reporté sur son compte (131/139, ou 121/129 si
+        le plan de l'entreprise les utilise). */
+  if (resultat) {
+    if (!postesBilan[cptResultat]) postesBilan[cptResultat] = { compte: cptResultat, tiers: '', solde: 0 };
+    postesBilan[cptResultat].solde -= resultat;
+  }
+  var parCompte = {};
+  Object.keys(postesBilan).forEach(function(k){
+    var po = postesBilan[k];
+    if (Math.abs(po.solde) < 1) return;
+    (parCompte[po.compte] = parCompte[po.compte] || []).push(po);
   });
-  lignesClo.push({ compte: cptResultat, sens: resultat >= 0 ? 'C' : 'D', montant: Math.abs(resultat), libelle: 'Résultat exercice ' + annee });
-
-  var ecritureResultat = {
-    id: uid(), date: annee+'-12-31',
-    libelle: 'Détermination du résultat exercice '+annee+(divisionId?' — '+divLabel:'')+' ('+(resultat>=0?'bénéfice':'perte')+')',
-    lignes: lignesClo,
-    compte: lignesClo[0].compte,
-    compte_debit: (lignesClo.find(function(l){return l.sens==='D';})||{}).compte,
-    compte_credit: (lignesClo.find(function(l){return l.sens==='C';})||{}).compte,
-    montant: Math.abs(resultat),
-    journal: 'CLO', ref: 'CLOTURE-'+annee+refSuffixe, reference: 'CLOTURE-'+annee+refSuffixe,
-    division: divisionId, type: 'cloture', verrouille: true,
-    created_at: new Date().toISOString()
-  };
-  DATA.ecritures.push(ecritureResultat);
-  await dbPut('ecritures', ecritureResultat);
-  if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', ecritureResultat);
-
-  /* 3. À-nouveaux : soldes réels des comptes de bilan (classes 1-5), calculés
-        via ecrLignes ci-dessus (multi-lignes incluses). Le résultat rejoint le
-        compte 131/139 dans le solde reporté au 01/01/N+1. */
-  soldesCptBilan[cptResultat] = (soldesCptBilan[cptResultat]||0) - resultat;
-
   var nbAN = 0;
   var dateAN = (annee+1)+'-01-01';
-  for (var cpt in soldesCptBilan) {
-    var s = soldesCptBilan[cpt];
-    if (Math.abs(s) < 1) continue;
+  var arr2 = function(x){ return Math.round(x * 100) / 100; };
+  var comptesAN = Object.keys(parCompte).sort();
+  for (var ia = 0; ia < comptesAN.length; ia++) {
+    var cpt = comptesAN[ia], lignesAN = [], net = 0;
+    parCompte[cpt].sort(function(a,b){ return String(a.tiers).localeCompare(String(b.tiers)); }).forEach(function(po){
+      var mt = arr2(Math.abs(po.solde));
+      lignesAN.push({ compte: cpt, sens: po.solde > 0 ? 'D' : 'C', montant: mt, tiers_id: po.tiers || undefined, libelle: 'À-nouveau '+(annee+1) });
+      net += (po.solde > 0 ? mt : -mt);
+    });
+    net = arr2(net);
+    if (net) lignesAN.push({ compte: '890', sens: net > 0 ? 'C' : 'D', montant: Math.abs(net), libelle: 'Compte de liaison à-nouveaux '+(annee+1) });
+    var totD = lignesAN.filter(function(l){ return l.sens === 'D'; }).reduce(function(t,l){ return t + l.montant; }, 0);
     var an = {
       id: uid(), date: dateAN,
       libelle: 'À-nouveau '+(annee+1)+' — compte '+cpt+(divisionId?' — '+divLabel:''),
-      montant: Math.abs(s),
-      compte_debit:  s>0 ? cpt : '890',
-      compte_credit: s>0 ? '890' : cpt,
+      lignes: lignesAN,
+      montant: arr2(totD),
+      compte_debit:  (lignesAN.find(function(l){ return l.sens === 'D'; }) || {}).compte,
+      compte_credit: (lignesAN.find(function(l){ return l.sens === 'C'; }) || {}).compte,
       journal: 'AN', reference: 'AN-'+(annee+1)+refSuffixe,
       division: divisionId, type: 'a_nouveau',
-      created_at: new Date().toISOString()
+      valide_le: maintenant, valide_par: qui, statut_ecr: 'valide',
+      created_at: maintenant
     };
     DATA.ecritures.push(an);
     await dbPut('ecritures', an);
@@ -76344,15 +76684,24 @@ async function rouvrirExercice(annee, divisionId) {
   divisionId = divisionId || '';
   var divLabel = divisionId ? (_nomDivision ? _nomDivision(divisionId) : divisionId) : 'Toutes divisions (consolidé)';
   if (!hasRole('admin')) { toast('Réservé à l\'administrateur.', 'error'); return; }
+  var refSuffixe = divisionId ? ('-'+divisionId) : '';
+  /* On rouvre dans l'ordre inverse de la clôture : rouvrir N supprime les à-nouveaux
+     de N+1 ; si N+1 est clos, ses écritures reposeraient sur des à-nouveaux disparus. */
+  var _p = DATA.params || {};
+  var _plusTard = Object.keys(_p).map(function(k){ var m = /^cloture_(\d{4})(-.*)?$/.exec(k); return (m && _p[k] === true && (m[2]||'') === refSuffixe) ? parseInt(m[1],10) : 0; })
+    .filter(function(y){ return y > annee; }).sort();
+  if (_plusTard.length) {
+    toast('🔒 Réouverture refusée : l\'exercice '+_plusTard[0]+' est clôturé. Rouvrez-le d\'abord (du plus récent au plus ancien).', 'error', 9000);
+    return;
+  }
   if (!confirm('🔓 Rouvrir l\'exercice '+annee+' — '+divLabel+' ?\n\nLes écritures de clôture et à-nouveaux de ce périmètre seront SUPPRIMÉES.')) return;
 
-  var refSuffixe = divisionId ? ('-'+divisionId) : '';
   /* Supprimer écritures CLO et AN liées à ce périmètre uniquement */
   var toDelete = (DATA.ecritures||[]).filter(function(e){
     return (e.reference==='CLOTURE-'+annee+refSuffixe) || (e.reference==='AN-'+(annee+1)+refSuffixe);
   });
   for (var i=0; i<toDelete.length; i++) {
-    await deleteRecord('ecritures', toDelete[i].id, { forceCloture: true });
+    await deleteRecord('ecritures', toDelete[i].id, { forceCloture: true, forceVisa: true });
   }
   DATA.ecritures = DATA.ecritures.filter(function(e){
     return !(e.reference==='CLOTURE-'+annee+refSuffixe || e.reference==='AN-'+(annee+1)+refSuffixe);
@@ -77628,38 +77977,39 @@ function _amortTousBiens(){
   return (DATA.biens_amort||[]).map(function(b){ return Object.assign({_source:'biens_amort'}, b); })
     .concat((DATA.immobilisations||[]).map(_amortAdapterImmo));
 }
-function calcAnnuite(bien, annee) {
-  var val = bien.valeur_origine||0;
-  var res = bien.valeur_residuelle||0;
-  var dur = parseInt(bien.duree)||25;
-  var base = val - res;
-  var taux = 1/dur;
-  var anneeDebut = parseInt((bien.date_debut||'2024-01-01').slice(0,4));
-
-  if (bien.methode === 'degressif') {
-    var coeff = dur <= 10 ? 2 : dur <= 20 ? 1.75 : 1.5;
-    taux = taux * coeff;
-    // Valeur nette au début de l'exercice
-    var vnc = base;
-    for (var a = anneeDebut; a < annee; a++) {
-      var dot = Math.min(vnc, Math.round(vnc * taux));
-      vnc -= dot;
+/* ═══ MOTEUR D'AMORTISSEMENT UNIQUE (SYSCOHADA révisé) ═══
+   Prorata temporis au mois de mise en service ; le bien est amorti en totalité (la dernière
+   annuité solde le reliquat, y compris la fraction de l'année de fin et les arrondis). Dégressif au
+   barème CGI usuel (1,5 jusqu'à 4 ans, 2 de 5 à 6 ans, 2,5 au-delà) avec bascule au linéaire sur la
+   durée restante. Un seul calcul sert les deux registres (biens du promoteur et immobilisations de la
+   société) : avant, deux formules différentes écrivaient la MÊME écriture de dotation. */
+function _amortPlan(bien) {
+  var plan = {};
+  var val = parseFloat(bien.valeur_origine) || 0, res = parseFloat(bien.valeur_residuelle) || 0;
+  var dur = parseInt(bien.duree) || 25, base = val - res;
+  if (!(base > 0) || !(dur > 0)) return plan;
+  var dd = String(bien.date_debut || '2024-01-01');
+  var anneeDebut = parseInt(dd.slice(0, 4)), moisDebut = parseInt(dd.slice(5, 7)) || 1;
+  var partielle = (13 - moisDebut) / 12, cumul = 0;
+  var degressif = bien.methode === 'degressif';
+  var taux = (degressif ? (dur <= 4 ? 1.5 : (dur <= 6 ? 2 : 2.5)) : 1) / dur;
+  var annuite = Math.round(base / dur);
+  for (var k = 0; k <= dur + 1 && cumul < base; k++) {
+    var vnc = base - cumul, dot;
+    if (degressif) {
+      var restant = dur - (k === 0 ? 0 : (partielle + (k - 1)));      /* durée restante au début de l'exercice */
+      if (k === 0) dot = Math.round(vnc * taux * partielle);
+      else if (restant <= 1) dot = vnc;
+      else dot = Math.max(Math.round(vnc * taux), Math.round(vnc / restant));
+    } else {
+      dot = k === 0 ? Math.round(annuite * partielle) : (k < dur ? annuite : vnc);
     }
-    return Math.min(vnc, Math.round(vnc * taux));
-  } else {
-    // Linéaire
-    var annuiteBase = Math.round(base / dur);
-    // Prorata première année
-    if (annee === anneeDebut) {
-      var moisDebut = parseInt((bien.date_debut||'2024-01-01').slice(5,7))||1;
-      return Math.round(annuiteBase * (13 - moisDebut) / 12);
-    }
-    // Dernière année
-    var finAmort = anneeDebut + dur;
-    if (annee >= finAmort) return 0;
-    return annuiteBase;
+    dot = Math.min(vnc, Math.max(0, dot));
+    plan[anneeDebut + k] = dot; cumul += dot;
   }
+  return plan;
 }
+function calcAnnuite(bien, annee) { return _amortPlan(bien)[annee] || 0; }
 
 function calcAmortCumul(bien, annee) {
   var anneeDebut = parseInt((bien.date_debut||'2024-01-01').slice(0,4));
@@ -77755,7 +78105,7 @@ async function saveBienAmort() {
      caisse (cf. genererEcritureCaisseMouvement). */
   var _okEcr = await dbPut('ecritures', ecr);
   if (_okEcr === false) {
-    var _i = DATA.ecritures.findIndex(function(e){ return e.id === ecr.id; });
+    var _i = DATA.ecritures.findIndex(function(e){ return e.id === ecr.id && e._rejete; });
     if (_i >= 0) DATA.ecritures.splice(_i, 1);
     toast('❌ Bien enregistré, mais écriture comptable refusée (exercice clos à cette date) — corrigez la date d\'acquisition.', 'error');
     switchAmortTab('biens');
@@ -78049,7 +78399,7 @@ async function comptabiliserDotations() {
     toast('🔒 Exercice ' + annee + ' clôturé — dotations bloquées.', 'error'); return;
   }
 
-  var count=0, refuses=0;
+  var count=0, refuses=0, divergentes=[];
   var date31dec=annee+'-12-31';
   for(var i=0;i<biens.length;i++){
     var b=biens[i];
@@ -78060,6 +78410,19 @@ async function comptabiliserDotations() {
        (genererDotationsAnnuelles pour un véhicule) — upsert sûr, jamais
        de double écriture même si les deux boutons sont utilisés. */
     var ecrId = b._source==='immobilisations' ? ('ecr_immosoc_dot_'+b.id+'_'+annee) : ('ecr_681_'+b.id+'_'+annee);
+    /* Dotation déjà visée : identique → rien à faire ; différente et non contre-passée → à contre-passer ;
+       contre-passée → nouvelle écriture « révision » (l'id d'origine reste occupé par la pièce visée). */
+    var _id0 = ecrId, _rev = 1, _skip = false;
+    for (;;) {
+      var _ex = (DATA.ecritures||[]).find(function(e){ return e.id === ecrId; });
+      if (!_ex || !ecrEstValidee(_ex)) break;
+      if (!_ex.contrepassee_par) {
+        if (Math.round(_ex.montant) === Math.round(dot)) { _skip = true; } else { divergentes.push(b.designation + ' (' + fmtF(_ex.montant) + ' → ' + fmtF(dot) + ')'); _skip = true; }
+        break;
+      }
+      _rev++; ecrId = _id0 + '_r' + _rev;
+    }
+    if (_skip) continue;
     var ecr={
       id:ecrId,
       ref:'DAP-'+annee+'-'+(b.dossier||b.id.slice(-6).toUpperCase()),
@@ -78080,7 +78443,7 @@ async function comptabiliserDotations() {
     if (idxDot >= 0) DATA.ecritures[idxDot] = ecr; else DATA.ecritures.push(ecr);
     var _ok = await dbPut('ecritures',ecr);
     if (_ok === false) {
-      var _idx2 = DATA.ecritures.findIndex(function(e){ return e.id === ecr.id; });
+      var _idx2 = DATA.ecritures.findIndex(function(e){ return e.id === ecr.id && e._rejete; });   /* seulement l'objet refusé : dbPut a remis la pièce persistée en mémoire */
       if (_idx2 >= 0) DATA.ecritures.splice(_idx2, 1);
       refuses++;
       continue;
@@ -78100,7 +78463,8 @@ async function comptabiliserDotations() {
     }
     count++;
   }
-  toast('✅ '+count+' dotation(s) comptabilisée(s) — Débit 681 / Crédit 281 pour '+annee+'.'+(refuses?' · ⛔ '+refuses+' refusée(s) (exercice clos).':''), refuses?'warning':'success');
+  toast('✅ '+count+' dotation(s) comptabilisée(s) — Débit 681 / Crédit 281 pour '+annee+'.'+(refuses?' · ⛔ '+refuses+' refusée(s) (pièce visée ou exercice clos).':'')
+    +(divergentes.length?' · ⚠️ Dotation visée différente du calcul actuel, à contre-passer puis regénérer : '+divergentes.join(' ; ')+'.':''), (refuses||divergentes.length)?'warning':'success');
   buildDotations();
   buildAmortBiens();
   if (typeof renderImmoSociete === 'function') renderImmoSociete();
@@ -97386,71 +97750,30 @@ function etatBalance() {
 /* Bilan SYSCOHADA */
 function etatBilan() {
   var year = _comptaYear();
-  var soldes = {};
-  /* [FIX] Aucun filtre par division ici — "Imprimer Bilan" pour une entité
-     précise imprimait en réalité le cumul de TOUTES les divisions mélangées,
-     un document officiel donné à une banque ou un auditeur pouvait donc être
-     complètement faux. Même filtre que buildBilan() (écran), pour qu'écran
-     et impression donnent toujours le même résultat. */
-  var divFEtat = (typeof _comptaDivisionFilter === 'function') ? _comptaDivisionFilter() : '';
-  DATA.ecritures.filter(function(e){ return e.date && e.date < ((+year + 1) + '-01-01') && (!divFEtat || e.division === divFEtat); }).forEach(function(e){
-    ecrLignes(e).forEach(function(l){
-      if (!l.compte) return;
-      soldes[l.compte] = (soldes[l.compte]||0) + (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant)||0);
-    });
-  });
-  /* [FIX structurel] Même défaut que buildBilan()/buildDashTabCompta() :
-     itérait sur APP.planComptable (comptes "courants") au lieu des comptes
-     réellement postés — tout sous-compte hors de cette liste curatée
-     (4451/4453-4456, notamment) contribuait pour zéro au document imprimé. */
-  function gs(codes) {
-    var t = 0;
-    for (var code in soldes) { if (codes.some(function(p){ return code.indexOf(p) === 0; })) t += soldes[code] || 0; }
-    return t;
-  }
-  var actifImmo = gs(['21','22','23','24','27']);
-  var stocks    = gs(['31','32','33','34','35','36']);
-  /* [FIX] 441/445 retirés (passif fiscal réel dans ce plan comptable, pas des
-     créances) ; 444 (TVA récupérable) et 409 (avances fournisseurs) ajoutés —
-     même correction que buildBilan(), voir son commentaire pour le détail. */
-  var creances  = gs(['411','412','418','409','421','423','444','461','471']);
-  var treso     = gs(['51','52','53','55','57']);
-  var totalActif = actifImmo + stocks + creances + treso;
-  /* [FIX] Formule signée correctement (pas de simple abs() qui écraserait à
-     tort un capital réellement négatif) et étendue à 109/119/121/129 — un
-     résultat cumulé antérieur (bénéfice ou perte) n'apparaissait nulle part
-     avant ce correctif. Même formule validée numériquement que buildBilan(). */
-  var capitauxCredit = -gs(['101','106','109','111','121']);
-  var capitauxDebitContra = gs(['119','129']);
-  var capitaux  = capitauxCredit - capitauxDebitContra;
-  var resultBrut = gs(['7']) - gs(['6']);
-  var dettesLT  = Math.abs(gs(['16','17','18']));
-  var dF  = Math.abs(gs(['401','402','408']));
-  var dFS = Math.abs(gs(['431','432','441','443','445','447','448']));
-  var dP  = Math.abs(gs(['422']));
-  /* [FIX] 419 (avances clients — le compte de chaque versement encaissé),
-     451 (groupe/associés), 462/467/468/472/4651 : absents jusqu'ici, comme
-     dans buildBilan() avant correction. */
-  var dDiv = Math.abs(gs(['419','45','462','467','468','472','48','4651']));
-  var totalPassif = capitaux + resultBrut + dettesLT + dF + dFS + dP + dDiv;
-  function r(l, v){ return '<tr><td>' + l + '</td><td class="num">' + fmtF(Math.abs(v)) + '</td></tr>'; }
+  /* Même calcul que l'écran (calcBilan) — jamais de formule parallèle :
+     un état imprimé doit toujours donner le chiffre affiché. */
+  var B = calcBilan(year, (typeof _comptaDivisionFilter === 'function') ? _comptaDivisionFilter() : '');
+  function r(l, v){ return '<tr><td>' + l + '</td><td class="num">' + (v < 0 ? '−' : '') + fmtF(Math.abs(v)) + '</td></tr>'; }
   var actif = '<h3>ACTIF</h3><table><thead><tr><th>Rubriques SYSCOHADA</th><th class="num">Montant (FCFA)</th></tr></thead><tbody>'
-    + r('Immobilisations corporelles (Cl.2)', actifImmo)
-    + r('Stocks (lots, travaux en cours)', stocks)
-    + r('Créances clients, TVA récupérable & débiteurs', creances)
-    + r('Trésorerie (banques, caisses, MM)', treso)
-    + '<tr class="total"><td>TOTAL ACTIF</td><td class="num">' + fmtF(totalActif) + '</td></tr></tbody></table>';
+    + r('Immobilisations (valeur brute)', B.immoBrut)
+    + r('Amortissements et dépréciations (28-29)', B.amort)
+    + r('Stocks (lots, travaux en cours)', B.stocks)
+    + r('Créances : clients, État (TVA récupérable), débiteurs divers', B.creances)
+    + r('Trésorerie (banques, caisses, MM)', B.tresoActif)
+    + '<tr class="total"><td>TOTAL ACTIF</td><td class="num">' + fmtF(B.totalActif) + '</td></tr></tbody></table>';
   var passif = '<h3>PASSIF</h3><table><thead><tr><th>Rubriques SYSCOHADA</th><th class="num">Montant (FCFA)</th></tr></thead><tbody>'
-    + r('Capitaux propres (net du résultat cumulé)', Math.abs(capitaux))
-    + r('Résultat de l\'exercice ' + year, resultBrut)
-    + r('Emprunts & dettes à LT', dettesLT)
-    + r('Fournisseurs', dF)
-    + r('Dettes fiscales & sociales', dFS)
-    + r('Dettes envers le personnel', dP)
-    + r('Avances clients, associés et dettes diverses', dDiv)
-    + '<tr class="total"><td>TOTAL PASSIF</td><td class="num">' + fmtF(totalPassif) + '</td></tr></tbody></table>';
-  var eq = Math.abs(totalActif - totalPassif) < 100 ? '✔ Bilan équilibré (Actif = Passif)'
-    : '⚠ Écart Actif / Passif : ' + fmtF(Math.abs(totalActif - totalPassif)) + ' FCFA';
+    + r('Capitaux propres (avant résultat de l\'exercice)', B.capitaux)
+    + r('Résultat de l\'exercice ' + year, B.resultat)
+    + r('Emprunts & dettes à LT', B.dettesFin)
+    + r('Fournisseurs', B.fournisseurs)
+    + r('Dettes fiscales & sociales', B.fiscal)
+    + r('Dettes envers le personnel', B.personnel)
+    + r('Avances clients, associés et dettes diverses', B.diverses)
+    + r('Découverts bancaires et trésorerie passive', B.tresoPassif)
+    + (B.liaison ? r('Écart de reprise — compte de liaison 890 (à régulariser)', B.liaison) : '')
+    + '<tr class="total"><td>TOTAL PASSIF</td><td class="num">' + fmtF(B.totalPassif) + '</td></tr></tbody></table>';
+  var eq = B.equilibre ? '✔ Bilan équilibré (Actif = Passif)'
+    : '⚠ Écart Actif / Passif : ' + fmtF(Math.abs(B.ecart)) + ' FCFA';
   var contenu = '<div style="display:flex;gap:18px;"><div style="flex:1;">' + actif + '</div><div style="flex:1;">' + passif + '</div></div>'
     + '<p style="margin-top:12px;font-weight:600;">' + eq + '</p>';
   genererEtatPDF({ titre:'Bilan SYSCOHADA', sousTitre:'Exercice clos le 31/12/' + year, couleur:'#1D4ED8', contenu:contenu });
@@ -97462,26 +97785,27 @@ function etatCompteResultat() {
   var R = _calcResultat(year);
   function row(l, v){ return '<tr><td>' + l + '</td><td class="num">' + (v ? fmtF(v) : '\u2014') + '</td></tr>'; }
   function sig(l, v){ return '<tr><td>' + l + '</td><td class="num">' + (v < 0 ? '\u2212' : '') + fmtF(Math.abs(v)) + '</td></tr>'; }
-  var charges = '<h3>Charges \u2014 Classe 6</h3><table><tbody>'
-    + row('Achats (60)', R.achats)
-    + row('Transports (61)', R.transports)
-    + row('Services ext\u00e9rieurs (62)', R.servExt)
-    + row('Imp\u00f4ts &amp; taxes (63)', R.impots)
-    + row('Charges de personnel (64)', R.personnel)
-    + row('Autres charges (65)', R.autresCh)
-    + row('Charges financi\u00e8res (66)', R.chargesFin)
-    + row('Charges HAO (67)', R.chargesHAO)
-    + row('Dotations amortissements (68)', R.dotations)
-    + row('Participation (691)', R.participation)
-    + row('Imp\u00f4t sur les soci\u00e9t\u00e9s' + (R.isEstime ? ' (estim\u00e9 25%)' : ' (693)'), R.is)
+  var map = R.map, P = function(k){ return '(' + map[k].join(', ') + ')'; };
+  var charges = '<h3>Charges \u2014 Classe 6 (et 8)</h3><table><tbody>'
+    + row('Achats ' + P('achats'), R.achats)
+    + row('Transports ' + P('transports'), R.transports)
+    + row('Services ext\u00e9rieurs ' + P('servExt'), R.servExt)
+    + row('Imp\u00f4ts &amp; taxes ' + P('impots'), R.impots)
+    + row('Charges de personnel ' + P('personnel'), R.personnel)
+    + row('Autres charges ' + P('autresCh'), R.autresCh)
+    + row('Charges financi\u00e8res ' + P('chargesFin'), R.chargesFin)
+    + row('Charges HAO ' + P('chargesHAO'), R.chargesHAO)
+    + row('Dotations amortissements ' + P('dotations'), R.dotations)
+    + row('Participation ' + P('participation'), R.participation)
+    + row('Imp\u00f4t sur les soci\u00e9t\u00e9s' + (R.isEstime ? ' (estim\u00e9 25%)' : ' ' + P('is')), R.is)
     + '<tr class="total"><td>TOTAL CHARGES</td><td class="num">' + fmtF(R.totalCharges) + '</td></tr></tbody></table>';
   var produits = '<h3>Produits \u2014 Classe 7</h3><table><tbody>'
-    + row('Ventes lots / logements / travaux (70)', R.ventes)
-    + row('Production stock\u00e9e / immobilis\u00e9e (71-72)', R.prodStockee)
-    + row('Autres produits d\'exploitation (73-75)', R.autresProd)
-    + row('Reprises (78)', R.reprises)
-    + row('Produits financiers (76)', R.prodFin)
-    + row('Produits HAO (77)', R.prodHAO)
+    + row('Ventes lots / logements / travaux ' + P('ventes'), R.ventes)
+    + row('Production stock\u00e9e / variation de stocks ' + P('stock'), R.prodStockee)
+    + row('Autres produits d\'exploitation ' + P('autresProd'), R.autresProd)
+    + row('Reprises ' + P('reprises'), R.reprises)
+    + row('Produits financiers ' + P('prodFin'), R.prodFin)
+    + row('Produits HAO ' + P('prodHAO'), R.prodHAO)
     + '<tr class="total"><td>TOTAL PRODUITS</td><td class="num">' + fmtF(R.totalProduits) + '</td></tr></tbody></table>';
   var sigT = '<h3>Soldes interm\u00e9diaires de gestion</h3><table><tbody>'
     + sig('Production de l\'exercice', R.production)
@@ -118195,19 +118519,36 @@ function cesCoutStockPrevu() {
   return (op && op.cout_revient_unitaire) ? Math.round(op.cout_revient_unitaire * nbLots) : 0;
 }
 
+/* Écritures d'une cession : vente (D tiers / C produit), sortie de stock, encaissement initial.
+   IDEMPOTENT : id déterministe (ou l'id déjà mémorisé sur la cession), donc une modification de la
+   cession METTRA À JOUR ses écritures au lieu de les laisser périmées. Le garde-fou de visa / d'exercice
+   clos est appliqué en amont par cesVerrouEcritures() ; ici une pièce visée n'est jamais touchée. */
+function cesVerrouEcritures(c, dateNouvelle) {
+  return ecrsVerrouillees((DATA.ecritures || []).filter(function(e){ return e.cession_id === c.id; }), dateNouvelle);
+}
 async function cesGenererEcriture(c) {
   if (!DATA.ecritures) DATA.ecritures = [];
   var an=(c.date||today()).slice(0,4);
   var cptTiers = (typeof crecCompte === 'function') ? crecCompte() : requireCompteDefaut('client_foncier');
   var cptProduit = requireCompteDefaut('cession_produit');
   var _divCes = (c.source_key && c.source_key.indexOf('parcelle:') === 0) ? _resolveDivisionEcriture('parcelle', c.source_key.slice(9)) : '';   /* [Cloisonnement] */
+  var trouve = function(id){ return (DATA.ecritures||[]).find(function(e){ return e.id === id; }); };
+  var poser = async function(id, exist, obj) {
+    if (exist && ecrEstValidee(exist)) return exist;                 /* pièce visée : intacte */
+    var e = Object.assign({}, exist || {}, obj, { id: id });
+    var i = DATA.ecritures.findIndex(function(x){ return x.id === id; });
+    if (i >= 0) DATA.ecritures[i] = e; else DATA.ecritures.push(e);
+    await dbPut('ecritures', e);
+    if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', e);
+    return e;
+  };
   /* 1. Vente : tiers (débit) / produit cession (crédit) — comptes configurables (Paramètres → Comptabilité) */
-  var evente={ id:uid(), ref:'CESS-'+an+'-'+prochainNumeroRef('ecritures','CESS',an,4), date:c.date||today(), piece:'CESSION',
+  var idV = c.ecriture_vente_id || ('ecr_ces_vente_' + c.id), exV = trouve(idV);
+  var evente = await poser(idV, exV, { ref:(exV && exV.ref) || ('CESS-'+an+'-'+prochainNumeroRef('ecritures','CESS',an,4)), date:c.date||today(), piece:'CESSION',
     type:'produit', libelle:'Cession foncière — '+(c.designation||'')+' à '+(c.acquereur||''),
     compte:cptProduit, compte_debit:cptTiers, compte_credit:cptProduit, montant:c.prix_cession||0,
-    mode:'cession', programme_id:'', division:_divCes, notes:'Cession part entreprise — '+cesSourceRef(c.source_key), source:'cession_fonciere', cession_id:c.id, created_at:today() };
-  DATA.ecritures.push(evente); await dbPut('ecritures', evente);
-  if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', evente);
+    mode:'cession', programme_id:'', division:_divCes, notes:'Cession part entreprise — '+cesSourceRef(c.source_key), source:'cession_fonciere', cession_id:c.id,
+    created_at:(exV && exV.created_at) || today() });
   c.ecriture_vente_id=evente.id;
   /* 1bis. Sortie de stock de la part entreprise valorisée à la production (331) :
      Débit 712 (Variation de stocks en cours) / Crédit 331 — en face du produit 701,
@@ -118217,28 +118558,33 @@ async function cesGenererEcriture(c) {
     var opStk = pStk && pStk.operation_id ? (DATA.af_operations||[]).find(function(x){ return x.id === pStk.operation_id; }) : null;
     if (opStk && opStk.cout_revient_unitaire > 0) {
       var montantSortie = Math.round(opStk.cout_revient_unitaire * (c.nb_lots || 1));
-      var _cdStkS = (DATA.params && DATA.params.comptes_defaut) || {};
       var _cptVarS = requireCompteDefaut('stock_lots_variation');
       var _cptStkS = requireCompteDefaut('stock_lots_compte');
-      var esortie = { id:uid(), ref:'STK-SORT-'+an+'-'+prochainNumeroRef('ecritures','STK-SORT',an,4), date:c.date||today(), piece:'CESSION',
+      var idS = c.ecriture_stock_id || ('ecr_ces_stock_' + c.id), exS = trouve(idS);
+      var esortie = await poser(idS, exS, { ref:(exS && exS.ref) || ('STK-SORT-'+an+'-'+prochainNumeroRef('ecritures','STK-SORT',an,4)), date:c.date||today(), piece:'CESSION',
         type:'produit', libelle:'Sortie de stock — '+(c.nb_lots||1)+' lot(s) part entreprise — '+(c.designation||''),
         compte:_cptVarS, compte_debit:_cptVarS, compte_credit:_cptStkS, montant:montantSortie,
-        mode:'stock', programme_id:'', division:_divCes, notes:'Coût de revient sorti en face de la cession '+evente.ref, source:'cession_fonciere', cession_id:c.id, created_at:today() };
-      DATA.ecritures.push(esortie); await dbPut('ecritures', esortie);
-      if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', esortie);
+        mode:'stock', programme_id:'', division:_divCes, notes:'Coût de revient sorti en face de la cession '+evente.ref, source:'cession_fonciere', cession_id:c.id,
+        created_at:(exS && exS.created_at) || today() });
       c.ecriture_stock_id = esortie.id;
     }
   }
-  /* 2. Encaissement : 521/571 (débit) / 4111 (crédit) */
-  if ((c.montant_encaisse||0)>0) {
+  /* 2. Encaissement initial : 521/571 (débit) / 4111 (crédit). Les versements ultérieurs ont leurs propres
+        écritures (recouvrement) : l'encaissement initial = total encaissé − somme des versements enregistrés. */
+  var verses = (c.paiements || []).reduce(function(t, p){ return t + (parseFloat(p.montant) || 0); }, 0);
+  var encInit = Math.max(0, (c.montant_encaisse || 0) - verses);
+  var idE = c.ecriture_enc_id || ('ecr_ces_enc_' + c.id), exE = trouve(idE);
+  if (encInit > 0) {
     var compteTreso=(c.mode==='especes')?_compteCaisseSouscripteurs():'521';
-    var eenc={ id:uid(), ref:'ENC-CESS-'+an+'-'+prochainNumeroRef('ecritures','ENC-CESS',an,4), date:c.date||today(), piece:'CESSION',
+    var eenc = await poser(idE, exE, { ref:(exE && exE.ref) || ('ENC-CESS-'+an+'-'+prochainNumeroRef('ecritures','ENC-CESS',an,4)), date:c.date||today(), piece:'CESSION',
       type:'tresorerie', libelle:'Encaissement cession — '+(c.acquereur||''),
-      compte:compteTreso, compte_debit:compteTreso, compte_credit:cptTiers, montant:c.montant_encaisse||0,
-      mode:c.mode||'virement', programme_id:'', division:_divCes, notes:'Encaissement cession foncière', source:'cession_fonciere', cession_id:c.id, created_at:today() };
-    DATA.ecritures.push(eenc); await dbPut('ecritures', eenc);
-    if (typeof syncToSupabase==='function') syncToSupabase('pi_ecritures', eenc);
+      compte:compteTreso, compte_debit:compteTreso, compte_credit:cptTiers, montant:encInit,
+      mode:c.mode||'virement', programme_id:'', division:_divCes, notes:'Encaissement cession foncière', source:'cession_fonciere', cession_id:c.id,
+      created_at:(exE && exE.created_at) || today() });
     c.ecriture_enc_id=eenc.id;
+  } else if (exE && !ecrEstValidee(exE)) {
+    await deleteRecord('ecritures', exE.id, { skipIntegrity: true });
+    c.ecriture_enc_id = null;
   }
 }
 
@@ -118291,10 +118637,15 @@ async function cesDelete() {
      retenue) que la suppression effacerait, laissant en plus les écritures
      de résiliation orphelines (aucune cession à référencer). */
   if (c && c.resiliation) { alert('Impossible : cette cession a une résiliation enregistrée le '+dateShort(c.resiliation.date)+'.\nLa suppression effacerait cet historique. La fiche doit être conservée telle quelle.'); return; }
+  var _verrDelCes = c ? cesVerrouEcritures(c) : '';
+  if (_verrDelCes) { toast('🔒 Suppression impossible : ' + _verrDelCes + '. Contre-passez les écritures de cette cession pour l\'annuler.', 'error', 9000); return; }
   if (!confirm('Supprimer cette cession ? Les écritures liées seront retirées.')) return;
-  if (c) {
-    if (c.ecriture_vente_id && typeof deleteRecord==='function') await deleteRecord('ecritures', c.ecriture_vente_id);
-    if (c.ecriture_enc_id && typeof deleteRecord==='function') await deleteRecord('ecritures', c.ecriture_enc_id);
+  if (c && typeof deleteRecord==='function') {
+    /* TOUTES les écritures de la cession : vente, sortie de stock (qui restait orpheline),
+       encaissement initial et recouvrements. */
+    var _ecrsCes = (DATA.ecritures||[]).filter(function(e){ return e.cession_id === c.id; }).map(function(e){ return e.id; });
+    [c.ecriture_vente_id, c.ecriture_stock_id, c.ecriture_enc_id].forEach(function(id){ if (id && _ecrsCes.indexOf(id) === -1) _ecrsCes.push(id); });
+    for (var _ie = 0; _ie < _ecrsCes.length; _ie++) await deleteRecord('ecritures', _ecrsCes[_ie], { skipIntegrity: true });
   }
   if (typeof deleteRecord==='function') await deleteRecord('cessions_foncieres', _cesId);
   else { DATA.cessions_foncieres=DATA.cessions_foncieres.filter(function(x){return x.id!==_cesId;}); await dbDelete('cessions_foncieres',_cesId); }
@@ -118878,6 +119229,16 @@ async function cesSave() {
 
   var c = _cesId ? DATA.cessions_foncieres.find(function(x){return x.id===_cesId;}) : null;
   var isNew=false;
+  /* Les écritures de la cession suivent ses montants et sa date. Si elles sont visées ou dans un exercice clos,
+     la modification financière est refusée AVANT tout changement (sinon fiche et comptabilité divergent). */
+  var _changeFin = false;
+  if (c && c.ecriture_vente_id) {
+    var _nvDate = _cesGet('ces-date')||today();
+    _changeFin = (parseFloat(_cesGet('ces-prix'))||0) !== (c.prix_cession||0) || (parseFloat(_cesGet('ces-encaisse'))||0) !== (c.montant_encaisse||0)
+      || _nvDate !== c.date || (parseInt(_cesGet('ces-nblots'))||0) !== (c.nb_lots||0) || src !== c.source_key;
+    var _verrCes = _changeFin ? cesVerrouEcritures(c, _nvDate) : '';
+    if (_verrCes) { toast('🔒 Cession non modifiable (prix, encaissement, date ou lots) : ' + _verrCes + '. Contre-passez les écritures concernées (Comptabilité › Journal).', 'error', 9000); return; }
+  }
   if (!c) { c={ id:'ces_'+uid(), created_at:today() }; isNew=true; }
   if (!c.dossier) c.dossier = cesGenererRefDossier();
   c.source_key=src; var parts=src.split(':'); c.source_type=parts[0]; c.source_id=parts[1];
@@ -118899,7 +119260,7 @@ async function cesSave() {
   if (isNew) DATA.cessions_foncieres.push(c);
   await dbPut('cessions_foncieres', c);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_cessions_foncieres', c);
-  if (!c.ecriture_vente_id) await cesGenererEcriture(c);
+  if (!c.ecriture_vente_id || _changeFin) { await cesGenererEcriture(c); await dbPut('cessions_foncieres', c); if (typeof syncToSupabase==='function') syncToSupabase('pi_cessions_foncieres', c); }
   await cesGenererCommissions(c);
 
   if (c.source_type==='parcelle') {
@@ -119321,6 +119682,11 @@ async function crecSavePaiement() {
     var p = (c.paiements || []).find(function (x) { return x.id === _crecEditPaiementId; });
     if (!p) { toast('Versement introuvable', 'error'); return; }
     var ancienMontant = parseFloat(p.montant) || 0;
+    var _ecrP = p.ecriture_id ? (DATA.ecritures || []).find(function (x) { return x.id === p.ecriture_id; }) : null;
+    var _dateP = (document.getElementById('crecp-date') || {}).value || p.date;
+    var _modifFin = montant !== ancienMontant || _dateP !== p.date || ((document.getElementById('crecp-mode') || {}).value || p.mode) !== p.mode;
+    var _verrP = (_ecrP && _modifFin) ? ecrsVerrouillees([_ecrP], _dateP) : '';
+    if (_verrP) { toast('🔒 Versement non modifiable : ' + _verrP + '. Contre-passez l\'écriture, puis saisissez le versement correct.', 'error', 9000); return; }
     var resteHorsCe = crecReste(c) + ancienMontant;
     if (montant > resteHorsCe + 1) { if (!confirm('Le montant dépasse le reste dû (' + fmtF(resteHorsCe) + ' F). Continuer ?')) return; }
 
@@ -119365,6 +119731,8 @@ async function crecSavePaiement() {
   }
 
   /* ── Mode ajout d'un nouveau versement (comportement original) ── */
+  var _dateNv = (document.getElementById('crecp-date') || {}).value || today();
+  if (exerciceEstClos(_dateNv)) { toast('🔒 Exercice ' + new Date(_dateNv).getFullYear() + ' clôturé : choisissez une date de versement sur un exercice ouvert.', 'error', 8000); return; }
   var reste = crecReste(c);
   if (montant > reste + 1) { if (!confirm('Le montant dépasse le reste dû (' + fmtF(reste) + ' F). Continuer ?')) return; }
   var p2 = {
@@ -119468,6 +119836,7 @@ async function crecValiderDeclaration(declId) {
     if (!confirm('Le montant déclaré (' + fmtF(d.montant) + ' F) dépasse le reste dû (' + fmtF(reste) + ' F). Valider quand même ?')) return;
   } else if (!confirm('Confirmer l\'encaissement de ' + fmtF(d.montant) + ' F pour ' + (c.acquereur || '') + ' et générer l\'écriture comptable ?')) return;
 
+  if (exerciceEstClos(d.date || today())) { toast('🔒 Exercice ' + new Date(d.date || today()).getFullYear() + ' clôturé : la date du versement déclaré tombe sur un exercice verrouillé.', 'error', 8000); return; }
   var p = {
     id: uid(), date: d.date || today(), montant: d.montant,
     mode: d.mode || 'virement', ref: d.ref || '',
@@ -119517,8 +119886,11 @@ async function crecRejeterDeclaration(declId) {
 }
 async function crecDeletePaiement(cid, pid) {
   var c = (DATA.cessions_foncieres || []).find(function (x) { return x.id === cid; });
-  if (!c || !confirm('Supprimer ce versement et son écriture ?')) return;
+  if (!c) return;
   var p = (c.paiements || []).find(function (x) { return x.id === pid; });
+  var _verrDP = (p && p.ecriture_id) ? ecrsVerrouillees([(DATA.ecritures || []).find(function (x) { return x.id === p.ecriture_id; })]) : '';
+  if (_verrDP) { toast('🔒 Suppression impossible : ' + _verrDP + '. Contre-passez l\'écriture du versement.', 'error', 9000); return; }
+  if (!confirm('Supprimer ce versement et son écriture ?')) return;
   if (p) {
     c.montant_encaisse = Math.max(0, crecVerse(c) - (p.montant || 0));
     if (p.ecriture_id && typeof deleteRecord === 'function') await deleteRecord('ecritures', p.ecriture_id);
@@ -134310,6 +134682,7 @@ function caisseCalculerRapprochement(caisseId) {
   var dernComptee = clot.filter(_compte).pop();
   var reel = dernComptee && dernComptee === derniere ? parseFloat(derniere.fond_cloture_reel) || 0 : (parseFloat(derniere.fond_cloture_theorique) || 0);
   var somme = clot.reduce(function(a,s){ return a + (parseFloat(s.ecart) || 0); }, 0);
+  var sommeTech = clot.reduce(function(a,s){ return a + (caisseEcartEstTechnique(s) ? (parseFloat(s.ecart) || 0) : 0); }, 0);
   var ruptures = [];
   var precedent = null;
   sess.forEach(function(s){
@@ -134320,7 +134693,7 @@ function caisseCalculerRapprochement(caisseId) {
     if (s.statut === 'cloturee') precedent = s;
   });
   return { caisse_id: caisseId, fondInitial: fondInitial, entrees: entrees, sorties: sorties, attendu: attendu, reel: reel, ecartReel: reel - attendu,
-    sommeEcarts: somme, attenteEntrees: attE, attenteSorties: attS, ruptures: ruptures, nbSessions: clot.length,
+    sommeEcarts: somme, sommeEcartsTechniques: sommeTech, attenteEntrees: attE, attenteSorties: attS, ruptures: ruptures, nbSessions: clot.length,
     derniereDate: String(derniere.date || '').slice(0,10), sessionOuverte: !!ouverteId };
 }
 function caisseRapprochement() {
@@ -134340,6 +134713,7 @@ function caisseRapprochement() {
       + '<tr><td>Dernier comptage réel</td><td style="text-align:right;">' + fmtF(r.reel) + '</td></tr>'
       + '<tr style="font-weight:800;"><td>Écart réel cumulé</td><td style="text-align:right;color:' + couleur + ';">' + (r.ecartReel > 0 ? '+' : '') + fmtF(r.ecartReel) + ' FCFA</td></tr>'
       + '<tr><td style="color:var(--blanc-dim);">Somme des écarts enregistrés session par session</td><td style="text-align:right;color:var(--blanc-dim);">' + (r.sommeEcarts > 0 ? '+' : '') + fmtF(r.sommeEcarts) + '</td></tr>'
+      + (r.sommeEcartsTechniques ? '<tr><td style="color:var(--blanc-dim);">dont écarts qualifiés techniques (défaut logiciel corrigé, non comptabilisés)</td><td style="text-align:right;color:var(--blanc-dim);">' + (r.sommeEcartsTechniques > 0 ? '+' : '') + fmtF(r.sommeEcartsTechniques) + '</td></tr>' : '')
       + ((r.attenteEntrees || r.attenteSorties) ? '<tr><td style="color:var(--rouge);">Mouvements en attente de validation (non comptés)</td><td style="text-align:right;color:var(--rouge);">+' + fmtF(r.attenteEntrees) + ' / −' + fmtF(r.attenteSorties) + '</td></tr>' : '')
       + '</tbody></table>'
       + (r.ruptures.length ? '<div style="margin-top:8px;font-size:12px;"><strong>Ruptures de chaîne</strong> (fond d\'ouverture différent du dernier comptage) : ' + r.ruptures.length
@@ -138945,12 +139319,12 @@ async function caisseEnvoyerEtatMensuel(caisseId, manuel, moisStr) {
   var sessions = (DATA.caisse_sessions || []).filter(function(s){ return s.caisse_id === caisseId && s.statut === 'cloturee' && (s.date||'').slice(0,7) === mois; });
   if (!sessions.length) { if (manuel) toast('Aucune session clôturée pour ce mois.', 'error'); return; }
 
-  var totalEntrees = 0, totalSorties = 0, totalEcart = 0;
+  var totalEntrees = 0, totalSorties = 0, totalEcart = 0, totalEcartTech = 0;
   sessions.forEach(function(s) {
     var mvts = (DATA.caisse_mouvements || []).filter(function(m){ return m.session_id === s.id && _caisseMvtEffectif(m); });
     totalEntrees += mvts.filter(function(m){ return m.type==='entree'; }).reduce(function(sum,m){ return sum+(parseFloat(m.montant)||0); }, 0);
     totalSorties += mvts.filter(function(m){ return m.type==='sortie'; }).reduce(function(sum,m){ return sum+(parseFloat(m.montant)||0); }, 0);
-    totalEcart += parseFloat(s.ecart) || 0;
+    if (caisseEcartEstTechnique(s)) totalEcartTech += parseFloat(s.ecart) || 0; else totalEcart += parseFloat(s.ecart) || 0;
   });
 
   var texte = '💰 ÉTAT MENSUEL DE CAISSE — ' + c.nom + '\n'
@@ -138959,7 +139333,9 @@ async function caisseEnvoyerEtatMensuel(caisseId, manuel, moisStr) {
     + 'Total entrées du mois : ' + fmtF(totalEntrees) + ' FCFA\n'
     + 'Total sorties du mois : ' + fmtF(totalSorties) + ' FCFA\n'
     + 'Solde net du mois : ' + fmtF(totalEntrees - totalSorties) + ' FCFA\n'
-    + 'Cumul des écarts de caisse (théorique/réel) : ' + fmtF(totalEcart) + ' FCFA\n\n'
+    + 'Cumul des écarts de caisse (théorique/réel) : ' + fmtF(totalEcart) + ' FCFA\n'
+    + (totalEcartTech ? 'Écarts techniques (défaut logiciel corrigé, non comptabilisés) : ' + fmtF(totalEcartTech) + ' FCFA\n' : '')
+    + '\n'
     + 'Détail par journée disponible dans le module Caisse (brouillards journaliers).';
 
   var okInterne = await caisseEnvoyerMessageInterne(c, texte);
@@ -139871,7 +140247,7 @@ async function genererEcritureCaisseMouvement(mvt, compteContrepartie, viaAuto) 
   if (idx >= 0) DATA.ecritures[idx] = ecr; else DATA.ecritures.push(ecr);
   var _okEcr = await dbPut('ecritures', ecr);
   if (_okEcr === false) {
-    var _i2 = DATA.ecritures.findIndex(function(e){ return e.id === ecr.id; });
+    var _i2 = DATA.ecritures.findIndex(function(e){ return e.id === ecr.id && e._rejete; });
     if (_i2 >= 0) DATA.ecritures.splice(_i2, 1);
     try { toast('❌ Écriture refusée — le mouvement reste à ventiler.', 'error'); } catch(e){}
     return null;
@@ -140746,7 +141122,7 @@ function _cdParCaisse(b){
     var ecartC = (DATA.caisse_sessions||[]).filter(function(s){
       var j=(s.date||'').slice(0,10);
       return s.caisse_id===c.id && s.statut==='cloturee' && j>=b.deb && j<=b.fin;
-    }).reduce(function(s,x){ return s+(parseFloat(x.ecart)||0); },0);
+    }).reduce(function(s,x){ return s+caisseEcartReel(x); },0);
 
     var session = caisseGetSessionOuverte(c.id);
     var solde = session ? caisseSoldeSession(session) : null;
@@ -140868,7 +141244,7 @@ function caisseRenderDashboard(){
   var ecartCumul = (DATA.caisse_sessions||[]).filter(function(s){
     var j=(s.date||'').slice(0,10);
     return s.statut==='cloturee' && j>=b.deb && j<=b.fin && idsFiltre.indexOf(s.caisse_id) >= 0;
-  }).reduce(function(s,x){ return s+(parseFloat(x.ecart)||0); },0);
+  }).reduce(function(s,x){ return s+caisseEcartReel(x); },0);
 
   /* [Fix lenteur] Cette fonction tourne à CHAQUE sauvegarde de bon. Avant :
      12 passages complets sur DATA.caisse_mouvements (un par mois de la
@@ -141006,10 +141382,89 @@ function _caisseCompteEcart(sens){
     : requireCompteDefaut('ecart_caisse_manquant');
 }
 
+/* ═══ ÉCARTS TECHNIQUES ═══
+   Un écart dû à un défaut du logiciel (corrigé depuis) n'est PAS un manquant ni un excédent : le
+   comptabiliser créerait une perte ou un produit fictif. On le QUALIFIE (cause + référence du correctif,
+   personne, date) : il reste visible et tracé, mais il n'est plus régularisable en comptabilité, n'entre
+   plus dans la régularisation en masse, l'alerte quotidienne ni le cumul des écarts réels. La qualification
+   est annulable (historique conservé). */
+function caisseEcartEstTechnique(s){ return !!(s && s.ecart_technique && String(s.ecart_technique.motif || '').trim()); }
+function caisseEcartReel(s){ return caisseEcartEstTechnique(s) ? 0 : (parseFloat(s && s.ecart) || 0); }
+function _caisseEcartsTechniques(){
+  return (DATA.caisse_sessions || []).filter(function(s){
+    return s.statut === 'cloturee' && (parseFloat(s.ecart) || 0) !== 0 && !s.ecart_regularise && caisseEcartEstTechnique(s);
+  }).sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+}
 function _caisseEcartsEnAttente(){
   return (DATA.caisse_sessions || []).filter(function(s){
-    return s.statut === 'cloturee' && (parseFloat(s.ecart) || 0) !== 0 && !s.ecart_regularise;
+    return s.statut === 'cloturee' && (parseFloat(s.ecart) || 0) !== 0 && !s.ecart_regularise && !caisseEcartEstTechnique(s);
   }).sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+}
+async function caisseQualifierEcartTechnique(sessionId){
+  if (!exigerDroit('Caisse','v','la qualification d\'un écart technique')) return;
+  if (!caisseRoleAdminLike()) { toast('Réservé aux responsables de caisse.', 'error'); return; }
+  var s = (DATA.caisse_sessions||[]).find(function(x){ return x.id===sessionId; });
+  if (!s) return;
+  var ec = parseFloat(s.ecart) || 0;
+  if (s.statut !== 'cloturee' || ec === 0) { toast('Seule une session clôturée avec un écart peut être qualifiée.', 'info'); return; }
+  if (s.ecart_regularise) { toast('Écart déjà régularisé en comptabilité : il ne peut plus être qualifié (contre-passer l\'écriture d\'écart).', 'error', 7000); return; }
+  if (caisseEcartEstTechnique(s)) { toast('Écart déjà qualifié de technique.', 'info'); return; }
+  var c = (DATA.caisses||[]).find(function(x){ return x.id===s.caisse_id; });
+  var motif = prompt('ÉCART TECHNIQUE — ' + (c?c.nom:'') + ', session du ' + String(s.date||'').slice(0,10) + ', écart ' + (ec>0?'+':'') + fmtF(ec) + ' FCFA\n\nCause (obligatoire) : quel défaut du logiciel l\'a produit ?\nEx. : fond d\'ouverture hérité d\'une clôture avant correction ; doublon supprimé ; solde théorique devenu négatif.', '');
+  if (motif === null) return;
+  motif = motif.trim();
+  if (motif.length < 10) { toast('⚠️ Décrivez la cause (au moins 10 caractères).', 'error'); return; }
+  var ref = prompt('Référence du correctif (obligatoire) : date et intitulé du correctif qui a réglé le défaut.\nEx. : correctif du 08/08/2026 — fond d\'ouverture ; revue des écarts du 18/10/2026.', '');
+  if (ref === null) return;
+  ref = ref.trim();
+  if (ref.length < 4) { toast('⚠️ La référence du correctif est obligatoire.', 'error'); return; }
+  if (!confirm('Qualifier cet écart de TECHNIQUE ?\n\n• Aucune écriture comptable ne sera générée (ni perte ni produit).\n• L\'écart reste visible, tracé et annulable.\n• Le comptage physique n\'est pas modifié.\n\nÀ faire seulement si la cause est PROUVÉE (les écarts ronds sans explication sont, le plus souvent, des mouvements non saisis).')) return;
+  s.ecart_technique = { montant: ec, motif: motif, reference_correctif: ref,
+    par: (APP.currentUser&&APP.currentUser.nom)||'—', par_id: (APP.currentUser&&APP.currentUser.id)||null, le: new Date().toISOString() };
+  s._baseModifie = s._modifie || null;
+  await dbPut('caisse_sessions', s);
+  await caisseSyncEtAlerter('pi_caisse_sessions', s);
+  try { if (typeof logAction === 'function') logAction('CAISSE_ECART_TECHNIQUE', (c?c.nom:'') + ' ' + String(s.date||'').slice(0,10) + ' : ' + fmtF(ec) + ' FCFA — ' + motif); } catch(e){}
+  toast('✅ Écart qualifié de technique — aucune écriture générée.', 'success');
+  caisseRenderEcarts();
+  if (typeof caisseRenderDashboard==='function') caisseRenderDashboard();
+}
+async function caisseAnnulerEcartTechnique(sessionId){
+  if (!exigerDroit('Caisse','v','l\'annulation d\'une qualification d\'écart technique')) return;
+  if (!caisseRoleAdminLike()) { toast('Réservé aux responsables de caisse.', 'error'); return; }
+  var s = (DATA.caisse_sessions||[]).find(function(x){ return x.id===sessionId; });
+  if (!s || !caisseEcartEstTechnique(s)) return;
+  var motif = prompt('Pourquoi annuler la qualification « écart technique » ? (obligatoire)\nL\'écart redeviendra un écart réel à expliquer ou à régulariser.', '');
+  if (motif === null) return;
+  motif = motif.trim();
+  if (!motif) { toast('⚠️ Le motif est obligatoire.', 'error'); return; }
+  s.ecart_technique_historique = (s.ecart_technique_historique || []).concat([Object.assign({}, s.ecart_technique, {
+    annule_par: (APP.currentUser&&APP.currentUser.nom)||'—', annule_le: new Date().toISOString(), annule_motif: motif })]);
+  delete s.ecart_technique;
+  s._baseModifie = s._modifie || null;
+  await dbPut('caisse_sessions', s);
+  await caisseSyncEtAlerter('pi_caisse_sessions', s);
+  toast('Qualification annulée : l\'écart redevient un écart réel.', 'info');
+  caisseRenderEcarts();
+  if (typeof caisseRenderDashboard==='function') caisseRenderDashboard();
+}
+function caisseHtmlEcartsTechniques(){
+  var l = _caisseEcartsTechniques();
+  if (!l.length) return '';
+  var net = l.reduce(function(a,s){ return a + (parseFloat(s.ecart)||0); }, 0);
+  return '<div class="card" data-n="' + l.length + '" style="padding:16px;margin-top:12px;border-left:3px solid var(--bleu,#3B82F6);">'
+    + '<div style="font-weight:800;font-size:15px;margin-bottom:6px;">🛠️ Écarts techniques <span style="color:var(--bleu,#3B82F6);">(' + l.length + ', net ' + (net>0?'+':'') + fmtF(net) + ' FCFA)</span></div>'
+    + '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:10px;">Écarts dus à un défaut du logiciel corrigé depuis. <strong>Aucune écriture comptable</strong> : ni perte ni produit. Conservés pour la traçabilité.</div>'
+    + '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Caisse</th><th style="text-align:right;">Écart</th><th>Cause</th><th>Correctif</th><th>Qualifié par</th><th></th></tr></thead><tbody>'
+    + l.map(function(s){
+        var c = (DATA.caisses||[]).find(function(x){ return x.id===s.caisse_id; }), t = s.ecart_technique, ec = parseFloat(s.ecart)||0;
+        return '<tr><td>' + escHtml(String(s.date||'').slice(0,10)) + '</td><td>' + escHtml(c?c.nom:'') + '</td>'
+          + '<td style="text-align:right;font-weight:700;">' + (ec>0?'+':'') + fmtF(ec) + '</td>'
+          + '<td style="font-size:11.5px;">' + escHtml(t.motif) + '</td><td style="font-size:11.5px;">' + escHtml(t.reference_correctif || '') + '</td>'
+          + '<td style="font-size:11px;">' + escHtml(t.par || '') + '<br>' + escHtml(String(t.le||'').slice(0,10)) + '</td>'
+          + '<td><button class="btn btn-secondary btn-sm" onclick="caisseAnnulerEcartTechnique(\'' + s.id + '\')">↩️ Annuler</button></td></tr>';
+      }).join('')
+    + '</tbody></table></div></div>';
 }
 
 /* Net des écarts non régularisés, par caisse : permet de voir qu'un écart se compense avec un autre
@@ -141106,7 +141561,7 @@ function caisseRenderEcarts(){
 
   var liste = _caisseEcartsEnAttente(), _rupt = caisseRupturesAJustifier(), htmlR = caisseHtmlRuptures(_rupt);
   if (boxR) boxR.innerHTML = htmlR;
-  var suite = boxR ? '' : htmlR;
+  var suite = (boxR ? '' : htmlR) + caisseHtmlEcartsTechniques();
   if (!liste.length) { box.innerHTML = suite; return; }
 
   var html = '<div class="card" data-n="' + liste.length + '" style="padding:16px;border-left:3px solid var(--rouge);">'
@@ -141135,7 +141590,8 @@ function caisseRenderEcarts(){
       + '<td style="text-align:right;">'+fmtF(s.fond_cloture_reel)+'</td>'
       + '<td style="text-align:right;font-weight:700;color:'+(exc?'var(--vert)':'var(--rouge)')+';">'+(exc?'+':'')+fmtF(ec)+'</td>'
       + '<td>'+(exc?'<span style="color:var(--vert);">Excédent</span>':'<span style="color:var(--rouge);">Manquant</span>')+'</td>'
-      + '<td><button class="btn btn-primary btn-sm" onclick="caisseRegulariserEcart(\''+s.id+'\')">✅ Régulariser</button></td>'
+      + '<td style="white-space:nowrap;"><button class="btn btn-primary btn-sm" onclick="caisseRegulariserEcart(\''+s.id+'\')">✅ Régulariser</button> '
+      + '<button class="btn btn-secondary btn-sm" title="Écart dû à un défaut du logiciel corrigé depuis : aucune écriture comptable" onclick="caisseQualifierEcartTechnique(\''+s.id+'\')">🛠️ Technique</button></td>'
     + '</tr>';
   });
   html += caisseArboTableau('ecart', liste, function(s){ return s.caisse_id; }, function(s){ return s.date; }, function(s){ return _rowsE[s.id]; }, _thE, function(l){ return caisseResumeNet(l, function(s){ return s.ecart; }); }) + '</div>';
@@ -141145,6 +141601,7 @@ function caisseRenderEcarts(){
 async function genererEcritureEcartCaisse(session, motif){
   var ec = parseFloat(session.ecart)||0;
   if (ec === 0) return null;
+  if (caisseEcartEstTechnique(session)) { try { toast('⛔ Écart qualifié de technique : il ne se comptabilise pas (annulez d\'abord la qualification si c\'est un écart réel).', 'error', 7000); } catch(e){} return null; }
   var caisse = (DATA.caisses||[]).find(function(c){ return c.id===session.caisse_id; });
   var compteCaisse = (caisse && caisse.compte) || '571';
   var exc = ec > 0;
@@ -141169,7 +141626,7 @@ async function genererEcritureEcartCaisse(session, motif){
      comptabilisé nulle part. */
   var _okEcart = await dbPut('ecritures', ecr);
   if (_okEcart === false) {
-    var _iE = DATA.ecritures.findIndex(function(e){ return e.id===ecr.id; });
+    var _iE = DATA.ecritures.findIndex(function(e){ return e.id===ecr.id && e._rejete; });
     if (_iE >= 0) DATA.ecritures.splice(_iE, 1);
     try { toast('❌ Écriture d\'écart refusée — l\'écart reste à régulariser.', 'error'); } catch(e){}
     return null;
@@ -141193,6 +141650,7 @@ async function caisseRegulariserEcart(sessionId){
   var s = (DATA.caisse_sessions||[]).find(function(x){ return x.id===sessionId; });
   if (!s) return;
   if (s.ecart_regularise) { toast('Écart déjà régularisé.', 'info'); return; }
+  if (caisseEcartEstTechnique(s)) { toast('⛔ Écart qualifié de technique : il ne se comptabilise pas.', 'error', 6000); return; }
   if (caisseMvtsEnAttente(s).length) { toast('⛔ Cette session a encore des mouvements en attente de validation : validez-les ou rejetez-les avant de régulariser l\'écart.', 'error', 7000); return; }
   var _cs = (DATA.caisses||[]).find(function(x){ return x.id===s.caisse_id; });
   var _ec = parseFloat(s.ecart) || 0;
@@ -141280,7 +141738,7 @@ function caisseAVentilerStats(){
 }
 function caisseEcartNonRegularise(){
   return _dashArr('caisse_sessions').filter(function(s){
-    return s.statut==='cloturee' && (parseFloat(s.ecart)||0)!==0 && !s.ecart_regularise;
+    return s.statut==='cloturee' && (parseFloat(s.ecart)||0)!==0 && !s.ecart_regularise && !caisseEcartEstTechnique(s);
   }).reduce(function(a,s){ return a+Math.abs(parseFloat(s.ecart)||0); }, 0);
 }
 
