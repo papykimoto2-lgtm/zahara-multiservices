@@ -59823,7 +59823,8 @@ var FC_PROCEDURES = {
   titre_foncier: 'Formalités relatives au titre foncier', mutation: 'Mutation immobilière', morcellement: 'Morcellement',
   fusion: 'Fusion de parcelles', autre: 'Autre procédure',
   titre_individuel: 'Titre individuel du souscripteur (mutation, inscription, remise)',
-  immatriculation: "Immatriculation au Livre foncier (réquisition)", rural_a_examiner: 'Parcelle rurale (procédure distincte à déterminer)'
+  immatriculation: "Immatriculation au Livre foncier (réquisition)", rural_a_examiner: 'Parcelle rurale (procédure distincte à déterminer)',
+  immatriculation_rurale: "Immatriculation d'une parcelle rurale (AFOR / agriculture)"
 };
 var FC_STATUTS = {
   a_preparer: 'À préparer', a_venir: 'À venir', en_cours: 'En cours', attente_intervenant: "En attente d'un intervenant",
@@ -59939,6 +59940,8 @@ function fcEtapesPour(type, situation) {
   var ordre = 0, sit = FC_SITUATIONS[situation] || null;
   var liste = type === 'immatriculation_urbaine'
     ? [FC_ETAPES_REF.filter(function(s){ return s[0] === 'creation_dossier'; })[0]].concat(FC_ETAPES_URBAIN, [FC_ETAPES_REF.filter(function(s){ return s[0] === 'cloture'; })[0]])
+    : type === 'immatriculation_rurale'
+    ? [FC_ETAPES_REF.filter(function(s){ return s[0] === 'creation_dossier'; })[0]].concat(FC_ETAPES_RURALE, [FC_ETAPES_REF.filter(function(s){ return s[0] === 'cloture'; })[0]])
     : FC_ETAPES_REF.filter(function(s){
         if (type === 'rural_a_examiner') return FC_ETAPES_RURAL.indexOf(s[0]) !== -1;
         return s[5] === '*' || s[5].split(',').indexOf(type) !== -1;
@@ -60234,6 +60237,14 @@ var FC_CORRESP_PROC = {
 function fcEtapeProcedure(e) { var c = String(e && e.code || ''); return /^urb_/.test(c) || !!FC_CORRESP_PROC[c]; }
 function fcTitreEtapeProc(e) { var c = String(e && e.code || ''); return FC_CORRESP_PROC[c] ? "Correspond à une étape de la procédure d'immatriculation fournie le 17/10/2026 : " + FC_CORRESP_PROC[c] : FC_TITRE_PROCEDURE; }
 function fcRouge(html, titre) { return '<span style="color:#c0392b;font-weight:600;" title="' + escHtml(titre || FC_TITRE_PROCEDURE) + '">' + html + '</span>'; }
+var FC_BLEU = '#1f5fbf';
+var FC_TITRE_RURALE = "Étape issue de la procédure d'immatriculation d'une parcelle rurale (AFOR / agriculture) fournie par le promoteur";
+function fcEtapeRurale(e) { return /^rur_/.test(String(e && e.code || '')); }
+function fcBleu(html, titre) { return '<span style="color:' + FC_BLEU + ';font-weight:600;" title="' + escHtml(titre || FC_TITRE_RURALE) + '">' + html + '</span>'; }
+/* Marque visuelle d'une étape de procédure : rouge = immatriculation urbaine, bleu = immatriculation rurale. */
+function fcMarqueEtape(e, html) { return fcEtapeProcedure(e) ? fcRouge(html, fcTitreEtapeProc(e)) : (fcEtapeRurale(e) ? fcBleu(html) : html); }
+function fcMarquePhase(ph, html) { return /^U/.test(ph) ? fcRouge(html) : (/^R\d/.test(ph) ? fcBleu(html, FC_TITRE_RURALE) : html); }
+function fcFondPhase(ph) { return /^U/.test(ph) ? 'rgba(192,57,43,.14)' : (/^R\d/.test(ph) ? 'rgba(31,95,191,.12)' : 'var(--card2,#f5f1ea)'); }
 function fcPhaseReduite(did, ph) { return !!((APP._fcPh || {})[did] || {})[ph]; }
 function fcPhasesAppliquer(did) {
   var host = document.getElementById('fc-detail'); if (!host) return;
@@ -60417,7 +60428,7 @@ function fcOngletsHtml(sections) {
   return '<style>.fc-tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--or);margin:10px 0 12px;position:sticky;top:0;background:var(--card,#fff);z-index:3;padding-top:4px;}'
     + '.fc-tabs button{border:1px solid var(--bord,#ddd);border-bottom:none;background:var(--card2,#f5f1ea);padding:7px 12px;border-radius:8px 8px 0 0;cursor:pointer;font-size:12px;font-weight:600;color:inherit;}'
     + '.fc-tabs button.on{background:var(--or);color:#fff;border-color:var(--or);}.fc-nb{background:rgba(0,0,0,.12);border-radius:9px;padding:0 6px;margin-left:4px;font-size:10px;}'
-    + '.fc-pane{display:none;}.fc-pane.on{display:block;}tr.fc-proc>td{background:rgba(192,57,43,.07);}tr.fc-proc>td:first-child{border-left:4px solid #c0392b;}</style>'
+    + '.fc-pane{display:none;}.fc-pane.on{display:block;}tr.fc-proc>td{background:rgba(192,57,43,.07);}tr.fc-proc>td:first-child{border-left:4px solid #c0392b;}tr.fc-proc-rural>td{background:rgba(31,95,191,.07);}tr.fc-proc-rural>td:first-child{border-left:4px solid #1f5fbf;}</style>'
     + '<div class="fc-tabs" role="tablist">' + liste.map(function(x){ return '<button type="button" role="tab" class="' + (x.k === actif ? 'on' : '') + '" data-fcon="' + x.k + '" onclick="fcOnglet(\'' + x.k + '\')">' + x.t + '</button>'; }).join('') + '</div>'
     + liste.map(function(x){ return '<div class="fc-pane' + (x.k === actif ? ' on' : '') + '" data-fcpane="' + x.k + '">' + x.h + '</div>'; }).join('');
 }
@@ -60448,9 +60459,9 @@ function fcRenderDetail(id) {
   h += '<div style="margin-bottom:6px;display:flex;gap:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="fcPhasesTout(' + _q + ',true)">▾ Tout déployer</button><button type="button" class="btn btn-secondary btn-sm" onclick="fcPhasesTout(' + _q + ',false)">▸ Tout réduire</button></div>';
   h += '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Statut</th><th>Responsable</th><th>Échéance</th><th>Justificatifs</th><th>Visibilité</th><th></th></tr></thead><tbody>';
   d.etapes.forEach(function(e){
-    if (e.phase !== phase) { phase = e.phase; h += '<tr data-fcphh="' + e.phase + '" role="button" tabindex="0" aria-expanded="' + (fcPhaseReduite(d.id, e.phase) ? 'false' : 'true') + '" onclick="fcPhaseBascule(' + _q + ',\'' + e.phase + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}" style="cursor:pointer;"><td colspan="8" style="background:' + (/^U/.test(e.phase) ? 'rgba(192,57,43,.14)' : 'var(--card2,#f5f1ea)') + ';font-weight:700;font-size:12px;"><span class="fc-ph-fl">' + (fcPhaseReduite(d.id, e.phase) ? '▸' : '▾') + '</span> ' + (/^U/.test(e.phase) ? fcRouge(escHtml(fcLibPhase(phase))) : escHtml(fcLibPhase(phase))) + ' <span class="fc-nb" style="background:rgba(0,0,0,.1);border-radius:9px;padding:0 6px;font-weight:400;">' + (_ok[e.phase] || 0) + '/' + _tot[e.phase] + '</span></td></tr>'; }
+    if (e.phase !== phase) { phase = e.phase; h += '<tr data-fcphh="' + e.phase + '" role="button" tabindex="0" aria-expanded="' + (fcPhaseReduite(d.id, e.phase) ? 'false' : 'true') + '" onclick="fcPhaseBascule(' + _q + ',\'' + e.phase + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}" style="cursor:pointer;"><td colspan="8" style="background:' + fcFondPhase(e.phase) + ';font-weight:700;font-size:12px;"><span class="fc-ph-fl">' + (fcPhaseReduite(d.id, e.phase) ? '▸' : '▾') + '</span> ' + fcMarquePhase(e.phase, escHtml(fcLibPhase(phase))) + ' <span class="fc-nb" style="background:rgba(0,0,0,.1);border-radius:9px;padding:0 6px;font-weight:400;">' + (_ok[e.phase] || 0) + '/' + _tot[e.phase] + '</span></td></tr>'; }
     var figee = FC_STATUTS_FINAUX.indexOf(e.statut) !== -1, et = fcEtatEcheance(e);
-    h += '<tr data-fcph="' + e.phase + '"' + (fcPhaseReduite(d.id, e.phase) ? ' style="display:none"' : '') + (fcEtapeProcedure(e) ? ' class="fc-proc"' : '') + '><td>' + e.ordre + '</td><td>' + (fcEtapeProcedure(e) ? fcRouge(escHtml(e.libelle), fcTitreEtapeProc(e)) : escHtml(e.libelle)) + (e.justificatif_requis ? ' <span title="Justificatif requis" style="color:#B87333;">📎</span>' : '') + fcInfoEtapeHtml(d, e) + fcHintDependance(d, e) + fcEquipeLigneHtml(e.code) + fcValidationHtml(d, e)
+    h += '<tr data-fcph="' + e.phase + '"' + (fcPhaseReduite(d.id, e.phase) ? ' style="display:none"' : '') + (fcEtapeProcedure(e) ? ' class="fc-proc"' : (fcEtapeRurale(e) ? ' class="fc-proc-rural"' : '')) + '><td>' + e.ordre + '</td><td>' + fcMarqueEtape(e, escHtml(e.libelle)) + (e.justificatif_requis ? ' <span title="Justificatif requis" style="color:#B87333;">📎</span>' : '') + fcInfoEtapeHtml(d, e) + fcHintDependance(d, e) + fcEquipeLigneHtml(e.code) + fcValidationHtml(d, e)
       + (e.issue ? '<br><span style="font-size:11px;color:#2e7d4f;">Issue officielle enregistrée : ' + escHtml(e.issue) + '</span>' : '') + (e.motif ? '<br><span style="font-size:11px;color:#c0392b;">Motif : ' + escHtml(e.motif) + '</span>' : '') + '</td>'
       + '<td>' + (figee ? fcBadgeStatut(e.statut) : '<select class="filter-select" onchange="fcStatutUI(\'' + d.id + '\',\'' + e.code + '\',this)">' + Object.keys(FC_STATUTS).map(function(k){ return '<option value="' + k + '"' + (k === e.statut ? ' selected' : '') + '>' + escHtml(FC_STATUTS[k]) + '</option>'; }).join('') + '</select>') + '</td>'
       + '<td>' + escHtml(fcNomUtilisateur(e.responsable_id || d.responsable_id)) + '</td>'
@@ -61682,7 +61693,7 @@ var FC_SITUATIONS = {
   attestation_villageoise: { libelle: 'Attestation villageoise', procedure: 'regularisation', a_determiner: true, demarche: 'Faire vérifier le statut juridique du terrain et déterminer la procédure de régularisation applicable.' },
   lotissement_non_approuve: { libelle: 'Parcelle issue d\'un lotissement non approuvé', procedure: 'regularisation', a_determiner: true, demarche: 'Examiner préalablement la situation du lotissement et les possibilités de régularisation.' },
   litige: { libelle: 'Terrain faisant l\'objet d\'un litige', procedure: 'regularisation', a_determiner: true, demarche: 'Faire examiner les droits en présence et les procédures administratives ou judiciaires nécessaires.' },
-  rural: { libelle: 'Parcelle rurale', procedure: 'rural_a_examiner', a_determiner: true, demarche: 'Examiner la procédure propre au domaine foncier rural, qui est distincte de celle du foncier urbain.' }
+  rural: { libelle: 'Parcelle rurale', procedure: 'immatriculation_rurale', a_determiner: false, demarche: "Suivre la procédure rurale (AFOR / agriculture) : enquête foncière et accord des propriétaires terriens, enquête villageoise ouverte à l'agriculture, certificat foncier, puis titre foncier. Elle est distincte de la procédure urbaine ; à faire valider par un juriste ou un géomètre-expert." }
 };
 FC_SITUATIONS.terrain_coutumier = { libelle: 'Terrain brut sans titre (droits coutumiers)', procedure: 'immatriculation_urbaine', a_determiner: false, demarche: "Suivre la procédure en deux temps : procédure coutumière et technique (obligatoire), puis procédure administrative et voie ACD ou approbation." };
 /* ═══ Immatriculation d'une parcelle urbaine sans titre (ACD ou approbation) ═══
@@ -61789,7 +61800,7 @@ var FC_DEPS_URBAIN = {
 function fcUrbainVoieDe(e) { return (e.phase === 'U3' || e.phase === 'U5') ? 'acd' : (e.phase === 'U4' ? 'approbation' : ''); }
 var FC_URB_VOIES = { acd: 'ACD (arrêté de concession définitive)', approbation: 'Approbation du lotissement' };
 function fcUrbainFacultative(code) { var f = (DATA.params || {}).fc_urbain_facultatives; return !!(f && f[code]); }
-function fcLibPhase(ph) { return /^U\d$/.test(ph) ? FC_PHASES[ph] : 'Phase ' + ph + ' — ' + FC_PHASES[ph]; }
+function fcLibPhase(ph) { return /^[UR]\d$/.test(ph) ? FC_PHASES[ph] : 'Phase ' + ph + ' — ' + FC_PHASES[ph]; }
 /* Étapes de la phase 1 obligatoires et pas encore terminées ou écartées. */
 function fcUrbainPhase1Manquantes(d) {
   return (d.etapes || []).filter(function(x){ return x.phase === 'U1' && !fcUrbainFacultative(x.code) && ['termine', 'annule'].indexOf(x.statut) === -1; });
@@ -63639,7 +63650,7 @@ Object.assign(FC_DEPENDANCES, FC_DEPS_URBAIN);   /* étapes de l'immatriculation
 function fcDependancesActives() { return ((DATA.params || {}).fc_dependances) !== false; }
 /* Étapes préalables (de ce dossier) qui ne sont ni terminées ni annulées. */
 function fcPrerequisManquants(d, code) {
-  return (FC_DEPENDANCES[code] || []).map(function(c){ return fcEtape(d, c); }).filter(function(e){ return e && ['termine', 'annule'].indexOf(e.statut) === -1 && !(d.type_procedure === 'immatriculation_urbaine' && fcUrbainFacultative(e.code)); });
+  return (FC_DEPENDANCES[code] || (code === 'cloture' && d.type_procedure === 'immatriculation_rurale' ? ['rur_retrait_titre'] : [])).map(function(c){ return fcEtape(d, c); }).filter(function(e){ return e && ['termine', 'annule'].indexOf(e.statut) === -1 && !(d.type_procedure === 'immatriculation_urbaine' && fcUrbainFacultative(e.code)); });
 }
 function fcHintDependance(d, e) {
   if (!fcDependancesActives() || FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return '';
@@ -63790,7 +63801,7 @@ async function fcSauverEquipeUI() {
    Règle A : étapes que la procédure prévoit aujourd'hui mais absentes du dossier (ouvert avant une mise à jour, étape manquante).
    Règle B : dossier d'une procédure standard en situation coutumière (terrain brut, attestation villageoise) → étapes de la phase coutumière et technique.
    Ajout manuel : tout le catalogue des étapes connues. Chaque ajout est journalisé, confié à la fonction concernée et inséré à sa place logique. */
-function fcDefEtape(code) { var l = FC_ETAPES_REF.concat(FC_ETAPES_URBAIN); for (var i = 0; i < l.length; i++) if (l[i][0] === code) return l[i]; return null; }
+function fcDefEtape(code) { var l = FC_ETAPES_REF.concat(FC_ETAPES_URBAIN, FC_ETAPES_RURALE); for (var i = 0; i < l.length; i++) if (l[i][0] === code) return l[i]; return null; }
 function fcCreerEtape(code, type, d) {
   var s = fcDefEtape(code); if (!s) return null; var m = fcMetaEtape(code);
   return { code: s[0], libelle: fcLibelleEtape(s[0], type, s[1]), phase: s[2], ordre: 0, statut: 'a_venir', responsable_id: d.responsable_id || '', date_debut: '', date_cible: '', date_fin: '', justificatif_requis: !!s[3], justificatifs: [],
@@ -63838,7 +63849,7 @@ function fcPanneauSuggestionsEtapes(d) {
   if (['cloture', 'annule'].indexOf(d.statut) !== -1) return '';
   var sug = fcSuggestionsEtapes(d); APP._fcSug = APP._fcSug || {}; APP._fcSug[d.id] = sug;
   var ont = {}; d.etapes.forEach(function(e){ ont[e.code] = 1; });
-  var libres = FC_ETAPES_REF.concat(FC_ETAPES_URBAIN).filter(function(s, i, a){ return !ont[s[0]] && a.findIndex(function(x){ return x[0] === s[0]; }) === i; });
+  var libres = FC_ETAPES_REF.concat(FC_ETAPES_URBAIN, FC_ETAPES_RURALE).filter(function(s, i, a){ return !ont[s[0]] && a.findIndex(function(x){ return x[0] === s[0]; }) === i; });
   var cartes = sug.map(function(x, i){
     return '<div style="border-left:4px solid #2e7d4f;background:#f1f8f3;padding:8px 10px;margin:6px 0;font-size:12px;"><b>' + escHtml(x.titre) + '</b> <span class="fc-nb">' + x.codes.length + '</span><div style="color:var(--dim);margin:3px 0;">' + escHtml(x.raison) + '</div>'
       + '<div style="font-size:11px;">' + x.codes.slice(0, 5).map(function(c){ return escHtml(fcLibelleEtape(c, d.type_procedure, (fcDefEtape(c) || [])[1] || c)); }).join(' · ') + (x.codes.length > 5 ? ' …(+' + (x.codes.length - 5) + ')' : '') + '</div>'
@@ -64029,7 +64040,7 @@ function fcFriseSimple(d) {
 
 /* ── Dépôt au guichet unique : le dossier est-il prêt ? ── */
 function fcPretADeposer(d) {
-  var urb = d.type_procedure === 'immatriculation_urbaine', dep = fcEtape(d, urb ? 'urb_depot_guf' : 'depot'); if (!dep || d.statut === 'annule') return null;
+  var urb = d.type_procedure === 'immatriculation_urbaine', rur = d.type_procedure === 'immatriculation_rurale', dep = fcEtape(d, urb ? 'urb_depot_guf' : (rur ? 'rur_depot_liasses' : 'depot')); if (!dep || d.statut === 'annule') return null;
   var manq = urb ? fcUrbainPhase1Manquantes(d) : d.etapes.filter(function(e){ return e.ordre < dep.ordre && e.code !== dep.code && FC_STATUTS_FINAUX.indexOf(e.statut) === -1; });
   var aControler = (DATA.pieces_foncieres || []).filter(function(p){ return p.dossier_id === d.id && p.statut === 'a_verifier' && !p.retire && !p.remplacee_par; }).length;
   return { depose: dep.statut === 'termine', pret: !manq.length && !aControler, manquantes: manq.map(function(e){ return e.libelle; }), a_controler: aControler, etape: dep.libelle };
@@ -64093,6 +64104,103 @@ var FC_ROLES_DEFAUT = {
   ind_droits_frais: ['comptable'], urb_dotation: ['comptable'], urb_droits_publication: ['comptable'], enregistrement_publicite: ['comptable'],
   controle_pieces: ['service_foncier'], validation_technique: ['service_foncier'], completude_documents: ['service_foncier'], verification_references: ['service_foncier']
 };
+
+/* ═══ Immatriculation d'une parcelle rurale (AFOR / agriculture) ═══
+   Procédure fournie par le promoteur (« PROCÉDURE D'IMMATRICULATION D'UNE PARCELLE RURALE AFOR OU L'AGRICULTURE »), reprise étape par étape.
+   Étapes repérées en BLEU (l'immatriculation urbaine est en rouge). Origine : texte du promoteur, non vérifié par ImmoSuite ; à faire valider par un juriste ou un géomètre-expert.
+   [code, libellé, phase, justificatif requis, visibilité (souscripteur = grande étape communiquée pour information), ''] */
+FC_PROCEDURES.immatriculation_rurale = "Immatriculation d'une parcelle rurale (AFOR / agriculture)";
+FC_PHASES.R1 = 'Rural — Phase 1 : recherche, délimitation et levé de la parcelle';
+FC_PHASES.R2 = 'Rural — Phase 2 : enquête foncière et accord des propriétaires terriens';
+FC_PHASES.R3 = "Rural — Phase 3 : enquête villageoise et certificat foncier (agriculture)";
+FC_PHASES.R4 = 'Rural — Phase 4 : titre foncier (conservation foncière, cadastre, AFOR)';
+Object.assign(FC_ACTEURS_REF, {
+  agriculture: "Direction départementale ou régionale de l'agriculture (DD / DR)", afor: 'AFOR — Agence foncière rurale', commissaire_enqueteur: "Commissaire enquêteur nommé par l'agriculture",
+  comite_villageois: 'Comité villageois (comité foncier)', sous_prefet: 'Sous-préfet', voisins: 'Voisins de la parcelle', ministere_agriculture: "Ministère de l'agriculture"
+});
+var FC_RURAL_REF = {
+  version: '2026-10-25', origine: "Procédure d'immatriculation d'une parcelle rurale fournie par le promoteur, non vérifiée par ImmoSuite",
+  avertissement: "Le foncier rural suit une procédure distincte du foncier urbain. À faire valider par un juriste ou un géomètre-expert ; les frais et délais réels se confirment auprès de l'agriculture et de l'AFOR."
+};
+var FC_ETAPES_RURALE = [
+  ['rur_recherche', 'Recherche de la parcelle rurale', 'R1', 0, 'interne', ''],
+  ['rur_reperage', 'Repérage et visite de la parcelle', 'R1', 0, 'interne', ''],
+  ['rur_demarche_coutumiere', 'Démarche coutumière', 'R1', 1, 'interne', ''],
+  ['rur_delimitation', 'Délimitation de la parcelle', 'R1', 0, 'interne', ''],
+  ['rur_leve_topo', 'Levé topographique', 'R1', 1, 'interne', ''],
+  ['rur_enquete_fonciere', 'Enquête foncière', 'R2', 0, 'interne', ''],
+  ['rur_pv_famille', 'Établissement du ou des procès-verbaux de famille', 'R2', 1, 'interne', ''],
+  ['rur_enquete_pv_famille', 'Enquête sur le procès-verbal de famille auprès de la chefferie et des sachants', 'R2', 1, 'interne', ''],
+  ['rur_commissaire_justice', 'Intervention du commissaire de justice : consolidation des déclarations des propriétaires terriens et désignation du représentant légal (le gestionnaire)', 'R2', 1, 'interne', ''],
+  ['rur_convention_notaire', 'Convention notariée suivie du versement de la donation (compensation en nature)', 'R2', 1, 'souscripteur', ''],
+  ['rur_achat_liasses', 'Achat de deux liasses (une ou plusieurs pour les propriétaires terriens, une pour la société)', 'R3', 1, 'interne', ''],
+  ['rur_depot_liasses', "Renseignement des liasses et dépôt à l'agriculture pour l'ouverture de l'enquête", 'R3', 1, 'souscripteur', ''],
+  ['rur_commissaire_enqueteur', "Nomination d'un commissaire enquêteur par le DD ou le DR de l'agriculture", 'R3', 1, 'interne', ''],
+  ['rur_frais_ouverture_enquete', "Paiement des frais d'ouverture d'enquête par dossier à l'agriculture", 'R3', 1, 'interne', ''],
+  ['rur_frais_comite_villageois', 'Paiement des frais de siège du comité villageois', 'R3', 1, 'interne', ''],
+  ['rur_ouverture_enquete', "Ouverture de l'enquête villageoise auprès du chef de village, du comité foncier et des agents de l'agriculture (durée : un mois à compter de l'ouverture)", 'R3', 1, 'souscripteur', ''],
+  ['rur_bornage_geometre', 'Délimitation et bornage exécutés par le géomètre expert (par son topographe)', 'R3', 1, 'interne', ''],
+  ['rur_cloture_enquete', "Clôture de l'enquête avec confirmation des limites en présence des voisins", 'R3', 1, 'interne', ''],
+  ['rur_frais_voisins', 'Règlement des frais de déplacement des voisins', 'R3', 1, 'interne', ''],
+  ['rur_traitement_agriculture', "Traitement du dossier par l'agriculture, en attente de validation (s'il n'y a pas d'opposition)", 'R3', 0, 'interne', ''],
+  ['rur_reunion_validation', 'Réunion de validation sous la présidence du sous-préfet', 'R3', 1, 'interne', ''],
+  ['rur_certificat_foncier', 'Délivrance du certificat foncier', 'R3', 1, 'souscripteur', ''],
+  ['rur_frais_publication', 'Paiement des frais de publication au journal officiel', 'R3', 1, 'interne', ''],
+  ['rur_dossier_afor', "Constitution du dossier de demande d'immatriculation (titre foncier) et dépôt à l'AFOR", 'R4', 1, 'souscripteur', ''],
+  ['rur_transmission_conservation', 'Dossier transmis à la conservation foncière du chef-lieu', 'R4', 0, 'interne', ''],
+  ['rur_transmission_cadastre', 'Dossier transmis au cadastre pour le bornage contradictoire', 'R4', 0, 'interne', ''],
+  ['rur_frais_bornage_contradictoire', 'Paiement des frais du bornage contradictoire', 'R4', 1, 'interne', ''],
+  ['rur_creation_tf', 'Dossier transmis à la conservation pour la création du titre foncier', 'R4', 1, 'souscripteur', ''],
+  ['rur_transmission_afor', "Dossier transmis à l'AFOR", 'R4', 0, 'interne', ''],
+  ['rur_validation_ministere', 'Dossier transmis au ministère de l\'agriculture pour validation du titre foncier', 'R4', 1, 'interne', ''],
+  ['rur_retrait_titre', 'Retrait du titre foncier', 'R4', 1, 'souscripteur', '']
+];
+var FC_RURAL_ACTEURS = {
+  rur_recherche: ['demandeur'], rur_reperage: ['demandeur', 'famille'], rur_demarche_coutumiere: ['demandeur', 'chef_village', 'famille'], rur_delimitation: ['geometre', 'famille', 'voisins'], rur_leve_topo: ['geometre'],
+  rur_enquete_fonciere: ['demandeur', 'agriculture'], rur_pv_famille: ['famille'], rur_enquete_pv_famille: ['chef_village', 'famille'], rur_commissaire_justice: ['commissaire_justice', 'famille'],
+  rur_convention_notaire: ['notaire', 'famille', 'demandeur'], rur_achat_liasses: ['demandeur', 'agriculture'], rur_depot_liasses: ['demandeur', 'agriculture'], rur_commissaire_enqueteur: ['agriculture', 'commissaire_enqueteur'],
+  rur_frais_ouverture_enquete: ['demandeur', 'agriculture'], rur_frais_comite_villageois: ['demandeur', 'comite_villageois'], rur_ouverture_enquete: ['commissaire_enqueteur', 'chef_village', 'comite_villageois', 'agriculture'],
+  rur_bornage_geometre: ['geometre'], rur_cloture_enquete: ['commissaire_enqueteur', 'voisins', 'geometre'], rur_frais_voisins: ['demandeur', 'voisins'], rur_traitement_agriculture: ['agriculture'],
+  rur_reunion_validation: ['sous_prefet', 'agriculture', 'comite_villageois'], rur_certificat_foncier: ['agriculture', 'demandeur'], rur_frais_publication: ['demandeur'],
+  rur_dossier_afor: ['demandeur', 'afor'], rur_transmission_conservation: ['afor', 'conservation_fonciere'], rur_transmission_cadastre: ['conservation_fonciere', 'cadastre'], rur_frais_bornage_contradictoire: ['demandeur', 'cadastre'],
+  rur_creation_tf: ['conservation_fonciere'], rur_transmission_afor: ['conservation_fonciere', 'afor'], rur_validation_ministere: ['afor', 'ministere_agriculture'], rur_retrait_titre: ['demandeur', 'afor']
+};
+Object.keys(FC_RURAL_ACTEURS).forEach(function(k){ FC_META_ETAPES[k] = { acteurs: FC_RURAL_ACTEURS[k], bloc: 0, pieces: [] }; });
+FC_META_ETAPES.rur_depot_liasses.pieces = ["À conserver : récépissé de dépôt à l'agriculture", 'Liasses renseignées'];
+FC_META_ETAPES.rur_certificat_foncier.pieces = ['Certificat foncier'];
+FC_META_ETAPES.rur_retrait_titre.pieces = ['Titre foncier retiré — vérifier la concordance avec le propriétaire et la parcelle'];
+Object.assign(FC_DEPENDANCES, {
+  rur_recherche: ['creation_dossier'], rur_reperage: ['rur_recherche'], rur_demarche_coutumiere: ['rur_reperage'], rur_delimitation: ['rur_demarche_coutumiere'], rur_leve_topo: ['rur_delimitation'],
+  rur_enquete_fonciere: ['rur_leve_topo'], rur_pv_famille: ['rur_enquete_fonciere'], rur_enquete_pv_famille: ['rur_pv_famille'], rur_commissaire_justice: ['rur_enquete_pv_famille'],
+  rur_convention_notaire: ['rur_commissaire_justice'], rur_achat_liasses: ['rur_convention_notaire'], rur_depot_liasses: ['rur_achat_liasses'], rur_commissaire_enqueteur: ['rur_depot_liasses'],
+  rur_frais_ouverture_enquete: ['rur_commissaire_enqueteur'], rur_frais_comite_villageois: ['rur_commissaire_enqueteur'], rur_ouverture_enquete: ['rur_frais_ouverture_enquete', 'rur_frais_comite_villageois'],
+  rur_bornage_geometre: ['rur_ouverture_enquete'], rur_cloture_enquete: ['rur_bornage_geometre'], rur_frais_voisins: ['rur_cloture_enquete'], rur_traitement_agriculture: ['rur_cloture_enquete', 'rur_frais_voisins'],
+  rur_reunion_validation: ['rur_traitement_agriculture'], rur_certificat_foncier: ['rur_reunion_validation'], rur_frais_publication: ['rur_certificat_foncier'], rur_dossier_afor: ['rur_certificat_foncier', 'rur_frais_publication'],
+  rur_transmission_conservation: ['rur_dossier_afor'], rur_transmission_cadastre: ['rur_transmission_conservation'], rur_frais_bornage_contradictoire: ['rur_transmission_cadastre'],
+  rur_creation_tf: ['rur_frais_bornage_contradictoire'], rur_transmission_afor: ['rur_creation_tf'], rur_validation_ministere: ['rur_transmission_afor'], rur_retrait_titre: ['rur_validation_ministere']
+});
+Object.assign(FC_EQUIPE_ETAPES, {
+  rur_recherche: ['foncier', '', ['commercial'], ['direction']], rur_reperage: ['foncier', '', ['technique'], []], rur_demarche_coutumiere: ['foncier', 'direction', ['juridique'], []],
+  rur_delimitation: ['technique', '', ['foncier'], []], rur_leve_topo: ['technique', '', [], ['foncier']], rur_enquete_fonciere: ['foncier', '', ['juridique'], []],
+  rur_pv_famille: ['juridique', '', ['foncier'], []], rur_enquete_pv_famille: ['juridique', '', ['foncier'], []], rur_commissaire_justice: ['juridique', 'direction', ['foncier'], []],
+  rur_convention_notaire: ['juridique', 'direction', ['foncier'], []], rur_achat_liasses: ['assistance', '', ['foncier', 'finance'], []], rur_depot_liasses: ['foncier', '', ['assistance'], ['direction']],
+  rur_commissaire_enqueteur: ['foncier', '', [], []], rur_frais_ouverture_enquete: ['finance', '', ['foncier'], []], rur_frais_comite_villageois: ['finance', '', ['foncier'], []],
+  rur_ouverture_enquete: ['foncier', '', ['juridique'], ['direction']], rur_bornage_geometre: ['technique', '', ['foncier'], []], rur_cloture_enquete: ['foncier', '', ['technique', 'juridique'], []],
+  rur_frais_voisins: ['finance', '', ['foncier'], []], rur_traitement_agriculture: ['foncier', '', [], ['direction']], rur_reunion_validation: ['foncier', '', ['juridique'], ['direction']],
+  rur_certificat_foncier: ['foncier', 'direction', [], ['commercial']], rur_frais_publication: ['finance', '', ['foncier'], []], rur_dossier_afor: ['foncier', 'direction', ['assistance', 'juridique'], []],
+  rur_transmission_conservation: ['assistance', '', ['foncier'], []], rur_transmission_cadastre: ['assistance', '', ['foncier'], []], rur_frais_bornage_contradictoire: ['finance', '', ['foncier'], []],
+  rur_creation_tf: ['foncier', '', [], ['direction', 'commercial']], rur_transmission_afor: ['assistance', '', ['foncier'], []], rur_validation_ministere: ['foncier', '', [], ['direction']],
+  rur_retrait_titre: ['assistance', 'direction', ['foncier'], ['commercial']]
+});
+Object.assign(FC_DELAIS_DEFAUT, {
+  rur_recherche: 30, rur_reperage: 7, rur_demarche_coutumiere: 14, rur_delimitation: 7, rur_leve_topo: 14, rur_enquete_fonciere: 21, rur_pv_famille: 14, rur_enquete_pv_famille: 14,
+  rur_commissaire_justice: 14, rur_convention_notaire: 30, rur_achat_liasses: 7, rur_depot_liasses: 7, rur_commissaire_enqueteur: 30, rur_frais_ouverture_enquete: 7, rur_frais_comite_villageois: 7,
+  rur_ouverture_enquete: 30, rur_bornage_geometre: 14, rur_cloture_enquete: 7, rur_frais_voisins: 7, rur_traitement_agriculture: 60, rur_reunion_validation: 30, rur_certificat_foncier: 30,
+  rur_frais_publication: 15, rur_dossier_afor: 15, rur_transmission_conservation: 15, rur_transmission_cadastre: 15, rur_frais_bornage_contradictoire: 7, rur_creation_tf: 60,
+  rur_transmission_afor: 15, rur_validation_ministere: 60, rur_retrait_titre: 15
+});
+Object.assign(FC_ROLES_DEFAUT, { rur_frais_ouverture_enquete: ['comptable'], rur_frais_comite_villageois: ['comptable'], rur_frais_voisins: ['comptable'], rur_frais_publication: ['comptable'], rur_frais_bornage_contradictoire: ['comptable'] });
+
 function fcUserUniqueParRole(roles) {
   var l = (DATA.users || []).filter(function(u){ return u && u.statut !== 'inactif' && roles.indexOf(u.role) !== -1; });
   return l.length === 1 ? l[0].id : '';
@@ -64169,8 +64277,8 @@ function fcRenderModeles() {
     + '<div class="table-wrap"><table><thead><tr><th>#</th><th>Étape</th><th>Durée (jours)</th><th>Responsable par défaut</th><th>Observé</th>' + (urb ? '<th title="Une étape facultative ne bloque plus la phase suivante (réforme)">Obligatoire</th>' : '') + '</tr></thead><tbody>';
   etapes.forEach(function(e){
     var c = (m.etapes || {})[e.code] || {}, j = parseInt(c.jours, 10) || 0; total += j;
-    if (e.phase !== phase) { phase = e.phase; h += '<tr><td colspan="' + (urb ? 6 : 5) + '" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;">' + (/^U/.test(phase) ? fcRouge(escHtml(fcLibPhase(phase))) : escHtml(fcLibPhase(phase))) + '</td></tr>'; }
-    h += '<tr><td>' + e.ordre + '</td><td>' + (fcEtapeProcedure(e) ? fcRouge(escHtml(e.libelle), fcTitreEtapeProc(e)) : escHtml(e.libelle)) + '</td><td><input type="number" min="0" max="3650" class="form-control" style="width:90px;" id="fm-j-' + e.code + '" value="' + (j || '') + '" ' + ro + '></td>'
+    if (e.phase !== phase) { phase = e.phase; h += '<tr><td colspan="' + (urb ? 6 : 5) + '" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;">' + fcMarquePhase(phase, escHtml(fcLibPhase(phase))) + '</td></tr>'; }
+    h += '<tr><td>' + e.ordre + '</td><td>' + fcMarqueEtape(e, escHtml(e.libelle)) + '</td><td><input type="number" min="0" max="3650" class="form-control" style="width:90px;" id="fm-j-' + e.code + '" value="' + (j || '') + '" ' + ro + '></td>'
       + '<td><select class="filter-select" id="fm-r-' + e.code + '" ' + ro + '><option value="">— responsable du dossier —</option>' + users.map(function(u){ return '<option value="' + u.id + '"' + (u.id === c.responsable_id ? ' selected' : '') + '>' + escHtml(u.nom || u.login) + '</option>'; }).join('') + '</select></td>'
       + '<td style="font-size:11px;color:var(--dim);">' + (sug && sug[e.code] ? '<span title="Durée sous laquelle 3 dossiers sur 4 se sont terminés (moyenne ' + sug[e.code].moyenne + ' j, médiane ' + sug[e.code].mediane + ' j)">' + sug[e.code].jours + ' j (P75, ' + sug[e.code].n + ' dossiers)</span>' : '') + '</td>' + (urb && e.phase.charAt(0) === 'U' ? '<td><input type="checkbox" id="fm-o-' + e.code + '" ' + (fcUrbainFacultative(e.code) ? '' : 'checked ') + ro + '></td>' : (urb ? '<td></td>' : '')) + '</tr>';
   });
