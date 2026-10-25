@@ -15,6 +15,7 @@ et simule le cloud. Ils protègent les règles ajoutées à la caisse :
 | `rapprochement.test.js` | écart réel cumulé par caisse, ruptures de chaîne, sessions techniques et rejets ignorés |
 | `remise.test.js` | remises banque/direction (pièce obligatoire, confirmation de réception par une autre personne), explication obligatoire d'un écart de clôture |
 | `gardes-creation.test.js` | contrôles de saisie sur le service d'une demande et l'import CSV (reprise d'historique par ligne), avertissement de virement hors demande |
+| `ecarts-techniques.test.js` | écart dû à un défaut corrigé : qualification (cause, correctif, auteur, date), jamais comptabilisé (seul ni en masse), hors cumul des écarts réels, annulable, refusé si déjà régularisé |
 | `reappro.test.js` | virement lié à la demande, doublon de demande, validation par un autre, statut monotone à la synchro |
 
 Lancer : `npm run test:caisse` (ou `node --test tests-caisse/*.test.js`).
