@@ -116309,6 +116309,9 @@ async function valCreate(type,refId,libelle,montant,meta){
 async function valDecide(id,decision,motif){
   var v=(DATA.validations||[]).find(function(x){return x.id===id;}); if(!v)return;
   if(decision==='valide' && typeof hasRole==='function' && !hasRole('admin') && !hasRole('manager')){ toast('Validation réservée à la hiérarchie.','error'); return; }
+  /* Attestation de solde : le DG doit pouvoir examiner les pièces avant de valider ; s'il ne les a pas ouvertes, on le lui demande. */
+  if(decision==='valide' && (v.type==='attestation_solde' || v.type==='attestation_solde_finale') && !(APP._attPiecesVues||{})[v.ref_id+'|'+attKindDeType(v.type)]
+     && !confirm('Vous n\'avez pas consulté les pièces justificatives de cette attestation (bouton « 🔎 Pièces »).\n\nValider quand même ?')) return;
   v.statut=decision; v.valideur=(APP.currentUser&&APP.currentUser.nom)||'—'; v.date_decision=today(); v.motif=motif||'';
   await dbPut('validations',v); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',v);
   await valApply(v.type,v.ref_id,decision);
@@ -116468,7 +116471,7 @@ function renderValidations(){
         else acts='<span style="font-size:11px;color:var(--blanc-dim);">réservé à la hiérarchie</span>';
       } else { acts='<span style="font-size:11px;color:var(--blanc-dim);">'+(v.valideur||'')+' · '+(v.date_decision||'')+(v.motif?(' · '+v.motif):'')+'</span>'; }
       if(v.type==='attestation_solde_cession') acts='<button class="btn btn-secondary btn-sm" onclick="cesAttApercu(\''+v.ref_id+'\')">👁 Voir</button> '+acts;
-      if(v.type==='attestation_solde' || v.type==='attestation_solde_finale') acts='<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">👁 Voir</button> '+acts;
+      if(v.type==='attestation_solde' || v.type==='attestation_solde_finale') acts='<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">👁 Voir</button> <button class="btn btn-secondary btn-sm" title="Versements, reçus, bons de caisse et écritures à l\'appui de l\'attestation" onclick="attSoldePieces(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">🔎 Pièces</button> '+acts;
       return '<tr><td>'+valTypeLabel(v.type)+'</td><td style="font-size:12px;">'+v.libelle+'</td><td style="text-align:right;font-weight:600;">'+fmtF(Math.round(v.montant||0))+'</td><td style="font-size:11px;">'+(v.demandeur||'—')+'</td><td>'+(v.date_demande||'—')+'</td><td>'+valStatutBadge(v.statut)+'</td><td style="white-space:nowrap;">'+acts+'</td></tr>';
         } });
       tb.innerHTML=rt.lignes; if(bar) bar.innerHTML=rt.barre; if(pied) pied.innerHTML=rt.pied;
@@ -117250,6 +117253,69 @@ function attSoldeApercu(clientId, kind){
   var html = (a.statut==='valide' && a.html) ? attSoldeHtmlFinal(a, c) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind), date:today(), projet:true, kind:kind, sansVisa:!!a.sans_visa});
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
   w.document.write(html); w.document.close();
+}
+/* Pièces justificatives d'une attestation de solde, présentées au DG/gérant AVANT validation : contrat, versements retenus
+   avec leur preuve d'encaissement (reçu, bon de caisse, référence bancaire) et leur écriture comptable, anomalies signalées.
+   Rien n'est inventé : chaque ligne vient des versements enregistrés ; ce qui manque est affiché « manquant ». */
+function attSoldePiecesDonnees(c, kind){
+  var S = attSoldeSolde(c, kind), anomalies = 0;
+  var lignes = S.vs.map(function(v){
+    var mvt = (DATA.caisse_mouvements||[]).find(function(m){ return m && m.versement_id === v.id; });
+    var ecr = (DATA.ecritures||[]).find(function(e){ return e && e.id === 'ecr_vrs_' + v.id; });
+    var especes = v.mode === 'especes', pb = [];
+    var caisse = '—';
+    if(especes){
+      if(!mvt){ caisse = 'bon de caisse manquant'; pb.push('Espèces sans bon de caisse'); }
+      else if(mvt.rejete){ caisse = (mvt.numero||'bon') + ' — rejeté'; pb.push('Bon de caisse rejeté'); }
+      else if(mvt.requiert_validation && mvt.valide !== true){ caisse = (mvt.numero||'bon') + ' — en attente de validation'; pb.push('Bon de caisse non validé'); }
+      else caisse = (mvt.numero||'bon') + ' — validé';
+    } else if(!String(v.reference||'').trim()){ pb.push('Aucune référence (chèque, virement…)'); }
+    if(!ecr) pb.push('Écriture comptable introuvable');
+    if(!String(v.ref||'').trim()) pb.push('Numéro de reçu absent');
+    if(pb.length) anomalies++;
+    return { v:v, caisse:caisse, ecriture: ecr ? 'oui' : 'manquante', problemes:pb };
+  });
+  return { S:S, lignes:lignes, anomalies:anomalies };
+}
+function attSoldePiecesHtml(c, kind){
+  var D = attSoldePiecesDonnees(c, kind), S = D.S, E = escHtml, a = c[attChamp(kind)] || {};
+  var prog = (DATA.programmes||[]).find(function(x){ return x.id===c.programme_id; }) || {};
+  var nom = ((c.prenoms||'') + ' ' + (c.nom||'')).trim();
+  var th = 'style="border:1px solid #bbb;padding:5px 7px;background:#eef1f6;text-align:left;font-size:12px;"', td = 'style="border:1px solid #bbb;padding:5px 7px;font-size:12px;vertical-align:top;"';
+  var rows = D.lignes.map(function(l){
+    var v = l.v, m = (v.montant_impute != null ? v.montant_impute : v.montant);
+    return '<tr' + (l.problemes.length ? ' style="background:#fff4e5;"' : '') + '>'
+      + '<td '+td+'>' + E(v.ref||'—') + '</td><td '+td+'>' + E(dateShort(v.date)) + '</td><td '+td+'>' + E(v.objet||'Valeur initiale logement') + '</td>'
+      + '<td '+td+'>' + E(v.mode||'—') + '</td><td '+td+'>' + E(v.reference||'—') + '</td><td '+td+'>' + E(l.caisse) + '</td>'
+      + '<td '+td+'>' + E(l.ecriture) + '</td><td '+td+' style="text-align:right;">' + fmtF(Math.round(parseFloat(m)||0)) + ' F' + (v.partiel ? ' (imputé)' : '') + '</td>'
+      + '<td '+td+'>' + (l.problemes.length ? '⚠️ ' + E(l.problemes.join(' ; ')) : '✅') + '</td></tr>';
+  }).join('');
+  return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Pièces justificatives — ' + E(a.numero||'attestation') + '</title></head>'
+    + '<body style="font-family:Arial,sans-serif;margin:24px;color:#111;">'
+    + '<h2 style="margin:0 0 4px;">Pièces justificatives — ' + E(attLibKind(kind)) + ' N° ' + E(a.numero||'—') + '</h2>'
+    + '<div style="color:#555;font-size:12px;margin-bottom:14px;">Document de contrôle pour la décision du DG / gérant. Ne se remet pas au souscripteur.</div>'
+    + '<h3 style="font-size:14px;">1. Souscripteur et contrat</h3>'
+    + '<table style="border-collapse:collapse;width:100%;margin-bottom:14px;"><tbody>'
+    + '<tr><td '+th+'>Souscripteur</td><td '+td+'>' + E(nom||'—') + '</td><td '+th+'>Dossier</td><td '+td+'>' + E(c.dossier||'—') + '</td></tr>'
+    + '<tr><td '+th+'>Programme</td><td '+td+'>' + E(prog.nom||prog.libelle||'—') + '</td><td '+th+'>Bien</td><td '+td+'>' + E(typeof recuBienLibelles==='function' ? recuBienLibelles(c) : '—') + '</td></tr>'
+    + '<tr><td '+th+'>Prix ' + (kind==='finale' ? 'final' : 'initial') + '</td><td '+td+'>' + fmtF(Math.round(S.prix)) + ' F</td><td '+th+'>Total versé retenu</td><td '+td+'>' + fmtF(Math.round(S.verse)) + ' F</td></tr>'
+    + '<tr><td '+th+'>Reste à payer</td><td '+td+'>' + fmtF(Math.max(0, Math.round(S.prix - S.verse))) + ' F</td><td '+th+'>Date de solde</td><td '+td+'>' + E(S.dateSolde ? dateShort(S.dateSolde) : '—') + '</td></tr>'
+    + '</tbody></table>'
+    + '<h3 style="font-size:14px;">2. Versements retenus et preuves d\'encaissement (' + D.lignes.length + ')</h3>'
+    + (D.lignes.length
+      ? '<table style="border-collapse:collapse;width:100%;"><thead><tr><th '+th+'>N° reçu</th><th '+th+'>Date</th><th '+th+'>Objet</th><th '+th+'>Mode</th><th '+th+'>Référence</th><th '+th+'>Bon de caisse</th><th '+th+'>Écriture</th><th '+th+'>Montant</th><th '+th+'>Contrôle</th></tr></thead><tbody>' + rows + '</tbody></table>'
+      : '<p style="color:#b00;">Aucun versement retenu pour ce souscripteur.</p>')
+    + '<h3 style="font-size:14px;margin-top:16px;">3. Synthèse des contrôles</h3>'
+    + '<p style="font-size:13px;">' + (S.solde ? '✅ Le souscripteur est soldé : les versements retenus couvrent le prix.' : '⛔ Le souscripteur n\'est pas soldé : l\'attestation serait rejetée à la validation.') + '<br>'
+    + (D.anomalies ? '⚠️ <b>' + D.anomalies + ' versement(s) à vérifier</b> (lignes surlignées) avant de valider.' : '✅ Aucune anomalie relevée sur les pièces.') + '</p>'
+    + '<p style="font-size:11px;color:#777;">Édité le ' + E(dateShort(today())) + ' par ' + E((APP.currentUser&&APP.currentUser.nom)||'—') + '. Les versements annulés ne sont pas retenus.</p>'
+    + '</body></html>';
+}
+function attSoldePieces(clientId, kind){
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
+  var w = window.open('','_blank','width=1000,height=800'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
+  w.document.write(attSoldePiecesHtml(c, kind)); w.document.close();
+  APP._attPiecesVues = APP._attPiecesVues || {}; APP._attPiecesVues[clientId + '|' + kind] = true;
 }
 function attSoldeImprimer(clientId, kind){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c[attChamp(kind)]; if(!a || a.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
