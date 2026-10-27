@@ -58,3 +58,16 @@ test('pièces : validation sans consultation → confirmation demandée ; refus 
     assert.ok(!app.etat.dialogues.some(function (d) { return /pièces justificatives/.test(d); }), 'pas de demande après consultation');
   } finally { await app.fermer(); }
 });
+
+test('souscripteur supprimé mais attestation encore en attente : message explicite, jamais un bouton muet', async () => {
+  const app = await ouvrirApp(); const page = app.page;
+  const r = await page.evaluate(function () {
+    window.__t = []; window.toast = function (m, t) { window.__t.push(String(m)); };
+    window.open = function () { window.__ouvert = true; return null; };
+    DATA.clients = [];
+    attSoldePieces('inexistant', 'initiale'); attSoldeApercu('inexistant', 'initiale');
+    return { t: window.__t, ouvert: !!window.__ouvert };
+  });
+  assert.equal(r.t.length, 2); assert.ok(r.t.every(function (m) { return /Souscripteur introuvable/.test(m); })); assert.equal(r.ouvert, false);
+  assert.deepEqual(app.etat.erreursPage, []);
+});
