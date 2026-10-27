@@ -16,6 +16,7 @@ et simule le cloud. Ils protègent les règles ajoutées à la caisse :
 | `remise.test.js` | remises banque/direction (pièce obligatoire, confirmation de réception par une autre personne), explication obligatoire d'un écart de clôture |
 | `gardes-creation.test.js` | contrôles de saisie sur le service d'une demande et l'import CSV (reprise d'historique par ligne), avertissement de virement hors demande |
 | `ecarts-techniques.test.js` | écart dû à un défaut corrigé : qualification (cause, correctif, auteur, date), jamais comptabilisé (seul ni en masse), hors cumul des écarts réels, annulable, refusé si déjà régularisé |
+| `validations-pagination.test.js` | page Validations : groupes repliables (Tout déployer / Tout réduire) et pagination (10/25/50/100) sur le circuit chantier & achats, les files d'attente et les historiques ; état conservé après une décision, recherche ramenée à la page 1 |
 | `foncier-immatriculation-rurale.test.js` | procédure rurale (AFOR / agriculture) : ouverte par la situation « parcelle rurale », 31 étapes en 4 phases dans l'ordre du document, ordre imposé jusqu'au retrait du titre, étapes et phases en bleu (urbain resté rouge), modèle par défaut et assistant |
 | `reappro.test.js` | virement lié à la demande, doublon de demande, validation par un autre, statut monotone à la synchro |
 

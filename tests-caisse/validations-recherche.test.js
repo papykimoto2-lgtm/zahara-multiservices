@@ -19,12 +19,12 @@ async function preparer(page) {
 const chercher = (page, txt) => page.evaluate(async function (t) {
   var el = document.getElementById('val-search'); el.value = t; el.dispatchEvent(new Event('input', { bubbles: true }));
   await new Promise(function (r) { setTimeout(r, 300); });
-  return { lignes: [].slice.call(document.querySelectorAll('#tbody-validations tr')).map(function (tr) { return tr.textContent.replace(/\s+/g, ' ').trim(); }), compte: document.getElementById('val-search-count').textContent };
+  return { lignes: [].slice.call(document.querySelectorAll('#tbody-validations tr:not(.val-grp-hd)')).map(function (tr) { return tr.textContent.replace(/\s+/g, ' ').trim(); }), compte: document.getElementById('val-search-count').textContent };
 }, txt);
 
 test('la barre de recherche est présente et la liste complète s\'affiche sans saisie', async () => {
   const app = await ouvrirApp(); await preparer(app.page);
-  const r = await app.page.evaluate(function () { return { barre: !!document.getElementById('val-search'), n: document.querySelectorAll('#tbody-validations tr').length, compte: document.getElementById('val-search-count').textContent }; });
+  const r = await app.page.evaluate(function () { return { barre: !!document.getElementById('val-search'), n: document.querySelectorAll('#tbody-validations tr:not(.val-grp-hd)').length, compte: document.getElementById('val-search-count').textContent }; });
   assert.equal(r.barre, true); assert.equal(r.n, 2); assert.equal(r.compte, '');
   assert.deepEqual(app.etat.erreursPage, []);
 });

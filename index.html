@@ -6046,10 +6046,12 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <input type="search" id="val-search" class="form-control" style="max-width:380px;" placeholder="🔍 Rechercher : type, objet, demandeur, date, montant, statut…" autocomplete="off" aria-label="Rechercher dans le circuit de validation" oninput="valSearchChange(this.value)">
             <span id="val-search-count" style="font-size:12px;color:var(--blanc-dim);"></span>
           </div>
+          <div id="val-toolbar"></div>
           <div class="table-wrap"><table>
           <thead><tr><th>Type</th><th>Objet</th><th style="text-align:right;">Montant</th><th>Demandeur</th><th>Date</th><th>Statut</th><th></th></tr></thead>
           <tbody id="tbody-validations"></tbody>
-        </table></div></div>
+        </table></div>
+          <div id="val-pagination"></div></div>
 
         <div class="steps-nav" style="margin:18px 0 10px;">
           <div class="etape">
@@ -114306,11 +114308,12 @@ function renderHistoriqueValidations() {
     if (!f.caisse.length) {
       boxC.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune décision de caisse sur cette période/filtre.</div>';
     } else {
-      var h = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N° bon</th><th>Type</th><th>Caisse</th><th>Motif</th><th style="text-align:right;">Montant</th><th>Demandeur</th><th>Décision</th><th>Par / le</th></tr></thead><tbody>';
-      f.caisse.forEach(function(m) {
+      boxC.innerHTML = valTableauCarte({ cle: 'h-caisse', items: f.caisse, thead: '<th>N° bon</th><th>Type</th><th>Caisse</th><th>Motif</th><th style="text-align:right;">Montant</th><th>Demandeur</th><th>Décision</th><th>Par / le</th>', rendu: 'renderHistoriqueValidations',
+        groupe: function(m) { return valMois((m.valide ? m.valide_le : m.rejete_le) || m.date); }, montant: function(m) { return m.montant; },
+        row: function(m) {
         var c = (DATA.caisses||[]).find(function(x){ return x.id===m.caisse_id; });
         var estValide = m.valide === true;
-        h += '<tr>'
+        return '<tr>'
           + '<td style="font-family:monospace;">' + escHtml(m.numero||'') + '</td>'
           + '<td><span class="badge" style="background:' + (m.type==='sortie'?'rgba(220,53,69,0.15);color:var(--rouge)':'rgba(16,163,74,0.15);color:var(--vert)') + ';">' + (m.type==='sortie'?'↓ Sortie':'↑ Entrée') + '</span></td>'
           + '<td>' + escHtml(c?c.nom:'') + '</td>'
@@ -114320,9 +114323,7 @@ function renderHistoriqueValidations() {
           + '<td>' + (estValide ? '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Validé</span>' : '<span class="badge" style="background:rgba(220,53,69,0.15);color:var(--rouge);">✖ Rejeté</span>') + (!estValide && m.motif_rejet ? '<div style="font-size:10px;color:var(--rouge);">' + escHtml(m.motif_rejet) + '</div>' : '') + '</td>'
           + '<td style="font-size:11px;">' + escHtml(estValide ? (m.valide_par||'') : (m.rejete_par||'')) + '<br><span style="color:var(--blanc-dim);">' + (estValide ? (m.valide_le||'').slice(0,16).replace('T',' ') : (m.rejete_le||'').slice(0,16).replace('T',' ')) + '</span></td>'
           + '</tr>';
-      });
-      h += '</tbody></table></div></div>';
-      boxC.innerHTML = h;
+        } });
     }
   }
 
@@ -114330,10 +114331,11 @@ function renderHistoriqueValidations() {
     if (!f.da.length) {
       boxD.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune décision de DA sur cette période/filtre.</div>';
     } else {
-      var h2 = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N° DA / FED</th><th>Objet</th><th style="text-align:right;">Montant</th><th>Demandeur</th><th>Décision</th><th>Par / le</th></tr></thead><tbody>';
-      f.da.forEach(function(d) {
+      boxD.innerHTML = valTableauCarte({ cle: 'h-da', items: f.da, thead: '<th>N° DA / FED</th><th>Objet</th><th style="text-align:right;">Montant</th><th>Demandeur</th><th>Décision</th><th>Par / le</th>', rendu: 'renderHistoriqueValidations',
+        groupe: function(d) { return valMois(d.valide_le || d.rejete_le); }, montant: function(d) { return d.montant; },
+        row: function(d) {
         var estRejete = d.statut === 'rejetee';
-        h2 += '<tr>'
+        return '<tr>'
           + '<td style="font-family:monospace;">' + escHtml(fedLabelDocument(d)) + '</td>'
           + '<td>' + escHtml(d.objet||'') + '</td>'
           + '<td style="text-align:right;font-weight:700;">' + fmtF(d.montant) + ' F</td>'
@@ -114341,9 +114343,7 @@ function renderHistoriqueValidations() {
           + '<td>' + (!estRejete ? '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Validé' + (d.statut==='decaissee'?' (payé)':'') + '</span>' : '<span class="badge" style="background:rgba(220,53,69,0.15);color:var(--rouge);">✖ Rejeté</span>') + (estRejete && d.motif_rejet ? '<div style="font-size:10px;color:var(--rouge);">' + escHtml(d.motif_rejet) + '</div>' : '') + '</td>'
           + '<td style="font-size:11px;">' + escHtml(d.valide_par||'') + '<br><span style="color:var(--blanc-dim);">' + ((d.valide_le||d.rejete_le)||'').slice(0,16).replace('T',' ') + '</span></td>'
           + '</tr>';
-      });
-      h2 += '</tbody></table></div></div>';
-      boxD.innerHTML = h2;
+        } });
     }
   }
 
@@ -114351,11 +114351,12 @@ function renderHistoriqueValidations() {
     if (!f.reappro.length) {
       boxR.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune décision de réapprovisionnement sur cette période/filtre.</div>';
     } else {
-      var h3 = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N°</th><th>Division / Caisse</th><th style="text-align:right;">Demandé</th><th style="text-align:right;">Accordé</th><th>Demandeur</th><th>Décision</th><th>Par / le</th></tr></thead><tbody>';
-      f.reappro.forEach(function(r) {
+      boxR.innerHTML = valTableauCarte({ cle: 'h-reappro', items: f.reappro, thead: '<th>N°</th><th>Division / Caisse</th><th style="text-align:right;">Demandé</th><th style="text-align:right;">Accordé</th><th>Demandeur</th><th>Décision</th><th>Par / le</th>', rendu: 'renderHistoriqueValidations',
+        groupe: function(r) { return valMois(r.valide_le); }, montant: function(r) { return r.montant_demande; },
+        row: function(r) {
         var estRejete = r.statut === 'rejetee';
         var caisse = (DATA.caisses||[]).find(function(x){ return x.id===r.caisse_id; });
-        h3 += '<tr>'
+        return '<tr>'
           + '<td style="font-family:monospace;">' + escHtml(r.numero||'') + '</td>'
           + '<td>' + escHtml(r.division_id ? _nomDivision(r.division_id) : '—')
             + '<div style="font-size:10px;color:var(--blanc-dim);">' + escHtml(caisse ? (caisse.nom||'') : '') + '</div></td>'
@@ -114368,9 +114369,7 @@ function renderHistoriqueValidations() {
             + (estRejete && r.motif_rejet ? '<div style="font-size:10px;color:var(--rouge);">' + escHtml(r.motif_rejet) + '</div>' : '') + '</td>'
           + '<td style="font-size:11px;">' + escHtml(r.valide_par||'') + '<br><span style="color:var(--blanc-dim);">' + (r.valide_le||'').slice(0,16).replace('T',' ') + '</span></td>'
           + '</tr>';
-      });
-      h3 += '</tbody></table></div></div>';
-      boxR.innerHTML = h3;
+        } });
     }
   }
 }
@@ -116373,8 +116372,55 @@ async function submitBC(id){
   var v=await valCreate('bon_commande', id, 'BC '+b.numero+' — '+bcFournisseurName(b.fournisseur_id), bcTotalHT(b), {chantier:b.chantier_id});
   if(v){ b.statut='en_attente_validation'; await dbPut('bons_commande',b); if(typeof syncToSupabase==='function')syncToSupabase('pi_bons_commande',b); renderAchats(); etudesLiveRefresh('bons_commande'); etudesLiveRefresh('validations'); toast('📤 Soumis à validation.','success'); }
 }
+/* ═══ Tableaux de validation longs : groupes repliables (« Tout déployer » / « Tout réduire ») + pagination ═══
+   Même principe pour tous les tableaux de la page Validations : les lignes sont regroupées (type, caisse, division, mois…), chaque groupe se replie,
+   et seule la page affichée est dessinée (10 / 25 / 50 / 100 lignes). L'état (groupes repliés, page, taille) est conservé après chaque décision. */
+function valPgEtat(cle){ APP._valPg = APP._valPg || {}; return APP._valPg[cle] || (APP._valPg[cle] = { page: 1, taille: 25 }); }
+function valGrpEtat(cle){ APP._valGrp = APP._valGrp || {}; return APP._valGrp[cle] || (APP._valGrp[cle] = {}); }
+function _valRendu(rendu){ if(typeof window[rendu]==='function') window[rendu](); }
+function valPgAller(cle, n, rendu){ valPgEtat(cle).page = Math.max(1, parseInt(n,10)||1); _valRendu(rendu); }
+function valPgTaille(cle, t, rendu){ var e = valPgEtat(cle); e.taille = [10,25,50,100].indexOf(parseInt(t,10))!==-1 ? parseInt(t,10) : 25; e.page = 1; _valRendu(rendu); }
+function valGrpBascule(cle, i, rendu){ var lab = ((APP._valGrpLabels||{})[cle]||[])[i]; if(lab===undefined) return; var g = valGrpEtat(cle); g[lab] = !g[lab]; _valRendu(rendu); }
+function valGrpTout(cle, ouvert, rendu){ var g = valGrpEtat(cle); ((APP._valGrpLabels||{})[cle]||[]).forEach(function(l){ g[l] = !ouvert; }); _valRendu(rendu); }
+/* o : { cle, items (déjà triés), colspan, groupe(item)→libellé (facultatif), montant(item)→nombre (facultatif), row(item)→'<tr>…</tr>', rendu:'nomDeFonction' }
+   Retourne { barre, lignes, pied } : barre = boutons Tout déployer / Tout réduire ; pied = pagination. */
+function valTableau(o){
+  var etat = valPgEtat(o.cle), grp = valGrpEtat(o.cle), items = o.items || [], total = items.length;
+  var ordre = [], parG = {};
+  if(o.groupe){ items.forEach(function(it){ var l = String(o.groupe(it) || '—'); if(!parG[l]){ parG[l] = []; ordre.push(l); } parG[l].push(it); }); items = []; ordre.forEach(function(l){ parG[l].forEach(function(it){ items.push({ it: it, g: l }); }); }); }
+  else items = items.map(function(it){ return { it: it, g: null }; });
+  APP._valGrpLabels = APP._valGrpLabels || {}; APP._valGrpLabels[o.cle] = ordre;
+  var pages = Math.max(1, Math.ceil(total / etat.taille)); etat.page = Math.min(Math.max(1, etat.page), pages);
+  var deb = (etat.page - 1) * etat.taille, vue = items.slice(deb, deb + etat.taille), lignes = '', courant = null, surPage = {};
+  vue.forEach(function(x){ if(x.g!==null) surPage[x.g] = (surPage[x.g]||0) + 1; });
+  vue.forEach(function(x, k){
+    if(x.g !== null && x.g !== courant){
+      courant = x.g; var i = ordre.indexOf(x.g), rep = !!grp[x.g], nb = parG[x.g].length, suite = (k === 0 && deb > 0 && items[deb - 1] && items[deb - 1].g === x.g);
+      var somme = o.montant ? parG[x.g].reduce(function(a, it){ return a + (parseFloat(o.montant(it)) || 0); }, 0) : null;
+      lignes += '<tr class="val-grp-hd" role="button" tabindex="0" aria-expanded="' + (rep ? 'false' : 'true') + '" onclick="valGrpBascule(\'' + o.cle + '\',' + i + ',\'' + o.rendu + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}" style="cursor:pointer;">'
+        + '<td colspan="' + o.colspan + '" style="background:var(--card2,#f5f1ea);font-weight:700;font-size:12px;"><span>' + (rep ? '▸' : '▾') + '</span> ' + escHtml(x.g) + (suite ? ' <i style="font-weight:400;">(suite)</i>' : '')
+        + ' <span style="background:rgba(0,0,0,.1);border-radius:9px;padding:0 7px;font-weight:400;">' + (nb > surPage[x.g] ? surPage[x.g] + ' sur ' + nb : nb) + '</span>'
+        + (somme !== null ? ' <span style="font-weight:400;color:var(--dim);">· ' + fmtF(Math.round(somme)) + ' F</span>' : '') + '</td></tr>';
+    }
+    if(x.g === null || !grp[x.g]) lignes += o.row(x.it);
+  });
+  var barre = ordre.length > 1 ? '<div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><button type="button" class="btn btn-secondary btn-sm" onclick="valGrpTout(\'' + o.cle + '\',true,\'' + o.rendu + '\')">▾ Tout déployer</button><button type="button" class="btn btn-secondary btn-sm" onclick="valGrpTout(\'' + o.cle + '\',false,\'' + o.rendu + '\')">▸ Tout réduire</button><span style="font-size:11px;color:var(--dim);">' + ordre.length + ' groupes</span></div>' : '';
+  var btn = function(n, lib, off){ return '<button type="button" class="btn btn-secondary btn-sm" ' + (off ? 'disabled ' : '') + 'onclick="valPgAller(\'' + o.cle + '\',' + n + ',\'' + o.rendu + '\')">' + lib + '</button>'; };
+  var pied = total <= 10 ? '<div style="font-size:11px;color:var(--dim);margin-top:6px;">' + total + ' élément(s)</div>'
+    : '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:12px;">' + btn(1, '«', etat.page === 1) + btn(etat.page - 1, '‹ Précédent', etat.page === 1)
+      + '<span>' + (deb + 1) + '–' + Math.min(total, deb + etat.taille) + ' sur <b>' + total + '</b> · page ' + etat.page + ' / ' + pages + '</span>' + btn(etat.page + 1, 'Suivant ›', etat.page === pages) + btn(pages, '»', etat.page === pages)
+      + '<label style="font-size:11px;color:var(--dim);">Lignes par page <select class="filter-select" onchange="valPgTaille(\'' + o.cle + '\',this.value,\'' + o.rendu + '\')">' + [10,25,50,100].map(function(t){ return '<option value="' + t + '"' + (t === etat.taille ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></label></div>';
+  return { barre: barre, lignes: lignes, pied: pied };
+}
+/* Tableau complet dans une carte (files d'attente et historiques). o.thead = cellules <th> ; o.colspan déduit du nombre de <th>. */
+function valTableauCarte(o){
+  o.colspan = (String(o.thead).match(/<th/g) || []).length || 1;
+  var r = valTableau(o);
+  return r.barre + '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr>' + o.thead + '</tr></thead><tbody>' + r.lignes + '</tbody></table></div>' + r.pied + '</div>';
+}
+function valMois(d){ var m = String(d||'').slice(0,7); return /^\d{4}-\d{2}$/.test(m) ? m : 'Sans date'; }
 var valFilter='en_attente';
-function valSetFilter(fl){ valFilter=fl; document.querySelectorAll('#val-filter-tabs .tab-btn').forEach(function(b){ b.classList.toggle('active', (b.getAttribute('onclick')||'').indexOf("'"+fl+"'")!==-1); }); renderValidations(); }
+function valSetFilter(fl){ valFilter=fl; valPgEtat('circuit').page=1; document.querySelectorAll('#val-filter-tabs .tab-btn').forEach(function(b){ b.classList.toggle('active', (b.getAttribute('onclick')||'').indexOf("'"+fl+"'")!==-1); }); renderValidations(); }
 function valReject(id){ var m=prompt('Motif du rejet ?',''); if(m===null)return; valDecide(id,'rejete',m||''); }
 /* Recherche multicritère : tous les mots saisis doivent apparaître (type, objet, demandeur, valideur, motif, date, montant, statut),
    sans tenir compte des accents ni de la casse ; le montant se cherche avec ou sans espaces. */
@@ -116389,7 +116435,7 @@ function valCorrespond(v, termes){
   return termes.every(function(t){ return foin.indexOf(t)!==-1 || foinSansEspace.indexOf(t.replace(/[\s\u00a0\u202f]/g,''))!==-1; });
 }
 function valSearchChange(txt){
-  valSearch=String(txt||'');
+  valSearch=String(txt||''); valPgEtat('circuit').page=1;
   clearTimeout(_valSearchTimer);
   _valSearchTimer=setTimeout(function(){ if(typeof renderValidations==='function') renderValidations(); }, 150);
 }
@@ -116409,10 +116455,13 @@ function renderValidations(){
   var cpt = document.getElementById('val-search-count');
   if(cpt) cpt.textContent = termes.length ? (list.length+' / '+totalListe+' résultat(s)') : '';
   var canDecide=(typeof hasRole!=='function')||hasRole('admin')||hasRole('manager');
-  var tb=document.getElementById('tbody-validations');
+  var tb=document.getElementById('tbody-validations'), bar=document.getElementById('val-toolbar'), pied=document.getElementById('val-pagination');
   if(tb){
-    if(!list.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:20px;">'+(termes.length?'Aucun résultat pour cette recherche.':'Aucun élément.')+'</td></tr>'; }
-    else tb.innerHTML=list.slice().sort(function(a,b){return (b.date_demande||'').localeCompare(a.date_demande||'');}).map(function(v){
+    if(!list.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:20px;">'+(termes.length?'Aucun résultat pour cette recherche.':'Aucun élément.')+'</td></tr>'; if(bar) bar.innerHTML=''; if(pied) pied.innerHTML=''; }
+    else {
+      var trie=list.slice().sort(function(a,b){return (b.date_demande||'').localeCompare(a.date_demande||'');});
+      var rt=valTableau({ cle:'circuit', items:trie, colspan:7, rendu:'renderValidations', groupe:function(v){ return valTypeLabel(v.type); }, montant:function(v){ return v.montant; },
+        row:function(v){
       var acts='';
       if(v.statut==='en_attente'){
         if(canDecide) acts='<button class="btn btn-primary btn-sm" onclick="valDecide(\''+v.id+'\',\'valide\')">✅ Valider</button> <button class="btn btn-danger btn-sm" onclick="valReject(\''+v.id+'\')">⛔ Rejeter</button>';
@@ -116421,7 +116470,9 @@ function renderValidations(){
       if(v.type==='attestation_solde_cession') acts='<button class="btn btn-secondary btn-sm" onclick="cesAttApercu(\''+v.ref_id+'\')">👁 Voir</button> '+acts;
       if(v.type==='attestation_solde' || v.type==='attestation_solde_finale') acts='<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">👁 Voir</button> '+acts;
       return '<tr><td>'+valTypeLabel(v.type)+'</td><td style="font-size:12px;">'+v.libelle+'</td><td style="text-align:right;font-weight:600;">'+fmtF(Math.round(v.montant||0))+'</td><td style="font-size:11px;">'+(v.demandeur||'—')+'</td><td>'+(v.date_demande||'—')+'</td><td>'+valStatutBadge(v.statut)+'</td><td style="white-space:nowrap;">'+acts+'</td></tr>';
-    }).join('');
+        } });
+      tb.innerHTML=rt.lignes; if(bar) bar.innerHTML=rt.barre; if(pied) pied.innerHTML=rt.pied;
+    }
   }
 }
 
@@ -140671,13 +140722,14 @@ function _pilotageRenderValidCaisse() {
 
   var monPlafond = (typeof userPlafond === 'function') ? userPlafond() : Infinity;
   var jePeuxValider = (typeof userPeut === 'function') ? userPeut('Caisse', 'v') : true;
-  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Type</th><th>Date</th><th>Caisse</th><th>Motif</th><th>Bénéficiaire</th><th style="text-align:right;">Montant</th><th>Demandé par</th><th></th></tr></thead><tbody>';
-  liste.forEach(function(m) {
+  box.innerHTML = valTableauCarte({ cle: 'caisse', items: liste, thead: '<th>Type</th><th>Date</th><th>Caisse</th><th>Motif</th><th>Bénéficiaire</th><th style="text-align:right;">Montant</th><th>Demandé par</th><th></th>', rendu: 'renderPageValidations',
+    groupe: function(m) { return (function(){ var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; }); return c ? c.nom : 'Caisse supprimée'; })(); }, montant: function(m) { return m.montant; },
+    row: function(m) {
     var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
     var montant = parseFloat(m.montant) || 0;
     var habiliteMontant = jePeuxValider && (!isFinite(monPlafond) || montant <= monPlafond);
     var estSortie = m.type === 'sortie';
-    html += '<tr>'
+    return '<tr>'
       + '<td><span class="badge" style="background:' + (estSortie?'rgba(220,53,69,0.15);color:var(--rouge)':'rgba(16,163,74,0.15);color:var(--vert)') + ';">' + (estSortie?'↓ Sortie':'↑ Entrée') + '</span></td>'
       + '<td>' + (m.date||'').slice(0,10) + '</td>'
       + '<td>' + escHtml(c ? c.nom : '') + '</td>'
@@ -140691,9 +140743,7 @@ function _pilotageRenderValidCaisse() {
             + '<button class="btn btn-danger btn-sm" onclick="caisseRejeterDecaissement(\'' + m.id + '\').then(renderPageValidations)">✖ Rejeter</button>'
           : '<span class="badge badge-neutre" title="Plafond insuffisant">🔒</span>')
       + '</td></tr>';
-  });
-  html += '</tbody></table></div></div>';
-  box.innerHTML = html;
+    } });
 }
 
 function _pilotageRenderValidFED() {
@@ -140706,10 +140756,11 @@ function _pilotageRenderValidFED() {
   if (badge) { badge.textContent = fiches.length; badge.style.display = fiches.length ? 'inline-block' : 'none'; }
   if (!fiches.length) { box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:24px;">✅ Aucune fiche d\'engagement en attente' + (divFiltre ? ' pour ce secteur' : '') + '.</div>'; return; }
 
-  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N°</th><th>Objet</th><th>Ligne</th><th>Division</th><th style="text-align:right;">Montant</th><th></th></tr></thead><tbody>';
-  fiches.forEach(function(d) {
+  box.innerHTML = valTableauCarte({ cle: 'fed', items: fiches, thead: '<th>N°</th><th>Objet</th><th>Ligne</th><th>Division</th><th style="text-align:right;">Montant</th><th></th>', rendu: 'renderPageValidations',
+    groupe: function(d) { return d.division_id ? _nomDivision(d.division_id) : 'Sans division'; }, montant: function(d) { return d.montant; },
+    row: function(d) {
     var divLabel = d.division_id ? escHtml(_nomDivision(d.division_id)) : '—';
-    html += '<tr>'
+    return '<tr>'
       + '<td><b>' + escHtml(fedLabelDocument(d)) + '</b></td>'
       + '<td>' + escHtml(d.objet||'') + '</td><td>' + escHtml(d.compte) + '</td><td>' + divLabel + '</td>'
       + '<td style="text-align:right;">' + fmtF(d.montant) + ' F</td>'
@@ -140717,9 +140768,7 @@ function _pilotageRenderValidFED() {
       + '<button class="btn btn-primary btn-sm" onclick="daValider(\'' + d.id + '\').then(renderPageValidations)">✅ Valider</button> '
       + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)daRejeter(\'' + d.id + '\',m).then(renderPageValidations);})()">❌ Rejeter</button>'
       + '</td></tr>';
-  });
-  html += '</tbody></table></div></div>';
-  box.innerHTML = html;
+    } });
 }
 
 /* Demandes de réapprovisionnement de fonds en attente. Le solde constaté
@@ -140737,12 +140786,13 @@ function _pilotageRenderValidReappro() {
 
   var monPlafond = (typeof userPlafond === 'function') ? userPlafond() : Infinity;
   var jePeuxValider = (typeof userPeut === 'function') ? userPeut('Caisse', 'v') : true;
-  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N°</th><th>Division / Caisse</th><th style="text-align:right;">Demandé</th><th style="text-align:right;">Solde constaté</th><th>Motif</th><th>Demandé par</th><th></th></tr></thead><tbody>';
-  liste.forEach(function(d) {
+  box.innerHTML = valTableauCarte({ cle: 'reappro', items: liste, thead: '<th>N°</th><th>Division / Caisse</th><th style="text-align:right;">Demandé</th><th style="text-align:right;">Solde constaté</th><th>Motif</th><th>Demandé par</th><th></th>', rendu: 'renderPageValidations',
+    groupe: function(d) { return d.division_id ? _nomDivision(d.division_id) : 'Sans division'; }, montant: function(d) { return d.montant_demande; },
+    row: function(d) {
     var caisse = (DATA.caisses||[]).find(function(x){ return x.id === d.caisse_id; });
     var montant = parseFloat(d.montant_demande) || 0;
     var habilite = jePeuxValider && (!isFinite(monPlafond) || montant <= monPlafond);
-    html += '<tr>'
+    return '<tr>'
       + '<td><b>' + escHtml(d.numero||'') + '</b></td>'
       + '<td>' + escHtml(d.division_id ? _nomDivision(d.division_id) : '—')
         + '<div style="font-size:10px;color:var(--blanc-dim);">' + escHtml(caisse ? (caisse.nom||'') : 'caisse supprimée') + '</div></td>'
@@ -140756,9 +140806,7 @@ function _pilotageRenderValidReappro() {
             + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)reapRejeter(\'' + d.id + '\', m).then(renderPageValidations);})()">❌ Rejeter</button>'
           : '<span style="font-size:11px;color:var(--blanc-dim);">Au-dessus de votre plafond</span>')
       + '</td></tr>';
-  });
-  html += '</tbody></table></div></div>';
-  box.innerHTML = html;
+    } });
 }
 
 function _pilotageRenderValidTransferts() {
@@ -140771,19 +140819,18 @@ function _pilotageRenderValidTransferts() {
   if (badge) { badge.textContent = transferts.length; badge.style.display = transferts.length ? 'inline-block' : 'none'; }
   if (!transferts.length) { box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:24px;">✅ Aucun transfert budgétaire en attente' + (divFiltre ? ' pour ce secteur' : '') + '.</div>'; return; }
 
-  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>De</th><th>Vers</th><th>Division</th><th style="text-align:right;">Montant</th><th>Motif</th><th></th></tr></thead><tbody>';
-  transferts.forEach(function(t) {
+  box.innerHTML = valTableauCarte({ cle: 'transferts', items: transferts, thead: '<th>De</th><th>Vers</th><th>Division</th><th style="text-align:right;">Montant</th><th>Motif</th><th></th>', rendu: 'renderPageValidations',
+    groupe: function(t) { return t.division_id ? _nomDivision(t.division_id) : 'Sans division'; }, montant: function(t) { return t.montant; },
+    row: function(t) {
     var divLabel = t.division_id ? escHtml(_nomDivision(t.division_id)) : '—';
-    html += '<tr>'
+    return '<tr>'
       + '<td><b>' + escHtml(t.compte_source) + '</b></td><td><b>' + escHtml(t.compte_dest) + '</b></td><td>' + divLabel + '</td>'
       + '<td style="text-align:right;">' + fmtF(t.montant) + ' F</td><td style="font-size:12px;">' + escHtml(t.motif||'') + '</td>'
       + '<td style="white-space:nowrap;">'
       + '<button class="btn btn-primary btn-sm" onclick="transfertValider(\'' + t.id + '\').then(renderPageValidations)">✅ Valider</button> '
       + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)transfertRejeter(\'' + t.id + '\',m).then(renderPageValidations);})()">❌ Rejeter</button>'
       + '</td></tr>';
-  });
-  html += '</tbody></table></div></div>';
-  box.innerHTML = html;
+    } });
 }
 
 function _pilotageRenderValidBudgetPrev() {
@@ -140796,10 +140843,11 @@ function _pilotageRenderValidBudgetPrev() {
   if (badge) { badge.textContent = lignes.length; badge.style.display = lignes.length ? 'inline-block' : 'none'; }
   if (!lignes.length) { box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:24px;">✅ Aucun budget prévisionnel en attente' + (divFiltre ? ' pour ce secteur' : '') + '.</div>'; return; }
 
-  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Compte</th><th>Libellé</th><th>Division</th><th>Exercice</th><th style="text-align:right;">Montant</th><th>Soumis par</th><th></th></tr></thead><tbody>';
-  lignes.forEach(function(b) {
+  box.innerHTML = valTableauCarte({ cle: 'budgetprev', items: lignes, thead: '<th>Compte</th><th>Libellé</th><th>Division</th><th>Exercice</th><th style="text-align:right;">Montant</th><th>Soumis par</th><th></th>', rendu: 'renderPageValidations',
+    groupe: function(b) { return b.division_id ? _nomDivision(b.division_id) : 'Sans division'; }, montant: function(b) { return b.montant; },
+    row: function(b) {
     var divLabel = b.division_id ? escHtml(_nomDivision(b.division_id)) : '—';
-    html += '<tr>'
+    return '<tr>'
       + '<td><b>' + escHtml(b.compte) + '</b></td><td>' + escHtml(b.libelle||'') + '</td><td>' + divLabel + '</td><td>' + escHtml(String(b.exercice||'')) + '</td>'
       + '<td style="text-align:right;">' + fmtF(b.montant) + ' F</td>'
       + '<td style="font-size:11px;">' + escHtml(b.soumis_par||'—') + '</td>'
@@ -140807,9 +140855,7 @@ function _pilotageRenderValidBudgetPrev() {
       + '<button class="btn btn-primary btn-sm" onclick="budgetPrevisionnelValider(\'' + b.id + '\').then(renderPageValidations)">✅ Valider</button> '
       + '<button class="btn btn-danger btn-sm" onclick="(function(){var m=prompt(\'Motif du rejet :\');if(m!==null)budgetPrevisionnelRejeter(\'' + b.id + '\',m).then(renderPageValidations);})()">❌ Rejeter</button>'
       + '</td></tr>';
-  });
-  html += '</tbody></table></div></div>';
-  box.innerHTML = html;
+    } });
 }
 
 /* Badge global du nav-item Pilotage → Validations — total des 4 files,
