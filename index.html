@@ -117247,8 +117247,9 @@ async function attSoldeDemander(clientId, kind){
   attSoldeRafraichirUI(c.id);
   toast('📤 Attestation transmise au DG / gérant pour validation (menu Validations).','success');
 }
+function attSoldeClientIntrouvable(){ toast('⛔ Souscripteur introuvable : son dossier a été supprimé alors que cette attestation est encore en attente. Rejetez la demande, ou restaurez le souscripteur avant de la traiter.','error'); }
 function attSoldeApercu(clientId, kind){
-  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c){ attSoldeClientIntrouvable(); return; }
   var a = c[attChamp(kind)] || {};
   var html = (a.statut==='valide' && a.html) ? attSoldeHtmlFinal(a, c) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind), date:today(), projet:true, kind:kind, sansVisa:!!a.sans_visa});
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
@@ -117312,7 +117313,7 @@ function attSoldePiecesHtml(c, kind){
     + '</body></html>';
 }
 function attSoldePieces(clientId, kind){
-  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
+  var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c){ attSoldeClientIntrouvable(); return; }
   var w = window.open('','_blank','width=1000,height=800'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
   w.document.write(attSoldePiecesHtml(c, kind)); w.document.close();
   APP._attPiecesVues = APP._attPiecesVues || {}; APP._attPiecesVues[clientId + '|' + kind] = true;
