@@ -65,5 +65,7 @@
       "claude/*": false,
       "ccr-*": false
     }
-  }
+  },
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
 }
