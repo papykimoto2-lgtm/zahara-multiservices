@@ -2,6 +2,10 @@
 <html lang="fr">
 <head>
 <script>
+/* Perf : pollers suspendus quand l'onglet est masqué (moins de réseau/CPU). Les intervalles <=1s (horloges) restent inchangés. */
+(function(){ var _si = window.setInterval; window.setInterval = function(fn, ms){ var a = [].slice.call(arguments, 2); if (typeof fn !== 'function' || ms <= 1000) return _si.apply(window, arguments); return _si.apply(window, [function(){ if (document.hidden) return; return fn.apply(this, a); }, ms]); }; })();
+</script>
+<script>
 /* Rapport CSP (mode observation) : les violations sont gardées dans le navigateur (50 dernières) et visibles via cspRapport(). */
 (function(){ var K = 'csp_violations'; window.cspRapport = function(){ try { return JSON.parse(localStorage.getItem(K) || '[]'); } catch (e) { return []; } };
   document.addEventListener('securitypolicyviolation', function(e){ var l = window.cspRapport(); l.push({ date: new Date().toISOString(), directive: e.violatedDirective, bloque: e.blockedURI, page: e.documentURI, ligne: e.lineNumber || 0, mode: e.disposition });
@@ -9,9 +13,7 @@
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="manifest" href="manifest-erp.json">
 <meta name="theme-color" content="#1B4332">
 <meta name="mobile-web-app-capable" content="yes">
