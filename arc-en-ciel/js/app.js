@@ -12,7 +12,7 @@ const VUES = [
 
 /* ───────── Configuration (1re ouverture) ───────── */
 function vueConfig() {
-  const url = el("input", { type: "url", required: true, placeholder: "https://xxxxxxxxxxxxxxxxxxxx.supabase.co", autocomplete: "off", inputmode: "url" });
+  const url = el("input", { type: "url", required: true, placeholder: "https://<réf-du-projet>.supabase.co", autocomplete: "off", inputmode: "url" });
   const cle = el("input", { type: "text", required: true, placeholder: "Clé « anon » (publique) du projet", autocomplete: "off" });
   const f = el("form", { class: "card", onsubmit: ev => { ev.preventDefault();
     const u = url.value.trim().replace(/\/+$/, "");
