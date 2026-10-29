@@ -10,19 +10,26 @@
   var D = G.document, M = G.ERP_MARQUE || {}, API = G.ARC_API, UI = G.ARC_UI;
   var el = UI.el, fc = UI.fc, fd = UI.fd, fdt = UI.fdt, badge = UI.badge, kpi = UI.kpi, card = UI.card, table = UI.table, toast = UI.toast, field = UI.field, msgErr = UI.msgErr;
   var sb = API.sb, ok = API.ok, rpc = API.rpc, from = API.from;
-  var S = { user: null, roles: [], perms: new Set(), membre: null, vue: "cite" };
+  var S = { user: null, roles: [], perms: new Set(), membre: null, vue: "auj" };
   var racine = D.getElementById("app");
   var echecs = 0, bloqueJusqua = 0;
   function can(p) { return S.perms.has(p); }
 
   var VUES = [
-    ["cite", "Ma cité", function () { return true; }, vueCite],
-    ["finances", "Finances", function () { return can("finance.lire") || can("finance.encaisser"); }, vueFinances],
-    ["depenses", "Dépenses", function () { return can("depense.creer") || can("depense.approuver") || can("depense.payer") || can("finance.lire"); }, vueDepenses],
-    ["reunions", "Réunions", function () { return true; }, vueReunions],
-    ["documents", "Documents", function () { return true; }, vueDocuments],
-    ["audit", "Audit", function () { return can("audit.lire"); }, vueAudit]
+    ["auj", "🏠 Aujourd'hui", function () { return true; }, vueAujourdhui],
+    ["cite", "🏘️ Ma cité", function () { return true; }, vueCite],
+    ["finances", "💰 Argent", function () { return can("finance.lire") || can("finance.encaisser"); }, vueFinances],
+    ["depenses", "🧾 Dépenses", function () { return can("depense.creer") || can("depense.approuver") || can("depense.payer") || can("finance.lire"); }, vueDepenses],
+    ["reunions", "📅 Réunions", function () { return true; }, vueReunions],
+    ["documents", "📁 Documents", function () { return true; }, vueDocuments],
+    ["audit", "🛡️ Audit et contrôle", function () { return can("audit.lire"); }, vueAudit]
   ];
+  var THEMES = [["bleu", "#1a3aa8"], ["teal", "#0e7490"], ["emeraude", "#0f7b5f"], ["orange", "#c9500a"], ["violet", "#6a32c9"], ["or", "#15171d"]];
+  var LIBROLES = { president: "Président", vice_president: "Vice-président", secretaire: "Secrétaire général", tresorier: "Trésorier", tresorier_adjoint: "Trésorier adjoint", second_approbateur: "Second approbateur",
+    responsable_commission: "Responsable de commission", controleur: "Contrôleur financier", commission_sociale: "Commission sociale", admin_technique: "Administrateur technique", membre: "Membre" };
+  function theme(t) { if (t) { try { localStorage.setItem("arc_theme", t); } catch (e) { } } var c; try { c = localStorage.getItem("arc_theme"); } catch (e) { c = null; }
+    c = THEMES.some(function (x) { return x[0] === c; }) ? c : "bleu"; if (c === "bleu") D.documentElement.removeAttribute("data-theme"); else D.documentElement.setAttribute("data-theme", c); return c; }
+  theme();
 
   /* ---------- Configuration (première ouverture) ---------- */
   function vueConfig() {
@@ -60,22 +67,85 @@
     racine.replaceChildren(el("div", { class: "login" }, el("img", { src: "icons/arc-192.png", width: 64, height: 64, alt: "" }), el("h1", {}, M.nom), el("p", { class: "mu" }, M.cite), f));
   }
 
-  /* ---------- Coque ---------- */
+  /* ---------- Coque : menu latéral, pastille de synchronisation ---------- */
+  var SYNC = { t: null, er: false }, OUVERT = false;
+  function hhmm(d) { return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+  function prenom() { return S.membre ? (S.membre.prenoms || S.membre.nom).split(" ")[0] : "membre"; }
   function coque(contenu) {
+    var cur = theme();
     var nav = el("nav", { "aria-label": "Sections" }, VUES.filter(function (v) { return v[2](); }).map(function (v) {
-      return el("button", { "aria-current": S.vue === v[0] ? "page" : null, onclick: function () { S.vue = v[0]; afficher(); } }, v[1]);
+      return el("button", { "aria-current": S.vue === v[0] ? "page" : null, onclick: function () { S.vue = v[0]; OUVERT = false; afficher(); } }, v[1]);
     }));
-    racine.replaceChildren(
-      el("header", {}, el("img", { src: "icons/arc-192.png", alt: "" }), el("h1", {}, M.nom),
-        el("button", { onclick: function () { sb.auth.signOut().then(function () { S.user = null; if (API.enDemo) G.location.reload(); else vueLogin(); }); } }, "Déconnexion")),
-      API.enDemo ? el("div", { class: "demo" }, "MODE DÉMONSTRATION — données fictives, aucune écriture") : null,
-      nav, el("main", {}, contenu),
-      el("div", { class: "ft" }, "Application développée par " + M.editeur + " · " + M.contact));
+    var role = S.roles.length ? S.roles.map(function (r) { return LIBROLES[r] || r; }).join(", ") : "Membre";
+    var pastille = API.enDemo ? el("span", { class: "pill dm" }, "Mode démonstration") : SYNC.er ? el("span", { class: "pill er" }, "Passerelle en erreur") : el("span", { class: "pill" }, "Synchronisé " + (SYNC.t ? hhmm(SYNC.t) : "…"));
+    var sb_ = el("aside", { class: "sb" },
+      el("div", { class: "br" }, el("img", { src: "icons/arc-192.png", alt: "" }), el("div", {}, el("b", {}, M.nom), el("span", {}, M.cite))), nav, el("div", { class: "grow" }),
+      el("div", { class: "dev" }, "Logiciel développé par " + M.editeur + " · " + M.contact),
+      el("div", { class: "me" }, el("b", {}, S.membre ? S.membre.nom + " " + (S.membre.prenoms || "") : "Compte connecté"), el("span", {}, role)),
+      el("div", { class: "dots", role: "group", "aria-label": "Couleur de l'application" }, THEMES.map(function (t) {
+        return el("button", { "data-c": t[1], "aria-label": "Thème " + t[0], "aria-pressed": cur === t[0] ? "true" : "false", onclick: function () { theme(t[0]); afficher(); } });
+      })),
+      el("button", { class: "lk", onclick: function () { sb.auth.signOut().then(function () { S.user = null; if (API.enDemo) G.location.reload(); else vueLogin(); }); } }, "↩ Déconnexion"), pastille);
+    Array.prototype.forEach.call(sb_.querySelectorAll(".dots button"), function (b) { b.style.background = b.getAttribute("data-c"); });
+    var top = el("div", { class: "top" }, el("button", { "aria-label": "Menu", onclick: function () { OUVERT = !OUVERT; sh.classList.toggle("open", OUVERT); } }, "☰"), el("b", {}, M.nom));
+    var sh = el("div", { class: "shell" + (OUVERT ? " open" : "") }, sb_, el("div", {}, top, API.enDemo ? el("div", { class: "demo" }, "MODE DÉMONSTRATION — données fictives, aucune écriture") : null, el("main", { class: "ct" }, contenu)));
+    racine.replaceChildren(sh);
   }
   function afficher() {
     var v = VUES.filter(function (x) { return x[0] === S.vue && x[2](); })[0] || VUES[0];
     coque(el("p", { class: "mu" }, "Chargement…"));
-    v[3]().then(coque, function (e) { coque(card("Erreur", el("p", {}, msgErr(e)))); });
+    v[3]().then(function (c) { SYNC.t = new Date(); SYNC.er = false; coque(c); }, function (e) { SYNC.er = true; coque(card("Erreur", el("p", {}, msgErr(e)))); });
+  }
+
+  /* ---------- Aujourd'hui : ce qui demande l'attention maintenant ---------- */
+  var ALK = "arc_alertes";
+  function alertesEtat() { try { return JSON.parse(localStorage.getItem(ALK) || "{}"); } catch (e) { return {}; } }
+  function alerteMaj(id, v) { var a = alertesEtat(); a[id] = v; try { localStorage.setItem(ALK, JSON.stringify(a)); } catch (e) { } afficher(); }
+  function vueAujourdhui() {
+    var mid = S.membre ? S.membre.id : "00000000-0000-0000-0000-000000000000", fin = can("finance.lire") || can("finance.encaisser");
+    return Promise.all([
+      ok(from("v_appels").select("montant_appele,montant_paye,reste,statut,member_id")),
+      (can("depense.approuver") || can("depense.payer") || can("finance.lire")) ? ok(from("expense_requests").select("id,statut,montant")) : Promise.resolve([]),
+      ok(from("meetings").select("titre,date_heure").gte("date_heure", new Date().toISOString()).order("date_heure").limit(3)),
+      can("audit.lire") ? rpc("verifier_chaine_audit") : Promise.resolve([]),
+      fin ? ok(from("v_soldes_comptes").select("solde")) : Promise.resolve([])
+    ]).then(function (R) {
+      var appels = R[0], deps = R[1], reunions = R[2], rupt = R[3], soldes = R[4];
+      var mes = appels.filter(function (a) { return a.member_id === mid; });
+      var duMoi = mes.filter(function (a) { return a.statut !== "paye"; }).reduce(function (s, a) { return s + Number(a.reste); }, 0);
+      var retardMoi = mes.filter(function (a) { return a.statut === "en_retard"; });
+      var retardTous = appels.filter(function (a) { return a.statut === "en_retard"; });
+      var aValider = deps.filter(function (d) { return d.statut === "soumise"; }).length, aPayer = deps.filter(function (d) { return d.statut === "approuvee"; }).length;
+      var tres = soldes.reduce(function (s, x) { return s + Number(x.solde); }, 0), impayes = retardTous.reduce(function (s, a) { return s + Number(a.reste); }, 0);
+      var kp = [];
+      if (can("depense.approuver")) kp.push(kpi("à valider", String(aValider), "🧾"));
+      if (can("depense.payer")) kp.push(kpi("à payer", String(aPayer), "💸"));
+      if (fin) kp.push(kpi("impayés en retard", fc(impayes), "⏰"), kpi("trésorerie", fc(tres), "🏦"));
+      kp.push(kpi("votre reste à payer", fc(duMoi), "🏘️"));
+      var AL = [];
+      if (rupt.length) AL.push({ id: "chaine", c: "er", t: "Journal d'audit : " + rupt.length + " rupture(s) de chaîne d'empreintes — alerter le comité.", v: "audit", l: "Voir l'audit →" });
+      if (fin && retardTous.length) AL.push({ id: "retard", c: "er", t: retardTous.length + " appel(s) de cotisation en retard : " + fc(impayes) + " à recouvrer.", v: "finances", l: "Voir les impayés →" });
+      if (aValider && can("depense.approuver")) AL.push({ id: "valider", c: "wa", t: aValider + " demande(s) de dépense à valider.", v: "depenses", l: "Voir les dépenses →" });
+      if (aPayer && can("depense.payer")) AL.push({ id: "payer", c: "wa", t: aPayer + " dépense(s) approuvée(s) à payer.", v: "depenses", l: "Voir les paiements →" });
+      if (retardMoi.length) AL.push({ id: "moi", c: "wa", t: "Vous avez " + retardMoi.length + " cotisation(s) en retard : " + fc(retardMoi.reduce(function (s, a) { return s + Number(a.reste); }, 0)) + ".", v: "cite", l: "Voir mes cotisations →" });
+      reunions.filter(function (r) { return new Date(r.date_heure) - new Date() < 7 * 864e5; }).forEach(function (r, i) { AL.push({ id: "reu" + i + r.date_heure, c: "in", t: "Réunion « " + r.titre + " » le " + fdt(r.date_heure) + ".", v: "reunions", l: "Voir les réunions →" }); });
+      var et = alertesEtat(), now = Date.now();
+      var visibles = AL.filter(function (a) { var x = et[a.id]; return !(x && x !== "moi" && x > now); });
+      var acts = el("div", { class: "acts" },
+        can("depense.creer") ? el("button", { class: "p", onclick: function () { S.vue = "depenses"; afficher(); } }, "＋ Nouvelle dépense") : null,
+        can("finance.encaisser") ? el("button", { class: "s", onclick: function () { S.vue = "finances"; afficher(); } }, "💰 Enregistrer un encaissement") : null,
+        el("button", { class: "s", onclick: function () { S.vue = "cite"; afficher(); } }, "🏘️ Mes cotisations"));
+      return el("div", {}, el("h1", { class: "hi" }, "Bonjour " + prenom()), el("p", { class: "sub" }, "Voici ce qui demande votre attention maintenant."), acts,
+        el("div", { class: "grid" }, kp),
+        el("h2", {}, "Alertes", visibles.length ? el("span", { class: "nb" }, String(visibles.length)) : null),
+        visibles.length ? visibles.map(function (a) {
+          var pris = et[a.id] === "moi";
+          return el("div", { class: "al " + a.c + (pris ? " pris" : "") }, el("span", { class: "tx" }, (a.c === "er" ? "🔴 " : a.c === "wa" ? "🟠 " : "🔵 ") + a.t + (pris ? " (pris en charge)" : "")),
+            el("span", { class: "bt" }, el("button", { class: "p", onclick: function () { S.vue = a.v; afficher(); } }, a.l),
+              el("button", { class: "s", onclick: function () { alerteMaj(a.id, "moi"); } }, "✋ Je m'en occupe"),
+              el("button", { class: "s", onclick: function () { alerteMaj(a.id, Date.now() + 30 * 60000); } }, "⏰ 30 min"), el("button", { class: "s", onclick: function () { alerteMaj(a.id, Date.now() + 2 * 3600000); } }, "⏰ 2 h")));
+        }) : el("p", { class: "mu" }, "✅ Rien d'urgent."));
+    });
   }
 
   /* ---------- Ma cité ---------- */

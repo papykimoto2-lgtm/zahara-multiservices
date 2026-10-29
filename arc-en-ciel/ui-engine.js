@@ -6,7 +6,7 @@
   "use strict";
   var D = G.document;
   function el(tag, attrs) {
-    var e = D.createElement(tag), i, k, v, kids = Array.prototype.slice.call(arguments, 2);
+    var e = D.createElement(tag), k, v, kids = Array.prototype.slice.call(arguments, 2);
     attrs = attrs || {};
     for (k in attrs) {
       v = attrs[k];
@@ -16,11 +16,11 @@
       else e.setAttribute(k, v === true ? "" : v);
     }
     (function ajouter(L) {
-      for (i = 0; i < L.length; i++) {
-        if (L[i] == null || L[i] === false) continue;
-        if (Array.isArray(L[i])) ajouter(L[i]);
-        else e.appendChild(L[i].nodeType ? L[i] : D.createTextNode(String(L[i])));
-      }
+      L.forEach(function (x) {                       /* forEach : un indice par niveau (les tableaux imbriqués ne se télescopent pas) */
+        if (x == null || x === false) return;
+        if (Array.isArray(x)) ajouter(x);
+        else e.appendChild(x.nodeType ? x : D.createTextNode(String(x)));
+      });
     })(kids);
     return e;
   }
@@ -33,7 +33,7 @@
     brouillon: ["Brouillon", ""], valide: ["Validé", "wa"], publie: ["Publié", "ok"]
   };
   function badge(s) { var x = ST[s] || [s, ""]; return el("span", { class: "b " + x[1] }, x[0]); }
-  function kpi(l, v) { return el("div", { class: "kpi" }, el("div", { class: "v" }, v), el("div", { class: "l" }, l)); }
+  function kpi(l, v, ic) { return el("div", { class: "kpi" }, ic ? el("div", { class: "ic", "aria-hidden": "true" }, ic) : null, el("div", { class: "v" }, v), el("div", { class: "l" }, l)); }
   function card(titre) { return el("section", { class: "card" }, titre ? el("h2", {}, titre) : null, Array.prototype.slice.call(arguments, 1)); }
   function table(cols, rows, vide) {
     if (!rows.length) return el("p", { class: "mu" }, vide || "Aucune donnée.");

@@ -20,16 +20,22 @@ const jwt = o => "x." + Buffer.from(JSON.stringify(o)).toString("base64url") + "
   chk("IF-3", "clé service_role : refusée (jamais mémorisée dans le navigateur)", /service_role refusée/.test(await p.locator("#toast").innerText()) && !(await p.evaluate(() => localStorage.getItem("arc_cfg"))));
   await p.click("text=Ouvrir la démo"); await p.waitForSelector(".demo");
   chk("IF-4", "démo : bandeau « MODE DÉMONSTRATION » visible", /MODE DÉMONSTRATION/.test(await txt(".demo")));
-  const attendus = { "Ma cité": /Reste à payer/, "Finances": /Trésorerie/, "Dépenses": /Seuils de validation/, "Réunions": /Procès-verbaux/, "Documents": /Règlement de copropriété/, "Audit": /Chaîne d'empreintes intacte/ };
-  for (const v of Object.keys(attendus)) { await p.click("nav >> text=" + v); await p.waitForTimeout(250); chk("IF-5 " + v, "écran « " + v + " » affiché", attendus[v].test(await txt("main")), (await txt("main")).slice(0, 80)); }
-  await p.click("nav >> text=Dépenses"); await p.waitForTimeout(200);
+  chk("IF-4b", "accueil « Aujourd'hui » : salutation, alertes et pastille", /Bonjour/.test(await txt("main")) && /Alertes/.test(await txt("main")) && /Mode démonstration/.test(await txt(".pill")));
+  await p.click("main .al >> text=Je m'en occupe >> nth=0"); await p.waitForTimeout(200);
+  chk("IF-4c", "alerte : « Je m'en occupe » la marque prise en charge (mémorisé)", /pris en charge/.test(await txt("main")));
+  await p.setViewportSize({ width: 390, height: 800 }); await p.click("button[aria-label=Menu]");
+  chk("IF-4d", "mobile : le bouton ☰ ouvre le menu latéral", await p.locator(".shell.open").count() === 1); const va = async v => { if (!(await p.locator(".shell.open").count())) await p.click("button[aria-label=Menu]"); await p.click("nav >> text=" + v); await p.waitForTimeout(250); };
+  const attendus = { "Ma cité": /Reste à payer|Mes cotisations/, "Argent": /Trésorerie/, "Dépenses": /Seuils de validation/, "Réunions": /Procès-verbaux/, "Documents": /Règlement de copropriété/, "Audit": /Chaîne d'empreintes intacte/ };
+  for (const v of Object.keys(attendus)) { await va(v); chk("IF-5 " + v, "écran « " + v + " » affiché", attendus[v].test(await txt("main")), (await txt("main")).slice(0, 80)); }
+  await va("Dépenses");
   await p.click("button:has-text('Approuver') >> nth=0"); await p.waitForTimeout(300);
   chk("IF-6", "démo : une écriture (approbation) est refusée avec un message clair", /Mode démonstration/.test(await p.locator("#toast").innerText()));
-  chk("IF-7", "pied de page : éditeur et contact issus de marque.js", /Sanix Africa Division Technologies/.test(await txt(".ft")) && /0779181075/.test(await txt(".ft")));
+  chk("IF-7", "pied de page : éditeur et contact issus de marque.js", /Sanix Africa Division Technologies/.test(await txt(".dev")) && /0779181075/.test(await txt(".dev")));
   chk("IF-8", "aucune erreur de console ni violation de CSP", logs.length === 0, JSON.stringify(logs));
   // XSS : un texte hostile s'affiche comme du texte
   await p.evaluate(() => { const U = window.ARC_UI; document.body.appendChild(U.el("div", { id: "x" }, U.el("b", {}, '<img src=x onerror="window.__xss=1">'))); });
   chk("IF-9", "texte hostile affiché comme texte (aucune balise créée)", (await p.evaluate(() => !window.__xss && document.querySelectorAll("#x img").length === 0)) === true);
+  chk("IF-9b", "el() : tableaux imbriqués suivis d'éléments frères conservés dans l'ordre (régression)", await p.evaluate(() => { const U = window.ARC_UI; return U.el("div", {}, [U.el("i", {}, "a"), U.el("i", {}, "b")], U.el("i", {}, "c"), [[U.el("i", {}, "d")]], U.el("i", {}, "e")).textContent === "abcde"; }));
   // Fichier unique
   await p.evaluate(() => { sessionStorage.clear(); localStorage.clear(); });
   await p.goto(base + "/dist/arc-en-ciel-connect.html"); await p.waitForSelector("form");

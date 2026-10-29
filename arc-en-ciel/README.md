@@ -15,7 +15,8 @@ Plateforme de gouvernance de la Cité Arc-en-Ciel de Songon Kassamblé, dévelop
 | `ui-engine.js` (`ARC_UI`) | construction du DOM sans innerHTML, montants F CFA, dates, pastilles, tableaux, notifications |
 | `demo-engine.js` (`ARC_DEMO`) | client Supabase factice (lecture) pour la démonstration |
 | `api-engine.js` (`ARC_API`) | client Supabase (schéma `app`), configuration, droits d'affichage |
-| `arc-engine.js` | écrans : Ma cité, Finances, Dépenses, Réunions, Documents, Audit ; connexion (5 essais puis blocage 60 s) |
+| `arc-engine.js` | écrans : Aujourd'hui (salutation, actions rapides, indicateurs, alertes avec « Je m'en occupe » / 30 min / 2 h), Ma cité, Argent, Dépenses, Réunions, Documents, Audit et contrôle ; connexion (5 essais puis blocage 60 s) |
+| `modules.css` | charte graphique d'ANGEL'S GROUP : menu latéral sombre, cartes arrondies, pastilles, 6 thèmes de couleur (`data-theme`, choix mémorisé), menu ☰ sur mobile, pastille « Synchronisé hh:mm » |
 
 ## Base de données (`supabase/migrations/`, exécuter dans l'ordre)
 - **001 Noyau** : membres, lots, propriétés, rôles et permissions, **mandats datés** (un changement de bureau ne perd aucun historique), **journal d'audit en ajout seul chaîné par empreintes** (`verifier_chaine_audit()` détecte une falsification).
@@ -31,7 +32,7 @@ Plateforme de gouvernance de la Cité Arc-en-Ciel de Songon Kassamblé, dévelop
 
 ## Tests
 - `node arc-en-ciel/tests/base-sql.js` — migrations + 23 scénarios dans un PostgreSQL jetable (droits, circuit de dépense, grand livre, RLS, audit, PV). Aucune base réelle touchée. (`tests/run.sh` en est le moteur.)
-- `node arc-en-ciel/tests/interface.js` — 16 contrôles navigateur : configuration, refus de clé service_role, démonstration, six écrans, XSS, fichier unique, ouverture `file://`. (`PLAYWRIGHT=/chemin/playwright` si besoin.)
+- `node arc-en-ciel/tests/interface.js` — 20 contrôles navigateur : configuration, refus de clé service_role, démonstration, accueil « Aujourd'hui » et alertes, menu mobile, six écrans, XSS, construction du DOM, fichier unique, ouverture `file://`. (`PLAYWRIGHT=/chemin/playwright` si besoin.)
 - `node arc-en-ciel/tests/conventions.js` — 10 contrôles de conventions : IIFE strict, scripts classiques, aucun innerHTML, aucun secret, aucune adresse Supabase réelle, migrations numérotées, manifeste, icônes, service worker.
 - `npm run test:arc` les enchaîne.
 
