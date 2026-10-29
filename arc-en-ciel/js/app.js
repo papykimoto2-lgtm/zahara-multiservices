@@ -1,4 +1,4 @@
-import { sb, configured, ok, rpc, from, chargerDroits } from "./api.js";
+import { sb, configured, enDemo, URL_VALIDE, ok, rpc, from, chargerDroits } from "./api.js";
 import { el, fcfa, fdate, fdt, badge, kpi, card, table, toast, field, msgErr } from "./ui.js";
 
 const S = { user: null, roles: [], perms: new Set(), membre: null, vue: "cite" };
@@ -9,6 +9,22 @@ const VUES = [
   ["depenses", "Dépenses", () => can("depense.creer") || can("depense.approuver") || can("depense.payer") || can("finance.lire"), vueDepenses],
   ["reunions", "Réunions", () => true, vueReunions], ["documents", "Documents", () => true, vueDocuments], ["audit", "Audit", () => can("audit.lire"), vueAudit]
 ];
+
+/* ───────── Configuration (1re ouverture) ───────── */
+function vueConfig() {
+  const url = el("input", { type: "url", required: true, placeholder: "https://xxxxxxxxxxxxxxxxxxxx.supabase.co", autocomplete: "off", inputmode: "url" });
+  const cle = el("input", { type: "text", required: true, placeholder: "Clé « anon » (publique) du projet", autocomplete: "off" });
+  const f = el("form", { class: "card", onsubmit: ev => { ev.preventDefault();
+    const u = url.value.trim().replace(/\/+$/, "");
+    if (!URL_VALIDE(u)) return toast("URL Supabase invalide.", true);
+    if (/service_role/i.test(atob((cle.value.split(".")[1] || "").replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil((cle.value.split(".")[1] || "").length / 4) * 4, "=") || "e30="))) return toast("Clé service_role refusée : utiliser la clé anon.", true);
+    try { localStorage.setItem("arc_cfg", JSON.stringify({ url: u, anonKey: cle.value.trim() })); } catch (e) { return toast("Stockage indisponible.", true); }
+    location.reload(); } }, el("h2", {}, "Connecter la cité"), el("p", { class: "mu" }, "Saisir l'adresse et la clé publique (anon) du projet Supabase dédié. Jamais la clé service_role."),
+    field("Adresse du projet", url), field("Clé anon", cle), el("button", { class: "p", type: "submit" }, "Enregistrer et ouvrir"));
+  const demo = card("Voir une démonstration", el("p", { class: "mu" }, "Données fictives, aucune écriture, aucun réseau."),
+    el("button", { class: "s", onclick: () => { try { sessionStorage.setItem("arc_demo", "1"); } catch (e) {} location.reload(); } }, "Ouvrir la démo"));
+  racine.replaceChildren(el("div", { class: "login" }, el("img", { src: "icons/logo.svg", width: 64, height: 64, alt: "" }), el("h1", {}, "Arc-en-Ciel Connect"), el("p", { class: "mu" }, "Cité Arc-en-Ciel de Songon Kassamblé"), f, demo));
+}
 
 /* ───────── Connexion ───────── */
 let echecs = 0, bloqueJusqua = 0;
@@ -31,7 +47,8 @@ function coque(contenu) {
     el("button", { "aria-current": S.vue === v[0] ? "page" : null, onclick: () => { S.vue = v[0]; afficher(); } }, v[1])));
   racine.replaceChildren(
     el("header", {}, el("img", { src: "icons/logo.svg", alt: "" }), el("h1", {}, "Arc-en-Ciel Connect"),
-      el("button", { onclick: async () => { await sb.auth.signOut(); S.user = null; vueLogin(); } }, "Déconnexion")),
+      el("button", { onclick: async () => { await sb.auth.signOut(); S.user = null; if (enDemo) location.reload(); else vueLogin(); } }, "Déconnexion")),
+    enDemo ? el("div", { class: "demo" }, "MODE DÉMONSTRATION — données fictives, aucune écriture") : null,
     nav, el("main", {}, contenu),
     el("div", { class: "ft" }, "Application développée par Sanix Africa Division Technologies · WhatsApp +225 0779181075 / 0140017751"));
 }
@@ -177,7 +194,7 @@ async function vueAudit() {
 
 /* ───────── Démarrage ───────── */
 async function demarrer() {
-  if (!configured) return racine.replaceChildren(card("Configuration manquante", el("p", {}, "Renseigner url et anonKey dans config.js (voir README).")));
+  if (!configured) return vueConfig();
   const { data } = await sb.auth.getSession();
   if (!data.session) return vueLogin();
   S.user = data.session.user;
@@ -187,6 +204,6 @@ async function demarrer() {
   } catch (e) { toast(msgErr(e), true); }
   afficher();
 }
-if (configured) sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_OUT") vueLogin(); });
+if (configured && !enDemo) sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_OUT") vueLogin(); });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 demarrer();

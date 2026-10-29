@@ -18,7 +18,7 @@ Cahier des charges : `docs/CAHIER_DES_CHARGES_ARC_EN_CIEL_CONNECT.pdf`.
 1. Créer un projet Supabase **nouveau**. Exécuter dans l'ordre `supabase/migrations/001…004*.sql`.
 2. *Settings → API → Exposed schemas* : ajouter `app`.
 3. Créer les comptes (Auth), puis lier chaque membre (`app.members.user_id`) et attribuer les premiers rôles en SQL (le premier président) ; ensuite le président attribue via `app.attribuer_role`.
-4. Renseigner `config.js` (URL + clé **anon** uniquement).
+4. Renseigner `config.js` **ou**, avec le fichier HTML unique, saisir URL + clé **anon** à la première ouverture (écran « Connecter la cité », mémorisé dans le navigateur). Un bouton « Ouvrir la démo » affiche des données fictives.
 5. Faire valider par le comité de pilotage les seuils de `app.validation_rules` (valeurs actuelles **illustratives**), la liste des rôles et les droits (`004`/`001`).
 6. Déployer le dossier (Vercel : `vercel.json` fournit les en-têtes de sécurité).
 

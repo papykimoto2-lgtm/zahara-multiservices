@@ -1,7 +1,13 @@
-const C = window.ARC_CONFIG || {};
-export const configured = !!(C.url && C.anonKey);
+import { demoClient } from "./demo.js";
+const lire = k => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } };
+const C = (window.ARC_CONFIG && window.ARC_CONFIG.url) ? window.ARC_CONFIG : (lire("arc_cfg") || {});
+const URL_OK = /^https:\/\/[a-z0-9]{20}\.supabase\.co$/;
+export const enDemo = (() => { try { return sessionStorage.getItem("arc_demo") === "1"; } catch (e) { return false; } })();
+export const reel = !!(URL_OK.test(C.url || "") && /^[\w-]+\.[\w-]+\.[\w-]+$/.test(C.anonKey || "") && window.supabase);
+export const configured = reel || enDemo;
+export const URL_VALIDE = u => URL_OK.test(u);
 // Le jeton utilisateur reste en mémoire de session (sessionStorage) : fermé = déconnecté.
-export const sb = configured ? window.supabase.createClient(C.url, C.anonKey, {
+export const sb = enDemo ? demoClient : reel ? window.supabase.createClient(C.url, C.anonKey, {
   db: { schema: "app" },
   auth: { persistSession: true, autoRefreshToken: true, storage: window.sessionStorage, detectSessionInUrl: false }
 }) : null;

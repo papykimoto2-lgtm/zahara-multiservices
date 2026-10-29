@@ -4,7 +4,7 @@ const fs = require("fs"), path = require("path"), crypto = require("crypto");
 const R = f => fs.readFileSync(path.join(__dirname, f), "utf8");
 const h = s => "'sha256-" + crypto.createHash("sha256").update(s, "utf8").digest("base64") + "'";
 const strip = s => s.replace(/^import .*$/gm, "").replace(/^export /gm, "");
-const code = [strip(R("js/ui.js")), strip(R("js/api.js")), strip(R("js/app.js")).replace(/if \("serviceWorker" in navigator\).*\n/, "")].join("\n");
+const code = [strip(R("js/ui.js")), strip(R("js/demo.js")), strip(R("js/api.js")), strip(R("js/app.js")).replace(/if \("serviceWorker" in navigator\).*\n/, "")].join("\n");
 const css = R("css/app.css"), vendor = R("vendor/supabase-js-2.45.4.js").replace('if(!e)throw new Error("Automatic publicPath is not supported in this browser")', 'if(!e)e="/"')   /* script en ligne : pas de chemin de chargement paresseux */, cfg = R("config.js");
 const logo = "data:image/svg+xml;base64," + Buffer.from(R("icons/logo.svg")).toString("base64");
 const jsLogo = code.split('"icons/logo.svg"').join(JSON.stringify(logo));
