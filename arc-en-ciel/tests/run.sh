@@ -13,3 +13,4 @@ $P -f "$HERE/stub_supabase.sql"
 for f in "$HERE"/../supabase/migrations/*.sql; do echo "→ $(basename "$f")"; $P -f "$f"; done
 $P -f "$HERE/arc.test.sql" 2>&1 | grep -v '^$'
 $P -f "$HERE/v2.test.sql" 2>&1 | grep -v '^$'
+$P -f "$HERE/v3.test.sql" 2>&1 | grep -v '^$'

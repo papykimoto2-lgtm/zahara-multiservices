@@ -36,7 +36,7 @@
             { t: "Échéance", f: function (r) { return fd(r.fin_prevue); } },
             { t: "Statut", f: function (r) { return el("span", {}, badge(r.statut), r.depassement ? " ⚠️ hors budget" : "", r.en_retard ? " ⏰ retard" : ""); } },
             { t: "", f: function (r) { return gestion ? el("div", { class: "row" }, el("button", { class: "s", onclick: function () { statut(r); } }, "Statut"), el("button", { class: "s", onclick: function () { avancement(r); } }, "Avancement"), el("button", { class: "s", onclick: function () { lier(r); } }, "Lier une dépense")) : ""; } }],
-            L, "Aucun projet à cet horizon."));
+            L, "Aucun projet à cet horizon.", "projets-" + h));
         }),
         gestion ? formProjet() : null,
         dev ? [carteDevis(Q, nom), formDevis(F)] : null);

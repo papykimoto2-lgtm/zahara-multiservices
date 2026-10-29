@@ -39,8 +39,13 @@
   function badge(s) { var x = ST[s] || [s, ""]; return el("span", { class: "b " + x[1] }, x[0]); }
   function kpi(l, v, ic) { return el("div", { class: "kpi" }, ic ? el("div", { class: "ic", "aria-hidden": "true" }, ic) : null, el("div", { class: "v" }, v), el("div", { class: "l" }, l)); }
   function card(titre) { return el("section", { class: "card" }, titre ? el("h2", {}, titre) : null, Array.prototype.slice.call(arguments, 1)); }
-  function table(cols, rows, vide) {
+  /* 4e argument facultatif : nom d'export → barre CSV / Excel / Imprimer sous le tableau (ARC_EXPORT). */
+  function table(cols, rows, vide, exportNom) {
     if (!rows.length) return el("p", { class: "mu" }, vide || "Aucune donnée.");
+    var t = tableau(cols, rows);
+    return exportNom && G.ARC_EXPORT ? el("div", {}, t, G.ARC_EXPORT.barre(exportNom, cols, rows)) : t;
+  }
+  function tableau(cols, rows) {
     return el("div", { class: "tw" }, el("table", {},
       el("thead", {}, el("tr", {}, cols.map(function (c) { return el("th", { class: c.n ? "n" : "" }, c.t); }))),
       el("tbody", {}, rows.map(function (r) {

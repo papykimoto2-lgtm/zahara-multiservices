@@ -9,7 +9,7 @@ var T = {
   user_roles: [{ user_id: U, role_code: "president", date_debut: "2025-01-01", date_fin: null }, { user_id: U, role_code: "tresorier", date_debut: "2025-01-01", date_fin: null }],
   role_permissions: (function () {
     var L = [];
-    ["finance.lire", "finance.encaisser", "finance.annuler", "finance.publier", "depense.creer", "depense.approuver", "depense.payer", "audit.lire", "vote.gerer", "proposition.traiter", "reclamation.traiter", "mediation.lire", "incident.traiter", "projet.gerer", "prestataire.gerer", "social.valider"].forEach(function (p) {
+    ["finance.lire", "finance.encaisser", "finance.annuler", "finance.publier", "depense.creer", "depense.approuver", "depense.payer", "audit.lire", "vote.gerer", "proposition.traiter", "reclamation.traiter", "mediation.lire", "incident.traiter", "projet.gerer", "prestataire.gerer", "social.valider", "assurance.gerer", "charges.gerer", "enquete.gerer", "membres.gerer", "reunion.gerer", "annonce.publier", "pv.publier"].forEach(function (p) {
       ["president", "tresorier"].forEach(function (r) { L.push({ role_code: r, perm_code: p }); });
     });
     return L;
@@ -64,6 +64,22 @@ var T = {
   v_fonds_solidarite: [{ solde: 310000, dons: 400000, aides: 90000 }],
   v_aides_publiees: [{ ref: "SOC-2026-000001", montant: 90000, date_versement: j(-25) }],
   social_cases: [{ id: "s1", ref: "SOC-2026-000007", type: "hospitalisation", description: "Dossier fictif de démonstration", montant_demande: 80000, statut: "proposee", montant_propose: 50000, motif: "Situation vérifiée", cree_le: j(-6, 1), member_id: "m2" }],
+  v_carte: [{ couche: "equipement", id: "g1", ref: "EQ-001", libelle: "Lampadaire entrée", sous_type: "lampadaire", statut: "bon", lat: 5.3361, lng: -4.1100 },
+    { couche: "equipement", id: "g2", ref: "EQ-002", libelle: "Portail principal", sous_type: "portail", statut: "bon", lat: 5.3372, lng: -4.1086 },
+    { couche: "equipement", id: "g3", ref: "EQ-003", libelle: "Pompe du local technique", sous_type: "local", statut: "hors_service", lat: 5.3355, lng: -4.1072 },
+    { couche: "incident", id: "n1", ref: "INC-2026-000008", libelle: "Lampadaire éteint voie B", sous_type: "eclairage", statut: "nouveau", lat: 5.3366, lng: -4.1094 }],
+  incidents: [], 
+  v_assurances_echeances: [{ id: "as1", assureur: "NSIA (démo)", police: "POL-DEMO-1", objet: "Multirisque espaces communs", fin: j(40), jours_restants: 40, etat: "a_renouveler" }],
+  insurance_claims: [{ id: "sn1", ref: "SIN-2026-000001", date_sinistre: j(-12), description: "Dégât des eaux au local technique (démo)", montant_estime: 250000, montant_indemnise: null, statut: "instruction", cree_le: j(-12, 1) }],
+  v_evolution_charges: [{ type: "eau", compteur: "C1", periode: "2026-09", consommation: 200, montant: 52000, variation_pct: 67.7, variation_an_pct: null, anomalie: true },
+    { type: "eau", compteur: "C1", periode: "2026-08", consommation: 125, montant: 31000, variation_pct: 3.3, variation_an_pct: null, anomalie: false },
+    { type: "electricite", compteur: "E1", periode: "2026-09", consommation: 900, montant: 118000, variation_pct: 2.1, variation_an_pct: 5.4, anomalie: false }],
+  surveys: [{ id: "sv1", titre: "Satisfaction 2026 (démo)", themes: ["Communication", "Entretien", "Confiance"], ouverture: j(-3, 1), cloture: j(10, 1), statut: "ouverte" }],
+  v_plan_pluriannuel: [{ annee: 2026, horizon: "court", projets: 2, cout_estime: 1800000, codes: "PRJ-2026-01, PRJ-2026-02" }, { annee: 2028, horizon: "moyen", projets: 1, cout_estime: 2000000, codes: "PRJ-2027-01" }],
+  lots: [{ id: "l1", ref: "L-001", libelle: "", statut: "occupe" }, { id: "l2", ref: "L-002", libelle: "", statut: "occupe" }],
+  lot_ownerships: [{ id: "o1", lot_id: "l1", member_id: M, lien: "proprietaire", quote_part: 1, date_fin: null }],
+  bank_lines: [{ id: "b1", account_id: "k2", date_op: j(-3), libelle: "VIR M-002 (démo)", montant: 10000, statut: "a_rapprocher" }, { id: "b2", account_id: "k2", date_op: j(-10), libelle: "Frais de tenue de compte (démo)", montant: -2500, statut: "ecart" }],
+  v_a_rapprocher: [{ id: "x9", ref: "ENC-2026-000015", account_id: "k2", date_op: j(-3), sens: "entree", montant: 10000 }],
   audit_logs: [{ id: 3, le: j(-1, 1), acteur: U, action: "DEPENSE_APPROUVE", table_nom: "expense_requests", ligne_id: "e1" }, { id: 2, le: j(-3, 1), acteur: U, action: "PAIEMENT", table_nom: "payments", ligne_id: "x1" }, { id: 1, le: j(-9, 1), acteur: U, action: "DEPENSE_PAYEE", table_nom: "expense_requests", ligne_id: "e3" }]
 };
 function Q(t) { this.rows = (T[t] || []).slice(); }
@@ -78,7 +94,7 @@ Q.prototype.then = function (res, rej) { return Promise.resolve({ data: this.row
 var session = { user: { id: U } };
 var client = {
   from: function (t) { return new Q(t); },
-  rpc: function (fn) { return Promise.resolve(fn === "verifier_chaine_audit" ? { data: [], error: null } : fn === "a_vote" ? { data: false, error: null } : fn === "alertes_controle" ? { data: [{ type: "projet_en_retard", ref: "PRJ-2026-02", detail: "Échéance dépassée (démo)", le: j(0, 1) }], error: null } : { data: null, error: { message: "Mode démonstration : aucune écriture n'est enregistrée." } }); },
+  rpc: function (fn) { return Promise.resolve(fn === "verifier_chaine_audit" ? { data: [], error: null } : fn === "a_vote" ? { data: false, error: null } : fn === "indicateurs_performance" ? { data: { taux_recouvrement_pct: 62.5, taux_membres_connectes_pct: 78, execution_budget_pct: 41.2, depenses_avec_justificatif_pct: 100, delai_moyen_validation_depense_h: 31.5, projets_termines_pct: 25, incidents_resolus_pct: 54.5, delai_moyen_reclamation_j: 9.2, participation_moyenne_pct: 65, decisions_executees_pct: 40, aides_versees: 1 }, error: null } : fn === "simuler_scenarios" ? { data: { projection: true, base: { solde_actuel: 1430000, recettes_moy_6m: 260000, depenses_moy_6m: 190000, lots: 40 }, horizon_mois: 12, projet: 2000000, scenarios: [{ scenario: "prudent", recettes_mensuelles: 208000, depenses_mensuelles: 200000, solde_final: 1526000, mois_pour_financer: 71, cotisation_supplementaire_par_lot_et_par_mois: 0 }, { scenario: "realiste", recettes_mensuelles: 260000, depenses_mensuelles: 190000, solde_final: 2270000, mois_pour_financer: 9, cotisation_supplementaire_par_lot_et_par_mois: 0 }, { scenario: "ambitieux", recettes_mensuelles: 299000, depenses_mensuelles: 180500, solde_final: 2851000, mois_pour_financer: 5, cotisation_supplementaire_par_lot_et_par_mois: 0 }] }, error: null } : fn === "resultats_enquete" ? { data: null, error: { message: "Résultats masqués : au moins 5 réponses sont nécessaires pour préserver l'anonymat (démo)." } } : fn === "alertes_controle" ? { data: [{ type: "projet_en_retard", ref: "PRJ-2026-02", detail: "Échéance dépassée (démo)", le: j(0, 1) }], error: null } : { data: null, error: { message: "Mode démonstration : aucune écriture n'est enregistrée." } }); },
   auth: {
     getSession: function () { return Promise.resolve({ data: { session: session } }); },
     signOut: function () { try { sessionStorage.removeItem("arc_demo"); } catch (e) { } return Promise.resolve({}); },

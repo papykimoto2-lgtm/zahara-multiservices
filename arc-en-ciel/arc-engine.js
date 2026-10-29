@@ -158,7 +158,7 @@
         visibles.length ? visibles.map(function (a) {
           var pris = et[a.id] === "moi";
           return el("div", { class: "al " + a.c + (pris ? " pris" : "") }, el("span", { class: "tx" }, (a.c === "er" ? "🔴 " : a.c === "wa" ? "🟠 " : "🔵 ") + a.t + (pris ? " (pris en charge)" : "")),
-            el("span", { class: "bt" }, el("button", { class: "p", onclick: function () { S.vue = a.v; afficher(); } }, a.l),
+            el("span", { class: "bt" }, el("button", { class: "p", onclick: function () { if (a.avant) a.avant(); S.vue = a.v; afficher(); } }, a.l),
               el("button", { class: "s", onclick: function () { alerteMaj(a.id, "moi"); } }, "✋ Je m'en occupe"),
               el("button", { class: "s", onclick: function () { alerteMaj(a.id, Date.now() + 30 * 60000); } }, "⏰ 30 min"), el("button", { class: "s", onclick: function () { alerteMaj(a.id, Date.now() + 2 * 3600000); } }, "⏰ 2 h")));
         }) : el("p", { class: "mu" }, "✅ Rien d'urgent."));
@@ -183,7 +183,7 @@
         card("Mes cotisations", table([
           { t: "Cotisation", f: function (r) { return lib[r.contribution_id]; } }, { t: "Période", k: "periode" }, { t: "Échéance", f: function (r) { return fd(r.echeance); } },
           { t: "Appelé", n: 1, f: function (r) { return fc(r.montant_appele); } }, { t: "Payé", n: 1, f: function (r) { return fc(r.montant_paye); } },
-          { t: "Statut", f: function (r) { return badge(r.statut); } }], appels, "Aucune cotisation appelée.")),
+          { t: "Statut", f: function (r) { return badge(r.statut); } }], appels, "Aucune cotisation appelée.", "mes-cotisations")),
         card("États financiers publiés", etats.length ? etats.map(function (e) {
           return el("p", {}, el("b", {}, e.titre + " — " + e.periode), " · recettes " + fc(e.contenu.recettes) + " · dépenses " + fc(e.contenu.depenses) + " · trésorerie " + fc(e.contenu.tresorerie) + " · impayés " + fc(e.contenu.impayes));
         }) : el("p", { class: "mu" }, "Aucun état publié.")),
@@ -211,7 +211,7 @@
         card("Derniers mouvements", table([
           { t: "Date", f: function (r) { return fd(r.date_op); } }, { t: "Réf.", k: "ref" }, { t: "Catégorie", k: "categorie" },
           { t: "Entrée", n: 1, f: function (r) { return r.sens === "entree" ? fc(r.montant) : ""; } }, { t: "Sortie", n: 1, f: function (r) { return r.sens === "sortie" ? fc(r.montant) : ""; } },
-          { t: "", f: function (r) { return annulees[r.id] ? badge("annulee") : (can("finance.annuler") && !r.contre_ecriture_de ? el("button", { class: "s", onclick: function () { annuler(r); } }, "Contrepasser") : r.motif || ""); } }], mouvements)),
+          { t: "", f: function (r) { return annulees[r.id] ? badge("annulee") : (can("finance.annuler") && !r.contre_ecriture_de ? el("button", { class: "s", onclick: function () { annuler(r); } }, "Contrepasser") : r.motif || ""); }, x: function (r) { return r.motif || ""; } }], mouvements, "Aucun mouvement.", "mouvements-tresorerie")),
         can("finance.publier") ? [formPublication(), formBilan()] : null);
     });
   }
@@ -265,7 +265,7 @@
         card("Demandes de dépense", table([
           { t: "Réf.", k: "ref" }, { t: "Objet", f: function (r) { return r.objet + " — " + r.fournisseur; } }, { t: "Montant", n: 1, f: function (r) { return fc(r.montant); } },
           { t: "Validations", f: function (r) { return (parDep[r.id] || []).map(function (a) { return a.role_code + (a.decision === "rejete" ? " ✗" : " ✓"); }).join(", ") || "—"; } },
-          { t: "Statut", f: function (r) { return badge(r.statut); } }, { t: "", f: function (r) { return actions(r, comptes); } }], deps)),
+          { t: "Statut", f: function (r) { return badge(r.statut); }, x: function (r) { return r.statut; } }, { t: "", f: function (r) { return actions(r, comptes); } }], deps, "Aucune demande.", "depenses")),
         card("Seuils de validation (paramétrables)", table([
           { t: "De", n: 1, f: function (r) { return fc(r.montant_min); } }, { t: "À", n: 1, f: function (r) { return r.montant_max == null ? "∞" : fc(r.montant_max); } },
           { t: "Rôles requis", f: function (r) { return r.roles_requis.join(" + "); } }, { t: "Décision formelle", f: function (r) { return r.decision_requise ? "Oui" : "Non"; } }], regles)));
@@ -334,7 +334,7 @@
       return el("div", {}, card("Alertes de contrôle (opérations à vérifier — ce ne sont pas des preuves de fraude)", table([{ t: "Type", k: "type" }, { t: "Réf.", k: "ref" }, { t: "Détail", k: "detail" }, { t: "Date", f: function (r) { return fdt(r.le); } }], alertes, "Aucune anomalie détectée.")),
         card("Intégrité du journal", el("p", {}, rupt.length ? badge("annulee") : badge("paye"), rupt.length ? " " + rupt.length + " rupture(s) de chaîne détectée(s) — alerter le comité." : " Chaîne d'empreintes intacte.")),
         card("Journal d'audit (60 derniers événements)", table([{ t: "#", k: "id" }, { t: "Date", f: function (r) { return fdt(r.le); } }, { t: "Action", k: "action" }, { t: "Table", k: "table_nom" },
-          { t: "Ligne", f: function (r) { return (r.ligne_id || "").slice(0, 8); } }, { t: "Acteur", f: function (r) { return (r.acteur || "système").slice(0, 8); } }], logs)));
+          { t: "Ligne", f: function (r) { return (r.ligne_id || "").slice(0, 8); } }, { t: "Acteur", f: function (r) { return (r.acteur || "système").slice(0, 8); } }], logs, "Aucun événement.", "journal-audit")));
     });
   }
 
