@@ -19,7 +19,9 @@ Plateforme de gouvernance de la Cité Arc-en-Ciel de Songon Kassamblé, dévelop
 | `participation-engine.js` | V2 : consultations et votes (bulletin secret, reçu vérifiable), boîte à idées, réclamations (réexamen, médiation confidentielle), incidents |
 | `projets-engine.js` | V2 : plan court / moyen / long terme, avancement, coût engagé et payé, retard et dépassement, comparatif des devis |
 | `solidarite-engine.js` | V2 : demandes d'aide confidentielles, fonds de solidarité, aides publiées sans identité |
-| `export-engine.js` (`ARC_EXPORT`) | CSV (Excel FR), Excel, impression / PDF avec **pied d'intégrité** (référence, SHA-256, QR) ; formules neutralisées |
+| `export-engine.js` (`ARC_EXPORT`) | CSV (Excel FR), Excel, impression / PDF avec pied (référence, SHA-256, QR) — **QR signé** si l'appareil a une clé de signature ; formules neutralisées |
+| `signature-engine.js` (`ARC_SIGN`) | signature ECDSA P-256 : clé privée **non exportable** (IndexedDB), clé publique et registre en base |
+| `verifier-engine.js` + `verifier.html` | vérification publique d'un QR, sans connexion : registre, empreinte, signature, révocation |
 | `carte-engine.js` | V3 : carte schématique sans fond externe (équipements, incidents ouverts), position par GPS, lien OpenStreetMap à la demande |
 | `previsions-engine.js` | V3 : simulation prudent / réaliste / ambitieux, plan pluriannuel, 11 indicateurs de performance, aide à la décision par règles |
 | `patrimoine-engine.js` | V3 : assurances et sinistres, consommations et évolution des charges, enquêtes de satisfaction anonymes |
@@ -44,17 +46,26 @@ Plateforme de gouvernance de la Cité Arc-en-Ciel de Songon Kassamblé, dévelop
 - **Aide à la décision** : règles lisibles (recouvrement, incidents, réclamations, décisions, trésorerie du scénario prudent) ; elle ne décide de rien et ne touche à aucun paiement, sanction ni aide sociale.
 - **Exports et impression** : toute table exportable en CSV / Excel ; l'impression (PDF navigateur) ajoute référence, empreinte SHA-256 et QR d'intégrité **non signé** (aucune clé de la cité n'est encore publiée).
 
+## Signature numérique (migration 011)
+- Le signataire (président, trésorier, secrétaire, contrôleur) crée sa clé dans **Administration → Signature** : la clé privée est générée sur l'appareil et **ne peut plus en sortir** ; seule la clé publique est inscrite (`enregistrer_cle` refuse toute partie privée).
+- Chaque impression signée inscrit au registre (**immuable, journalisé**) : référence, empreinte SHA-256 du contenu, clé, signature. Texte signé : `ARC1|référence|empreinte|clé`.
+- `verifier.html` (ouvert par le QR, sans connexion, fonction SQL `verifier_signature` accordée à `anon`) contrôle : inscription au registre, empreinte, signature ECDSA avec la clé publique, révocation (une signature **antérieure** à la révocation reste valable mais signalée ; **postérieure** : rejetée).
+- Perte de l'appareil : `revoquer_cle` (titulaire ou président, motif obligatoire). Pour un QR lu hors du site, `config.js` doit contenir l'URL et la clé anon du projet.
+
+## Charte visuelle
+Même charte qu'ANGEL'S GROUP, **dégradé conservé** : bandeau dégradé (couleurs du thème) avec titre et actions, indicateurs qui chevauchent le bandeau, onglets en pilules à dégradé, cartes arrondies ombrées, horloge et recherche (`/`) dans le menu, pastille « Passerelle connectée ». Six thèmes de couleur.
+
 ## Déploiement
-1. Créer un projet Supabase **nouveau**, exécuter `001…010`, puis *Settings → API → Exposed schemas* : ajouter `app`.
+1. Créer un projet Supabase **nouveau**, exécuter `001…011`, puis *Settings → API → Exposed schemas* : ajouter `app`.
 2. Créer les comptes (Auth), lier chaque membre (`app.members.user_id`), attribuer en SQL le premier rôle de président ; ensuite le président utilise `app.attribuer_role`.
 3. Faire valider par le comité : seuils (`app.validation_rules`), rôles et droits (`001`/`004`), règles de publication.
 4. Déployer le dossier (Vercel : `vercel.json` fournit CSP, HSTS, anti-framing).
 
 ## Tests
-- `node arc-en-ciel/tests/base-sql.js` — migrations 001–010 + 84 scénarios dans un PostgreSQL jetable (droits, circuit de dépense, grand livre, RLS, audit, PV). Aucune base réelle touchée. (`tests/run.sh` en est le moteur.)
-- `node arc-en-ciel/tests/interface.js` — 40 contrôles navigateur : configuration, refus de clé service_role, démonstration, accueil « Aujourd'hui » et alertes, menu mobile, six écrans, XSS, construction du DOM, fichier unique, ouverture `file://`. (`PLAYWRIGHT=/chemin/playwright` si besoin.)
-- `node arc-en-ciel/tests/conventions.js` — 10 contrôles de conventions : IIFE strict, scripts classiques, aucun innerHTML, aucun secret, aucune adresse Supabase réelle, migrations numérotées, manifeste, icônes, service worker.
+- `node arc-en-ciel/tests/base-sql.js` — migrations 001–011 + 88 scénarios dans un PostgreSQL jetable (droits, circuit de dépense, grand livre, RLS, audit, PV). Aucune base réelle touchée. (`tests/run.sh` en est le moteur.)
+- `node arc-en-ciel/tests/interface.js` — 52 contrôles navigateur : configuration, refus de clé service_role, démonstration, accueil « Aujourd'hui » et alertes, menu mobile, six écrans, XSS, construction du DOM, fichier unique, ouverture `file://`. (`PLAYWRIGHT=/chemin/playwright` si besoin.)
+- `node arc-en-ciel/tests/conventions.js` — 11 contrôles de conventions : IIFE strict, scripts classiques, aucun innerHTML, aucun secret, aucune adresse Supabase réelle, migrations numérotées, manifeste, icônes, service worker.
 - `npm run test:arc` les enchaîne.
 
 ## Limites assumées / suite
-SMS/WhatsApp (intégration autorisée à contracter), signature numérique des documents (clé et page de vérification propres à la cité ; le QR actuel n'atteste que l'intégrité), carte avec fond cartographique, import automatique des relevés bancaires, rapports générés côté serveur. Pas encore éprouvé sur un projet Supabase réel avec Auth.
+SMS/WhatsApp (intégration autorisée à contracter), carte avec fond cartographique, import automatique des relevés bancaires, rapports générés côté serveur. Pas encore éprouvé sur un projet Supabase réel avec Auth.

@@ -9,7 +9,7 @@ var T = {
   user_roles: [{ user_id: U, role_code: "president", date_debut: "2025-01-01", date_fin: null }, { user_id: U, role_code: "tresorier", date_debut: "2025-01-01", date_fin: null }],
   role_permissions: (function () {
     var L = [];
-    ["finance.lire", "finance.encaisser", "finance.annuler", "finance.publier", "depense.creer", "depense.approuver", "depense.payer", "audit.lire", "vote.gerer", "proposition.traiter", "reclamation.traiter", "mediation.lire", "incident.traiter", "projet.gerer", "prestataire.gerer", "social.valider", "assurance.gerer", "charges.gerer", "enquete.gerer", "membres.gerer", "reunion.gerer", "annonce.publier", "pv.publier"].forEach(function (p) {
+    ["finance.lire", "finance.encaisser", "finance.annuler", "finance.publier", "depense.creer", "depense.approuver", "depense.payer", "audit.lire", "vote.gerer", "proposition.traiter", "reclamation.traiter", "mediation.lire", "incident.traiter", "projet.gerer", "prestataire.gerer", "social.valider", "assurance.gerer", "charges.gerer", "enquete.gerer", "membres.gerer", "reunion.gerer", "annonce.publier", "pv.publier", "signature.gerer"].forEach(function (p) {
       ["president", "tresorier"].forEach(function (r) { L.push({ role_code: r, perm_code: p }); });
     });
     return L;
@@ -80,6 +80,8 @@ var T = {
   lot_ownerships: [{ id: "o1", lot_id: "l1", member_id: M, lien: "proprietaire", quote_part: 1, date_fin: null }],
   bank_lines: [{ id: "b1", account_id: "k2", date_op: j(-3), libelle: "VIR M-002 (démo)", montant: 10000, statut: "a_rapprocher" }, { id: "b2", account_id: "k2", date_op: j(-10), libelle: "Frais de tenue de compte (démo)", montant: -2500, statut: "ecart" }],
   v_a_rapprocher: [{ id: "x9", ref: "ENC-2026-000015", account_id: "k2", date_op: j(-3), sens: "entree", montant: 10000 }],
+  signing_keys: [{ kid: "demo-cle-0001", fonction: "Trésorier (démo)", cree_le: j(-20, 1), revoquee_le: null, motif_revocation: null, titulaire: U }],
+  signed_documents: [{ ref: "ARC-20261008-A1B2C3D4", titre: "Bilan trimestriel (démo)", kid: "demo-cle-0001", signe_le: j(-20, 1), hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }],
   audit_logs: [{ id: 3, le: j(-1, 1), acteur: U, action: "DEPENSE_APPROUVE", table_nom: "expense_requests", ligne_id: "e1" }, { id: 2, le: j(-3, 1), acteur: U, action: "PAIEMENT", table_nom: "payments", ligne_id: "x1" }, { id: 1, le: j(-9, 1), acteur: U, action: "DEPENSE_PAYEE", table_nom: "expense_requests", ligne_id: "e3" }]
 };
 function Q(t) { this.rows = (T[t] || []).slice(); }

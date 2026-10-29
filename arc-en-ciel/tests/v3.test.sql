@@ -101,4 +101,40 @@ select t.eq(app.generer_rappels() >= 0, true, 'rappels automatiques générés')
 select t.eq(app.generer_rappels(), 0, 'rappels : idempotents (aucun doublon)');
 select t.as_user('00000000-0000-0000-0000-0000000000f1'); select t.err($$select app.generer_rappels()$$, 'Droit insuffisant');
 reset role;
+
+-- ═══ Signature numérique : registre, clé publique seule, révocation, vérification publique ═══
+\echo SIGNATURE
+create temp table ctx2(k text primary key, v text); grant all on ctx2 to authenticated; grant usage on schema t to authenticated;
+set role authenticated; select t.as_user('00000000-0000-0000-0000-0000000000f1');
+select t.err($$select app.enregistrer_cle('cle-membre-01', '{"kty":"EC","crv":"P-256","x":"AAAA","y":"BBBB"}', 'Membre')$$, 'Droit insuffisant');
+select t.as_user('00000000-0000-0000-0000-0000000000b1');
+select t.err($$select app.enregistrer_cle('cle-president-01', '{"kty":"EC","crv":"P-256","x":"AAAA","y":"BBBB","d":"SECRET"}', 'Président')$$, 'violates check');
+select app.enregistrer_cle('cle-president-01', '{"kty":"EC","crv":"P-256","x":"AAAA","y":"BBBB"}', 'Président');
+select t.err($$select app.enregistrer_cle('cle-president-01', '{"kty":"EC","crv":"P-256","x":"AAAA","y":"BBBB"}', 'Président')$$, 'déjà utilisé');
+select app.enregistrer_signature('ARC-20261029-AB12CD', repeat('a',64), 'cle-president-01', repeat('S',86), 'Bilan T4', 'ARC1|ARC-20261029-AB12CD|' || repeat('a',64) || '|cle-president-01');
+select t.err($$select app.enregistrer_signature('ARC-20261029-AB12CD', repeat('a',64), 'cle-president-01', repeat('S',86), 'Bilan T4', 'ARC1|ARC-20261029-AB12CD|' || repeat('a',64) || '|cle-president-01')$$, 'déjà signée');
+select t.err($$select app.enregistrer_signature('ARC-20261029-ZZ99ZZ', repeat('b',64), 'cle-president-01', repeat('S',86), 'x', 'ARC1|AUTRE|' || repeat('b',64) || '|cle-president-01')$$, 'incohérent');
+select t.as_user('00000000-0000-0000-0000-0000000000c1');
+select t.err($$select app.enregistrer_signature('ARC-20261029-CC11CC', repeat('c',64), 'cle-president-01', repeat('S',86), 'x', 'ARC1|ARC-20261029-CC11CC|' || repeat('c',64) || '|cle-president-01')$$, 'non titulaire');
+reset role;
+select t.err($$update app.signed_documents set hash = repeat('f',64)$$, 'immuable');
+select t.err($$delete from app.signing_keys$$, 'immuable');
+-- Vérification publique SANS connexion (rôle anon)
+set role anon; select set_config('request.jwt.claim.sub', '', false);
+select t.eq((select (app.verifier_signature('ARC-20261029-AB12CD')->>'kid')), 'cle-president-01', 'vérification publique : document enregistré reconnu (sans connexion)');
+select t.eq((select (app.verifier_signature('ARC-INCONNU-0000')->>'inconnu')::boolean), true, 'vérification publique : référence inconnue signalée');
+select t.eq((select (app.verifier_signature('ARC-20261029-AB12CD') ? 'd')), false, 'vérification publique : jamais de clé privée');
+select t.err($$select count(*) from app.signed_documents$$, 'permission denied');
+select t.err($$select count(*) from app.members$$, 'permission denied');
+select t.err($$select app.enregistrer_cle('cle-anon-001', '{"kty":"EC","crv":"P-256","x":"A","y":"B"}', 'Pirate')$$, 'permission denied');
+reset role;
+set role authenticated; select t.as_user('00000000-0000-0000-0000-0000000000c1');
+select t.err($$select app.revoquer_cle('cle-president-01', 'Perte de l''appareil')$$, 'Seul le titulaire');
+select t.as_user('00000000-0000-0000-0000-0000000000b1');
+select t.err($$select app.revoquer_cle('cle-president-01', 'x')$$, 'Motif');
+select app.revoquer_cle('cle-president-01', 'Perte de l''appareil');
+select t.err($$select app.enregistrer_signature('ARC-20261029-DD22DD', repeat('d',64), 'cle-president-01', repeat('S',86), 'x', 'ARC1|ARC-20261029-DD22DD|' || repeat('d',64) || '|cle-president-01')$$, 'révoquée');
+reset role;
+set role anon; select t.eq((select (app.verifier_signature('ARC-20261029-AB12CD')->>'revoquee_le') is not null), true, 'vérification publique : révocation signalée');
+reset role;
 \echo TOUS LES TESTS V3 PASSENT

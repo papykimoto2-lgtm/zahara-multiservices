@@ -81,30 +81,61 @@
   var SYNC = { t: null, er: false }, OUVERT = false;
   function hhmm(d) { return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
   function prenom() { return S.membre ? (S.membre.prenoms || S.membre.nom).split(" ")[0] : "membre"; }
-  function coque(contenu) {
-    var cur = theme();
-    var nav = el("nav", { "aria-label": "Sections" }, VUES.filter(function (v) { return v[2](); }).map(function (v) {
-      return el("button", { "aria-current": S.vue === v[0] ? "page" : null, onclick: function () { S.vue = v[0]; OUVERT = false; afficher(); } }, v[1]);
+  var SOUS = { cite: "Votre situation, vos cotisations et la vie de la cité.", finances: "Trésorerie, encaissements et mouvements : tout l'argent sur une seule page.", depenses: "Demandes de dépense, validations et paiements, avec séparation des tâches.",
+    projets: "Le plan de développement de la cité, du court au long terme.", previsions: "Indicateurs de performance, projections financières et aide à la décision.", participation: "Votes secrets, consultations et boîte à idées.",
+    reclamations: "Réclamations traçables et incidents signalés dans la cité.", carte: "Équipements et incidents sur le plan de la cité.", solidarite: "Fonds de solidarité et aides, dans la confidentialité.",
+    patrimoine: "Assurances, sinistres et évolution des charges.", enquetes: "Votre avis compte : enquêtes anonymes.", reunions: "Réunions, procès-verbaux et décisions.", documents: "Documents officiels de la cité.",
+    audit: "Journal d'audit et alertes de contrôle interne.", admin: "Membres, réunions, annonces, signature et rapprochement bancaire." };
+  var BAN = null;                                   /* bannière particulière posée par un écran (ex. « Bonjour … » de l'accueil) */
+  function banniere(v, contenu) {
+    var b = BAN || {}; BAN = null;
+    var ban = el("div", { class: "ban" }, el("div", { class: "between" }, el("div", {}, el("h1", {}, b.t || v[1]), el("p", {}, b.s || SOUS[v[0]] || "")), el("div", { class: "ba noprint" }, b.acts || [])));
+    var g = contenu && contenu.firstElementChild;
+    if (g && g.classList.contains("grid") && !contenu.classList.contains("card")) { ban.classList.add("ov"); g.classList.add("kp"); }
+    return ban;
+  }
+  function horloge() {
+    var d = new Date();
+    return [d.toLocaleTimeString("fr-FR"), d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })];
+  }
+  setInterval(function () { var h = D.getElementById("hl"), j = D.getElementById("hd"); if (h) { var x = horloge(); h.textContent = x[0]; j.textContent = x[1]; } }, 1000);
+  function rechercher() {
+    var liste = VUES.filter(function (v) { return v[2](); }), champ = el("input", { type: "search", placeholder: "Aller à… (écran, ex. dépenses)", autocomplete: "off", "aria-label": "Rechercher un écran" }), res = el("div", { class: "rs" });
+    var fond = el("div", { class: "ov-rech", role: "dialog", "aria-modal": "true", onclick: function (e) { if (e.target === fond) fond.remove(); } }, el("div", { class: "card" }, champ, res));
+    function maj() { var q = champ.value.trim().toLowerCase(); res.replaceChildren.apply(res, liste.filter(function (v) { return v[1].toLowerCase().indexOf(q) >= 0 || (SOUS[v[0]] || "").toLowerCase().indexOf(q) >= 0; }).slice(0, 8).map(function (v) {
+      return el("button", { class: "s", onclick: function () { fond.remove(); S.vue = v[0]; OUVERT = false; afficher(); } }, v[1]); })); }
+    champ.addEventListener("input", maj); champ.addEventListener("keydown", function (e) { if (e.key === "Escape") fond.remove(); if (e.key === "Enter") { var b = res.querySelector("button"); if (b) b.click(); } });
+    maj(); D.body.appendChild(fond); champ.focus();
+  }
+  D.addEventListener("keydown", function (e) { if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test((D.activeElement || {}).tagName || "") && S.user) { e.preventDefault(); rechercher(); } });
+  function coque(contenu, v) {
+    var cur = theme(), cv = v || VUES.filter(function (x) { return x[0] === S.vue; })[0] || VUES[0], hh = horloge();
+    var nav = el("nav", { "aria-label": "Sections" }, VUES.filter(function (x) { return x[2](); }).map(function (x) {
+      return el("button", { "aria-current": S.vue === x[0] ? "page" : null, onclick: function () { S.vue = x[0]; OUVERT = false; afficher(); } }, x[1]);
     }));
     var role = S.roles.length ? S.roles.map(function (r) { return LIBROLES[r] || r; }).join(", ") : "Membre";
-    var pastille = API.enDemo ? el("span", { class: "pill dm" }, "Mode démonstration") : SYNC.er ? el("span", { class: "pill er" }, "Passerelle en erreur") : el("span", { class: "pill" }, "Synchronisé " + (SYNC.t ? hhmm(SYNC.t) : "…"));
+    var etat = API.enDemo ? ["pill dm", "Mode démonstration"] : SYNC.er ? ["pill er", "Passerelle en erreur"] : ["pill", "Synchronisé " + (SYNC.t ? hhmm(SYNC.t) : "…")];
     var sb_ = el("aside", { class: "sb" },
-      el("div", { class: "br" }, el("img", { src: "icons/arc-192.png", alt: "" }), el("div", {}, el("b", {}, M.nom), el("span", {}, M.cite))), nav, el("div", { class: "grow" }),
+      el("div", { class: "br" }, el("img", { src: "icons/arc-192.png", alt: "" }), el("div", {}, el("b", {}, M.nom), el("span", {}, M.cite))),
+      el("div", { class: "hor" }, el("b", { id: "hl" }, hh[0]), el("span", { id: "hd" }, hh[1])),
+      el("button", { class: "rech", onclick: rechercher }, "🔍 Rechercher", el("kbd", {}, "/")), nav, el("div", { class: "grow" }),
       el("div", { class: "dev" }, "Logiciel développé par " + M.editeur + " · " + M.contact),
       el("div", { class: "me" }, el("b", {}, S.membre ? S.membre.nom + " " + (S.membre.prenoms || "") : "Compte connecté"), el("span", {}, role)),
       el("div", { class: "dots", role: "group", "aria-label": "Couleur de l'application" }, THEMES.map(function (t) {
         return el("button", { "data-c": t[1], "aria-label": "Thème " + t[0], "aria-pressed": cur === t[0] ? "true" : "false", onclick: function () { theme(t[0]); afficher(); } });
       })),
-      el("button", { class: "lk", onclick: function () { sb.auth.signOut().then(function () { S.user = null; if (API.enDemo) G.location.reload(); else vueLogin(); }); } }, "↩ Déconnexion"), pastille);
+      el("button", { class: "lk", onclick: function () { sb.auth.signOut().then(function () { S.user = null; if (API.enDemo) G.location.reload(); else vueLogin(); }); } }, "↩ Déconnexion"), el("span", { class: etat[0] }, etat[1]));
     Array.prototype.forEach.call(sb_.querySelectorAll(".dots button"), function (b) { b.style.background = b.getAttribute("data-c"); });
     var top = el("div", { class: "top" }, el("button", { "aria-label": "Menu", onclick: function () { OUVERT = !OUVERT; sh.classList.toggle("open", OUVERT); } }, "☰"), el("b", {}, M.nom));
-    var sh = el("div", { class: "shell" + (OUVERT ? " open" : "") }, sb_, el("div", {}, top, API.enDemo ? el("div", { class: "demo" }, "MODE DÉMONSTRATION — données fictives, aucune écriture") : null, el("main", { class: "ct" }, contenu)));
+    var flo = SYNC.er ? el("span", { class: "pill er flo" }, "● Passerelle en erreur") : API.enDemo ? el("span", { class: "pill dm flo" }, "● Démonstration") : el("span", { class: "pill flo" }, "● Passerelle connectée");
+    var ban = v ? banniere(cv, contenu) : null;
+    var sh = el("div", { class: "shell cdl" + (OUVERT ? " open" : "") }, sb_, el("div", {}, top, API.enDemo ? el("div", { class: "demo" }, "MODE DÉMONSTRATION — données fictives, aucune écriture") : null, el("main", { class: "ct" }, ban, contenu)), flo);
     racine.replaceChildren(sh);
   }
   function afficher() {
     var v = VUES.filter(function (x) { return x[0] === S.vue && x[2](); })[0] || VUES[0];
     coque(el("p", { class: "mu" }, "Chargement…"));
-    v[3]().then(function (c) { SYNC.t = new Date(); SYNC.er = false; coque(c); }, function (e) { SYNC.er = true; coque(card("Erreur", el("p", {}, msgErr(e)))); });
+    v[3]().then(function (c) { SYNC.t = new Date(); SYNC.er = false; coque(c, v); }, function (e) { BAN = null; SYNC.er = true; coque(card("Erreur", el("p", {}, msgErr(e))), v); });
   }
 
   /* ---------- Aujourd'hui : ce qui demande l'attention maintenant ---------- */
@@ -149,10 +180,11 @@
       var et = alertesEtat(), now = Date.now();
       var visibles = AL.filter(function (a) { var x = et[a.id]; return !(x && x !== "moi" && x > now); });
       var acts = el("div", { class: "acts" },
-        can("depense.creer") ? el("button", { class: "p", onclick: function () { S.vue = "depenses"; afficher(); } }, "＋ Nouvelle dépense") : null,
-        can("finance.encaisser") ? el("button", { class: "s", onclick: function () { S.vue = "finances"; afficher(); } }, "💰 Enregistrer un encaissement") : null,
-        el("button", { class: "s", onclick: function () { S.vue = "cite"; afficher(); } }, "🏘️ Mes cotisations"));
-      return el("div", {}, el("h1", { class: "hi" }, "Bonjour " + prenom()), el("p", { class: "sub" }, "Voici ce qui demande votre attention maintenant."), acts,
+        can("depense.creer") ? el("button", { class: "ghost", onclick: function () { S.vue = "depenses"; afficher(); } }, "＋ Nouvelle dépense") : null,
+        can("finance.encaisser") ? el("button", { class: "ghost", onclick: function () { S.vue = "finances"; afficher(); } }, "💰 Encaissement") : null,
+        el("button", { class: "ghost", onclick: function () { S.vue = "cite"; afficher(); } }, "🏘️ Mes cotisations"));
+      BAN = { t: "Bonjour " + prenom(), s: "Voici ce qui demande votre attention maintenant.", acts: acts.childNodes.length ? Array.prototype.slice.call(acts.childNodes) : [] };
+      return el("div", {},
         el("div", { class: "grid" }, kp),
         el("h2", {}, "Alertes", visibles.length ? el("span", { class: "nb" }, String(visibles.length)) : null),
         visibles.length ? visibles.map(function (a) {
@@ -178,8 +210,7 @@
       R[4].forEach(function (c) { lib[c.id] = c.libelle; });
       var du = appels.filter(function (a) { return a.statut !== "paye"; }).reduce(function (s, a) { return s + Number(a.reste); }, 0);
       return el("div", {},
-        card(S.membre ? S.membre.nom + " " + (S.membre.prenoms || "") : "Bienvenue", el("div", { class: "grid" },
-          kpi("Rôle(s)", S.roles.join(", ") || "membre"), kpi("Reste à payer", fc(du)), kpi("Réf. membre", S.membre ? S.membre.ref : "—"))),
+        el("div", { class: "grid" }, kpi("votre rôle", S.roles.map(function (r) { return LIBROLES[r] || r; }).join(", ") || "Membre", "🪪"), kpi("Reste à payer", fc(du), "💳"), kpi("réf. membre", S.membre ? S.membre.ref : "—", "🏷️")),
         card("Mes cotisations", table([
           { t: "Cotisation", f: function (r) { return lib[r.contribution_id]; } }, { t: "Période", k: "periode" }, { t: "Échéance", f: function (r) { return fd(r.echeance); } },
           { t: "Appelé", n: 1, f: function (r) { return fc(r.montant_appele); } }, { t: "Payé", n: 1, f: function (r) { return fc(r.montant_paye); } },
@@ -204,9 +235,9 @@
       function somme(f, k) { return appels.filter(f).reduce(function (s, a) { return s + Number(a[k]); }, 0); }
       var annulees = {}; mouvements.forEach(function (m) { if (m.contre_ecriture_de) annulees[m.contre_ecriture_de] = 1; });
       return el("div", {},
-        card("Trésorerie", el("div", { class: "grid" }, soldes.map(function (s) { return kpi(s.nom + " (" + s.type + ")", fc(s.solde)); }),
-          kpi("Total appelé", fc(somme(function () { return true; }, "montant_appele"))), kpi("Encaissé", fc(somme(function () { return true; }, "montant_paye"))),
-          kpi("Impayés en retard", fc(somme(function (a) { return a.statut === "en_retard"; }, "reste"))))),
+        el("div", { class: "grid" }, soldes.map(function (s) { return kpi(s.nom, fc(s.solde), s.type === "banque" ? "🏦" : s.type === "caisse" ? "💵" : s.type === "mobile_money" ? "📱" : "🤝"); }),
+          kpi("total appelé", fc(somme(function () { return true; }, "montant_appele")), "📣"), kpi("encaissé", fc(somme(function () { return true; }, "montant_paye")), "✅"),
+          kpi("impayés en retard", fc(somme(function (a) { return a.statut === "en_retard"; }, "reste")), "⏰")),
         can("finance.encaisser") ? formPaiement(comptes) : null,
         card("Derniers mouvements", table([
           { t: "Date", f: function (r) { return fd(r.date_op); } }, { t: "Réf.", k: "ref" }, { t: "Catégorie", k: "categorie" },

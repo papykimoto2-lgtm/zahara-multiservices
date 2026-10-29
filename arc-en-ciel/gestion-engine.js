@@ -16,6 +16,7 @@
   function opts(L) { return L.map(function (x) { return el("option", { value: x[0] }, x[1]); }); }
   function id6() { return Date.now().toString(36).toUpperCase(); }
   var RUBRIQUES = [["membres", "👥 Membres et lots", function () { return can("membres.gerer"); }, rubMembres], ["reunions", "📅 Réunions et PV", function () { return can("reunion.gerer"); }, rubReunions],
+    ["signature", "🔏 Signature", function () { return can("signature.gerer"); }, rubSignature],
     ["annonces", "📣 Annonces et rappels", function () { return can("annonce.publier"); }, rubAnnonces], ["banque", "🏦 Rapprochement bancaire", function () { return can("finance.lire") || can("finance.encaisser"); }, rubBanque]];
 
   function vueAdmin() {
@@ -95,6 +96,23 @@
   function statutRes(r) {
     var s = G.prompt("Nouveau statut (a_faire, en_cours, execute, bloque, annule) :", r.statut); if (!s) return;
     from("resolutions").update({ statut: s }).eq("id", r.id).then(function (x) { maj(x); toast("Décision mise à jour."); A.afficher(); }).catch(echec);
+  }
+
+  /* ---------- Signature numérique ---------- */
+  function rubSignature() {
+    var S = G.ARC_SIGN;
+    return Promise.all([S ? S.etat() : null, ok(from("signing_keys").select("kid,fonction,cree_le,revoquee_le,motif_revocation,titulaire").order("cree_le", { ascending: false })), ok(from("signed_documents").select("ref,titre,kid,signe_le,hash").order("signe_le", { ascending: false }).limit(40))]).then(function (R) {
+      var loc = R[0], K = R[1], Dc = R[2], fonction = el("input", { required: true, minlength: 3, maxlength: 60, placeholder: "Ex. Trésorier, Président…" });
+      return el("div", {}, card("Clé de signature de cet appareil", loc ? el("p", {}, badge("paye"), " Clé " + loc.kid + " — " + loc.fonction + ". Les documents imprimés depuis cet appareil portent un QR SIGNÉ.") :
+        el("form", { onsubmit: function (ev) { ev.preventDefault();
+          if (!S || !S.dispo()) return toast("Signature indisponible sur cet appareil (HTTPS requis).", true);
+          S.creer(fonction.value.trim()).then(fait("Clé créée : la partie privée ne quitte jamais cet appareil."), echec); } },
+          el("p", { class: "mu" }, "Aucune clé sur cet appareil. La clé privée sera non exportable ; seule la clé publique est enregistrée. Perte de l'appareil : révoquer la clé ci-dessous."), field("Fonction du signataire", fonction), el("button", { class: "p", type: "submit" }, "Créer ma clé de signature"))),
+        card("Clés enregistrées", table([{ t: "Identifiant", k: "kid" }, { t: "Fonction", k: "fonction" }, { t: "Créée", f: function (r) { return fd(r.cree_le); } }, { t: "État", f: function (r) { return r.revoquee_le ? badge("annulee") : badge("paye"); }, x: function (r) { return r.revoquee_le ? "révoquée" : "valide"; } },
+          { t: "", f: function (r) { return !r.revoquee_le ? el("button", { class: "s", onclick: function () { var m = G.prompt("Motif de révocation (obligatoire) :"); if (!m) return; rpc("revoquer_cle", { p_kid: r.kid, p_motif: m }).then(fait("Clé révoquée."), echec); } }, "Révoquer") : r.motif_revocation; } }], K, "Aucune clé.")),
+        card("Documents signés", table([{ t: "Réf.", k: "ref" }, { t: "Titre", k: "titre" }, { t: "Signé le", f: function (r) { return fdt(r.signe_le); } }, { t: "Clé", k: "kid" }, { t: "Empreinte", f: function (r) { return r.hash.slice(0, 16) + "…"; } }], Dc, "Aucun document signé."),
+          el("p", { class: "mu" }, "Vérification publique : verifier.html (sans connexion).")));
+    });
   }
 
   /* ---------- Annonces et rappels ---------- */

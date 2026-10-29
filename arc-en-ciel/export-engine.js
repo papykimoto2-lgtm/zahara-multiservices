@@ -1,6 +1,6 @@
 /* Exports et impression ARC-EN-CIEL CONNECT : CSV (Excel FR, séparateur « ; »), Excel (.xls), impression / PDF par le navigateur.
-   - Toute impression porte un pied de page : référence, date, empreinte SHA-256 du contenu et QR d'intégrité (qrcode-generator, MIT).
-     Le QR et l'empreinte prouvent que le contenu n'a pas changé ; ils ne sont PAS une signature (aucune clé de la cité n'est encore publiée).
+   - Toute impression porte un pied de page : référence, date, empreinte SHA-256 du contenu et QR (qrcode-generator, MIT).
+     Avec une clé de signature sur l'appareil (signature-engine.js) le QR est SIGNÉ (origine + intégrité) ; sinon il n'atteste que l'intégrité.
    - Les montants sont exportés en nombres bruts ; les textes sont échappés (aucune formule ne peut s'exécuter : préfixe « ' » devant = + - @).
    Expose ARC_EXPORT. Dépend de ui-engine.js et de vendor/qrcode.js. */
 (function (G) {
@@ -36,12 +36,16 @@
     if (typeof G.qrcode !== "function") return "";
     try { var q = G.qrcode(0, "M"); q.addData(texte); q.make(); return q.createSvgTag({ cellSize: 3, margin: 0, scalable: true }); } catch (e) { return ""; }
   }
-  /* Imprime la zone de contenu courante avec le pied d'intégrité. */
+  /* Imprime la zone de contenu courante avec le pied d'intégrité ; SIGNÉ (ECDSA) si l'utilisateur a une clé de signature sur cet appareil. */
   function imprimer(titre, texteContenu) {
-    return sha(String(texteContenu || D.querySelector("main").textContent)).then(function (h) {
-      var ref = "ARC-" + stamp().replace(/-/g, "") + "-" + h.slice(0, 6).toUpperCase(), svg = qr(["ARC-EN-CIEL", ref, stamp(), "sha256:" + h].join("|"));
+    var texte = String(texteContenu || D.querySelector("main").textContent), S = G.ARC_SIGN;
+    return Promise.resolve(S ? S.pret() : false).then(function (aCle) { return aCle ? S.signer(titre, texte).then(function (r) { return { sig: r }; }, function (e) { UI.toast("Signature impossible : " + UI.msgErr(e) + " — impression non signée.", true); return {}; }) : {}; })
+      .then(function (o) { return sha(texte).then(function (h) { o.h = o.sig ? o.sig.hash : h; return o; }); }).then(function (o) {
+      var ref = o.sig ? o.sig.ref : "ARC-" + stamp().replace(/-/g, "") + "-" + o.h.slice(0, 6).toUpperCase(), svg = qr(o.sig ? o.sig.qr : ["ARC-EN-CIEL", ref, stamp(), "sha256:" + o.h].join("|"));
+      var note = o.sig ? "DOCUMENT SIGNÉ NUMÉRIQUEMENT (ECDSA P-256) par " + o.sig.fonction + " — clé " + o.sig.kid + ". Scannez le QR (ou ouvrez verifier.html) : origine, intégrité et validité de la clé sont contrôlées sans connexion."
+        : "QR d'intégrité (non signé) : il confirme que le contenu n'a pas été modifié, pas son origine.";
       var pied = el("div", { id: "pied-print" }, el("div", { class: "qrp" }), el("div", {}, el("b", {}, titre + " — " + (M.nom || "")), el("br"), "Réf. " + ref + " · émis le " + stamp(), el("br"),
-        "Empreinte SHA-256 : " + h, el("br"), "QR d'intégrité (non signé) : il confirme que le contenu n'a pas été modifié. Logiciel développé par " + (M.editeur || "") + " · " + (M.contact || "")));
+        "Empreinte SHA-256 : " + o.h, el("br"), note + " Logiciel développé par " + (M.editeur || "") + " · " + (M.contact || "")));
       if (svg) { var tmp = new G.DOMParser().parseFromString(svg, "image/svg+xml").documentElement; pied.firstChild.appendChild(D.importNode(tmp, true)); }
       var ancien = D.getElementById("pied-print"); if (ancien) ancien.remove();
       D.querySelector("main").appendChild(pied); D.title = titre + " — " + ref;
