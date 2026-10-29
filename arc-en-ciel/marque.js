@@ -7,6 +7,6 @@ window.ERP_MARQUE = {
   cite: "Cité Arc-en-Ciel de Songon Kassamblé",
   editeur: "Sanix Africa Division Technologies",
   contact: "WhatsApp : +225 0779181075 / 0140017751",
-  modules: ["cite", "finances", "depenses", "reunions", "documents"],
+  modules: ["cite", "finances", "depenses", "projets", "participation", "reclamations", "solidarite", "reunions", "documents"],
   outils: ["audit"]
 };

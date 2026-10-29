@@ -30,7 +30,11 @@
   var ST = {
     paye: ["Payé", "ok"], partiel: ["Partiel", "wa"], appele: ["Appelé", ""], en_retard: ["En retard", "er"], conteste: ["Contesté", "wa"],
     soumise: ["À valider", "wa"], approuvee: ["Approuvée", "ok"], payee: ["Payée", "ok"], rejetee: ["Rejetée", "er"], annulee: ["Annulée", "er"],
-    brouillon: ["Brouillon", ""], valide: ["Validé", "wa"], publie: ["Publié", "ok"]
+    brouillon: ["Brouillon", ""], valide: ["Validé", "wa"], publie: ["Publié", "ok"],
+    idee: ["Idée", ""], etude: ["À l'étude", "wa"], autorise: ["Autorisé", "ok"], en_cours: ["En cours", "wa"], termine: ["Terminé", "ok"], suspendu: ["Suspendu", "er"], abandonne: ["Abandonné", "er"],
+    nouveau: ["Nouveau", "wa"], en_analyse: ["En analyse", "wa"], planifie: ["Planifié", ""], en_intervention: ["En intervention", "wa"], resolu: ["Résolu", "ok"], rejete: ["Rejeté", "er"],
+    deposee: ["Déposée", "wa"], affectee: ["Affectée", ""], repondue: ["Répondue", "ok"], reexamen: ["Réexamen", "wa"], close: ["Close", ""],
+    recue: ["Reçue", ""], a_etude: ["À l'étude", "wa"], acceptee: ["Acceptée", "ok"], planifiee: ["Planifiée", ""], realisee: ["Réalisée", "ok"]
   };
   function badge(s) { var x = ST[s] || [s, ""]; return el("span", { class: "b " + x[1] }, x[0]); }
   function kpi(l, v, ic) { return el("div", { class: "kpi" }, ic ? el("div", { class: "ic", "aria-hidden": "true" }, ic) : null, el("div", { class: "v" }, v), el("div", { class: "l" }, l)); }

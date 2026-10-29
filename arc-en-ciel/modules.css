@@ -39,6 +39,9 @@ td.n,th.n{text-align:right;white-space:nowrap}.tw{overflow-x:auto}
 .b{display:inline-block;border-radius:99px;padding:1px 9px;font-size:12px;border:1px solid var(--mu);color:var(--mu)}.b.ok{color:var(--ok);border-color:var(--ok);background:var(--okbg)}.b.er{color:var(--er);border-color:var(--er);background:var(--erbg)}.b.wa{color:var(--wa);border-color:var(--wa);background:var(--wabg)}
 form{display:grid;gap:10px}label{display:grid;gap:4px;font-size:13px;color:var(--mu)}
 input,select,textarea{font:inherit;padding:10px;border:1px solid var(--bd);border-radius:10px;background:#fff;color:var(--tx);min-height:44px;width:100%}
+input[type=radio],input[type=checkbox]{width:auto;min-height:0;margin-right:8px;accent-color:var(--b)}
+label.row{display:flex;align-items:center;gap:6px;color:var(--tx);font-size:15px;padding:6px 0}
+progress{width:140px;height:10px;accent-color:var(--b)}
 button.p{background:var(--b);color:#fff;border:1px solid var(--b);border-radius:10px;padding:10px 16px;min-height:44px;font-weight:700;cursor:pointer}
 button.s{background:#fff;border:1px solid var(--b);color:var(--b);border-radius:10px;padding:8px 12px;min-height:40px;font-weight:600;cursor:pointer}
 button:disabled{opacity:.5}.mu{color:var(--mu)}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}

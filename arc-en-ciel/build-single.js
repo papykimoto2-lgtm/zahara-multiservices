@@ -4,7 +4,7 @@ const fs = require("fs"), path = require("path"), crypto = require("crypto");
 const R = f => fs.readFileSync(path.join(__dirname, f), "utf8");
 const h = s => "'sha256-" + crypto.createHash("sha256").update(s, "utf8").digest("base64") + "'";
 const png = "data:image/png;base64," + fs.readFileSync(path.join(__dirname, "icons/arc-192.png")).toString("base64");
-const code = ["marque.js", "ui-engine.js", "demo-engine.js", "api-engine.js", "arc-engine.js"].map(R).join("\n").split("icons/arc-192.png").join(png);
+const code = ["marque.js", "ui-engine.js", "demo-engine.js", "api-engine.js", "arc-engine.js", "participation-engine.js", "projets-engine.js", "solidarite-engine.js"].map(R).join("\n").split("icons/arc-192.png").join(png);
 const css = R("modules.css");
 /* script en ligne : pas de chemin de chargement paresseux pour supabase-js */
 const vendor = R("vendor/supabase-js-2.45.4.js").replace('if(!e)throw new Error("Automatic publicPath is not supported in this browser")', 'if(!e)e="/"');

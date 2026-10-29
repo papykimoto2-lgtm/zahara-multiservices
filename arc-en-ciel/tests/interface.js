@@ -25,11 +25,16 @@ const jwt = o => "x." + Buffer.from(JSON.stringify(o)).toString("base64url") + "
   chk("IF-4c", "alerte : « Je m'en occupe » la marque prise en charge (mémorisé)", /pris en charge/.test(await txt("main")));
   await p.setViewportSize({ width: 390, height: 800 }); await p.click("button[aria-label=Menu]");
   chk("IF-4d", "mobile : le bouton ☰ ouvre le menu latéral", await p.locator(".shell.open").count() === 1); const va = async v => { if (!(await p.locator(".shell.open").count())) await p.click("button[aria-label=Menu]"); await p.click("nav >> text=" + v); await p.waitForTimeout(250); };
-  const attendus = { "Ma cité": /Reste à payer|Mes cotisations/, "Argent": /Trésorerie/, "Dépenses": /Seuils de validation/, "Réunions": /Procès-verbaux/, "Documents": /Règlement de copropriété/, "Audit": /Chaîne d'empreintes intacte/ };
+  const attendus = { "Ma cité": /Reste à payer|Mes cotisations/, "Argent": /Trésorerie/, "Dépenses": /Seuils de validation/, "Réunions": /Procès-verbaux/, "Documents": /Règlement de copropriété/, "Audit": /Chaîne d'empreintes intacte/,
+    "Projets": /Remise en état de l'éclairage/, "Participation": /Priorité d'investissement 2027/, "Réclamations": /Caniveau bouché/, "Solidarité": /solde du fonds/ };
   for (const v of Object.keys(attendus)) { await va(v); chk("IF-5 " + v, "écran « " + v + " » affiché", attendus[v].test(await txt("main")), (await txt("main")).slice(0, 80)); }
   await va("Dépenses");
   await p.click("button:has-text('Approuver') >> nth=0"); await p.waitForTimeout(300);
   chk("IF-6", "démo : une écriture (approbation) est refusée avec un message clair", /Mode démonstration/.test(await p.locator("#toast").innerText()));
+  await va("Participation");
+  chk("IF-6b", "démo : un vote est refusé avec un message clair (aucune écriture)", await (async () => { await p.click("input[type=radio] >> nth=0"); await p.click("button:has-text('Voter (secret')"); await p.waitForTimeout(250); return /Mode démonstration/.test(await p.locator("#toast").innerText()); })());
+  await va("Solidarité");
+  chk("IF-6c", "solidarité : aide publiée sans identité (montant et date seulement)", /90 000 F/.test(await txt("main")) && !/Dossier fictif/.test(await txt("main").then(t => t.split("Aides accordées par la cité")[1].split("Demander une aide")[0])));
   chk("IF-7", "pied de page : éditeur et contact issus de marque.js", /Sanix Africa Division Technologies/.test(await txt(".dev")) && /0779181075/.test(await txt(".dev")));
   chk("IF-8", "aucune erreur de console ni violation de CSP", logs.length === 0, JSON.stringify(logs));
   // XSS : un texte hostile s'affiche comme du texte

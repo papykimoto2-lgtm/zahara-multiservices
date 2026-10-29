@@ -1,5 +1,5 @@
 /* Coque hors ligne : seules les ressources statiques sont mises en cache. Les données (API) ne le sont jamais. */
-const V = "arc-v2", COQUE = ["./", "index.html", "modules.css", "marque.js", "ui-engine.js", "demo-engine.js", "api-engine.js", "arc-engine.js", "config.js", "vendor/supabase-js-2.45.4.js", "icons/arc-192.png", "manifest.webmanifest"];
+const V = "arc-v3", COQUE = ["./", "index.html", "modules.css", "marque.js", "ui-engine.js", "demo-engine.js", "api-engine.js", "arc-engine.js", "participation-engine.js", "projets-engine.js", "solidarite-engine.js", "config.js", "vendor/supabase-js-2.45.4.js", "icons/arc-192.png", "manifest.webmanifest"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(V).then(c => c.addAll(COQUE)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== V).map(x => caches.delete(x)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", e => {

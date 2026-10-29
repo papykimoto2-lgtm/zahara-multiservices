@@ -24,6 +24,16 @@
     ["documents", "📁 Documents", function () { return true; }, vueDocuments],
     ["audit", "🛡️ Audit et contrôle", function () { return can("audit.lire"); }, vueAudit]
   ];
+  /* Registre : les moteurs V2 (participation, projets, solidarité) y ajoutent leurs écrans et leurs alertes. */
+  var ALERTES = [];
+  G.ARC_APP = {
+    S: S, can: can, afficher: afficher, aller: function (v) { S.vue = v; afficher(); },
+    vue: function (id, libelle, ok_, fn, apres) {
+      var i = VUES.map(function (v) { return v[0]; }).indexOf(apres);
+      VUES.splice(i < 0 ? VUES.length : i + 1, 0, [id, libelle, ok_, fn]);
+    },
+    alerte: function (fn) { ALERTES.push(fn); }
+  };
   var THEMES = [["bleu", "#1a3aa8"], ["teal", "#0e7490"], ["emeraude", "#0f7b5f"], ["orange", "#c9500a"], ["violet", "#6a32c9"], ["or", "#15171d"]];
   var LIBROLES = { president: "Président", vice_president: "Vice-président", secretaire: "Secrétaire général", tresorier: "Trésorier", tresorier_adjoint: "Trésorier adjoint", second_approbateur: "Second approbateur",
     responsable_commission: "Responsable de commission", controleur: "Contrôleur financier", commission_sociale: "Commission sociale", admin_technique: "Administrateur technique", membre: "Membre" };
@@ -129,6 +139,13 @@
       if (aPayer && can("depense.payer")) AL.push({ id: "payer", c: "wa", t: aPayer + " dépense(s) approuvée(s) à payer.", v: "depenses", l: "Voir les paiements →" });
       if (retardMoi.length) AL.push({ id: "moi", c: "wa", t: "Vous avez " + retardMoi.length + " cotisation(s) en retard : " + fc(retardMoi.reduce(function (s, a) { return s + Number(a.reste); }, 0)) + ".", v: "cite", l: "Voir mes cotisations →" });
       reunions.filter(function (r) { return new Date(r.date_heure) - new Date() < 7 * 864e5; }).forEach(function (r, i) { AL.push({ id: "reu" + i + r.date_heure, c: "in", t: "Réunion « " + r.titre + " » le " + fdt(r.date_heure) + ".", v: "reunions", l: "Voir les réunions →" }); });
+      return Promise.all(ALERTES.map(function (f) { return f().then(function (x) { return x || []; }, function () { return []; }); })).then(function (X) {
+        X.forEach(function (L) { AL = AL.concat(L); });
+        return finAujourdhui(kp, AL);
+      });
+    });
+  }
+  function finAujourdhui(kp, AL) {
       var et = alertesEtat(), now = Date.now();
       var visibles = AL.filter(function (a) { var x = et[a.id]; return !(x && x !== "moi" && x > now); });
       var acts = el("div", { class: "acts" },
@@ -145,7 +162,6 @@
               el("button", { class: "s", onclick: function () { alerteMaj(a.id, "moi"); } }, "✋ Je m'en occupe"),
               el("button", { class: "s", onclick: function () { alerteMaj(a.id, Date.now() + 30 * 60000); } }, "⏰ 30 min"), el("button", { class: "s", onclick: function () { alerteMaj(a.id, Date.now() + 2 * 3600000); } }, "⏰ 2 h")));
         }) : el("p", { class: "mu" }, "✅ Rien d'urgent."));
-    });
   }
 
   /* ---------- Ma cité ---------- */
@@ -196,7 +212,7 @@
           { t: "Date", f: function (r) { return fd(r.date_op); } }, { t: "Réf.", k: "ref" }, { t: "Catégorie", k: "categorie" },
           { t: "Entrée", n: 1, f: function (r) { return r.sens === "entree" ? fc(r.montant) : ""; } }, { t: "Sortie", n: 1, f: function (r) { return r.sens === "sortie" ? fc(r.montant) : ""; } },
           { t: "", f: function (r) { return annulees[r.id] ? badge("annulee") : (can("finance.annuler") && !r.contre_ecriture_de ? el("button", { class: "s", onclick: function () { annuler(r); } }, "Contrepasser") : r.motif || ""); } }], mouvements)),
-        can("finance.publier") ? formPublication() : null);
+        can("finance.publier") ? [formPublication(), formBilan()] : null);
     });
   }
   function formPaiement(comptes) {
@@ -222,6 +238,14 @@
       ev.preventDefault();
       rpc("publier_etat_financier", { p_periode: per.value.trim(), p_debut: d.value, p_fin: f.value }).then(function () { toast("État publié aux membres."); }, function (e) { toast(msgErr(e), true); });
     } }, field("Période", per), field("Du", d), field("Au", f), el("button", { class: "p", type: "submit" }, "Publier (non modifiable)")));
+  }
+
+  function formBilan() {
+    var per = el("input", { required: true, placeholder: "2026-T4", maxlength: 20 }), d = el("input", { type: "date", required: true }), f = el("input", { type: "date", required: true });
+    return card("Publier le bilan trimestriel (contrat de confiance numérique)", el("form", { onsubmit: function (ev) {
+      ev.preventDefault();
+      rpc("publier_bilan_trimestriel", { p_periode: per.value.trim(), p_debut: d.value, p_fin: f.value }).then(function () { toast("Bilan publié aux membres."); }, function (e) { toast(msgErr(e), true); });
+    } }, el("p", { class: "mu" }, "Recouvrement, projets, incidents, réclamations, aides, décisions : instantané non modifiable."), field("Période", per), field("Du", d), field("Au", f), el("button", { class: "p", type: "submit" }, "Publier le bilan")));
   }
 
   /* ---------- Dépenses ---------- */
@@ -305,13 +329,20 @@
     });
   }
   function vueAudit() {
-    return Promise.all([ok(from("audit_logs").select("id,le,acteur,action,table_nom,ligne_id").order("id", { ascending: false }).limit(60)), rpc("verifier_chaine_audit")]).then(function (R) {
-      var logs = R[0], rupt = R[1];
-      return el("div", {}, card("Intégrité du journal", el("p", {}, rupt.length ? badge("annulee") : badge("paye"), rupt.length ? " " + rupt.length + " rupture(s) de chaîne détectée(s) — alerter le comité." : " Chaîne d'empreintes intacte.")),
+    return Promise.all([ok(from("audit_logs").select("id,le,acteur,action,table_nom,ligne_id").order("id", { ascending: false }).limit(60)), rpc("verifier_chaine_audit"), rpc("alertes_controle")]).then(function (R) {
+      var logs = R[0], rupt = R[1], alertes = R[2] || [];
+      return el("div", {}, card("Alertes de contrôle (opérations à vérifier — ce ne sont pas des preuves de fraude)", table([{ t: "Type", k: "type" }, { t: "Réf.", k: "ref" }, { t: "Détail", k: "detail" }, { t: "Date", f: function (r) { return fdt(r.le); } }], alertes, "Aucune anomalie détectée.")),
+        card("Intégrité du journal", el("p", {}, rupt.length ? badge("annulee") : badge("paye"), rupt.length ? " " + rupt.length + " rupture(s) de chaîne détectée(s) — alerter le comité." : " Chaîne d'empreintes intacte.")),
         card("Journal d'audit (60 derniers événements)", table([{ t: "#", k: "id" }, { t: "Date", f: function (r) { return fdt(r.le); } }, { t: "Action", k: "action" }, { t: "Table", k: "table_nom" },
           { t: "Ligne", f: function (r) { return (r.ligne_id || "").slice(0, 8); } }, { t: "Acteur", f: function (r) { return (r.acteur || "système").slice(0, 8); } }], logs)));
     });
   }
+
+  /* Alerte de contrôle : opérations inhabituelles à vérifier (contrôleur financier) */
+  ALERTES.push(function () {
+    if (!can("audit.lire")) return Promise.resolve([]);
+    return rpc("alertes_controle").then(function (L) { return L && L.length ? [{ id: "ctl" + L.length, c: "wa", t: L.length + " opération(s) à vérifier par le contrôle interne.", v: "audit", l: "Voir les alertes →" }] : []; });
+  });
 
   /* ---------- Démarrage ---------- */
   function demarrer() {
@@ -327,5 +358,5 @@
   }
   if (API.configured && !API.enDemo) sb.auth.onAuthStateChange(function (ev) { if (ev === "SIGNED_OUT") vueLogin(); });
   if ("serviceWorker" in navigator && G.location.protocol.indexOf("http") === 0) navigator.serviceWorker.register("sw.js").catch(function () { });
-  demarrer();
+  if (D.readyState === "complete") demarrer(); else G.addEventListener("load", demarrer);   /* après le chargement des moteurs V2 */
 })(window);
