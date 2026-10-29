@@ -1,10 +1,19 @@
-// Mode démonstration : données FICTIVES en mémoire, aucune écriture, aucun réseau.
-const j = (n, d) => { const x = new Date(); x.setDate(x.getDate() + n); return (d ? x.toISOString() : x.toISOString().slice(0, 10)); };
-const U = "demo-user", M = "m1", C1 = "c1";
-const T = {
+/* Mode démonstration ARC-EN-CIEL CONNECT : données FICTIVES en mémoire, aucune écriture, aucun réseau.
+   Imite la partie lecture du client Supabase (from().select().eq().in().gte().order().limit()) pour que les écrans s'affichent sans base.
+   Toute écriture (rpc) est refusée avec un message clair. Activé par sessionStorage « arc_demo ». Expose ARC_DEMO. */
+(function (G) {
+  "use strict";
+function j(n, d) { var x = new Date(); x.setDate(x.getDate() + n); return d ? x.toISOString() : x.toISOString().slice(0, 10); }
+var U = "demo-user", M = "m1", C1 = "c1";
+var T = {
   user_roles: [{ user_id: U, role_code: "president", date_debut: "2025-01-01", date_fin: null }, { user_id: U, role_code: "tresorier", date_debut: "2025-01-01", date_fin: null }],
-  role_permissions: ["finance.lire", "finance.encaisser", "finance.annuler", "finance.publier", "depense.creer", "depense.approuver", "depense.payer", "audit.lire"]
-    .flatMap(p => ["president", "tresorier"].map(r => ({ role_code: r, perm_code: p }))),
+  role_permissions: (function () {
+    var L = [];
+    ["finance.lire", "finance.encaisser", "finance.annuler", "finance.publier", "depense.creer", "depense.approuver", "depense.payer", "audit.lire"].forEach(function (p) {
+      ["president", "tresorier"].forEach(function (r) { L.push({ role_code: r, perm_code: p }); });
+    });
+    return L;
+  })(),
   members: [{ id: M, ref: "M-001", nom: "Kouassi (démo)", prenoms: "Awa", user_id: U }],
   contributions: [{ id: C1, libelle: "Cotisation mensuelle (démo)" }],
   v_appels: [
@@ -37,20 +46,27 @@ const T = {
   documents: [{ titre: "Règlement de copropriété (démo)", categorie: "reglement", version: 2, chemin: "demo/reglement.pdf", visibilite: "membres", cree_le: j(-90, 1) }],
   audit_logs: [{ id: 3, le: j(-1, 1), acteur: U, action: "DEPENSE_APPROUVE", table_nom: "expense_requests", ligne_id: "e1" }, { id: 2, le: j(-3, 1), acteur: U, action: "PAIEMENT", table_nom: "payments", ligne_id: "x1" }, { id: 1, le: j(-9, 1), acteur: U, action: "DEPENSE_PAYEE", table_nom: "expense_requests", ligne_id: "e3" }]
 };
-class Q {
-  constructor(t) { this.rows = (T[t] || []).slice(); }
-  select() { return this; }
-  eq(k, v) { this.rows = this.rows.filter(r => r[k] === v); return this; }
-  in(k, v) { this.rows = this.rows.filter(r => v.includes(r[k])); return this; }
-  gte(k, v) { this.rows = this.rows.filter(r => r[k] >= v); return this; }
-  order(k, o = {}) { const s = o.ascending === false ? -1 : 1; this.rows.sort((a, b) => (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * s); return this; }
-  limit(n) { this.rows = this.rows.slice(0, n); return this; }
-  then(res, rej) { return Promise.resolve({ data: this.rows, error: null }).then(res, rej); }
-}
-const session = { user: { id: U } };
-export const demoClient = {
-  from: t => new Q(t),
-  rpc: fn => Promise.resolve(fn === "verifier_chaine_audit" ? { data: [], error: null } : { data: null, error: { message: "Mode démonstration : aucune écriture n'est enregistrée." } }),
-  auth: { getSession: async () => ({ data: { session } }), signOut: async () => { try { sessionStorage.removeItem("arc_demo"); } catch (e) {} return {}; }, onAuthStateChange: () => ({}), signInWithPassword: async () => ({ error: { message: "démo" } }) },
-  storage: { from: () => ({ createSignedUrl: async () => ({ error: { message: "démo" } }) }) }
+function Q(t) { this.rows = (T[t] || []).slice(); }
+Q.prototype.select = function () { return this; };
+Q.prototype.eq = function (k, v) { this.rows = this.rows.filter(function (r) { return r[k] === v; }); return this; };
+Q.prototype.in = function (k, v) { this.rows = this.rows.filter(function (r) { return v.indexOf(r[k]) >= 0; }); return this; };
+Q.prototype.gte = function (k, v) { this.rows = this.rows.filter(function (r) { return r[k] >= v; }); return this; };
+Q.prototype.order = function (k, o) { var s = o && o.ascending === false ? -1 : 1; this.rows.sort(function (a, b) { return (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * s; }); return this; };
+Q.prototype.limit = function (n) { this.rows = this.rows.slice(0, n); return this; };
+Q.prototype.then = function (res, rej) { return Promise.resolve({ data: this.rows, error: null }).then(res, rej); };
+
+var session = { user: { id: U } };
+var client = {
+  from: function (t) { return new Q(t); },
+  rpc: function (fn) { return Promise.resolve(fn === "verifier_chaine_audit" ? { data: [], error: null } : { data: null, error: { message: "Mode démonstration : aucune écriture n'est enregistrée." } }); },
+  auth: {
+    getSession: function () { return Promise.resolve({ data: { session: session } }); },
+    signOut: function () { try { sessionStorage.removeItem("arc_demo"); } catch (e) { } return Promise.resolve({}); },
+    onAuthStateChange: function () { return {}; },
+    signInWithPassword: function () { return Promise.resolve({ error: { message: "démo" } }); }
+  },
+  storage: { from: function () { return { createSignedUrl: function () { return Promise.resolve({ error: { message: "démo" } }); } }; } }
 };
+
+G.ARC_DEMO = { client: client };
+})(window);

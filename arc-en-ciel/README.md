@@ -1,29 +1,39 @@
-# Arc-en-Ciel Connect — V1 (socle)
+# ARC-EN-CIEL CONNECT — V1 (socle)
 
-Plateforme de gouvernance de la Cité Arc-en-Ciel de Songon Kassamblé. Développée par Sanix Africa Division Technologies.
-Cahier des charges : `docs/CAHIER_DES_CHARGES_ARC_EN_CIEL_CONNECT.pdf`.
+Plateforme de gouvernance de la Cité Arc-en-Ciel de Songon Kassamblé, développée par **Sanix Africa Division Technologies** (WhatsApp +225 0779181075 / 0140017751). Cahier des charges : `docs/CAHIER_DES_CHARGES_ARC_EN_CIEL_CONNECT.pdf`. Même style de développement qu'ANGEL'S GROUP : fichiers statiques sans framework ni compilation, **moteurs `*-engine.js` en IIFE**, identité d'instance dans `marque.js`, tests `node tests/*.js` au format PASS / FAIL.
 
-> **Projet Supabase dédié obligatoire.** Ne jamais l'exécuter dans la base d'une autre entreprise (Zahara ou autre). Ce dossier est déployable seul (`arc-en-ciel/` = racine du site) ; il est exclu du déploiement Zahara (`.vercelignore`).
+> **Projet Supabase dédié obligatoire.** Ne jamais l'exécuter dans la base d'une autre entreprise (Zahara ou autre). Le dossier se déploie seul (`arc-en-ciel/` = racine du site) ; il est exclu du déploiement Zahara (`.vercelignore`).
 
-## Contenu V1
-| Domaine | Livré |
+**Application** : `index.html` — ouvrable par double-clic (scripts classiques, aucun module ES, aucun serveur requis pour l'interface), installable (PWA : `manifest.webmanifest`, `icons/arc-*.png` générées par `node arc-en-ciel/tools/gen-icons.js`, hors ligne grâce à `sw.js`). Version à envoyer par WhatsApp : `node arc-en-ciel/build-single.js` → `dist/arc-en-ciel-connect.html` (un seul fichier, CSP par empreintes SHA-256).
+
+**Première ouverture** : écran **Connecter la cité** (URL du projet + clé *anon*, mémorisées dans le navigateur ; une clé *service_role* est refusée) ou **Ouvrir la démo** (données fictives, bandeau orange, aucune écriture). Autre option : renseigner `config.js` au déploiement.
+
+## Moteurs (fichiers partagés, globals `ARC_*`)
+| Fichier | Rôle |
 |---|---|
-| Noyau | membres, lots, propriétés, rôles/permissions, mandats datés, journal d'audit **en ajout seul, chaîné par empreintes** (vérifiable) |
-| Finance | grand livre **immuable**, comptes, cotisations → appels → paiements (partiels), **contrepassation motivée**, budgets, dépenses, **circuit de validation à seuils paramétrables**, séparation des tâches, états financiers publiés (figés) |
-| Gouvernance | réunions, PV versionnés (validé = figé, publié = définitif), décisions, annonces, notifications, documents (Storage privé) |
-| Sécurité | RLS sur toutes les tables, écritures financières uniquement par fonctions SQL, anti-escalade des rôles, CSP stricte, aucune clé secrète côté client |
-| Interface | PWA mobile first : Ma cité, Finances, Dépenses, Réunions, Documents, Audit |
+| `marque.js` | identité de l'instance (nom, cité, éditeur, contact, modules) — une autre cité remplace ce fichier |
+| `ui-engine.js` (`ARC_UI`) | construction du DOM sans innerHTML, montants F CFA, dates, pastilles, tableaux, notifications |
+| `demo-engine.js` (`ARC_DEMO`) | client Supabase factice (lecture) pour la démonstration |
+| `api-engine.js` (`ARC_API`) | client Supabase (schéma `app`), configuration, droits d'affichage |
+| `arc-engine.js` | écrans : Ma cité, Finances, Dépenses, Réunions, Documents, Audit ; connexion (5 essais puis blocage 60 s) |
+
+## Base de données (`supabase/migrations/`, exécuter dans l'ordre)
+- **001 Noyau** : membres, lots, propriétés, rôles et permissions, **mandats datés** (un changement de bureau ne perd aucun historique), **journal d'audit en ajout seul chaîné par empreintes** (`verifier_chaine_audit()` détecte une falsification).
+- **002 Finance** : un seul **grand livre immuable** ; comptes ; cotisations → appels → paiements (partiels) ; **contrepassation motivée** ; budgets ; dépenses avec **circuit de validation à seuils paramétrables** (table `validation_rules`, tranches sans chevauchement) ; le demandeur ne valide ni ne paie sa propre dépense ; chaque rôle requis doit approuver, une personne ne compte qu'une fois ; paiement refusé sans justificatif, sans solde suffisant ou sans approbation. Sommes **appelées** distinguées des sommes **encaissées**. Seuils fournis = **illustratifs**, à faire adopter par le comité.
+- **003 Gouvernance** : réunions, **PV versionnés** (validé = contenu figé, publié = définitif), décisions, annonces, notifications, documents (Storage privé), **états financiers publiés** (instantané non modifiable).
+- **004 Sécurité** : RLS sur toutes les tables, écritures financières **uniquement par fonctions SQL**, **anti-escalade** (seul le président attribue un rôle financier ; l'administrateur technique n'a aucun droit de validation), bucket `documents` privé.
 
 ## Déploiement
-1. Créer un projet Supabase **nouveau**. Exécuter dans l'ordre `supabase/migrations/001…004*.sql`.
-2. *Settings → API → Exposed schemas* : ajouter `app`.
-3. Créer les comptes (Auth), puis lier chaque membre (`app.members.user_id`) et attribuer les premiers rôles en SQL (le premier président) ; ensuite le président attribue via `app.attribuer_role`.
-4. Renseigner `config.js` **ou**, avec le fichier HTML unique, saisir URL + clé **anon** à la première ouverture (écran « Connecter la cité », mémorisé dans le navigateur). Un bouton « Ouvrir la démo » affiche des données fictives.
-5. Faire valider par le comité de pilotage les seuils de `app.validation_rules` (valeurs actuelles **illustratives**), la liste des rôles et les droits (`004`/`001`).
-6. Déployer le dossier (Vercel : `vercel.json` fournit les en-têtes de sécurité).
+1. Créer un projet Supabase **nouveau**, exécuter `001…004`, puis *Settings → API → Exposed schemas* : ajouter `app`.
+2. Créer les comptes (Auth), lier chaque membre (`app.members.user_id`), attribuer en SQL le premier rôle de président ; ensuite le président utilise `app.attribuer_role`.
+3. Faire valider par le comité : seuils (`app.validation_rules`), rôles et droits (`001`/`004`), règles de publication.
+4. Déployer le dossier (Vercel : `vercel.json` fournit CSP, HSTS, anti-framing).
 
 ## Tests
-`bash arc-en-ciel/tests/run.sh` — PostgreSQL jetable : migrations + 54 contrôles (droits, circuit de dépense, grand livre, RLS, audit, PV). Aucune base réelle touchée.
+- `node arc-en-ciel/tests/base-sql.js` — migrations + 23 scénarios dans un PostgreSQL jetable (droits, circuit de dépense, grand livre, RLS, audit, PV). Aucune base réelle touchée. (`tests/run.sh` en est le moteur.)
+- `node arc-en-ciel/tests/interface.js` — 16 contrôles navigateur : configuration, refus de clé service_role, démonstration, six écrans, XSS, fichier unique, ouverture `file://`. (`PLAYWRIGHT=/chemin/playwright` si besoin.)
+- `node arc-en-ciel/tests/conventions.js` — 10 contrôles de conventions : IIFE strict, scripts classiques, aucun innerHTML, aucun secret, aucune adresse Supabase réelle, migrations numérotées, manifeste, icônes, service worker.
+- `npm run test:arc` les enchaîne.
 
-## Hors périmètre V1 (phases suivantes)
-Votes, projets, social, incidents, prestataires, SMS/WhatsApp, exports PDF/Excel côté serveur, rapprochement bancaire, rapports automatisés, cartographie. Clé de signature et page de vérification des documents : à créer.
+## Limites assumées / suite
+Votes, projets, social, incidents, prestataires, SMS/WhatsApp, exports PDF/Excel côté serveur, rapprochement bancaire, rapports automatisés, cartographie (V2/V3). Documents imprimables avec QR de sécurité signé (moteur d'impression d'ANGEL'S GROUP) : à porter, avec clé de signature et page de vérification propres à la cité. Pas encore éprouvé sur un projet Supabase réel avec Auth.
