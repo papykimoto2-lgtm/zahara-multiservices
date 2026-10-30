@@ -127,7 +127,7 @@ L'ERP calcule la mensualité à partir du montant total, de l'apport et de la du
 
 **Statut du lot** : réservé jusqu'au **seuil d'immobilisation**, vendu au-delà. Le seuil est un paramètre (70 % du montant total par défaut). Au passage à « vendu », la vente du lot est comptabilisée, lot par lot.
 
-**Avertissements à la création** : avant d'enregistrer un **nouveau** souscripteur, l'ERP signale (sans bloquer) : un téléphone déjà utilisé par une autre fiche, un souscripteur de même nom, l'absence de lot, un lot sans prix, un montant total nul. Lire la liste puis choisir *Enregistrer quand même* ou revenir à la fiche. Un téléphone partagé peut être légitime (famille, agence) ; un nom identique est presque toujours un doublon à éviter. Les anomalies existantes se retrouvent dans Commercialisation › **🔎 Contrôles Ventes** (PRO-PRG).
+**Avertissements à la création** : avant d'enregistrer un **nouveau** souscripteur, l'ERP signale (sans bloquer) : un téléphone déjà utilisé par une autre fiche, un souscripteur de même nom, l'absence de lot, un lot sans prix, un montant total nul. Lire la liste puis choisir *Enregistrer quand même* ou revenir à la fiche. Un téléphone partagé peut être légitime (famille, agence). Un **nom identique est normal** lorsqu'un même client prend plusieurs appartements (une souscription par logement, chacune avec son lot et son échéancier) : dans ce cas créer une nouvelle souscription ; sinon, vérifier qu'il ne s'agit pas d'un doublon. Les anomalies existantes se retrouvent dans Commercialisation › **🔎 Contrôles Ventes** (PRO-PRG).
 
 ### SOU-09 — Imprimer les documents de souscription
 
