@@ -1,6 +1,6 @@
 # Manuel de procédures — Programmes, lots et commercialisation
 
-**Réf.** PRO-PRG · **Version** 1.0 · **Date** Octobre 2026
+**Réf.** PRO-PRG · **Version** 1.1 · **Date** Octobre 2026
 **Objet** : fixer qui fait quoi pour créer un programme immobilier, créer et valoriser ses lots et suivre son cycle de vie, du foncier à la livraison.
 **Principe directeur** : un programme avance par étapes ; chaque étape se constate dans l'ERP (parcelle titrée, conception, chiffrage, lots, marchés, ventes, encaissements, livraison) ; la vente d'un lot est comptabilisée dès qu'il passe « vendu ».
 
@@ -92,6 +92,23 @@ Les lots peuvent aussi être **réservés** ou **attribués** à un aménageur (
 
 Le statut d'un lot suit le souscripteur : réservé à l'enregistrement, vendu au seuil d'immobilisation (voir PRO-SOUS).
 
+**📅 Dates des programmes** (page Programmes) : renseigner en masse les dates de lancement et de livraison ; elles fixent le calendrier des échéanciers.
+
+#### Contrôles Ventes
+
+**Où** : Commercialisation › **🔎 Contrôles Ventes** (le compteur indique le nombre d'anomalies). Six onglets :
+
+| Onglet | Ce qu'il repère |
+|---|---|
+| **Souscripteurs sans lot** | Souscripteur actif sans lot rattaché : statut de vente, commission et échéancier sans bien |
+| **Lots sans souscripteur** | Lot réservé ou vendu qu'aucun souscripteur actif ne référence (y compris les lots multiples) |
+| **Lots partagés** | Un lot référencé par plusieurs souscripteurs : le plus souvent une fiche saisie deux fois à fusionner, parfois une double vente |
+| **Réservations expirées** | Lot réservé depuis plus que le délai de validité (30 jours par défaut) ou sans date |
+| **Lots sans prix** | Par programme, avec les lots réservés ou vendus sans prix (plus grave : échéancier et comptabilité sans base) |
+| **Montant total à 0** | Souscripteur sans montant total : ni échéancier ni taux de cotisation calculables |
+
+**Libérer une réservation expirée** (managers) : **🔓 Libérer** sur la ligne, ou le bouton groupé. Le lot redevient disponible et est détaché du souscripteur, avec historique et audit. **Seules les réservations sans aucun versement** sont libérables ; si un versement existe, la ligne indique « à relancer / résilier » et le dossier suit REL ou SOU-13. Le même accès existe sous l'alerte **Réservations à échéance** (bouton « Traiter / libérer »).
+
 ## 4. Contrôles
 
 | Contrôle | Effet |
@@ -101,6 +118,8 @@ Le statut d'un lot suit le souscripteur : réservé à l'enregistrement, vendu a
 | Surfaces > parcelle | Avertissement |
 | Vente sans compte paramétré | Lot enregistré, vente non comptabilisée (message) |
 | Lot hors statut « vendu » | Vente révoquée |
+| Réservation expirée avec versement | Jamais libérée par les contrôles : relance ou résiliation |
+| Réservation expirée sans versement | Libération par un manager uniquement |
 
 ## 5. Traçabilité
 
@@ -139,3 +158,4 @@ Le statut d'un lot suit le souscripteur : réservé à l'enregistrement, vendu a
 | Version | Date | Objet |
 |---|---|---|
 | 1.0 | Octobre 2026 | Création |
+| 1.1 | Octobre 2026 | Contrôles Ventes (souscripteurs sans lot, lots orphelins ou partagés, réservations expirées, prix manquants), libération des réservations sans versement, dates des programmes en masse |

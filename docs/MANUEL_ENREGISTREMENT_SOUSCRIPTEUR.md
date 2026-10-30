@@ -127,6 +127,8 @@ L'ERP calcule la mensualité à partir du montant total, de l'apport et de la du
 
 **Statut du lot** : réservé jusqu'au **seuil d'immobilisation**, vendu au-delà. Le seuil est un paramètre (70 % du montant total par défaut). Au passage à « vendu », la vente du lot est comptabilisée, lot par lot.
 
+**Avertissements à la création** : avant d'enregistrer un **nouveau** souscripteur, l'ERP signale (sans bloquer) : un téléphone déjà utilisé par une autre fiche, un souscripteur de même nom, l'absence de lot, un lot sans prix, un montant total nul. Lire la liste puis choisir *Enregistrer quand même* ou revenir à la fiche. Un téléphone partagé peut être légitime (famille, agence) ; un nom identique est presque toujours un doublon à éviter. Les anomalies existantes se retrouvent dans Commercialisation › **🔎 Contrôles Ventes** (PRO-PRG).
+
 ### SOU-09 — Imprimer les documents de souscription
 
 Après la création, la fenêtre des documents propose :
@@ -222,6 +224,7 @@ Chaque modification est journalisée avec l'avant et l'après.
 | Mineur : informations ou justificatif manquants, ou majeur | Refusé |
 | Versement : compte comptable manquant, client gelé, date invalide, caisse absente | Versement non enregistré |
 | Versement similaire déjà présent | Confirmation demandée |
+| Création : téléphone ou nom déjà connu, aucun lot, lot sans prix, montant nul | Avertissement, confirmation demandée |
 
 ---
 
@@ -287,3 +290,4 @@ R = réalise, A = approuve, C = consulté, I = informé.
 | Version | Date | Auteur | Objet |
 |---|---|---|---|
 | 1.0 | Octobre 2026 | | Création |
+| 1.1 | Octobre 2026 | | Avertissements à la création (doublon téléphone/nom, lot manquant ou sans prix, montant nul) |

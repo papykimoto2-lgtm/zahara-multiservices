@@ -1,6 +1,6 @@
 # Manuel de procédures — Commercial et CRM
 
-**Réf.** PRO-CRM · **Version** 1.0 · **Date** Octobre 2026
+**Réf.** PRO-CRM · **Version** 1.1 · **Date** Octobre 2026
 **Objet** : fixer qui fait quoi pour gérer les prospects, les ordres de mission terrain, les apporteurs d'affaires, les commissions et le plan d'action commercial.
 **Principe directeur** : chaque prospect avance d'un stade à l'autre avec une date de relance ; chaque vente génère automatiquement la commission de son commercial et de son apporteur, payée sur preuve.
 
@@ -117,6 +117,29 @@ Pour le recouvrement des retards : manuel Relances (PRO-REL).
 5. **Paiement** : saisir mode, date, référence ; l'ERP passe l'écriture de règlement (caisse 571 ou banque 521 selon le mode).
 6. Suivre les commissions dans Rapports Commerciaux.
 
+### CRM-06 bis — Contrôler les commissions
+
+**Qui** : comptabilité, responsable commercial. **Où** : Comptabilité › Commissions › **🔎 Contrôles commissions** (annuler, rattacher et réaffecter : managers). À faire chaque mois et avant tout paiement.
+
+| Onglet | Ce qu'il repère | Action |
+|---|---|---|
+| **Orphelines** | Commission dont le versement n'existe plus (versement supprimé, souscripteur recréé à l'import) | **🔗 Rattacher** si un seul versement du souscripteur a la même date et le même montant ; sinon **🚫 Annuler** (la charge comptabilisée est extournée) |
+| **Doublons** | Plusieurs commissions actives du même type pour un versement | On garde la plus ancienne ; les autres sont annulées et extournées |
+| **Bénéficiaire ≠ fiche** | Le bénéficiaire n'est plus le commercial ou l'apporteur de la fiche du souscripteur | Vérifier qui a réellement apporté la vente, puis **↪ Réaffecter** à la personne de la fiche (le montant ne change pas) |
+| **Versements sans commission** | Versements dont le souscripteur a un commercial ou un apporteur, sans commission (tableau par année) | Constat seul : le droit à commission des périodes anciennes est une décision de la direction |
+
+**Règle** : une commission n'est jamais supprimée quand sa charge est comptabilisée ; elle est **annulée** (visible, avec motif) et sa charge **extournée**. Les commissions payées ne sont jamais touchées.
+
+### CRM-06 ter — Payer les commissions par bénéficiaire
+
+**Qui** : comptabilité (préparation), direction (validation). **Où** : Comptabilité › Commissions › **🧾 États de paiement**.
+
+1. Le tableau regroupe, par bénéficiaire, les commissions « à payer » **saines** (versement et souscripteur existants, pas de doublon, souscripteur non résilié). Les autres sont exclues et comptées en bas, avec un lien vers les contrôles : les régulariser d'abord.
+2. Un **⚠** signale les commissions dont le bénéficiaire diffère de la fiche (CRM-06 bis).
+3. **🖨️ Bordereau** : imprime la liste (dossier, souscripteur, date du versement, base, taux, commission, total) avec les signatures *établi par*, *validé par* et *reçu par le bénéficiaire*.
+4. **📨 Valider** : soumet le bordereau au circuit de validation (type « Bordereau de commissions »).
+5. Une fois validé, **💰 Payer** règle en une fois les commissions validées du bénéficiaire : une référence, un mode (virement, espèces, chèque, Mobile Money), une confirmation. Le paiement est refusé tant que le bordereau n'est pas validé. Les écritures de règlement sont générées comme pour un paiement unitaire.
+
 ### CRM-07 — Plan d'action commercial et marketing (PAC)
 
 **Où** : Plan d'Action Commercial & Marketing.
@@ -141,6 +164,10 @@ Pour le recouvrement des retards : manuel Relances (PRO-REL).
 | Apporteur sans nom ou téléphone | Refusé |
 | Commission déjà générée pour le bénéficiaire | Pas de doublon |
 | Frais de souscription | Pas de commission par défaut |
+| Commission orpheline ou doublon dont la charge est comptabilisée | Annulée et extournée, jamais supprimée |
+| Commission payée | Jamais modifiée par les contrôles |
+| Bordereau non validé | Paiement groupé refusé |
+| Commission orpheline, doublon ou souscripteur résilié | Exclue des états de paiement |
 
 ## 5. Traçabilité
 
@@ -178,9 +205,12 @@ Pour le recouvrement des retards : manuel Relances (PRO-REL).
 3. ☐ Souscripteurs en retard traités (PRO-REL)
 4. ☐ Missions clôturées avec compte rendu
 5. ☐ Commissions à payer examinées
+6. ☐ Contrôles commissions passés : aucune orpheline ni doublon en attente
+7. ☐ Bordereaux validés avant tout paiement
 
 ## 9. Révisions
 
 | Version | Date | Objet |
 |---|---|---|
 | 1.0 | Octobre 2026 | Création |
+| 1.1 | Octobre 2026 | Contrôles des commissions (orphelines, doublons, bénéficiaire ≠ fiche), états de paiement par bénéficiaire avec validation |
