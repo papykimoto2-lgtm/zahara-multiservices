@@ -3659,6 +3659,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div class="page-subtitle">Gestion des clients et abonnements</div>
           </div>
           <div class="spacer"></div>
+          <button class="btn btn-secondary btn-sm" onclick="coordOuvrir('tous')" title="Compléter en masse les e-mails et téléphones manquants (import / export CSV)">✉️ Coordonnées manquantes</button>
           <button class="btn btn-secondary btn-sm" onclick="exportClients()">⬇ Export</button>
           <button class="btn btn-primary" onclick="openClientModal()">+ Nouveau</button>
         </div>
@@ -137067,7 +137068,7 @@ function fneRenderSoldes() {
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><select class="filter-select" onchange="fneSoldesFiltre(this.value)">'
     + [['a_facturer', 'À facturer'], ['erreur', 'À régulariser (erreur / non certifiée)'], ['facturee', 'Facturés'], ['tous', 'Tous les soldés']].map(function(o){ return '<option value="' + o[0] + '"' + (_fneSoldesFiltre === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
     + '</select><select class="filter-select" id="fne-lot-paiement" title="Mode de paiement indiqué à la DGI pour les factures émises en lot"><option value="transfer">Virement</option><option value="cash">Espèces</option><option value="mobile-money">Mobile Money</option><option value="check">Chèque</option><option value="card">Carte</option><option value="deferred">À terme</option></select>'
-    + '<button class="btn btn-primary btn-sm" onclick="fneEmettreLot()"' + (bloqGlobal ? ' disabled title="Corrigez d\'abord le paramétrage FNE"' : '') + '>🧾 Émettre la sélection</button></div></div>'
+    + '<button class="btn btn-secondary btn-sm" onclick="coordOuvrir(\'soldes\')" title="E-mails et téléphones manquants des soldés : saisie en masse ou import CSV">✉️ Compléter les e-mails</button><button class="btn btn-primary btn-sm" onclick="fneEmettreLot()"' + (bloqGlobal ? ' disabled title="Corrigez d\'abord le paramétrage FNE"' : '') + '>🧾 Émettre la sélection</button></div></div>'
     + glob.map(function(x){ return '<div style="font-size:12px;color:' + (x.bloquant ? 'var(--rouge)' : 'var(--or)') + ';">' + (x.bloquant ? '⛔ ' : '⚠️ ') + escHtml(x.msg) + '</div>'; }).join('')
     + '<div class="table-wrap" style="max-height:420px;overflow:auto;margin-top:8px;"><table><thead><tr><th><input type="checkbox" onchange="fneSoldesToutCocher(this.checked)" title="Tout cocher (lignes prêtes)"></th><th>Souscripteur</th><th>Programme / Lot</th><th style="text-align:right;">Montant du contrat</th><th>Contrôle des données</th><th>État</th><th></th></tr></thead><tbody>'
     + (vue.length ? vue.map(function(x){
@@ -137116,6 +137117,126 @@ function fneReleveFacturesHtml(c) {
     + (fs.length ? '<table style="width:100%;margin-top:4px;"><tbody>' + fs.map(function(f){ return '<tr><td>' + escHtml(f.numero) + (f.type === 'avoir' ? ' (avoir)' : '') + '</td><td>' + escHtml(f.date || '') + '</td><td style="text-align:right;">' + fmtF(f.ttc) + ' FCFA TTC</td><td>' + (badge[f.statut_fne] || escHtml(f.statut_fne || '')) + '</td><td class="no-print"><a href="#" onclick="imprimerFactureFNE(\'' + f.id + '\');return false;">🖨️ imprimer</a></td></tr>'; }).join('') + '</tbody></table>'
       : '<div style="color:var(--or);margin-top:4px;">Souscripteur soldé : facture à émettre. <a href="#" class="no-print" onclick="facturerSouscripteur(\'' + c.id + '\');return false;">🧾 Facturer maintenant</a></div>')
     + '</div>';
+}
+
+/* ══ Saisie en masse des coordonnées (e-mail / téléphone) des souscripteurs ══
+   Indispensable à la facturation FNE (l'API exige un e-mail et un téléphone). Tableau modifiable + import/export CSV.
+   Rien n'est enregistré avant « Enregistrer » ; les valeurs sont validées (e-mail, numéro via telAnalyser) et seuls les champs modifiés sont écrits. */
+var _coordBrouillon = {}, _coordScope = 'soldes', _coordManque = 'email', _coordLIM = 300;
+function _coordEmailValide(e) { return /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.test(String(e || '').trim()); }
+function _coordManquants(c) { return { email: !_coordEmailValide(c.email), tel: !String(c.tel || '').trim() || _telInvalide(c.tel) }; }
+function coordOuvrir(scope) {
+  _coordScope = scope || 'tous'; _coordManque = 'email'; _coordBrouillon = {};
+  var f = document.getElementById('coord-recherche'); if (f) f.value = '';
+  openModal('modal-coordonnees'); coordRender();
+}
+function coordFiltre() { _coordScope = document.getElementById('coord-scope').value; _coordManque = document.getElementById('coord-manque').value; coordRender(); }
+function coordSaisie(id, champ, valeur) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === id; }); if (!c) return;
+  var b = _coordBrouillon[id] = _coordBrouillon[id] || {};
+  if (String(valeur).trim() === String(c[champ] || '').trim()) delete b[champ]; else b[champ] = String(valeur).trim();
+  if (!Object.keys(b).length) delete _coordBrouillon[id];
+  coordVerifLigne(id); coordCompteur();
+}
+/* Contrôle d'une ligne : renvoie les messages d'erreur (bloquent l'enregistrement) et d'avertissement. */
+function coordControle(c) {
+  var b = _coordBrouillon[c.id] || {}, err = [], warn = [];
+  if (b.email !== undefined && b.email !== '') {
+    if (!_coordEmailValide(b.email)) err.push('E-mail invalide');
+    else { var n = _cdNormEmail(b.email), autre = (DATA.clients || []).find(function(x){ return x.id !== c.id && _cdNormEmail((_coordBrouillon[x.id] || {}).email !== undefined ? _coordBrouillon[x.id].email : x.email) === n; }); if (autre) warn.push('Déjà utilisé par ' + _fneNomClient(autre)); }
+  }
+  if (b.tel !== undefined && b.tel !== '') { var a = telAnalyser(b.tel); if (!a.valide) err.push(a.message || 'Téléphone invalide'); }
+  return { err: err, warn: warn };
+}
+function coordVerifLigne(id) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === id; }), cell = document.getElementById('coord-msg-' + id); if (!c || !cell) return;
+  var r = coordControle(c), b = _coordBrouillon[id];
+  cell.innerHTML = r.err.map(function(m){ return '<span style="color:var(--rouge);">⛔ ' + escHtml(m) + '</span>'; }).concat(r.warn.map(function(m){ return '<span style="color:var(--or);">⚠️ ' + escHtml(m) + '</span>'; })).join('<br>')
+    || (b ? '<span style="color:var(--vert);">✓ à enregistrer</span>' : '');
+}
+function coordCompteur() {
+  var ids = Object.keys(_coordBrouillon), nbErr = ids.filter(function(id){ var c = (DATA.clients || []).find(function(x){ return x.id === id; }); return c && coordControle(c).err.length; }).length;
+  var el = document.getElementById('coord-compteur'); if (el) el.textContent = ids.length + ' modification(s)' + (nbErr ? ' dont ' + nbErr + ' en erreur' : '');
+  var bt = document.getElementById('coord-enregistrer'); if (bt) bt.disabled = !ids.length || nbErr > 0;
+}
+function _coordLignes() {
+  var q = sfcNormalise((document.getElementById('coord-recherche') || {}).value || '');
+  return (DATA.clients || []).filter(function(c){
+    if (c.statut === 'resilie') return false;
+    if (_coordScope === 'soldes' && !fneSoldeClient(c).solde) return false;
+    var m = _coordManquants(c), manque = _coordManque === 'email' ? m.email : (_coordManque === 'tel' ? m.tel : (m.email || m.tel));
+    if (!manque && !_coordBrouillon[c.id]) return false;
+    if (q && sfcNormalise(_fneNomClient(c) + ' ' + (c.dossier || '')).indexOf(q) === -1) return false;
+    return true;
+  }).sort(function(a, b){ return _fneNomClient(a).localeCompare(_fneNomClient(b), 'fr'); });
+}
+function coordRender() {
+  var host = document.getElementById('coord-corps'); if (!host) return;
+  var sc = document.getElementById('coord-scope'), mq = document.getElementById('coord-manque'); if (sc) sc.value = _coordScope; if (mq) mq.value = _coordManque;
+  var L = _coordLignes(), tot = L.length, vue = L.slice(0, _coordLIM);
+  var prog = function(c){ var pg = (DATA.programmes || []).find(function(x){ return x.id === c.programme_id; }); return pg ? escHtml(pg.nom) : '—'; };
+  var val = function(c, ch){ var b = _coordBrouillon[c.id]; return escHtml(b && b[ch] !== undefined ? b[ch] : (c[ch] || '')); };
+  host.innerHTML = '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">' + tot + ' souscripteur(s) à compléter dans cette vue' + (tot > vue.length ? ' — les ' + vue.length + ' premiers sont affichés : affinez avec la recherche ou enregistrez par lots' : '') + '.</div>'
+    + '<div class="table-wrap" style="max-height:52vh;overflow:auto;"><table><thead><tr><th>Souscripteur</th><th>Programme</th><th>Téléphone</th><th>E-mail</th><th>Contrôle</th></tr></thead><tbody>'
+    + (vue.length ? vue.map(function(c){
+        var m = _coordManquants(c);
+        return '<tr><td><strong>' + escHtml(_fneNomClient(c)) + '</strong><div style="font-size:11px;color:var(--blanc-dim);">' + escHtml(c.dossier || '') + '</div></td><td style="font-size:12px;">' + prog(c) + '</td>'
+          + '<td><input class="form-control" style="min-width:130px;' + (m.tel ? 'border-color:var(--or);' : '') + '" value="' + val(c, 'tel') + '" placeholder="07 00 00 00 00" oninput="coordSaisie(\'' + c.id + '\',\'tel\',this.value)"></td>'
+          + '<td><input class="form-control" type="email" style="min-width:210px;' + (m.email ? 'border-color:var(--or);' : '') + '" value="' + val(c, 'email') + '" placeholder="nom@exemple.ci" oninput="coordSaisie(\'' + c.id + '\',\'email\',this.value)"></td>'
+          + '<td id="coord-msg-' + c.id + '" style="font-size:11px;"></td></tr>'; }).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:var(--vert);padding:18px;">✅ Rien à compléter dans cette vue.</td></tr>')
+    + '</tbody></table></div>';
+  vue.forEach(function(c){ if (_coordBrouillon[c.id]) coordVerifLigne(c.id); });
+  coordCompteur();
+}
+async function coordEnregistrer() {
+  var ids = Object.keys(_coordBrouillon), n = 0, ko = 0;
+  for (var i = 0; i < ids.length; i++) {
+    var c = (DATA.clients || []).find(function(x){ return x.id === ids[i]; }), b = _coordBrouillon[ids[i]]; if (!c) continue;
+    if (coordControle(c).err.length) { ko++; continue; }
+    if (b.tel !== undefined) { var a = telAnalyser(b.tel); c.tel = (b.tel === '') ? '' : (a.valide ? a.stockage : b.tel); }
+    if (b.email !== undefined) c.email = b.email;
+    await dbPut('clients', c); if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+    delete _coordBrouillon[ids[i]]; n++;
+  }
+  toast('✅ ' + n + ' fiche(s) mise(s) à jour' + (ko ? ' — ' + ko + ' ignorée(s) (erreur)' : '') + '.', ko ? 'warn' : 'success');
+  if (typeof renderFacturesClient === 'function' && document.getElementById('fac-soldes')) renderFacturesClient();
+  if (typeof renderClients === 'function') try { renderClients(); } catch (e) { /* page non affichée */ }
+  coordRender();
+}
+function coordExporterCSV() {
+  var q = function(x){ return '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"'; }, L = _coordLignes();
+  var rows = [['Dossier', 'Nom', 'Prénoms', 'Programme', 'Téléphone', 'E-mail'].map(q).join(';')];
+  L.forEach(function(c){ var pg = (DATA.programmes || []).find(function(x){ return x.id === c.programme_id; }); rows.push([c.dossier || '', c.nom || '', c.prenoms || '', pg ? pg.nom : '', c.tel || '', c.email || ''].map(q).join(';')); });
+  var blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'coordonnees_a_completer_' + today() + '.csv'; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  toast(L.length + ' ligne(s) exportée(s). Complétez les colonnes Téléphone / E-mail puis réimportez le fichier (colonne Dossier conservée).', 'info', 7000);
+}
+/* Import : rapprochement par n° de dossier ; ne remplit que les champs vides ou invalides, jamais une valeur correcte existante. Chargé dans le tableau, à enregistrer ensuite. */
+function coordTraiterTexte(texte) {
+  var lignes = String(texte || '').replace(/^﻿/, '').split(/\r?\n/).filter(function(l){ return l.trim(); });
+  if (lignes.length < 2) { toast('Fichier vide ou sans ligne de données.', 'error'); return; }
+  var sep = (lignes[0].split(';').length >= lignes[0].split(',').length) ? ';' : ',', ent = _csvSplit(lignes[0], sep).map(_norm);
+  var col = function(cles){ for (var i = 0; i < ent.length; i++) if (cles.some(function(k){ return ent[i].indexOf(k) !== -1; })) return i; return -1; };
+  var iD = col(['dossier']), iT = col(['tel', 'mobile', 'contact', 'phone']), iE = col(['mail', 'courriel']);
+  if (iD < 0 || (iT < 0 && iE < 0)) { toast('Colonnes introuvables : le fichier doit contenir « Dossier » et « E-mail » et/ou « Téléphone ».', 'error'); return; }
+  var parDossier = {}; (DATA.clients || []).forEach(function(c){ var k = _cdNormDossier(c.dossier); if (k) (parDossier[k] = parDossier[k] || []).push(c); });
+  var r = { appl: 0, introuvable: 0, invalide: 0, ignore: 0, ambigu: 0 };
+  lignes.slice(1).forEach(function(l){
+    var v = _csvSplit(l, sep), cs = parDossier[_cdNormDossier(v[iD])];
+    if (!cs) { r.introuvable++; return; } if (cs.length > 1) { r.ambigu++; return; }
+    var c = cs[0], m = _coordManquants(c), b = _coordBrouillon[c.id] = _coordBrouillon[c.id] || {}, fait = false;
+    if (iE >= 0 && String(v[iE] || '').trim()) { var e = String(v[iE]).trim(); if (!_coordEmailValide(e)) r.invalide++; else if (!m.email) r.ignore++; else { b.email = e; fait = true; } }
+    if (iT >= 0 && String(v[iT] || '').trim()) { var t = String(v[iT]).trim(); if (!telAnalyser(t).valide) r.invalide++; else if (!m.tel) r.ignore++; else { b.tel = t; fait = true; } }
+    if (fait) r.appl++; if (!Object.keys(b).length) delete _coordBrouillon[c.id];
+  });
+  _coordScope = 'tous'; _coordManque = 'tous'; coordRender();
+  toast('Import : ' + r.appl + ' fiche(s) chargée(s) dans le tableau (à enregistrer)' + (r.introuvable ? ' · ' + r.introuvable + ' dossier(s) introuvable(s)' : '') + (r.ambigu ? ' · ' + r.ambigu + ' dossier(s) en double' : '') + (r.invalide ? ' · ' + r.invalide + ' valeur(s) invalide(s)' : '') + (r.ignore ? ' · ' + r.ignore + ' champ(s) déjà renseigné(s) ignoré(s)' : '') + '.', r.appl ? 'success' : 'warn', 9000);
+}
+function coordImporter(input) {
+  var f = input.files && input.files[0]; if (!f) return;
+  var rd = new FileReader(); rd.onload = function(e){ coordTraiterTexte(e.target.result); input.value = ''; }; rd.readAsText(f, 'utf-8');
 }
 
 function facturerCession(cesId) {
@@ -137272,7 +137393,7 @@ function imprimerFactureFNE(facId) {
   var docTitre = f.type === 'avoir' ? 'AVOIR' : 'FACTURE';
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Facture ' + f.numero + '</title>'
     + '<style>body{font-family:Arial,sans-serif;font-size:12px;color:#1C1C2E;padding:24px;line-height:1.55;}'
-    + '.header{display:flex;justify-content:space-between;border-bottom:3px solid #B87333;padding-bottom:14px;margin-bottom:18px;}'
+    + '.header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;border-bottom:3px solid #B87333;padding-bottom:14px;margin-bottom:18px;}'
     + '.fne-mark{display:inline-block;background:#1A6B3A;color:#fff;font-weight:800;font-size:11px;padding:3px 10px;border-radius:5px;letter-spacing:1px;}'
     + '.simple-mark{display:inline-block;background:#64748B;color:#fff;font-weight:700;font-size:10px;padding:3px 10px;border-radius:5px;}'
     + '.err-mark{display:inline-block;background:#C0392B;color:#fff;font-weight:700;font-size:10px;padding:3px 10px;border-radius:5px;}'
@@ -137288,7 +137409,6 @@ function imprimerFactureFNE(facId) {
     + '.legal{font-size:10px;color:#6B6B9A;margin-top:16px;}'
     + '.no-print{text-align:center;margin-bottom:16px;} .no-print button{padding:9px 20px;background:#B87333;color:#fff;border:none;border-radius:6px;cursor:pointer;margin:0 4px;}'
     + '@media print{.no-print{display:none;}body{padding:0;}}</style></head><body>'
-    + sanixQrHtml('Facture', f.numero)
     + '<div class="no-print"><button onclick="window.print()">🖨️ Imprimer / PDF</button>'
     + (enErreur ? '<button onclick="window.opener && window.opener.fneRecertifier(\'' + f.id + '\')">🔁 Retenter la certification DGI</button>' : '')
     + '</div>'
@@ -137299,7 +137419,8 @@ function imprimerFactureFNE(facId) {
     + '<div style="text-align:right;"><div style="font-size:20px;font-weight:800;">' + docTitre + '</div>'
     + '<div style="font-size:13px;color:#B87333;font-weight:700;">' + escHtml(f.numero) + (certifiee && f.fne_reference ? ' · DGI ' + escHtml(f.fne_reference) : '') + '</div>'
     + '<div style="font-size:11px;color:#6B6B9A;">' + dateLbl + '</div>'
-    + '<div style="margin-top:6px;">' + (certifiee ? '<span class="fne-mark">✓ FNE certifiée DGI</span>' : estSimple ? '<span class="simple-mark">Facture simple — hors FNE</span>' : enErreur ? '<span class="err-mark">✗ Certification DGI échouée</span>' : enAttente ? '<span class="simple-mark">En attente de certification</span>' : '') + '</div></div></div>'
+    + '<div style="margin-top:6px;">' + (certifiee ? '<span class="fne-mark">✓ FNE certifiée DGI</span>' : estSimple ? '<span class="simple-mark">Facture simple — hors FNE</span>' : enErreur ? '<span class="err-mark">✗ Certification DGI échouée</span>' : enAttente ? '<span class="simple-mark">En attente de certification</span>' : '') + '</div></div>'
+    + sanixQrHtml('Facture', f.numero).replace('position:absolute;top:30px;right:36px;', 'flex:none;') + '</div>'
     + '<div class="parties">'
     + '<div class="party"><h4>Vendeur</h4>' + escHtml(p.societe || '') + '<br>NCC : ' + escHtml(p.dgi || '—') + '<br>' + escHtml(p.tel || '') + '</div>'
     + '<div class="party"><h4>Client</h4>' + escHtml(f.client) + (f.ncc_client ? '<br>NCC : ' + escHtml(f.ncc_client) : '') + (f.client_tel?'<br>Tél : '+escHtml(f.client_tel):'') + (f.client_email?'<br>'+escHtml(f.client_email):'') + '</div></div>'
@@ -147718,6 +147839,31 @@ goTo = function(page) {
 </div>
 
 <!-- Modal Facturation FNE -->
+<div class="modal-overlay" id="modal-coordonnees">
+  <div class="modal" style="max-width:1000px;width:96vw;">
+    <div class="modal-header">
+      <h3>✉️ Coordonnées des souscripteurs — saisie en masse</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-coordonnees')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">L'e-mail et le téléphone sont exigés par l'API FNE pour certifier une facture. Saisissez directement dans le tableau, ou exportez la liste en CSV, complétez-la (colonnes Téléphone / E-mail, colonne Dossier inchangée) puis réimportez-la. Rien n'est enregistré avant « Enregistrer ».</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+        <select class="filter-select" id="coord-scope" onchange="coordFiltre()"><option value="soldes">Souscripteurs soldés</option><option value="tous">Tous les souscripteurs actifs</option></select>
+        <select class="filter-select" id="coord-manque" onchange="coordFiltre()"><option value="email">E-mail manquant ou invalide</option><option value="tel">Téléphone manquant ou invalide</option><option value="tous">E-mail ou téléphone</option></select>
+        <input type="text" class="search-input" id="coord-recherche" placeholder="🔍 Nom ou n° de dossier" oninput="coordRender()" style="flex:1;min-width:160px;">
+        <button class="btn btn-secondary btn-sm" onclick="coordExporterCSV()">⬇ Exporter la liste (CSV)</button>
+        <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;">⬆ Importer un CSV<input type="file" accept=".csv,.txt,text/csv" style="display:none;" onchange="coordImporter(this)"></label>
+      </div>
+      <div id="coord-corps"></div>
+    </div>
+    <div class="modal-footer">
+      <span id="coord-compteur" style="margin-right:auto;font-size:12px;color:var(--blanc-dim);"></span>
+      <button class="btn btn-secondary" onclick="closeModal('modal-coordonnees')">Fermer</button>
+      <button class="btn btn-primary" id="coord-enregistrer" onclick="coordEnregistrer()" disabled>💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-fne">
   <div class="modal">
     <div class="modal-header">
