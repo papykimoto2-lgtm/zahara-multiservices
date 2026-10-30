@@ -4055,7 +4055,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
 
       <!-- ── LOTS & FONCIER ─────────────────────────── -->
       <div class="page" id="page-commercialisation">
-        <div class="page-header"><h2>📊 Commercialisation</h2></div>
+        <div class="page-header"><h2>📊 Commercialisation</h2><button class="btn btn-secondary" onclick="ventesCtlOuvrir()" title="Souscripteurs sans lot, lots sans souscripteur, lots partagés, réservations expirées, prix manquants">🔎 Contrôles Ventes <span id="ventes-ctl-n" class="badge"></span></button></div>
         <div class="kpi-grid" id="cmz-kpis"></div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;" class="cmz-row-2col">
@@ -4082,7 +4082,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <div class="card-body"><div id="cmz-table"></div></div>
         </div>
         <div class="card" style="margin-top:16px;" id="cmz-alerts-card">
-          <div class="card-header"><h3>⏰ Réservations à échéance (délai de validité dépassé)</h3></div>
+          <div class="card-header"><h3>⏰ Réservations à échéance (délai de validité dépassé)</h3><button class="btn btn-secondary btn-sm" onclick="ventesCtlOuvrir('expirees')">Traiter / libérer</button></div>
           <div class="card-body"><div id="cmz-alerts"></div></div>
         </div>
         <style>@media (max-width: 900px){ .cmz-row-2col{ grid-template-columns:1fr !important; } }</style>
@@ -30693,6 +30693,167 @@ function cmzBuildTendance() {
     + (t3prec>0 ? ' · ' + (tendance>=0?'▲ +':'▼ ')+Math.abs(tendance)+'% vs trimestre préc.' : '');
 }
 
+/* ── Contrôles Ventes : cohérence souscripteurs ↔ lots, réservations, prix ──
+   Lecture seule, sauf la libération (réservée aux managers) d'une réservation
+   expirée SANS aucun versement : au-delà, le dossier passe par la relance ou
+   la résiliation, jamais par un simple détachement du lot. */
+var _vtCtl = { onglet: 'sanslot' };
+function _vtNom(c) { return c ? (((c.prenoms || '') + ' ' + (c.nom || '')).trim() || c.dossier || '—') : '—'; }
+function _vtDelaiResa() { return parseInt((DATA.params || {}).delai_validite_reservation_j) || 30; }
+function _vtSeuilResa() { var n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate() - _vtDelaiResa()).toISOString().slice(0, 10); }
+function _vtVerseTotal(clientId) {
+  return (DATA.versements || []).filter(function (v) { return v.client_id === clientId; })
+    .reduce(function (s, v) { return s + (parseFloat(v.montant) || 0); }, 0);
+}
+function ventesCtlCalculer() {
+  var lots = DATA.lots || [], tous = DATA.clients || [];
+  var actifs = tous.filter(function (c) { return c.statut !== 'resilie'; });
+  var progs = {}; (DATA.programmes || []).forEach(function (p) { progs[p.id] = p; });
+  var parId = {}; tous.forEach(function (c) { parId[c.id] = c; });
+  var pris = {};
+  actifs.forEach(function (c) { _lotIdsDeClient(c).forEach(function (id) { (pris[id] = pris[id] || []).push(c); }); });
+  var seuil = _vtSeuilResa();
+  var r = { sanslot: [], orphelins: [], partages: [], expirees: [], prix: {}, prixNonDispo: [], montant: [] };
+  r.sanslot = actifs.filter(function (c) { return !_lotIdsDeClient(c).length; });
+  lots.forEach(function (l) {
+    var statut = l.statut || 'disponible', det = pris[l.id] || [];
+    if (statut !== 'disponible' && !det.length) {
+      var cl = l.client_id ? parId[l.client_id] : null;
+      r.orphelins.push({ lot: l, note: !l.client_id ? 'Aucun souscripteur' : (!cl ? 'Souscripteur introuvable' : (cl.statut === 'resilie' ? _vtNom(cl) + ' (résilié)' : _vtNom(cl) + ' ne référence pas ce lot')) });
+    }
+    if (det.length > 1) r.partages.push({ lot: l, clients: det });
+    if (statut === 'reserve' && (!l.date_reservation || l.date_reservation < seuil)) {
+      var verse = det.reduce(function (s, c) { return s + _vtVerseTotal(c.id); }, 0);
+      r.expirees.push({ lot: l, clients: det, verse: verse, libre: verse <= 0 });
+    }
+    if (!(parseFloat(l.prix) > 0)) {
+      var k = l.programme_id || '';
+      var e = r.prix[k] = r.prix[k] || { prog: (progs[k] && progs[k].nom) || '—', n: 0, nonDispo: 0 };
+      e.n++;
+      if (statut !== 'disponible') { e.nonDispo++; r.prixNonDispo.push(l); }
+    }
+  });
+  r.montant = actifs.filter(function (c) { return !(parseFloat(c.montant_total) > 0); });
+  return r;
+}
+function ventesCtlTotal(r) {
+  r = r || ventesCtlCalculer();
+  return r.sanslot.length + r.orphelins.length + r.partages.length + r.expirees.length + r.prixNonDispo.length + r.montant.length;
+}
+function ventesCtlOuvrir(onglet) { _vtCtl.onglet = onglet || _vtCtl.onglet || 'sanslot'; openModal('modal-ventes-ctl'); ventesCtlRender(); }
+function ventesCtlOnglet(o) { _vtCtl.onglet = o; ventesCtlRender(); }
+function ventesCtlFiche(id) { closeModal('modal-ventes-ctl'); openClientModal(id); }
+function ventesCtlLot(id) { closeModal('modal-ventes-ctl'); openLotModal(id); }
+function ventesCtlRender() {
+  var box = document.getElementById('ventesctl-corps'); if (!box) return;
+  var r = ventesCtlCalculer(), progs = {}; (DATA.programmes || []).forEach(function (p) { progs[p.id] = p; });
+  var onglets = [
+    ['sanslot', 'Souscripteurs sans lot', r.sanslot.length], ['orphelins', 'Lots sans souscripteur', r.orphelins.length],
+    ['partages', 'Lots partagés', r.partages.length], ['expirees', 'Réservations expirées', r.expirees.length],
+    ['prix', 'Lots sans prix', r.prixNonDispo.length], ['montant', 'Montant total à 0', r.montant.length]
+  ];
+  var CAP = 100;
+  var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">' + onglets.map(function (o) {
+    return '<button class="btn btn-sm ' + (_vtCtl.onglet === o[0] ? 'btn-primary' : 'btn-secondary') + '" onclick="ventesCtlOnglet(\'' + o[0] + '\')">' + o[1] + ' <strong>' + o[2] + '</strong></button>';
+  }).join('') + '</div>';
+  var th = function (a) { return '<thead><tr>' + a.map(function (x) { return '<th>' + x + '</th>'; }).join('') + '</tr></thead>'; };
+  var suite = function (n) { return n > CAP ? '<div style="font-size:11px;color:var(--blanc-dim);margin-top:6px;">' + CAP + ' premières lignes sur ' + n + '.</div>' : ''; };
+  var vide = '<div style="color:#10B981;padding:12px 0;">✅ Aucune anomalie.</div>';
+  var o = _vtCtl.onglet;
+  if (o === 'sanslot') {
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Souscripteurs actifs sans aucun lot rattaché : leur statut de vente, leur commission et leur échéancier ne peuvent pas être rapprochés d\'un bien.</div>';
+    h += r.sanslot.length ? '<table class="data-table">' + th(['Dossier', 'Souscripteur', 'Programme', 'Montant', '']) + '<tbody>' + r.sanslot.slice(0, CAP).map(function (c) {
+      return '<tr><td>' + escHtml(c.dossier || '') + '</td><td>' + escHtml(_vtNom(c)) + '</td><td>' + escHtml((progs[c.programme_id] || {}).nom || '—') + '</td><td>' + fmtF(c.montant_total || 0) + ' F</td><td><button class="btn btn-secondary btn-sm" onclick="ventesCtlFiche(\'' + c.id + '\')">Ouvrir la fiche</button></td></tr>';
+    }).join('') + '</tbody></table>' + suite(r.sanslot.length) : vide;
+  } else if (o === 'orphelins') {
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Lots réservés ou vendus qu\'aucun souscripteur actif ne référence.</div>';
+    h += r.orphelins.length ? '<table class="data-table">' + th(['Lot', 'Programme', 'Statut', 'Constat', '']) + '<tbody>' + r.orphelins.slice(0, CAP).map(function (x) {
+      return '<tr><td>Lot ' + escHtml(String(x.lot.numero || '')) + '</td><td>' + escHtml((progs[x.lot.programme_id] || {}).nom || '—') + '</td><td>' + escHtml(x.lot.statut) + '</td><td>' + escHtml(x.note) + '</td><td><button class="btn btn-secondary btn-sm" onclick="ventesCtlLot(\'' + x.lot.id + '\')">Ouvrir le lot</button></td></tr>';
+    }).join('') + '</tbody></table>' + suite(r.orphelins.length) : vide;
+  } else if (o === 'partages') {
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Un même lot référencé par plusieurs souscripteurs actifs : le plus souvent une fiche saisie deux fois (à fusionner), parfois une double vente.</div>';
+    h += r.partages.length ? '<table class="data-table">' + th(['Lot', 'Programme', 'Souscripteurs']) + '<tbody>' + r.partages.slice(0, CAP).map(function (x) {
+      return '<tr><td>Lot ' + escHtml(String(x.lot.numero || '')) + '</td><td>' + escHtml((progs[x.lot.programme_id] || {}).nom || '—') + '</td><td>' + x.clients.map(function (c) {
+        return '<a href="#" onclick="ventesCtlFiche(\'' + c.id + '\');return false;">' + escHtml(_vtNom(c)) + '</a> (' + fmtF(_vtVerseTotal(c.id)) + ' F versés)';
+      }).join('<br>') + '</td></tr>';
+    }).join('') + '</tbody></table>' + suite(r.partages.length) : vide;
+  } else if (o === 'expirees') {
+    var libres = r.expirees.filter(function (x) { return x.libre; });
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Réservations de plus de ' + _vtDelaiResa() + ' jours (ou sans date). Seules celles <strong>sans aucun versement</strong> peuvent être libérées ici ; les autres relèvent de la relance ou de la résiliation.</div>';
+    if (libres.length && hasRole('manager')) h += '<div style="margin-bottom:8px;"><button class="btn btn-warning btn-sm" onclick="ventesLibererToutes()">🔓 Libérer les ' + libres.length + ' réservation(s) sans versement</button></div>';
+    h += r.expirees.length ? '<table class="data-table">' + th(['Lot', 'Programme', 'Réservé le', 'Souscripteur', 'Versé', '']) + '<tbody>' + r.expirees.slice(0, CAP).map(function (x) {
+      var l = x.lot;
+      return '<tr><td>Lot ' + escHtml(String(l.numero || '')) + '</td><td>' + escHtml((progs[l.programme_id] || {}).nom || '—') + '</td><td>' + escHtml(l.date_reservation || '(non renseignée)') + '</td><td>' + (x.clients.length ? x.clients.map(function (c) { return escHtml(_vtNom(c)); }).join(', ') : '—') + '</td><td>' + fmtF(x.verse) + ' F</td><td>'
+        + (x.libre ? (hasRole('manager') ? '<button class="btn btn-warning btn-sm" onclick="ventesLibererReservation(\'' + l.id + '\')">🔓 Libérer</button>' : '') : '<span style="font-size:11px;color:var(--blanc-dim);">à relancer / résilier</span>') + '</td></tr>';
+    }).join('') + '</tbody></table>' + suite(r.expirees.length) : vide;
+  } else if (o === 'prix') {
+    var lignes = Object.keys(r.prix).map(function (k) { return r.prix[k]; }).sort(function (a, b) { return b.n - a.n; });
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Lots sans prix : ils faussent le « CA potentiel » et le prix moyen au m². Un lot réservé ou vendu sans prix est plus grave (échéancier et comptabilité sans base).</div>';
+    h += lignes.length ? '<table class="data-table">' + th(['Programme', 'Lots sans prix', 'dont réservés / vendus']) + '<tbody>' + lignes.map(function (e) {
+      return '<tr><td>' + escHtml(e.prog) + '</td><td>' + e.n + '</td><td>' + (e.nonDispo ? '<strong style="color:#EF4444;">' + e.nonDispo + '</strong>' : '0') + '</td></tr>';
+    }).join('') + '</tbody></table>' : vide;
+    if (r.prixNonDispo.length) h += '<div style="margin-top:10px;">' + r.prixNonDispo.slice(0, CAP).map(function (l) { return '<button class="btn btn-secondary btn-sm" style="margin:2px;" onclick="ventesCtlLot(\'' + l.id + '\')">Lot ' + escHtml(String(l.numero || '')) + '</button>'; }).join('') + '</div>';
+  } else {
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Souscripteurs actifs dont le montant total est nul : pas d\'échéancier ni de taux de cotisation calculables.</div>';
+    h += r.montant.length ? '<table class="data-table">' + th(['Dossier', 'Souscripteur', 'Programme', '']) + '<tbody>' + r.montant.slice(0, CAP).map(function (c) {
+      return '<tr><td>' + escHtml(c.dossier || '') + '</td><td>' + escHtml(_vtNom(c)) + '</td><td>' + escHtml((progs[c.programme_id] || {}).nom || '—') + '</td><td><button class="btn btn-secondary btn-sm" onclick="ventesCtlFiche(\'' + c.id + '\')">Ouvrir la fiche</button></td></tr>';
+    }).join('') + '</tbody></table>' + suite(r.montant.length) : vide;
+  }
+  box.innerHTML = h;
+}
+/* Libère une réservation expirée sans versement. `silencieux` : appel groupé (pas de confirmation, retourne true/false). */
+async function ventesLibererReservation(lotId, silencieux) {
+  if (!hasRole('manager')) { if (!silencieux) toast('⛔ Réservé aux managers.', 'error'); return false; }
+  var lot = (DATA.lots || []).find(function (l) { return l.id === lotId; });
+  if (!lot || lot.statut !== 'reserve') { if (!silencieux) toast('Ce lot n\'est plus réservé.', 'error'); return false; }
+  var det = (DATA.clients || []).filter(function (c) { return c.statut !== 'resilie' && _lotIdsDeClient(c).indexOf(lotId) >= 0; });
+  var verse = det.reduce(function (s, c) { return s + _vtVerseTotal(c.id); }, 0);
+  if (verse > 0) { if (!silencieux) toast('⛔ ' + fmtF(verse) + ' F déjà versés : passez par la relance ou la résiliation.', 'error'); return false; }
+  if (!silencieux && !confirm('Libérer le lot ' + (lot.numero || '') + ' ?\nIl redevient disponible et est détaché de son souscripteur (aucun versement enregistré).')) return false;
+  var qui = (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || 'system';
+  for (var i = 0; i < det.length; i++) {
+    var c = det[i], avant = JSON.parse(JSON.stringify(c));
+    c.lot_ids = _lotIdsDeClient(c).filter(function (id) { return id !== lotId; });
+    c.lot_id = c.lot_ids[0] || '';
+    c._modifie = new Date().toISOString();
+    await dbPut('clients', c);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+    await logAudit('clients', c.id, 'update', avant, c);
+  }
+  lot.historique_statuts = (lot.historique_statuts || []).concat([{ date: new Date().toISOString(), ancien: 'reserve', nouveau: 'disponible', client_id: lot.client_id || null, user: qui, motif: 'Réservation expirée sans versement' }]);
+  lot.statut = 'disponible'; lot.client_id = null; lot.date_reservation = '';
+  await dbPut('lots', lot);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_lots', lot);
+  if (!silencieux) { toast('Lot ' + (lot.numero || '') + ' libéré.', 'success'); ventesCtlRender(); renderCommercialisation(); }
+  return true;
+}
+async function ventesLibererToutes() {
+  var libres = ventesCtlCalculer().expirees.filter(function (x) { return x.libre; });
+  if (!libres.length) return;
+  if (!confirm('Libérer ' + libres.length + ' réservation(s) expirée(s) sans aucun versement ?\nLes lots redeviennent disponibles.')) return;
+  var n = 0;
+  for (var i = 0; i < libres.length; i++) { if (await ventesLibererReservation(libres[i].lot.id, true)) n++; }
+  toast(n + ' lot(s) libéré(s).', 'success'); ventesCtlRender(); renderCommercialisation();
+}
+/* Garde-fous à la création d'une souscription : renvoie les avertissements (jamais bloquant seul). */
+function ventesGardeSouscription(s) {
+  var av = [], clients = DATA.clients || [];
+  var tel = _cdNormPhone(s.tel);
+  if (tel.length >= 6) {
+    var memeTel = clients.filter(function (c) { return _cdNormPhone(c.tel) === tel || _cdNormPhone(c.tel2) === tel; });
+    if (memeTel.length) av.push('Ce téléphone est déjà celui de : ' + memeTel.slice(0, 3).map(_vtNom).join(', ') + '.');
+  }
+  var nom = sfcNormalise((s.nom || '') + ' ' + (s.prenoms || ''));
+  if (nom.length >= 3) {
+    var memeNom = clients.filter(function (c) { return _cdNomComplet(c) === nom; });
+    if (memeNom.length) av.push('Un souscripteur de même nom existe déjà (dossier ' + (memeNom[0].dossier || '—') + ').');
+  }
+  if (!(s.lotIds || []).length) av.push('Aucun lot n\'est rattaché à cette souscription.');
+  else if ((s.lotIds || []).some(function (id) { var l = (DATA.lots || []).find(function (x) { return x.id === id; }); return l && !(parseFloat(l.prix) > 0); })) av.push('Un des lots choisis n\'a pas de prix.');
+  if (!(parseFloat(s.montant) > 0)) av.push('Le montant total est nul : aucun échéancier ne pourra être calculé.');
+  return av;
+}
+
 function renderCommercialisation() {
   var lots = DATA.lots || [], progs = DATA.programmes || [];
   var totD=0, totR=0, totV=0;
@@ -30746,6 +30907,7 @@ function renderCommercialisation() {
   var _delaiResa = parseInt((DATA.params||{}).delai_validite_reservation_j) || 30;
   var _seuilDateResa = new Date(now.getFullYear(), now.getMonth(), now.getDate() - _delaiResa).toISOString().slice(0,10);
   var expirees = lots.filter(function(l){ return l.statut==='reserve' && l.date_reservation && l.date_reservation < _seuilDateResa; });
+  var _vn = document.getElementById('ventes-ctl-n'); if (_vn) { var _vt = ventesCtlTotal(); _vn.textContent = _vt || ''; }
   document.getElementById('cmz-alerts').innerHTML = expirees.length
     ? '<table class="data-table"><thead><tr><th>Lot</th><th>Programme</th><th>Réservé le</th><th>Souscripteur</th></tr></thead><tbody>'
       + expirees.map(function(l){
@@ -33575,6 +33737,11 @@ async function saveClient() {
     }
   }
 
+  /* Garde-fous à la création : doublon (téléphone / nom), lot manquant ou sans prix, montant nul. */
+  if (!APP.editingId && typeof ventesGardeSouscription === 'function') {
+    var _avVente = ventesGardeSouscription({ nom: nom, prenoms: document.getElementById('c-prenoms').value.trim(), tel: tel, lotIds: _tousLotIdsChoisis, montant: document.getElementById('c-montant-total').value });
+    if (_avVente.length && !confirm('⚠️ Vérifiez avant d\'enregistrer :\n\n• ' + _avVente.join('\n• ') + '\n\nEnregistrer quand même ?')) return;
+  }
   APP._savingClient = true;
   var id = APP.editingId || uid();
   var _ancienLotId = null;
@@ -149227,6 +149394,14 @@ goTo = function(page) {
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-pa-rapport')">Fermer</button><button class="btn btn-secondary" onclick="paImprimerCourse(_paRapportId,'rapport')">🖨️ Aperçu / imprimer</button>
       <button class="btn btn-secondary" id="pra-btn-brouillon" onclick="paRapportEnregistrer(false)">💾 Brouillon</button><button class="btn btn-primary" id="pra-btn-transmettre" onclick="paRapportEnregistrer(true)">📤 Transmettre à la hiérarchie</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-ventes-ctl">
+  <div class="modal" style="max-width:1050px;width:96vw;">
+    <div class="modal-header"><h3>🔎 Contrôles Ventes</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-ventes-ctl')">✕</button></div>
+    <div class="modal-body"><div id="ventesctl-corps"></div></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-ventes-ctl')">Fermer</button></div>
   </div>
 </div>
 
