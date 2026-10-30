@@ -12686,6 +12686,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
                 <button class="btn btn-primary btn-sm" onclick="comptabiliserToutesCommissions()">📒 Tout comptabiliser</button>
                 <button class="btn btn-secondary btn-sm" onclick="exportCommissionsCSV()">⬇ Export CSV</button>
                 <button class="btn btn-danger btn-sm" onclick="regenererToutesCommissions()">🔄 Régénérer tout</button>
+                <button class="btn btn-primary btn-sm" onclick="commBordOuvrir()" title="Commissions saines à payer, par bénéficiaire : bordereau, validation, règlement">🧾 États de paiement</button>
                 <button class="btn btn-primary btn-sm" onclick="commCtlOuvrir()" title="Orphelines, doublons, bénéficiaire différent de la fiche, versements sans commission">🔎 Contrôles commissions</button>
                 <button class="btn btn-secondary btn-sm" onclick="verifierCommissionsVersementsUI()" title="Détecte les commissions orphelines (versement supprimé) et en double (souvent causées par un versement saisi deux fois)">🔍 Vérifier doublons/orphelines</button>
               </div>
@@ -30898,6 +30899,101 @@ async function commCtlReaffecter(id) {
   toast('Commission réaffectée.', 'success'); _cmRafraichir();
 }
 
+/* ── États de paiement des commissions (bordereau par bénéficiaire) ──
+   Ne retient que les commissions saines : versement et souscripteur existants, pas de doublon, souscripteur non
+   résilié. Le bordereau est soumis au circuit de validation ; le règlement n'est possible qu'après validation. */
+var _cbCache = [];
+function commBordCalculer() {
+  var parClient = {}; (DATA.clients || []).forEach(function (x) { parClient[x.id] = x; });
+  var parVers = {}; (DATA.versements || []).forEach(function (v) { parVers[v.id] = v; });
+  var ctl = commCtlCalculer(), extras = {}, divergent = {};
+  ctl.doublons.forEach(function (g) { g.extras.forEach(function (c) { extras[c.id] = 1; }); });
+  ctl.benef.forEach(function (x) { divergent[x.c.id] = 1; });
+  var groupes = {}, exclus = [];
+  (DATA.commissions || []).forEach(function (c) {
+    if (c.statut !== 'a_payer') return;
+    var cl = parClient[c.client_id], motif = '';
+    if (!parVers[c.versement_id]) motif = 'versement inexistant';
+    else if (!cl) motif = 'souscripteur absent';
+    else if (cl.statut === 'resilie') motif = 'souscripteur résilié';
+    else if (extras[c.id]) motif = 'doublon';
+    if (motif) { exclus.push({ c: c, motif: motif }); return; }
+    var cle = c.type_beneficiaire + '|' + ((c.type_beneficiaire === 'commercial' ? c.beneficiaire_id : c.apporteur_id) || c.beneficiaire || '');
+    var g = groupes[cle] = groupes[cle] || { cle: cle, nom: c.beneficiaire || '—', type: c.type_beneficiaire, tel: c.beneficiaire_tel || '', items: [], total: 0, valides: 0, diverge: 0 };
+    g.items.push(c); g.total += parseFloat(c.montant_comm) || 0;
+    if (c.bordereau_valide) g.valides++;
+    if (divergent[c.id]) g.diverge++;
+  });
+  return { benefs: Object.keys(groupes).map(function (k) { return groupes[k]; }).sort(function (a, b) { return b.total - a.total; }), exclus: exclus };
+}
+function commBordOuvrir() { openModal('modal-comm-bord'); commBordRender(); }
+function _cbRef(g) { return 'bord|' + g.cle; }
+function commBordRender() {
+  var box = document.getElementById('commbord-corps'); if (!box) return;
+  var r = commBordCalculer(), mgr = hasRole('manager'); _cbCache = r.benefs;
+  var total = r.benefs.reduce(function (s, g) { return s + g.total; }, 0);
+  var h = '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">Commissions « à payer » saines, regroupées par bénéficiaire. Le bordereau est imprimé, soumis à validation, puis réglé en une fois (une référence, un mode de paiement). Total : <strong>' + fmtF(total) + ' F</strong> pour ' + r.benefs.length + ' bénéficiaire(s).</div>';
+  h += r.benefs.length ? '<table class="data-table"><thead><tr><th>Bénéficiaire</th><th>Type</th><th>Commissions</th><th>Total</th><th>Validation</th><th></th></tr></thead><tbody>' + r.benefs.map(function (g, i) {
+    var pend = valPending('bordereau_commission', _cbRef(g));
+    var st = g.valides === g.items.length ? '<span style="color:#10B981;">✅ Validé</span>' : (pend ? '<span style="color:#F59E0B;">⏳ En attente</span>' : (g.valides ? '<span style="color:#F59E0B;">' + g.valides + '/' + g.items.length + ' validées</span>' : '<span style="color:var(--blanc-dim);">Non soumis</span>'));
+    return '<tr><td>' + escHtml(g.nom) + (g.diverge ? ' <span title="Bénéficiaire différent de la fiche du souscripteur sur ' + g.diverge + ' commission(s) — voir Contrôles commissions" style="color:#F59E0B;">⚠ ' + g.diverge + '</span>' : '') + '</td><td>' + escHtml(g.type) + '</td><td>' + g.items.length + '</td><td>' + fmtF(g.total) + ' F</td><td>' + st + '</td><td style="white-space:nowrap;">'
+      + '<button class="btn btn-secondary btn-sm" onclick="commBordImprimer(' + i + ')">🖨️ Bordereau</button> '
+      + (mgr && !pend && g.valides < g.items.length ? '<button class="btn btn-secondary btn-sm" onclick="commBordSoumettre(' + i + ')">📨 Valider</button> ' : '')
+      + (mgr && g.valides ? '<button class="btn btn-primary btn-sm" onclick="commBordPayer(' + i + ')">💰 Payer ' + g.valides + '</button>' : '') + '</td></tr>';
+  }).join('') + '</tbody></table>' : '<div style="padding:12px 0;color:var(--blanc-dim);">Aucune commission saine à payer.</div>';
+  if (r.exclus.length) {
+    var parMotif = {}; r.exclus.forEach(function (x) { var m = parMotif[x.motif] = parMotif[x.motif] || { n: 0, t: 0 }; m.n++; m.t += parseFloat(x.c.montant_comm) || 0; });
+    h += '<div style="margin-top:14px;padding:10px 12px;border-left:4px solid #F59E0B;background:rgba(245,158,11,.08);font-size:12px;"><strong>À régulariser avant paiement</strong> (exclues de ces états) : '
+      + Object.keys(parMotif).map(function (k) { return parMotif[k].n + ' ' + escHtml(k) + ' (' + fmtF(parMotif[k].t) + ' F)'; }).join(' · ')
+      + ' — <a href="#" onclick="closeModal(\'modal-comm-bord\');commCtlOuvrir();return false;">ouvrir les Contrôles commissions</a></div>';
+  }
+  box.innerHTML = h;
+}
+async function commBordSoumettre(i) {
+  var g = _cbCache[i]; if (!g || !hasRole('manager')) return;
+  var ids = g.items.filter(function (c) { return !c.bordereau_valide; }).map(function (c) { return c.id; });
+  if (!ids.length) return;
+  var tot = g.items.filter(function (c) { return !c.bordereau_valide; }).reduce(function (s, c) { return s + (parseFloat(c.montant_comm) || 0); }, 0);
+  var v = await valCreate('bordereau_commission', _cbRef(g), 'Bordereau de commissions — ' + g.nom + ' (' + ids.length + ')', tot, { ids: ids, beneficiaire: g.nom });
+  if (v) toast('Bordereau soumis à validation.', 'success');
+  commBordRender();
+}
+async function commBordPayer(i) {
+  var g = _cbCache[i]; if (!g || !hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var items = g.items.filter(function (c) { return c.bordereau_valide && c.statut === 'a_payer'; });
+  if (!items.length) { toast('Aucune commission validée à payer.', 'error'); return; }
+  var tot = items.reduce(function (s, c) { return s + (parseFloat(c.montant_comm) || 0); }, 0);
+  var ref = prompt('Référence de paiement pour ' + g.nom + ' — ' + fmtF(tot) + ' F (ex. virement) :', ''); if (ref === null) return;
+  var choix = prompt('Mode de paiement :\n1. Virement bancaire\n2. Espèces\n3. Chèque\n4. Mobile Money\n\nEntrez 1, 2, 3 ou 4 :', '1');
+  var mode = ['virement', 'especes', 'cheque', 'mobile_money'][parseInt(choix) - 1] || 'virement';
+  if (!confirm('Régler ' + items.length + ' commission(s) à ' + g.nom + ' pour ' + fmtF(tot) + ' F ?')) return;
+  var ok = 0;
+  for (var k = 0; k < items.length; k++) { if (await payerCommission(items[k].id, { ref: ref, mode: mode, silencieux: true })) ok++; }
+  if (typeof filterEcritures === 'function') filterEcritures();
+  if (typeof renderCommissions === 'function') renderCommissions();
+  if (typeof buildKPIsApporteurs === 'function') buildKPIsApporteurs();
+  toast(ok + '/' + items.length + ' commission(s) payée(s).', ok === items.length ? 'success' : 'error');
+  commBordRender();
+}
+function commBordImprimer(i) {
+  var g = _cbCache[i]; if (!g) return;
+  var soc = (DATA.params && (DATA.params.societe || DATA.params.nom)) || '';
+  var w = window.open('', '_blank'); if (!w) { toast('Autorisez les fenêtres surgissantes.', 'error'); return; }
+  var parVers = {}; (DATA.versements || []).forEach(function (v) { parVers[v.id] = v; });
+  var parClient = {}; (DATA.clients || []).forEach(function (x) { parClient[x.id] = x; });
+  var rows = g.items.slice().sort(function (a, b) { return String(a.date_versement || '').localeCompare(String(b.date_versement || '')); }).map(function (c) {
+    var cl = parClient[c.client_id] || {};
+    return '<tr><td>' + escHtml(cl.dossier || '') + '</td><td>' + escHtml(c.client_nom || '') + '</td><td>' + escHtml(c.date_versement || '') + '</td><td style="text-align:right;">' + fmtF(c.montant_base || 0) + '</td><td style="text-align:right;">' + (c.taux != null ? c.taux + ' %' : '') + '</td><td style="text-align:right;">' + fmtF(c.montant_comm || 0) + '</td><td>' + (c.bordereau_valide ? 'validée' : '') + '</td></tr>';
+  }).join('');
+  w.document.write('<html><head><title>Bordereau de commissions</title><style>body{font-family:Georgia,serif;padding:36px;color:#111;font-size:12.5px;line-height:1.5;}h1{font-size:17px;margin:0 0 4px;}table{width:100%;border-collapse:collapse;margin:10px 0;}th,td{padding:5px 6px;border:1px solid #ccc;text-align:left;font-size:11.5px;}th{background:#f2f2f2;}.sig{display:flex;gap:30px;margin-top:40px;}.sig div{flex:1;border-top:1px solid #333;padding-top:4px;font-size:11px;}</style></head><body>'
+    + (typeof sanixQrHtml === 'function' ? sanixQrHtml('Bordereau commissions ' + g.nom, new Date().toISOString().slice(0, 10)) : '')
+    + '<h1>Bordereau de paiement de commissions</h1><div style="color:#555;font-size:11.5px;">' + escHtml(soc) + ' — établi le ' + new Date().toLocaleDateString('fr-FR') + '</div>'
+    + '<div style="margin:10px 0;"><strong>Bénéficiaire :</strong> ' + escHtml(g.nom) + ' (' + escHtml(g.type) + ')' + (g.tel ? ' · ' + escHtml(g.tel) : '') + '</div>'
+    + '<table><thead><tr><th>Dossier</th><th>Souscripteur</th><th>Versement du</th><th>Base (F)</th><th>Taux</th><th>Commission (F)</th><th></th></tr></thead><tbody>' + rows + '<tr style="font-weight:700;"><td colspan="5">Total à payer (' + g.items.length + ' commission(s))</td><td style="text-align:right;">' + fmtF(g.total) + '</td><td></td></tr></tbody></table>'
+    + '<div class="sig"><div>Établi par</div><div>Validé par</div><div>Reçu par le bénéficiaire (date, signature)</div></div></body></html>');
+  w.document.close(); setTimeout(function () { w.print(); }, 400);
+}
+
 /* ── Contrôles Ventes : cohérence souscripteurs ↔ lots, réservations, prix ──
    Lecture seule, sauf la libération (réservée aux managers) d'une réservation
    expirée SANS aucun versement : au-delà, le dossier passe par la relance ou
@@ -36469,19 +36565,19 @@ async function loadCommissions() {
 }
 
 /** Marquer une commission comme payée */
-async function payerCommission(id) {
+async function payerCommission(id, opts) {
   var comm = (DATA.commissions||[]).find(function(c){ return c.id===id; });
   if (!comm) return;
   /* Seule une commission « à payer » se règle : une annulée repasserait sinon « payée » et serait décaissée. */
   if (comm.statut !== 'a_payer') { toast(comm.statut === 'annulee' ? 'Commission annulée : paiement impossible.' : 'Cette commission n\'est pas à payer (statut : ' + (comm.statut || '—') + ').', 'error'); return; }
-  var ref = prompt('Référence de paiement (ex: virement SGCI) :', '');
+  var ref = (opts && opts.ref !== undefined) ? opts.ref : prompt('Référence de paiement (ex: virement SGCI) :', '');
   if (ref === null) return;
 
   // Choisir le mode de paiement pour la comptabilisation
   var modes = ['virement','especes','cheque','mobile_money'];
   var modeLabels = 'Mode de paiement :\n1. Virement bancaire\n2. Espèces\n3. Chèque\n4. Mobile Money';
-  var choix = prompt(modeLabels + '\n\nEntrez 1, 2, 3 ou 4 :', '1');
-  var mode = modes[parseInt(choix)-1] || 'virement';
+  var choix = (opts && opts.mode) ? null : prompt(modeLabels + '\n\nEntrez 1, 2, 3 ou 4 :', '1');
+  var mode = (opts && opts.mode) || modes[parseInt(choix)-1] || 'virement';
 
   /* [FIX] Le statut "payee" était persisté AVANT la comptabilisation, sans
      filet : si comptabiliserCommission/comptabiliserPaiementCommission
@@ -36516,13 +36612,15 @@ async function payerCommission(id) {
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', comm);
     toast('❌ Échec de la comptabilisation du paiement (' + (e && e.message ? e.message : 'erreur') + ') — la commission n’a PAS été marquée payée. Vérifiez les comptes par défaut puis réessayez.', 'error', 9000);
     renderCommissions();
-    return;
+    return false;
   }
 
+  if (opts && opts.silencieux) return true;
   filterEcritures();
   renderCommissions();
   if (typeof buildKPIsApporteurs === 'function') buildKPIsApporteurs();
   toast('Commission payée et écritures comptables générées.', 'success');
+  return true;
 }
 
 /** Annuler une commission */
@@ -120539,7 +120637,7 @@ function printFacture(id){
 /* ══════════════════════════════════════════════════════
    VALIDATIONS HIÉRARCHIQUES — workflow générique
    ══════════════════════════════════════════════════════ */
-function valTypeLabel(t){ var m={bon_commande:'Bon de commande',situation:'Situation de travaux',convention:'Convention',facture_fournisseur:'Facture fournisseur',liberation_garantie:'Libération retenue garantie',reception_travaux:'Réception de travaux',livraison:'Livraison souscripteur',attestation_solde:'Attestation de solde',attestation_solde_finale:'Attestation de solde (valeur finale)',cession:'Cession foncière',attestation_solde_cession:'Attestation de solde (cession foncière)',etape_fonciere:'Étape de dossier foncier',demande_course:'Demande de course',rapport_course:'Rapport de course',autre:'Autre'}; return m[t]||t; }
+function valTypeLabel(t){ var m={bon_commande:'Bon de commande',situation:'Situation de travaux',convention:'Convention',facture_fournisseur:'Facture fournisseur',liberation_garantie:'Libération retenue garantie',reception_travaux:'Réception de travaux',livraison:'Livraison souscripteur',attestation_solde:'Attestation de solde',attestation_solde_finale:'Attestation de solde (valeur finale)',cession:'Cession foncière',attestation_solde_cession:'Attestation de solde (cession foncière)',etape_fonciere:'Étape de dossier foncier',demande_course:'Demande de course',rapport_course:'Rapport de course',bordereau_commission:'Bordereau de commissions',autre:'Autre'}; return m[t]||t; }
 function valStatutBadge(st){ var m={en_attente:'badge-or',valide:'badge-vert',rejete:'badge-rouge',annule:'badge-rouge'}; var l={en_attente:'⏳ En attente',valide:'✅ Validé',rejete:'⛔ Rejeté',annule:'↩ Validation annulée'}; return '<span class="badge '+(m[st]||'badge-or')+'">'+(l[st]||st)+'</span>'; }
 function valPending(type,refId){ return (DATA.validations||[]).find(function(v){return v.type===type&&v.ref_id===refId&&v.statut==='en_attente';}); }
 async function valCreate(type,refId,libelle,montant,meta){
@@ -120611,6 +120709,17 @@ async function valApply(type,refId,decision){
       }
       cesAttSauver(cc);
       if(typeof cesRender==='function') cesRender();
+    }
+  }
+  if(type==='bordereau_commission'){
+    var vb=(DATA.validations||[]).filter(function(x){return x.type===type&&x.ref_id===refId;}).pop();
+    var idsb=(vb&&vb.meta&&vb.meta.ids)||[], nomB=(APP.currentUser&&APP.currentUser.nom)||'—';
+    for(var ib=0; ib<idsb.length; ib++){
+      var cb=(DATA.commissions||[]).find(function(x){return x.id===idsb[ib];});
+      if(!cb || cb.statut!=='a_payer') continue;
+      if(decision==='valide'){ cb.bordereau_valide=refId; cb.bordereau_valide_le=today(); cb.bordereau_valide_par=nomB; }
+      else { delete cb.bordereau_valide; }
+      await dbPut('commissions',cb); if(typeof syncToSupabase==='function')syncToSupabase('pi_commissions',cb);
     }
   }
   /* extensible : situation, convention, cession … */
@@ -149611,6 +149720,14 @@ goTo = function(page) {
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-pa-rapport')">Fermer</button><button class="btn btn-secondary" onclick="paImprimerCourse(_paRapportId,'rapport')">🖨️ Aperçu / imprimer</button>
       <button class="btn btn-secondary" id="pra-btn-brouillon" onclick="paRapportEnregistrer(false)">💾 Brouillon</button><button class="btn btn-primary" id="pra-btn-transmettre" onclick="paRapportEnregistrer(true)">📤 Transmettre à la hiérarchie</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-comm-bord">
+  <div class="modal" style="max-width:1000px;width:96vw;">
+    <div class="modal-header"><h3>🧾 États de paiement des commissions</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-comm-bord')">✕</button></div>
+    <div class="modal-body"><div id="commbord-corps"></div></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-comm-bord')">Fermer</button></div>
   </div>
 </div>
 
