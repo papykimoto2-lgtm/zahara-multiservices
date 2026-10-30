@@ -69,3 +69,42 @@ test('la cartographie des processus place chaque manuel dans un seul processus',
   assert.ok(r.flux >= 1);
   assert.equal(r.autres, -1);
 });
+
+test('SMQ : fiche processus (pilote, indicateurs, documents) avec suggestions à valider', async () => {
+  const app = await ouvrirApp();
+  const r = await app.page.evaluate(async function () {
+    window.toast = function () {};
+    window.smqPeutEditer = function () { return true; };
+    DATA.params = DATA.params || {}; DATA.params.smq_processus = {};
+    switchTab('params', 'manuels'); manuelsChangerVue('carto');
+    smqOuvrir('encaissement');
+    var visible = getComputedStyle(document.getElementById('manuels-smq-card')).display;
+    smqSuggerer('k'); smqSuggerer('d');
+    var nbK = _smqEdit.indicateurs.length, nbD = _smqEdit.documents.length;
+    var nonValides = _smqEdit.indicateurs.every(function (x) { return x.valide === false; });
+    var procedures = _smqEdit.documents.filter(function (x) { return x.type === 'Procédure' && x.ref; }).length;
+    document.getElementById('smq-pilote').value = 'Awa Koné';
+    document.getElementById('smq-k-valide-0').checked = true;
+    document.getElementById('smq-d-valide-0').checked = true;
+    await smqSauver();
+    var d = smqDonnees('encaissement');
+    var avant = smqResumeHtml('encaissement');
+    var compl = smqCompletudeHtml();
+    smqAjouter('k'); smqSuggerer('k');
+    var apresDoublon = _smqEdit.indicateurs.length;
+    window.smqPeutEditer = function () { return false; };
+    await smqSauver();
+    smqRendre();
+    var sansBouton = document.getElementById('manuels-smq').innerHTML.indexOf('smqSauver()') === -1;
+    return { visible: visible, nbK: nbK, nbD: nbD, nonValides: nonValides, procedures: procedures, pilote: d.pilote, kSauves: d.indicateurs.length, dSauves: d.documents.length,
+      resume: avant.indexOf('Awa Koné') !== -1 && avant.indexOf('1 indicateur') !== -1, compl: compl.indexOf('1 / ') !== -1, sansBouton: sansBouton, nbApres: apresDoublon, sup: SMQ_SUGGESTIONS.encaissement.k.length };
+  });
+  assert.equal(r.visible, 'block');
+  assert.equal(r.nbK, r.sup);
+  assert.ok(r.procedures >= 5);
+  assert.ok(r.nbD > r.procedures);
+  assert.ok(r.nonValides);
+  assert.equal(r.pilote, 'Awa Koné');
+  assert.equal(r.kSauves, r.sup);
+  assert.ok(r.resume && r.compl && r.sansBouton);
+});
