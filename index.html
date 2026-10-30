@@ -18501,7 +18501,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
 
           <div class="form-group span-2">
             <label>Programme *</label>
-            <select class="form-control" id="c-programme" onchange="updateLotsByProgramme()">
+            <select class="form-control" id="c-programme" onchange="updateLotsByProgramme();majIndicationDureeProjet()">
               <option value="">— Choisir —</option>
             </select>
           </div>
@@ -18640,6 +18640,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <div class="form-group">
             <label>Durée mensualités (mois)</label>
             <input type="number" class="form-control" id="c-duree" value="60" oninput="calcEcheancier()">
+            <div id="c-duree-hint"></div>
           </div>
           <div class="form-group">
             <label>📅 Date de souscription</label>
@@ -18647,7 +18648,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
           <div class="form-group">
             <label>Date de 1ère mensualité</label>
-            <input type="date" class="form-control" id="c-date-debut">
+            <input type="date" class="form-control" id="c-date-debut" onchange="majIndicationDureeProjet()">
           </div>
           <div class="form-group span-2">
             <label>Mensualité calculée</label>
@@ -33215,6 +33216,7 @@ function openClientModal(id) {
   var _btnRel = document.getElementById('tab-btn-client-releve'); if (_btnRel) _btnRel.style.display = id ? '' : 'none';
   var _paneRel = document.getElementById('tab-modal-client-releve'); if (_paneRel && _paneRel.classList.contains('active')) switchTab('modal-client', 'identite');
   var _cRel = document.getElementById('releve-client-content'); if (_cRel) _cRel.innerHTML = '';
+  if (typeof majIndicationDureeProjet === 'function') majIndicationDureeProjet();
   openModal('modal-client');
 }
 
@@ -33318,6 +33320,21 @@ function calcEcheancier() {
   var reste = total - apport;
   var mensualite = duree > 0 ? Math.ceil(reste / duree) : 0;
   document.getElementById('c-mensualite').value = mensualite > 0 ? fcfa(mensualite) : '—';
+  if (typeof majIndicationDureeProjet === 'function') majIndicationDureeProjet();
+}
+/* Sous la durée : durée du projet (jusqu'à la livraison du programme) et mensualité théorique de suivi, ou avertissement « estimé ». */
+function majIndicationDureeProjet() {
+  var box = document.getElementById('c-duree-hint'); if (!box) return;
+  var progId = (document.getElementById('c-programme') || {}).value, prog = progId ? (DATA.programmes || []).find(function(p){ return p.id === progId; }) : null;
+  if (!prog) { box.innerHTML = ''; return; }
+  var ancre = (document.getElementById('c-date-debut') || {}).value || (document.getElementById('c-date-souscription') || {}).value, dp = dureeProjetDepuis(prog, ancre);
+  var st = 'style="margin-top:6px;padding:7px 9px;border-left:3px solid #f59e0b;background:rgba(245,158,11,.10);border-radius:6px;font-size:11px;line-height:1.5;"';
+  if (!dp) { box.innerHTML = '<div ' + st + '>⚠️ ' + (ancre ? 'Ce programme n\'a pas de date de livraison' : 'Renseignez la date de début') + ' : le retard de ce souscripteur sera <strong>estimé</strong> d\'après la durée saisie ci-dessus. Dates à compléter dans Programmes.</div>'; return; }
+  var cc = APP.editingId ? (DATA.clients || []).find(function(x){ return x.id === APP.editingId; }) : null;
+  var valeur = cc && typeof attSoldePrix === 'function' ? attSoldePrix(cc).initial : (parseFloat((document.getElementById('c-montant-total') || {}).value) || 0);
+  box.innerHTML = '<div ' + st.replace('#f59e0b', '#2e7d4f').replace('245,158,11', '46,125,79') + '>📐 Durée du projet : <strong>' + dp.n + ' mois</strong> jusqu\'à la livraison du ' + dateShort(dp.livraison)
+    + (valeur > 0 ? ' — mensualité théorique de suivi : <strong>' + fcfa(Math.ceil(valeur / dp.n)) + '</strong> (valeur initiale ÷ durée du projet)' : '')
+    + '. <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById(\'c-duree\').value=' + dp.n + ';calcEcheancier()">Utiliser ' + dp.n + ' mois</button></div>';
 }
 
 /* Vérifie que l'apport initial déclaré sur la fiche a bien un versement réel
@@ -34365,30 +34382,59 @@ function clientFinancementBancaire(c) {
   return /(cr[eé]dit|pr[eê]t|financement) bancaire|^cb\b/.test(m);
 }
 
+/* ══ Échéancier théorique d'un souscripteur — SOURCE UNIQUE du retard de paiement ══
+   Programme daté (livraison renseignée) : la valeur INITIALE V (prix − modifications facturées) est répartie linéairement sur la durée du
+   projet n (mois entre la date de début du souscripteur et la livraison du programme). L'apport reste dû dès le départ et vaut avance :
+       attendu(t) = min(V, max(apport, V × mois écoulés ÷ n))      mensualité théorique = V ÷ n
+   Un souscripteur qui suit son échéancier contractuel n'est donc jamais en retard, et un gros apport met en avance.
+   Programme sans date de livraison : ancienne règle, marquée « estimé » : attendu = apport + mois écoulés × mensualité (durée de la fiche).
+   Retard en mois = écart ÷ mensualité théorique, plafonné aux mois réellement écoulés (jamais « 40 mois » le premier mois, jamais infini). */
+function _dateLocale(s) { var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+function _moisEntre(a, b) { return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()); }
+/* Durée du projet pour un souscripteur qui démarre à « ancre » : mois jusqu'à la livraison du programme, ou null si elle n'est pas renseignée. */
+function dureeProjetDepuis(prog, ancre) {
+  if (!prog || !prog.date_livraison) return null;
+  var livr = _dateLocale(prog.date_livraison), debut = _dateLocale(ancre);
+  if (!livr || !debut) return null;
+  return { n: Math.max(1, _moisEntre(debut, livr)), livraison: String(prog.date_livraison).slice(0, 10) };
+}
+function echeancierClient(c, now, verse) {
+  now = now || new Date();
+  var dateAncre = c.date_debut || c.date_souscription, debut = _dateLocale(dateAncre), total = parseFloat(c.montant_total) || 0;
+  if (!debut || total <= 0) return null;
+  if (verse == null) verse = (DATA.versements || []).filter(function(v){ return v.client_id === c.id && v.statut !== 'annule' && _versementSurPrix(v); })
+    .reduce(function(a, v){ return a + (parseFloat(v.montant) || 0); }, 0);
+  var apport = parseFloat(c.apport) || 0, moisEcoules = Math.max(0, _moisEntre(debut, now));
+  var prog = c.programme_id ? (DATA.programmes || []).find(function(x){ return x.id === c.programme_id; }) : null, dp = dureeProjetDepuis(prog, dateAncre);
+  var mode, n, valeur, mensualite, attendu;
+  if (dp) {
+    mode = 'projet'; n = dp.n;
+    valeur = (typeof attSoldePrix === 'function') ? attSoldePrix(c).initial : total;
+    if (!(valeur > 0)) valeur = total;
+    mensualite = Math.ceil(valeur / n);
+    attendu = Math.min(valeur, Math.max(apport, valeur * Math.min(1, moisEcoules / n)));
+  } else {
+    mode = 'estime'; n = parseInt(c.duree, 10) || 0; valeur = total;
+    mensualite = n > 0 ? Math.ceil((total - apport) / n) : 0;
+    attendu = Math.min(total, apport + moisEcoules * mensualite);
+  }
+  var ecart = Math.max(0, attendu - verse);
+  var exact = ecart <= 0.5 ? 0 : (mensualite > 0 ? Math.min(ecart / mensualite, moisEcoules) : moisEcoules);
+  return { mode: mode, n: n, valeurInitiale: valeur, apport: apport, mensualite: mensualite, moisEcoules: moisEcoules, attendu: attendu, verse: verse, ecart: ecart,
+           moisRetardExact: exact, moisRetard: Math.round(exact), livraison: dp ? dp.livraison : '', dateAncre: String(dateAncre).slice(0, 10) };
+}
+
 function getRetardataires() {
-  var now = new Date();
-  var result = [];
+  var now = new Date(), result = [], verses = {};
+  _dashArr('versements').forEach(function(v) { if (v.statut !== 'annule' && _versementSurPrix(v)) verses[v.client_id] = (verses[v.client_id] || 0) + (parseFloat(v.montant) || 0); });
   _dashArr('clients').forEach(function(c) {
-    /* date_debut (1ère mensualité) reste l'ancre correcte de l'échéancier ;
-       repli sur date_souscription si elle manque, pour ne pas faire
-       disparaître silencieusement un dossier de la liste des retards. */
-    var dateAncre = c.date_debut || c.date_souscription;
-    if (!dateAncre || !c.montant_total) return;
-    var versements = _dashArr('versements').filter(function(v) { return v.client_id === c.id && _versementSurPrix(v); });
-    var verse = versements.reduce(function(a, v) { return a + (parseFloat(v.montant) || 0); }, 0);
-    if (verse >= c.montant_total) return; // soldé
-    if (clientFinancementBancaire(c)) return;   // financement bancaire : jamais en retard
-
-    var debut = new Date(dateAncre);
-    var moisEcoules = Math.max(0, (now.getFullYear() - debut.getFullYear()) * 12 + (now.getMonth() - debut.getMonth()));
-    var mensualite = c.duree > 0 ? Math.ceil((c.montant_total - c.apport) / c.duree) : 0;
-    var attendu = (c.apport || 0) + moisEcoules * mensualite;
-    attendu = Math.min(attendu, c.montant_total);
-
-    if (verse < attendu) {
-      var retard = Math.round((attendu - verse) / mensualite);
-      result.push({ id: c.id, nom: c.nom, prenoms: c.prenoms, tel: c.tel, dossier: c.dossier, moisRetard: retard, montantDu: attendu - verse });
-    }
+    if (!(parseFloat(c.montant_total) > 0)) return;
+    var verse = verses[c.id] || 0;
+    if (verse >= c.montant_total) return;        // soldé
+    if (clientFinancementBancaire(c)) return;    // financement bancaire : jamais en retard
+    var e = echeancierClient(c, now, verse);     // null : aucune date de départ exploitable
+    if (!e || e.ecart <= 0.5) return;
+    result.push({ id: c.id, nom: c.nom, prenoms: c.prenoms, tel: c.tel, dossier: c.dossier, moisRetard: e.moisRetard, montantDu: e.ecart, echeancier: e.mode, mensualite: e.mensualite });
   });
   return result;
 }
@@ -49571,15 +49617,9 @@ function rarCollecter() {
        l'a été. Un dossier peut avoir un reste élevé sans être en retard (il
        vient d'être signé) — ne pas confondre les deux, sinon la relance
        harcèle des clients à jour. */
-    var mensualite = _rarMensualite(c);
-    var moisRetard = 0, duAJour = 0;
-    var dateAncreRar = c.date_debut || c.date_souscription;
-    if (dateAncreRar && mensualite > 0 && !clientFinancementBancaire(c)) {
-      var debut = new Date(dateAncreRar);
-      var moisEcoules = Math.max(0, (now.getFullYear()-debut.getFullYear())*12 + (now.getMonth()-debut.getMonth()));
-      var attendu = Math.min((parseFloat(c.apport)||0) + moisEcoules*mensualite, du);
-      if (verse < attendu) { duAJour = attendu - verse; moisRetard = Math.round(duAJour / mensualite); }
-    }
+    var ech = clientFinancementBancaire(c) ? null : echeancierClient(c, now, verse);   /* même calcul que getRetardataires */
+    var mensualite = ech ? ech.mensualite : _rarMensualite(c);
+    var moisRetard = ech ? ech.moisRetard : 0, duAJour = ech ? ech.ecart : 0;
 
     var lot = c.lot_id ? (DATA.lots || []).find(function(l){ return l.id === c.lot_id; }) : null;
     var bien = lot
@@ -49605,7 +49645,7 @@ function rarCollecter() {
       bien: bien, typeBien: typeBien, natureLot: natureLot,
       du: du, verse: verse, reste: reste,
       pctVerse: du > 0 ? Math.round(verse/du*100) : 0,
-      duAJour: duAJour, moisRetard: moisRetard,
+      duAJour: duAJour, moisRetard: moisRetard, echeancier: ech ? ech.mode : '',
       mensualite: mensualite, dateDebut: c.date_debut || ''
     });
   });
@@ -50246,6 +50286,14 @@ function relanceEfficacite(retardataires) {
   (DATA.clients || []).forEach(function(c){ (c.promesses_paiement || []).forEach(function(p){ if (p.statut === 'annulee') return; var e = promesseEtat(c, p); if (e === 'tenue') tenues++; else if (e === 'non_tenue') nonTenues++; }); });
   return { relances: ids.length, regularises: regularises, taux: ids.length ? Math.round(regularises / ids.length * 100) : null, tenues: tenues, nonTenues: nonTenues };
 }
+/* Avertissement : souscripteurs jugés sur un échéancier estimé (programme sans date de livraison). */
+function relanceAvisEstime(retardataires) {
+  var est = (retardataires || []).filter(function(r){ return r.echeancier === 'estime'; }); if (!est.length) return '';
+  var parProg = {};
+  est.forEach(function(r){ var c = (DATA.clients || []).find(function(x){ return x.id === r.id; }), pr = c && (DATA.programmes || []).find(function(x){ return x.id === c.programme_id; }), nom = pr ? (pr.nom || '—') : '—'; parProg[nom] = (parProg[nom] || 0) + 1; });
+  var liste = Object.keys(parProg).sort(function(a, b){ return parProg[b] - parProg[a]; }).slice(0, 6).map(function(n){ return escHtml(n) + ' (' + parProg[n] + ')'; }).join(' · ');
+  return '<div class="alert alert-warn" style="margin-top:10px;font-size:12px;">⚠️ <strong>' + est.length + ' souscripteur(s) sur ' + retardataires.length + '</strong> sont jugés sur un <strong>échéancier estimé</strong> : leur programme n\'a pas de date de livraison, le retard est calculé d\'après la durée saisie sur la fiche (souvent 60 mois par défaut). Programmes à compléter : ' + liste + '. <a href="#" onclick="goTo(\'programmes\');return false;">Ouvrir les programmes</a></div>';
+}
 function relanceDashHtml(retardataires) {
   var tr = ctxTranchesRetard(retardataires), tot = tr.reduce(function(a, t){ return a + t.montant; }, 0), ef = relanceEfficacite(retardataires);
   var ouverts = (DATA.dossiersJuridiques || []).filter(function(d){ return d.type === 'contentieux' && d.statut !== 'clos_favorable' && d.statut !== 'clos_defavorable'; });
@@ -50257,7 +50305,7 @@ function relanceDashHtml(retardataires) {
   h += carte('⚖️ En contentieux', fcfa(ctx.reclame), ouverts.length + ' dossier(s) · récupéré ' + fcfa(ctx.recupere) + ' · frais ' + fcfa(ctx.frais), 'var(--violet)');
   h += carte('Régularisation après relance (90 j)', ef.taux === null ? '—' : ef.taux + ' %', ef.relances ? ef.regularises + ' sur ' + ef.relances + ' client(s) relancé(s) ne sont plus en retard' : 'Aucune relance sur la période', 'var(--vert)');
   h += carte('Promesses de paiement', (ef.tenues + ef.nonTenues) ? Math.round(ef.tenues / (ef.tenues + ef.nonTenues) * 100) + ' % tenues' : '—', ef.tenues + ' tenue(s) · ' + ef.nonTenues + ' non tenue(s)', 'var(--or)');
-  return h + '</div></div>';
+  return h + '</div></div>' + relanceAvisEstime(retardataires);
 }
 /* ══ Promesses de paiement et file « à traiter aujourd'hui » ══
    Une promesse (date + montant) est portée par la fiche du client (client.promesses_paiement), comme le journal commercial : elle se
@@ -50400,7 +50448,7 @@ function detectRelances() {
       + '<td><a href="#" style="color:inherit;" title="Ouvrir le dossier du souscripteur" onclick="openClientModal(\'' + r.id + '\');return false;"><strong>' + r.nom + ' ' + r.prenoms + '</strong></a><br><span style="font-size:11px;color:var(--blanc-dim);">' + r.tel + '</span>'
         + an.motifs.map(function(m){ return '<br><span style="font-size:11px;color:' + (m.prio === 1 ? 'var(--rouge)' : 'var(--or)') + ';font-weight:600;">' + m.label + '</span>'; }).join('') + '</td>'
       + '<td>' + (prog ? prog.nom : '—') + (lot ? ' / Lot ' + lot.numero : '') + '</td>'
-      + '<td style="color:var(--rouge);font-weight:bold;">' + r.moisRetard + ' mois</td>'
+      + '<td style="color:var(--rouge);font-weight:bold;">' + r.moisRetard + ' mois' + (r.echeancier === 'estime' ? ' <span title="Programme sans date de livraison : retard estimé d\'après la durée saisie sur la fiche du souscripteur" style="font-size:10px;color:var(--or);font-weight:600;white-space:nowrap;">≈ estimé</span>' : '') + '</td>'
       + '<td style="color:var(--rouge);">' + fcfa(r.montantDu) + '</td>'
       + '<td><span class="badge ' + n.badge + '">' + n.icone + ' ' + n.label + '</span>' + promesseChipHtml(r, an) + (dosCtx ? '<br><a href="#" style="font-size:11px;color:var(--rouge);" title="Ouvrir le dossier contentieux" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\');return false;">⚖️ ' + escHtml(dosCtx.ref) + '</a>' : '') + '</td>'
       + '<td style="font-size:11px;">' + (lastRelance ? dateShort(lastRelance.date) : 'Jamais') + '</td>'
@@ -77984,7 +78032,8 @@ function buildTiersEcheances() {
   /* ── 411 — Clients : date d'échéance précise ── */
   var lignes411 = [];
   DATA.clients.forEach(function(c) {
-    var mensualite = _rarMensualite(c);
+    var ech0 = echeancierClient(c, today);
+    var mensualite = ech0 ? ech0.mensualite : _rarMensualite(c);
     if (!mensualite) return; /* pas de plan d'échéancier — rien à dater précisément */
     var versements = DATA.versements.filter(function(v){ return v.client_id===c.id && _versementSurPrix(v); });
     var totalVerse = versements.reduce(function(s,v){return s+(v.montant||0);},0);
@@ -78002,9 +78051,9 @@ function buildTiersEcheances() {
     var moisEcoules = Math.floor((today - dateDebut) / (1000*60*60*24*30.5));
     var nbMensualitesAttendues = moisEcoules + 1; /* la prochaine échéance à venir */
     var prochaine = new Date(dateDebut); prochaine.setMonth(prochaine.getMonth() + nbMensualitesAttendues);
-    var enRetard = prochaine < today;
+    var enRetard = !!(ech0 && ech0.ecart > 0.5 && !clientFinancementBancaire(c));   /* même critère que les relances */
     var prog = DATA.programmes.find(function(p){return p.id===c.programme_id;})||{nom:'—'};
-    lignes411.push({ date: prochaine, client: c, prog: prog, montant: Math.min(mensualite, solde), enRetard: enRetard });
+    lignes411.push({ date: prochaine, client: c, prog: prog, montant: enRetard ? ech0.ecart : Math.min(mensualite, solde), enRetard: enRetard });
   });
   lignes411.sort(function(a,b){ return a.date - b.date; });
 
@@ -79338,15 +79387,9 @@ function buildTiers411() {
        getRetardataires (repli date_souscription, mensualité recalculée
        plutôt que le champ c.mensualite qui peut être désynchronisé après
        une modification du prix, de l'apport ou de la durée). */
-    var dateAncre411 = c.date_debut || c.date_souscription;
-    var mensualite = _rarMensualite(c);
-    var retardMois = 0;
-    if (dateAncre411 && mensualite > 0 && !clientFinancementBancaire(c)) {
-      var debutRef = new Date(dateAncre411);
-      var moisEcoules = Math.max(0, (today.getFullYear()-debutRef.getFullYear())*12 + (today.getMonth()-debutRef.getMonth()));
-      var attendu = Math.min(c.montant_total||0, (c.apport||0) + mensualite*moisEcoules);
-      retardMois = Math.max(0, Math.round((attendu - totalVerse) / mensualite));
-    }
+    var ech411 = clientFinancementBancaire(c) ? null : echeancierClient(c, today, totalVerse);
+    var mensualite = ech411 ? ech411.mensualite : _rarMensualite(c);
+    var retardMois = ech411 ? ech411.moisRetard : 0;
 
     // Antériorité
     if (solde > 0) {
@@ -137783,14 +137826,9 @@ function _caisseCollecterClients411() {
     var totalVerse = versements.reduce(function(s,v){return s+(v.montant||0);},0);
     var solde = (c.montant_total||0) - totalVerse;
     if (solde <= 0) return;
-    var mensualite = c.mensualite || 0;
     var joursRetard = 0;
-    if (mensualite > 0 && !clientFinancementBancaire(c)) {
-      var dateDebut = c.date_debut ? new Date(c.date_debut) : new Date('2023-01-01');
-      var moisEcoules = Math.floor((today - dateDebut) / (1000*60*60*24*30.5));
-      var attendu = Math.min(c.montant_total||0, (c.apport||0) + mensualite*moisEcoules);
-      joursRetard = Math.max(0, Math.round((attendu - totalVerse) / Math.max(mensualite,1) * 30.5));
-    }
+    var echC = clientFinancementBancaire(c) ? null : echeancierClient(c, today, totalVerse);   /* même calcul que les relances (plus de repli sur 2023) */
+    if (echC) joursRetard = Math.round(echC.moisRetardExact * 30.5);
     out.push({ compte:'411', tiers: ((c.prenoms||'')+' '+(c.nom||'')).trim() || c.dossier || c.id, solde: solde, joursRetard: joursRetard,
                division: (typeof _divisionDeProgramme === 'function') ? _divisionDeProgramme(c.programme_id) : '' });
   });
