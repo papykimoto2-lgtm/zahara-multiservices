@@ -48,3 +48,24 @@ test('chaque diagramme renvoie vers le manuel qui détaille ses procédures', as
   assert.ok(r.liens.length >= 1);
   assert.ok(r.liens.every(function (h) { return h === 'docs/MANUEL_PROCEDURES_FONCIER.pdf'; }));
 });
+
+test('la cartographie des processus place chaque manuel dans un seul processus', async () => {
+  const app = await ouvrirApp();
+  const r = await app.page.evaluate(function () {
+    var compte = {};
+    MANUELS_PROCESSUS.forEach(function (p) { p.refs.forEach(function (x) { compte[x] = (compte[x] || 0) + 1; }); });
+    var doubles = Object.keys(compte).filter(function (x) { return compte[x] > 1; });
+    var sansProcessus = MANUELS_CATALOGUE.filter(function (m) { return !compte[m.ref]; }).map(function (m) { return m.ref; });
+    switchTab('params', 'manuels');
+    manuelsChangerVue('carto');
+    var puces = document.querySelectorAll('#manuels-liste button[onclick^="manuelsSelectionner"]').length;
+    manuelsSelectionner('PRO-ATT');
+    var flux = document.querySelectorAll('#manuels-flux .manuel-flux').length;
+    return { doubles: doubles, sansProcessus: sansProcessus, puces: puces, nb: MANUELS_CATALOGUE.length, flux: flux, autres: document.getElementById('manuels-liste').textContent.indexOf('Autres procédures') };
+  });
+  assert.deepEqual(r.doubles, []);
+  assert.deepEqual(r.sansProcessus, []);
+  assert.equal(r.puces, r.nb);
+  assert.ok(r.flux >= 1);
+  assert.equal(r.autres, -1);
+});
