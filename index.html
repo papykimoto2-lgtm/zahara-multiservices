@@ -44934,7 +44934,8 @@ var TVA_CPT_DUE = '4441', TVA_CPT_CREDIT = '4449';
 function _tvaCfg() {
   var c = (DATA.params && DATA.params.tva) || {};
   return { prorata: (c.prorata === undefined ? 100 : parseFloat(c.prorata)),
-    regime: c.regime || 'RNI', declarations: Array.isArray(c.declarations) ? c.declarations : [], politique_fne: c.politique_fne === 'strict' ? 'strict' : 'signaler', rapprochements: (c.rapprochements && typeof c.rapprochements === 'object') ? c.rapprochements : {} };
+    regime: c.regime || 'RNI', declarations: Array.isArray(c.declarations) ? c.declarations : [], politique_fne: c.politique_fne === 'strict' ? 'strict' : 'signaler', rapprochements: (c.rapprochements && typeof c.rapprochements === 'object') ? c.rapprochements : {},
+    politique_achat: (c.politique_achat && typeof c.politique_achat === 'object') ? c.politique_achat : {}, fournisseurs_fne: (c.fournisseurs_fne && typeof c.fournisseurs_fne === 'object') ? c.fournisseurs_fne : {} };
 }
 async function _tvaSave(cfg) {
   DATA.params = DATA.params || {}; DATA.params.tva = cfg;
@@ -45094,6 +45095,8 @@ function tvaRapprochement(mois) {
   if (ni.length) add('tiers', 'attention', ni.length + ' pièce(s) sans fournisseur identifié', 'Sans nom de fournisseur, le classement et le suivi des FNE manquantes sont faussés : renseignez-le dans « Justifier ».', { lib: 'Compléter', js: 'tvaJAller(\'justifier\',\'' + mois + '\')' });
   else add('tiers', 'ok', 'Fournisseur identifié sur toutes les pièces');
 
+  var dero = (DATA.fiches_engagement_depense || []).filter(function(d){ return d.derogation_fne && String(d.valide_le || '').slice(0, 7) === mois; });
+  if (dero.length) add('derog', 'attention', dero.length + ' achat(s) validé(s) au-dessus du seuil chez un fournisseur non qualifié', dero.slice(0, 8).map(function(d){ return escHtml(d.numero_da || '') + ' (' + escHtml(d.derogation_fne.fournisseur || '—') + ', ' + fmtF(d.montant) + ' F' + (d.derogation_fne.motif ? ' — ' + escHtml(d.derogation_fne.motif) : '') + ')'; }).join(' · ') + '. La TVA de ces achats est exposée si la FNE n\'est pas obtenue.');
   /* 5 bis. Demandes d'achat payées dans le mois sans FNE enregistrée */
   var daSans = (DATA.fiches_engagement_depense || []).filter(function(d){ return d.statut === 'decaissee' && String(d.decaisse_le || '').slice(0, 7) === mois && daFneEtat(d).cle === 'retard'; });
   if (daSans.length) add('da', 'attention', daSans.length + ' demande(s) d\'achat payée(s) sans FNE enregistrée depuis plus de ' + FNE_DELAI_HEURES + ' h', daSans.slice(0, 8).map(function(d){ return escHtml(d.numero_da || d.numero_fed || '') + ' (' + escHtml(d.beneficiaire || 'fournisseur') + ', ' + fmtF(d.montant) + ' F)'; }).join(' · ') + '. Réclamez la FNE à l\'acheteur ou enregistrez « sans FNE ».', { lib: 'Demandes d\'achat', js: 'closeModal(\'modal-tva-justif\');goTo(\'budget\');switchTab(\'budget\',\'da\')' });
@@ -45162,6 +45165,69 @@ function tvaJBandeauRapprochement(mois) {
     + ' <a href="#" onclick="tvaJOuvrir(\'rapprochement\',\'' + mois + '\');return false;">Ouvrir le rapprochement</a></div>';
 }
 
+/* ══ Politique d'achat par seuil : au-dessus d'un montant, fournisseur qualifié « FNE délivrée » ══
+   Qualification d'un fournisseur : manuelle (Agréé / Interdit, dans « Justif. TVA » → Fournisseurs) ou automatique d'après l'historique des pièces
+   (≥ 95 % de TVA justifiée = agréé ; aucune FNE conforme sur au moins 2 achats = sans FNE). Appliquée à la soumission puis à la validation d'une demande d'achat :
+   mode « avertir » = confirmation ; mode « bloquer » = dérogation motivée du validateur, conservée sur la DA. */
+function _tvaFKey(n) { return String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, ''); }
+function achatPolitique() {
+  var c = _tvaCfg().politique_achat || {};
+  return { actif: !!c.actif, seuil: parseFloat(c.seuil) || 0, mode: c.mode === 'bloquer' ? 'bloquer' : 'avertir' };
+}
+function fournisseurQualif(nom) {
+  var cle = _tvaFKey(nom), man = (_tvaCfg().fournisseurs_fne || {})[cle];
+  if (man && (man.statut === 'agree' || man.statut === 'interdit')) return { statut: man.statut, source: 'manuel', detail: man.statut === 'agree' ? 'agréé manuellement' : 'interdit manuellement' };
+  var L = tvaJListe('', '').filter(function(x){ return x.etat !== 'avant_fne' && _tvaFKey(x.tiers) === cle; });
+  if (!L.length) return { statut: 'inconnu', source: 'auto', detail: 'aucune pièce enregistrée' };
+  var tot = 0, ok = 0, nbOk = 0; L.forEach(function(x){ tot += x.tva; if (x.etat === 'conforme') { ok += x.tva; nbOk++; } });
+  if (nbOk >= 1 && tot > 0 && ok / tot >= 0.95) return { statut: 'agree', source: 'auto', detail: Math.round(ok / tot * 100) + ' % de TVA justifiée sur ' + L.length + ' pièce(s)' };
+  if (nbOk === 0 && L.length >= 2) return { statut: 'interdit', source: 'auto', detail: 'aucune FNE conforme sur ' + L.length + ' achats' };
+  return { statut: 'inconnu', source: 'auto', detail: nbOk + ' FNE conforme(s) sur ' + L.length + ' pièce(s)' };
+}
+function _daNomFournisseur(d) {
+  var f = d.fournisseur_id ? (DATA.fournisseurs || []).filter(function(x){ return x.id === d.fournisseur_id; })[0] : null;
+  return String((f && (f.nom || f.raison_sociale)) || d.beneficiaire || '').trim();
+}
+function achatPolitiqueControle(d) {
+  var pol = achatPolitique(), montant = parseFloat(d.montant) || 0;
+  if (!pol.actif || !(pol.seuil > 0) || montant < pol.seuil) return { ok: true, applicable: false, pol: pol };
+  var nom = _daNomFournisseur(d);
+  if (!nom) return { ok: false, applicable: true, pol: pol, nom: '', statut: 'inconnu', motif: 'Aucun fournisseur indiqué sur la demande d\'achat' };
+  var q = fournisseurQualif(nom);
+  if (q.statut === 'agree') return { ok: true, applicable: true, pol: pol, nom: nom, statut: q.statut };
+  return { ok: false, applicable: true, pol: pol, nom: nom, statut: q.statut, motif: 'Fournisseur « ' + nom + ' » ' + (q.statut === 'interdit' ? 'classé sans FNE (' + q.detail + ')' : 'non qualifié (' + q.detail + ')') };
+}
+function _tvaJOptQualif(nom) {
+  var man = (_tvaCfg().fournisseurs_fne || {})[_tvaFKey(nom)], cur = man && (man.statut === 'agree' || man.statut === 'interdit') ? man.statut : 'auto', q = fournisseurQualif(nom);
+  var lab = { agree: 'agréé', interdit: 'sans FNE', inconnu: 'non qualifié' }[q.statut];
+  return '<select class="filter-select" style="font-size:11px;" onchange="tvaJQualifier(\'' + encodeURIComponent(nom) + '\',this.value)"><option value="auto"' + (cur === 'auto' ? ' selected' : '') + '>Auto (' + lab + ')</option><option value="agree"' + (cur === 'agree' ? ' selected' : '') + '>✓ Agréé</option><option value="interdit"' + (cur === 'interdit' ? ' selected' : '') + '>✗ Interdit</option></select>';
+}
+async function tvaJQualifier(nomEnc, statut) {
+  var nom = decodeURIComponent(nomEnc), cfg = _tvaCfg(); cfg.fournisseurs_fne = cfg.fournisseurs_fne || {};
+  if (statut === 'auto') delete cfg.fournisseurs_fne[_tvaFKey(nom)]; else cfg.fournisseurs_fne[_tvaFKey(nom)] = { nom: nom, statut: statut, par: (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || '', le: new Date().toISOString() };
+  await _tvaSave(cfg); tvaJRender();
+}
+async function tvaJAjouterQualif() {
+  var nom = ((document.getElementById('tvaj-q-nom') || {}).value || '').trim(), st = (document.getElementById('tvaj-q-statut') || {}).value || 'agree';
+  if (!nom) { toast('Indiquez le nom du fournisseur.', 'error'); return; }
+  await tvaJQualifier(encodeURIComponent(nom), st);
+}
+async function tvaJPolitiqueAchat(champ, v) {
+  var cfg = _tvaCfg(), pa = cfg.politique_achat = cfg.politique_achat || {};
+  if (champ === 'actif') pa.actif = (v === 'oui'); else if (champ === 'seuil') pa.seuil = Math.max(0, parseFloat(v) || 0); else pa.mode = (v === 'bloquer') ? 'bloquer' : 'avertir';
+  await _tvaSave(cfg); tvaJRender();
+}
+function tvaJPolitiqueAchatHtml() {
+  var pol = achatPolitique(), man = _tvaCfg().fournisseurs_fne || {}, ks = Object.keys(man);
+  return '<div class="card" style="margin-bottom:10px;"><div class="card-title" style="font-size:13px;">🛒 Politique d\'achat par seuil</div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;"><div class="form-group" style="margin:0;"><label style="font-size:11px;">Politique</label><select class="form-control" onchange="tvaJPolitiqueAchat(\'actif\',this.value)"><option value="non"' + (pol.actif ? '' : ' selected') + '>Désactivée</option><option value="oui"' + (pol.actif ? ' selected' : '') + '>Activée</option></select></div>'
+    + '<div class="form-group" style="margin:0;"><label style="font-size:11px;">Seuil (FCFA TTC)</label><input type="number" class="form-control" style="width:130px;" value="' + (pol.seuil || '') + '" placeholder="ex : 100000" onchange="tvaJPolitiqueAchat(\'seuil\',this.value)"></div>'
+    + '<div class="form-group" style="margin:0;"><label style="font-size:11px;">Au-dessus du seuil, fournisseur non qualifié</label><select class="form-control" onchange="tvaJPolitiqueAchat(\'mode\',this.value)"><option value="avertir"' + (pol.mode === 'avertir' ? ' selected' : '') + '>Avertir (confirmation)</option><option value="bloquer"' + (pol.mode === 'bloquer' ? ' selected' : '') + '>Bloquer sauf dérogation motivée</option></select></div></div>'
+    + '<div style="font-size:11.5px;color:var(--blanc-dim);margin:6px 0;">Contrôle appliqué aux demandes d\'achat à la soumission et à la validation. Un fournisseur est « agréé » s\'il a délivré des FNE conformes (≥ 95 % de la TVA) ou si vous l\'agréez ci-dessous ; un fournisseur sans historique n\'est pas qualifié.</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input class="form-control" id="tvaj-q-nom" placeholder="Qualifier un fournisseur (nom exact)" style="max-width:260px;"><select class="filter-select" id="tvaj-q-statut"><option value="agree">✓ Agréé (délivre la FNE)</option><option value="interdit">✗ Interdit (pas de FNE)</option></select><button class="btn btn-secondary btn-sm" onclick="tvaJAjouterQualif()">Ajouter</button></div>'
+    + (ks.length ? '<div style="font-size:12px;margin-top:6px;">Qualifications manuelles : ' + ks.map(function(k){ return escHtml(man[k].nom || k) + ' ' + _tvaJOptQualif(man[k].nom || k); }).join(' · ') + '</div>' : '') + '</div>';
+}
+
 function _tvaJNav() {
   var tab = function(k, lib){ return '<button class="tab-btn' + (_tvaJ.onglet === k ? ' active' : '') + '" onclick="tvaJChange(\'onglet\',\'' + k + '\')">' + lib + '</button>'; };
   return '<div class="tab-nav" style="margin-bottom:10px;">' + tab('rapprochement', '✅ Rapprochement du mois') + tab('justifier', '🧾 Pièces à justifier') + tab('fournisseurs', '🏪 Fournisseurs') + tab('manque', '📉 Manque à gagner') + '</div>';
@@ -45207,14 +45273,14 @@ function tvaJRender() {
       var rec = taux(mine.filter(function(x){ return x.mois > m3(maintenant, 3); })), anc = taux(mine.filter(function(x){ return x.mois <= m3(maintenant, 3) && x.mois > m3(maintenant, 6); }));
       return { n: n, o: o, t: o.tot > 0 ? o.ok / o.tot * 100 : 0, rec: rec, anc: anc };
     }).sort(function(a, b){ return b.o.perdue + b.o.ajust - a.o.perdue - a.o.ajust; });
-    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">Classement par TVA non récupérée. Un fournisseur à 0 % ne délivre pas de FNE : à remplacer ou à exiger. La tendance compare les 3 derniers mois aux 3 précédents.</div>'
+    h += tvaJPolitiqueAchatHtml() + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">Classement par TVA non récupérée. Un fournisseur à 0 % ne délivre pas de FNE : à remplacer ou à exiger. La tendance compare les 3 derniers mois aux 3 précédents.</div>'
       + '<div style="text-align:right;margin-bottom:6px;"><button class="btn btn-secondary btn-sm" onclick="tvaJExporter(\'fournisseurs\')">⬇ Export CSV</button></div>'
-      + '<div class="table-wrap" style="max-height:46vh;overflow:auto;"><table><thead><tr><th>Fournisseur</th><th style="text-align:right;">Pièces</th><th style="text-align:right;">TVA</th><th style="text-align:right;">Récupérable</th><th style="text-align:right;">Perdue</th><th style="text-align:right;">À justifier</th><th>Conformité</th><th>Tendance</th></tr></thead><tbody>'
+      + '<div class="table-wrap" style="max-height:46vh;overflow:auto;"><table><thead><tr><th>Fournisseur</th><th style="text-align:right;">Pièces</th><th style="text-align:right;">TVA</th><th style="text-align:right;">Récupérable</th><th style="text-align:right;">Perdue</th><th style="text-align:right;">À justifier</th><th>Conformité</th><th>Tendance</th><th>Qualification d\'achat</th></tr></thead><tbody>'
       + (rows.length ? rows.map(function(r){
           var tend = (r.rec == null || r.anc == null) ? '—' : (r.rec > r.anc + 5 ? '<span style="color:var(--vert);">↗ en progrès</span>' : (r.rec < r.anc - 5 ? '<span style="color:var(--rouge);">↘ se dégrade</span>' : '→ stable'));
           var st = r.t >= 95 ? '<span class="badge badge-vert">✓ FNE délivrée</span>' : (r.o.ok === 0 && r.o.ajust === 0 ? '<span class="badge badge-rouge">✗ Sans FNE</span>' : '<span class="badge badge-or">⚠ Partielle</span>');
-          return '<tr><td>' + escHtml(r.n) + '</td><td style="text-align:right;">' + r.o.nb + '</td><td style="text-align:right;">' + f(r.o.tot) + '</td><td style="text-align:right;color:var(--vert);">' + f(r.o.ok) + '</td><td style="text-align:right;color:var(--rouge);">' + f(r.o.perdue) + '</td><td style="text-align:right;color:var(--or);">' + f(r.o.ajust) + '</td><td>' + st + ' <span style="font-size:11px;">' + Math.round(r.t) + ' %</span></td><td style="font-size:12px;">' + tend + '</td></tr>'; }).join('')
-        : '<tr><td colspan="8" style="text-align:center;color:var(--blanc-dim);padding:18px;">Aucune pièce sur la période.</td></tr>')
+          return '<tr><td>' + escHtml(r.n) + '</td><td style="text-align:right;">' + r.o.nb + '</td><td style="text-align:right;">' + f(r.o.tot) + '</td><td style="text-align:right;color:var(--vert);">' + f(r.o.ok) + '</td><td style="text-align:right;color:var(--rouge);">' + f(r.o.perdue) + '</td><td style="text-align:right;color:var(--or);">' + f(r.o.ajust) + '</td><td>' + st + ' <span style="font-size:11px;">' + Math.round(r.t) + ' %</span></td><td style="font-size:12px;">' + tend + '</td><td>' + _tvaJOptQualif(r.n) + '</td></tr>'; }).join('')
+        : '<tr><td colspan="9" style="text-align:center;color:var(--blanc-dim);padding:18px;">Aucune pièce sur la période.</td></tr>')
       + '</tbody></table></div>';
   } else {
     var bloc = function(titre, obj, tri){
@@ -117045,6 +117111,8 @@ async function daSauver(champs) {
 async function daSoumettre(id) {
   var d = (DATA.fiches_engagement_depense||[]).find(function(x){ return x.id===id; }); if (!d) return;
   if (d.statut !== 'brouillon') { toast('Seule une fiche en brouillon peut être soumise.', 'error'); return; }
+  var _pc = achatPolitiqueControle(d);
+  if (!_pc.ok && !confirm('⚠️ Politique d\'achat : ' + _pc.motif + '.\n\nMontant ' + fmtF(d.montant) + ' F ≥ seuil de ' + fmtF(_pc.pol.seuil) + ' F : ' + (_pc.pol.mode === 'bloquer' ? 'le validateur devra motiver une dérogation.' : 'le validateur sera averti.') + '\n\nSoumettre quand même ?')) return;
   d.statut = 'soumise'; d.soumis_par = (APP.currentUser&&APP.currentUser.nom)||'—'; d.soumis_le = new Date().toISOString(); d._modifie = new Date().toISOString();
   await dbPut('fiches_engagement_depense', d); if (typeof syncToSupabase==='function') syncToSupabase('pi_fiches_engagement_depense', d);
   toast('📤 Fiche ' + d.numero_fed + ' soumise pour validation.', 'success');
@@ -117059,6 +117127,14 @@ async function daValider(id) {
     toast('🔒 Disponible insuffisant sur la ligne ' + d.compte + ' (' + fmtF(dispo) + ' F disponible, ' + fmtF(d.montant) + ' F demandé). Faites un transfert vers cette ligne avant de valider.', 'error');
     return;
   }
+  var _pv = achatPolitiqueControle(d);
+  if (!_pv.ok) {
+    var _txt = '⚠️ Politique d\'achat : ' + _pv.motif + '.\nMontant ' + fmtF(d.montant) + ' F ≥ seuil de ' + fmtF(_pv.pol.seuil) + ' F.';
+    var _mot = '';
+    if (_pv.pol.mode === 'bloquer') { _mot = String(prompt(_txt + '\n\nPour valider malgré tout, indiquez le motif de la dérogation (obligatoire) :') || '').trim(); if (_mot.length < 5) { toast('🔒 Validation refusée : fournisseur non qualifié sans motif de dérogation.', 'error'); return; } }
+    else if (!confirm(_txt + '\n\nValider quand même ?')) return;
+    d.derogation_fne = { motif: _mot, fournisseur: _pv.nom, statut: _pv.statut, par: (APP.currentUser && APP.currentUser.nom) || '—', le: new Date().toISOString() };
+  } else if (d.derogation_fne) delete d.derogation_fne;
   /* [Transformation FED → DA] C'est ICI, au moment de la validation, que la
      fiche cesse d'être un simple engagement et devient une vraie Demande
      d'Achat exécutable — même enregistrement, nouveau numéro DA attribué,
@@ -117111,7 +117187,7 @@ function budgetRenderDA() {
           ? '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Payée le ' + dateShort(d.decaisse_le) + '</span>'
           : '<span class="badge" style="background:rgba(184,115,51,0.15);color:var(--or);">🕓 À décaisser</span>')
       + '</td>'
-      + '<td>' + (function(){ var e = daFneEtat(d); return '<span class="badge ' + e.badge + '" style="font-size:10px;">' + escHtml(e.lib) + '</span>'; })() + '</td>'
+      + '<td>' + (function(){ var e = daFneEtat(d); return '<span class="badge ' + e.badge + '" style="font-size:10px;">' + escHtml(e.lib) + '</span>' + (d.derogation_fne ? '<br><span class="badge badge-or" style="font-size:9px;" title="' + escHtml('Dérogation : ' + (d.derogation_fne.motif || 'validée malgré fournisseur non qualifié') + ' (' + (d.derogation_fne.par || '') + ')') + '">dérogation fournisseur</span>' : ''); })() + '</td>'
       + '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm btn-icon" title="Imprimer la DA" onclick="imprimerDA(\'' + d.id + '\')">🖨️</button> '
       + '<button class="btn btn-secondary btn-sm btn-icon" title="Bon d\'achat à remettre à l\'acheteur (exige la FNE)" onclick="imprimerBonAchat(\'' + d.id + '\')">🧾</button> '
       + '<button class="btn btn-secondary btn-sm btn-icon" title="Enregistrer la FNE reçue du fournisseur" onclick="daFneOuvrir(\'' + d.id + '\')">📥</button></td>'
