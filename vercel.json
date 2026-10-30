@@ -75,6 +75,9 @@
       ]
     }
   ],
+  "functions": {
+    "api/fne-proxy.js": { "maxDuration": 30 }
+  },
   "git": {
     "deploymentEnabled": {
       "claude/admiring-hopper-i4ptq0": false,

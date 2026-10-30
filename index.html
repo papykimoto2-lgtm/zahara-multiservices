@@ -136729,6 +136729,8 @@ function fneBaseUrl() {
    appel direct au serveur DGI (fonctionne seulement si celui-ci autorise les
    requêtes cross-origin depuis un navigateur, ce qui n'est pas garanti). */
 function fneEndpointFetch(pathSuffix, apiKey, bodyObj, proxyUrl, directBaseUrl, environnement) {
+  /* Page en HTTPS : la passerelle serveur /api/fne-proxy est utilisée d'office (un appel direct vers la DGI serait bloqué : contenu mixte / CORS). */
+  if (!proxyUrl && typeof location !== 'undefined' && location.protocol === 'https:') proxyUrl = '/api/fne-proxy';
   if (proxyUrl) {
     var base = proxyUrl.replace(/\/$/, '');
     var sep = base.indexOf('?') >= 0 ? '&' : '?';
@@ -136779,7 +136781,7 @@ async function fneCertifierFacture(f) {
   var p = DATA.params || {};
   if (!p.fne_api_key) { f.statut_fne = 'erreur'; f.fne_erreur = 'Clé API FNE non configurée (Paramètres → Société → API FNE).'; return f; }
   var url = fneBaseUrl();
-  if (!p.fne_proxy && !url) { f.statut_fne = 'erreur'; f.fne_erreur = 'URL API FNE non configurée pour l\'environnement « ' + (p.fne_environnement||'test') + ' ».'; return f; }
+  if (!p.fne_proxy && !url && !(typeof location !== 'undefined' && location.protocol === 'https:')) { f.statut_fne = 'erreur'; f.fne_erreur = 'URL API FNE non configurée pour l\'environnement « ' + (p.fne_environnement||'test') + ' ».'; return f; }
   var corps = fneConstruireCorpsFacture(f, p);
   try {
     var res = await fneEndpointFetch('/external/invoices/sign', p.fne_api_key, corps, p.fne_proxy, url, p.fne_environnement);
@@ -136787,7 +136789,7 @@ async function fneCertifierFacture(f) {
     try { data = await res.json(); } catch (eJson) { /* réponse non JSON */ }
     if (!res.ok) {
       f.statut_fne = 'erreur';
-      f.fne_erreur = (data && data.message) ? data.message + ' (HTTP ' + res.status + ')' : ('Erreur HTTP ' + res.status);
+      f.fne_erreur = (data && data.message) ? data.message + ' (HTTP ' + res.status + ')' : (res.status === 404 ? 'Passerelle FNE introuvable (HTTP 404) : /api/fne-proxy n\'est pas déployée sur ce domaine.' : 'Erreur HTTP ' + res.status);
       f.fne_reponse_brute = data || null;
       return f;
     }
@@ -136940,6 +136942,15 @@ async function fneTesterConnexion() {
   var out = document.getElementById('fne-test-resultat');
   if (out) out.innerHTML = '⏳ Test en cours' + (proxy ? ' (via passerelle ' + escHtml(proxy) + ')' : ' (appel direct navigateur)') + '…';
   try {
+    /* Sécurité : en PRODUCTION, jamais de facture d'essai (elle serait certifiée pour de vrai). On vérifie seulement la passerelle et sa configuration. */
+    var prx = proxy || ((typeof location !== 'undefined' && location.protocol === 'https:') ? '/api/fne-proxy' : '');
+    if (prx) {
+      var ping = await fetch(prx.replace(/\/$/, '') + (prx.indexOf('?') >= 0 ? '&' : '?') + 'ping=1&env=' + encodeURIComponent(env));
+      var pj = null; try { pj = await ping.json(); } catch (e0) { /* réponse non JSON */ }
+      if (!ping.ok || !pj || pj.ok !== true) { if (out) out.innerHTML = '<span style="color:#dc2626;">❌ Passerelle « ' + escHtml(prx) + ' » introuvable (HTTP ' + ping.status + ') : le fichier api/fne-proxy.js doit être déployé sur ce domaine.</span>'; return; }
+      if (!pj.configured) { if (out) out.innerHTML = '<span style="color:#dc2626;">❌ Passerelle joignable, mais l\'URL de l\'environnement « ' + escHtml(env) + ' » n\'est pas configurée côté serveur (variable FNE_URL_PROD sur Vercel).</span>'; return; }
+    }
+    if (env === 'production') { if (out) out.innerHTML = '<span style="color:#059669;">✅ ' + (prx ? 'Passerelle prête' : 'Paramètres enregistrés') + ' (production). Aucune facture d\'essai n\'est envoyée en production : la première facture réelle validera la clé API.</span>'; return; }
     var res = await fneEndpointFetch('/external/invoices/sign', apiKey, { invoiceType:'sale', paymentMethod:'cash', template:'B2C', isRne:false, clientCompanyName:'TEST', clientPhone:'0000000000', clientEmail:'test@test.ci', pointOfSale:'Test', establishment:'Test', items:[{taxes:['TVA'],description:'Test connexion',quantity:1,amount:1}] }, proxy, url.replace(/\/$/,''), env);
     if (res.status === 401) { if(out) out.innerHTML = '<span style="color:#d97706;">🔐 Serveur joignable, mais clé API refusée (401) — vérifiez la clé.</span>'; return; }
     if (res.ok || res.status === 400) { if(out) out.innerHTML = '<span style="color:#059669;">✅ Serveur FNE joignable (réponse HTTP ' + res.status + ').</span>'; return; }
