@@ -4008,6 +4008,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
         </div>
         <div class="kpi-grid" id="kpi-facturation" style="margin-bottom:16px;"></div>
+        <div id="fac-soldes"></div>
         <div class="card">
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
             <input type="text" class="search-input" placeholder="🔍 N°, client, désignation..." id="fac-search" oninput="_debInput('renderFacturesClient')" style="flex:1;min-width:200px;">
@@ -5404,6 +5405,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <div class="spacer"></div>
           <input type="text" class="form-control" id="search-relances" placeholder="🔍 Rechercher un souscripteur (nom, tél, dossier)" style="max-width:280px;" oninput="detectRelances()">
           <button class="btn btn-secondary btn-sm" onclick="relancesActualiser()">🔄 Actualiser la liste</button>
+          <button class="btn btn-secondary btn-sm" onclick="imprimerEtatRelances()" title="Imprimer l'état tel qu'affiché (onglet, recherche et tri en cours)">🖨️ Imprimer l'état</button>
         </div>
 
         <div id="relances-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;"></div>
@@ -5417,8 +5419,8 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <table>
               <thead>
                 <tr>
-                  <th>Client</th><th>Programme / Lot</th><th>Retard (mois)</th>
-                  <th>Montant Dû</th><th title="Part du prix du bien déjà versée (hors frais de souscription)">Taux de cotisation</th><th>Niveau</th><th>Dernière relance</th><th>Actions</th>
+                  <th>Client</th><th id="th-rel-programme">Programme / Lot</th><th id="th-rel-mois">Retard (mois)</th>
+                  <th id="th-rel-montant">Montant Dû</th><th id="th-rel-taux" title="Part du prix du bien déjà versée (hors frais de souscription)">Taux de cotisation</th><th>Niveau</th><th>Dernière relance</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody id="tbody-relances"></tbody>
@@ -33984,6 +33986,7 @@ function renderClients() {
       + '<td style="white-space:nowrap;">'
       + '<button class="btn btn-secondary btn-sm btn-icon" onclick="openClientModal(\'' + c.id + '\')" title="Modifier">✏️</button> '
       + '<button class="btn btn-secondary btn-sm btn-icon" onclick="openPaiementModal(\'' + c.id + '\')" title="Versement">💳</button> '
+      + (function(){ var e = fneEtatClient(c); return (e.cle === 'a_facturer' || e.cle === 'erreur' || e.cle === 'en_attente') ? '<button class="btn btn-secondary btn-sm btn-icon" onclick="facturerSouscripteur(\'' + c.id + '\')" title="Soldé : ' + e.label + '">🧾</button> ' : (e.cle === 'facturee' ? '<button class="btn btn-secondary btn-sm btn-icon" onclick="imprimerFactureFNE(\'' + e.facture.id + '\')" title="' + e.label + ' — imprimer" style="color:var(--vert);">🧾</button> ' : ''); })()
       + '<button class="btn btn-secondary btn-sm btn-icon" onclick="genererCodeAcces(\'' + c.id + '\')" title="Code acces portail" style="background:#E0E8FF;color:#1D4ED8;border-color:#93C5FD;">🔑</button> '
       + (c.statut!=='resilie' ? ('<button class="btn btn-secondary btn-sm btn-icon" onclick="resilierOuvrir(\'' + c.id + '\')" title="Résilier la souscription" style="background:#FEF3C7;color:#92400E;border-color:#FCD34D;">📄</button> ') : '')
       + (c.statut==='resilie' && c.resiliation && c.resiliation.montant_rembourse>0 && !c.resiliation.rembourse ? ('<button class="btn btn-secondary btn-sm btn-icon" onclick="resilierOuvrirRemboursement(\'' + c.id + '\')" title="Marquer le remboursement effectué" style="background:#DCFCE7;color:#166534;border-color:#86EFAC;">💰</button> ') : '')
@@ -50476,6 +50479,18 @@ async function promesseAnnuler(clientId, promesseId) {
   detectRelances();
 }
 var _relancesNiveauActif = 'tous';
+/* Tri du tableau : clic sur l'en-tête (retard, montant dû, taux de cotisation, programme) ; un 2e clic inverse. Sans choix : ordre par défaut (priorité du jour / retard décroissant). */
+var _relancesTri = null;
+var _relancesVue = []; /* lignes affichées (filtrées + triées), reprises telles quelles par l'impression */
+function setRelancesTri(cle) {
+  var defDir = (cle === 'programme') ? 1 : -1;
+  _relancesTri = (_relancesTri && _relancesTri.cle === cle) ? { cle: cle, dir: -_relancesTri.dir } : { cle: cle, dir: defDir };
+  detectRelances();
+}
+function _relancesThTri(cle, label) {
+  var actif = _relancesTri && _relancesTri.cle === cle;
+  return label + (actif ? (_relancesTri.dir > 0 ? ' ▲' : ' ▼') : ' <span style="opacity:.35;">⇅</span>');
+}
 function setRelancesNiveau(cle) {
   _relancesNiveauActif = cle;
   detectRelances();
@@ -50483,6 +50498,7 @@ function setRelancesNiveau(cle) {
 
 function detectRelances() {
   var retards = getRetardataires();
+  _relancesVue = [];
   var stats = document.getElementById('relances-stats');
   var compteurs = {};
   RELANCE_NIVEAUX.forEach(function(n){ compteurs[n.cle] = 0; });
@@ -50535,7 +50551,22 @@ function detectRelances() {
     return;
   }
 
-  tbody.innerHTML = retardsAffiches.sort(function(a, b) { return _relancesNiveauActif === 'jour' ? (analyses[a.id].prio - analyses[b.id].prio) || (b.montantDu - a.montantDu) : b.moisRetard - a.moisRetard; }).map(function(r) {
+  _relancesVue = retardsAffiches; /* trié sur place ci-dessous */
+  var nomProg = function(r) { var c = DATA.clients.find(function(x){ return x.id === r.id; }), pg = c ? DATA.programmes.find(function(x){ return x.id === c.programme_id; }) : null; return pg ? String(pg.nom || '') : '\uffff'; };
+  [['programme','Programme / Lot','Trier par programme'],['mois','Retard (mois)','Trier par nombre de mois de retard'],['montant','Montant Dû','Trier par montant dû'],['taux','Taux de cotisation','Trier par taux de cotisation']].forEach(function(t) {
+    var th = document.getElementById('th-rel-' + t[0]);
+    if (th) { th.style.cursor = 'pointer'; th.style.whiteSpace = 'nowrap'; th.style.userSelect = 'none'; th.title = t[2]; th.setAttribute('onclick', "setRelancesTri('" + t[0] + "')"); th.innerHTML = _relancesThTri(t[0], t[1]); }
+  });
+  var cmpTri = _relancesTri && {
+    programme: function(a, b) { return nomProg(a).localeCompare(nomProg(b), 'fr'); },
+    mois: function(a, b) { return (a.moisRetard - b.moisRetard) || (a.montantDu - b.montantDu); },
+    montant: function(a, b) { return a.montantDu - b.montantDu; },
+    taux: function(a, b) { return a.tauxCotisation - b.tauxCotisation; }
+  }[_relancesTri.cle];
+  tbody.innerHTML = retardsAffiches.sort(function(a, b) {
+    if (cmpTri) return cmpTri(a, b) * _relancesTri.dir;
+    return _relancesNiveauActif === 'jour' ? (analyses[a.id].prio - analyses[b.id].prio) || (b.montantDu - a.montantDu) : b.moisRetard - a.moisRetard;
+  }).map(function(r) {
     var an = analyses[r.id];
     var client = DATA.clients.find(function(c) { return c.id === r.id; });
     var prog = client ? DATA.programmes.find(function(p) { return p.id === client.programme_id; }) : null;
@@ -79756,6 +79787,7 @@ function showReleveTiersClient(clientId) {
     +'<span>Total versé : <span style="color:var(--vert);">'+fmtF(soldeRunning)+' FCFA</span></span>'
     +'<span>Solde dû : <span style="color:'+(montantTotal-soldeRunning>0?'var(--rouge)':'var(--vert)')+';font-size:15px;">'+fmtF(Math.abs(montantTotal-soldeRunning))+' FCFA</span></span>'
     +'</div>'
+    + fneReleveFacturesHtml(c)
     + (totalFrais>0
         ? '<div style="font-size:11px;color:var(--dim);padding:8px 0 0;border-top:1px dashed var(--bord);margin-top:4px;line-height:1.6;">'
           + 'ℹ️ <strong>Frais de souscription non remboursables : '+fmtF(totalFrais)+' FCFA</strong> ('+fraisSous.length+' versement'+(fraisSous.length>1?'s':'')+'). '
@@ -100251,6 +100283,49 @@ function _cdcParamsLire() {
 }
 
 /* Lettre de relance graduée selon le retard */
+/* État imprimable de la liste affichée : mêmes filtres (onglet, recherche) et même tri que l'écran. */
+function imprimerEtatRelances() {
+  var L = _relancesVue || [];
+  if (!L.length) { toast('Aucune ligne à imprimer : ajustez le filtre ou la recherche.', 'info'); return; }
+  var E = escHtml, soc = (typeof _identiteSociete === 'function') ? _identiteSociete() : { nom: (DATA.params && DATA.params.societe) || '' };
+  var onglets = { jour: "À traiter aujourd'hui", tous: 'Tous les niveaux' };
+  RELANCE_NIVEAUX.forEach(function(n){ onglets[n.cle] = n.label; });
+  var search = ((document.getElementById('search-relances') || {}).value || '').trim();
+  var triLib = { programme: 'programme', mois: 'mois de retard', montant: 'montant dû', taux: 'taux de cotisation' };
+  var filtre = 'Niveau : ' + (onglets[_relancesNiveauActif] || _relancesNiveauActif) + (search ? ' · Recherche : « ' + search + ' »' : '')
+    + ' · Tri : ' + (_relancesTri ? triLib[_relancesTri.cle] + (_relancesTri.dir > 0 ? ' (croissant)' : ' (décroissant)') : 'par défaut');
+  var totDu = 0, totVerse = 0, totPrix = 0;
+  var lignes = L.map(function(r) {
+    var c = DATA.clients.find(function(x){ return x.id === r.id; }) || {};
+    var prog = DATA.programmes.find(function(x){ return x.id === c.programme_id; }), lot = DATA.lots.find(function(x){ return x.id === c.lot_id; });
+    var n = _relanceNiveauDe(r.moisRetard);
+    var last = (DATA.relances || []).filter(function(x){ return x.client_id === r.id; }).sort(function(a, b){ return new Date(b.date) - new Date(a.date); })[0];
+    totDu += r.montantDu; totVerse += r.verse; totPrix += r.total;
+    return '<tr><td>' + E(((r.nom || '') + ' ' + (r.prenoms || '')).trim()) + '<br><span class="sm">' + E(r.dossier || '') + (r.tel ? ' · ' + E(r.tel) : '') + '</span></td>'
+      + '<td>' + E(prog ? prog.nom : '—') + (lot ? ' / Lot ' + E(lot.numero) : '') + '</td>'
+      + '<td class="num">' + r.moisRetard + (r.echeancier === 'estime' ? ' *' : '') + '</td>'
+      + '<td class="num al">' + fcfa(r.montantDu) + '</td><td class="num">' + fcfa(r.verse) + '</td>'
+      + '<td class="num">' + (Math.round(r.tauxCotisation * 10) / 10).toString().replace('.', ',') + ' %</td>'
+      + '<td>' + E(n.label) + '</td><td>' + (last ? dateShort(last.date) : 'Jamais') + '</td></tr>';
+  }).join('');
+  var taux = totPrix > 0 ? Math.round(totVerse / totPrix * 1000) / 10 : 0;
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>État des relances</title><style>'
+    + 'body{font-family:Arial;font-size:10px;padding:16px;color:#111;} h1{font-size:14px;text-align:center;margin:4px 0;}'
+    + 'table{width:100%;border-collapse:collapse;margin-top:8px;} th,td{border:1px solid #999;padding:3px 5px;vertical-align:top;}'
+    + 'th{background:#efeae3;font-size:9px;} .num{text-align:right;white-space:nowrap;} .al{color:#b91c1c;font-weight:700;} .sm{font-size:8.5px;color:#555;}'
+    + 'tr.tot td{background:#f6f2ec;font-weight:700;} tr{page-break-inside:avoid;} thead{display:table-header-group;}</style></head><body>'
+    + '<div style="text-align:right;font-size:9.5px;">' + E(soc.nom || '') + ' · ' + new Date().toLocaleDateString('fr-FR') + '</div>'
+    + '<h1>ÉTAT DES RELANCES — SOUSCRIPTEURS EN RETARD DE PAIEMENT</h1>'
+    + '<div style="text-align:center;font-size:9.5px;color:#444;">' + E(filtre) + '</div>'
+    + '<table><thead><tr><th>Souscripteur</th><th>Programme / Lot</th><th class="num">Retard (mois)</th><th class="num">Montant dû</th><th class="num">Versé</th><th class="num">Taux de cotisation</th><th>Niveau</th><th>Dernière relance</th></tr></thead><tbody>'
+    + lignes
+    + '<tr class="tot"><td colspan="3">TOTAL — ' + L.length + ' souscripteur(s)</td><td class="num al">' + fcfa(totDu) + '</td><td class="num">' + fcfa(totVerse) + '</td><td class="num">' + String(taux).replace('.', ',') + ' %</td><td colspan="2"></td></tr>'
+    + '</tbody></table>'
+    + (L.some(function(r){ return r.echeancier === 'estime'; }) ? '<p class="sm">* Retard estimé : le programme n\'a pas de date de livraison, le calcul s\'appuie sur la durée saisie sur la fiche.</p>' : '')
+    + '</body></html>';
+  openPrintPreview(html, 'État des relances', true);
+}
+
 function etatRelance(clientId) {
   var c = DATA.clients.find(function(x){ return x.id === clientId; });
   if (!c) { toast('Souscripteur introuvable.', 'error'); return; }
@@ -136781,6 +136856,7 @@ function renderFacturesClient() {
       + '<div class="kpi-card"><div class="kpi-label">Total TTC facturé</div><div class="kpi-value">'+fmtF(totalTTC)+' FCFA</div></div>';
   }
 
+  if (typeof fneRenderSoldes === 'function') fneRenderSoldes();
   if (!l.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucune facture.</td></tr>'; return; }
   var statutBadge = { certifiee:'<span class="badge badge-vert">✓ Certifiée</span>', a_certifier:'<span class="badge badge-or">⏳ En attente</span>', erreur:'<span class="badge badge-rouge">✗ Erreur</span>', hors_fne:'<span class="badge badge-neutre">Hors FNE</span>', non_applicable:'<span class="badge badge-neutre">Simple</span>' };
   tbody.innerHTML = l.map(function(f) {
@@ -136876,6 +136952,161 @@ async function fneTesterConnexion() {
 }
 
 /* Ouvre le modal facturation depuis une cession */
+/* ══ Facturation FNE des souscripteurs SOLDÉS ══
+   Un souscripteur qui a soldé (versé sur le prix ≥ montant du contrat) reçoit UNE facture normalisée. Le montant facturé est le montant total du contrat
+   (avenants et régularisations inclus), traité comme un montant HT comme dans le reste du module. Les frais de souscription sont exclus (_versementSurPrix).
+   Une facture vit sur la fiche : client_id, lot_id, programme_id. Les doublons sont refusés tant qu'une facture n'a pas été annulée par un avoir. */
+function fneSoldeClient(c) {
+  var total = parseFloat(c.montant_total) || 0;
+  var verse = (DATA.versements || []).filter(function(v){ return v.client_id === c.id && v.statut !== 'annule' && _versementSurPrix(v); })
+    .reduce(function(a, v){ return a + (parseFloat(v.montant) || 0); }, 0);
+  return { total: total, verse: verse, solde: total > 0 && verse >= total - 0.5 };
+}
+/* Factures « de vente » rattachées au souscripteur (hors avoirs, hors factures annulées par un avoir, hors facture simple interne). */
+function fneFacturesClient(c) {
+  return (DATA.factures_client || []).filter(function(f){
+    if (f.type === 'avoir' || f.avoir_id || f.mode_facture === 'simple') return false;
+    return f.client_id === c.id || (!f.client_id && c.lot_id && f.ref_id === c.lot_id);
+  });
+}
+function fneEtatClient(c) {
+  if (c.statut === 'resilie') return { cle: 'exclu', label: 'Résilié', badge: 'badge-neutre' };
+  var s = fneSoldeClient(c);
+  if (!s.solde) return { cle: 'non_solde', label: 'Non soldé', badge: 'badge-neutre' };
+  var fs = fneFacturesClient(c); if (!fs.length) return { cle: 'a_facturer', label: 'À facturer', badge: 'badge-or' };
+  var f = fs[0];
+  if (f.statut_fne === 'certifiee') return { cle: 'facturee', label: 'Facturée ✓ ' + f.numero, badge: 'badge-vert', facture: f };
+  if (f.statut_fne === 'erreur') return { cle: 'erreur', label: 'Erreur de certification', badge: 'badge-rouge', facture: f };
+  return { cle: 'en_attente', label: 'Émise, non certifiée', badge: 'badge-or', facture: f };
+}
+/* Contrôle des données AVANT la première certification : ce que l'API FNE exige ou refuse. */
+function fneControleGlobal() {
+  var p = DATA.params || {}, l = [];
+  if (p.fne_actif !== 'oui') l.push({ bloquant: false, msg: 'FNE non activée (Paramètres → Société) : les factures seront enregistrées « hors FNE », sans certification DGI.' });
+  else {
+    if (!p.fne_api_key) l.push({ bloquant: true, msg: 'Clé API FNE absente (Paramètres → Société → API FNE).' });
+    if (!p.fne_proxy && p.fne_environnement === 'production') l.push({ bloquant: false, msg: 'Aucune passerelle serveur configurée : l\'appel direct du navigateur à la DGI peut être bloqué (CORS).' });
+    if (p.fne_environnement !== 'production') l.push({ bloquant: false, msg: 'Environnement TEST : les factures ne sont pas des documents fiscaux.' });
+  }
+  if (p.tva_assujetti !== 'non' && (parseFloat(p.tva) || 18) !== 18) l.push({ bloquant: false, msg: 'Taux de TVA paramétré à ' + p.tva + ' % (taux légal : 18 %).' });
+  return l;
+}
+function fneControleClient(c) {
+  var p = DATA.params || {}, actif = p.fne_actif === 'oui', l = [], s = fneSoldeClient(c);
+  if (!(s.total > 0)) l.push({ bloquant: true, msg: 'Montant du contrat nul' });
+  if (!String(c.tel || '').trim()) l.push({ bloquant: actif, msg: 'Téléphone manquant' });
+  if (!String(c.email || '').trim()) l.push({ bloquant: actif, msg: 'E-mail manquant' });
+  if (!String(c.ncc || '').trim() && /\b(sarl|sas|sa|sci|ste|soci[ée]t[ée]|groupe|ets|entreprise|holding|association)\b/i.test((c.nom || '') + ' ' + (c.prenoms || ''))) l.push({ bloquant: false, msg: 'Société sans NCC : facture B2C par défaut' });
+  return l;
+}
+function _fneNomClient(c) { return ((c.nom || '') + ' ' + (c.prenoms || '')).trim() || 'Souscripteur'; }
+function _fneDonneesClient(c) {
+  var s = fneSoldeClient(c), lot = c.lot_id ? (DATA.lots || []).find(function(x){ return x.id === c.lot_id; }) : null, prog = c.programme_id ? (DATA.programmes || []).find(function(x){ return x.id === c.programme_id; }) : null;
+  return { type: 'commercialisation', ref_id: c.lot_id || c.id, client_id: c.id, lot_id: c.lot_id || '', programme_id: c.programme_id || '', dossier: c.dossier || '',
+    client: _fneNomClient(c), ncc_client: c.ncc || '', tel: c.tel || '', email: c.email || '',
+    designation: 'Solde du contrat ' + (c.dossier || '') + (lot ? ' — Lot ' + (lot.numero || '') : '') + (prog ? ' — ' + prog.nom : ''), montant_ht: s.total };
+}
+/* Ouvre l'émission pour un souscripteur soldé (bouton de la fiche, de la liste des souscripteurs ou de « Factures FNE »). */
+function facturerSouscripteur(clientId) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === clientId; });
+  if (!c) { toast('Souscripteur introuvable.', 'error'); return; }
+  var e = fneEtatClient(c);
+  if (e.cle === 'exclu') { toast('Souscription résiliée : aucune facture de vente.', 'error'); return; }
+  if (e.cle === 'non_solde') { var s = fneSoldeClient(c); toast('Facturation réservée aux souscripteurs ayant soldé : il reste ' + fmtF(Math.max(0, s.total - s.verse)) + ' FCFA à payer.', 'error'); return; }
+  if (e.facture) { toast('Déjà facturé : ' + e.facture.numero + (e.cle === 'erreur' ? ' (certification en erreur : relancez-la depuis « Factures FNE »)' : '') + '.', 'info'); goTo('facturation'); return; }
+  _fneOuvrirModal(_fneDonneesClient(c));
+  var zone = document.getElementById('fne-certif-statut'), pb = fneControleGlobal().concat(fneControleClient(c));
+  if (zone && pb.length) zone.innerHTML = pb.map(function(x){ return '<div style="color:' + (x.bloquant ? 'var(--rouge)' : 'var(--or)') + ';">' + (x.bloquant ? '⛔ ' : '⚠️ ') + escHtml(x.msg) + '</div>'; }).join('')
+    + '<div style="color:var(--blanc-dim);margin-top:4px;">Vous pouvez compléter téléphone et e-mail ci-dessus : ils seront aussi enregistrés sur la fiche.</div>';
+}
+/* Les coordonnées saisies à l'émission complètent la fiche (jamais l'inverse). */
+async function _fneMajContactClient(f) {
+  var c = f.client_id ? (DATA.clients || []).find(function(x){ return x.id === f.client_id; }) : null; if (!c) return;
+  var ch = false;
+  if (!String(c.tel || '').trim() && f.client_tel) { c.tel = f.client_tel; ch = true; }
+  if (!String(c.email || '').trim() && f.client_email) { c.email = f.client_email; ch = true; }
+  if (!String(c.ncc || '').trim() && f.ncc_client) { c.ncc = f.ncc_client; ch = true; }
+  if (ch) { await dbPut('clients', c); if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c); }
+}
+function _fneFactureSouscripteur(c, modePaiement) {
+  var p = DATA.params || {}, d = _fneDonneesClient(c), tauxTva = (p.tva_assujetti === 'non') ? 0 : (p.tva || 18), ht = d.montant_ht, tva = Math.round(ht * tauxTva / 100);
+  return { id: 'fac_' + Date.now() + '_' + Math.floor(Math.random() * 1000), numero: _fneNumero(), mode_facture: 'fne', type: d.type, ref_id: d.ref_id,
+    client_id: d.client_id, lot_id: d.lot_id, programme_id: d.programme_id, dossier: d.dossier,
+    client: d.client, client_tel: String(c.tel || '').trim(), client_email: String(c.email || '').trim(), ncc_client: String(c.ncc || '').trim(),
+    fne_template: String(c.ncc || '').trim() ? 'B2B' : 'B2C', fne_payment_method: modePaiement || 'transfer', designation: d.designation,
+    ht: ht, taux_tva: tauxTva, tva: tva, ttc: ht + tva, date: today(),
+    statut_fne: (p.fne_actif === 'oui') ? 'a_certifier' : 'hors_fne', created_at: new Date().toISOString() };
+}
+var _fneSoldesFiltre = 'a_facturer';
+function fneSoldesFiltre(v) { _fneSoldesFiltre = v; fneRenderSoldes(); }
+function fneSoldesToutCocher(on) { document.querySelectorAll('.fne-lot-ck').forEach(function(x){ if (!x.disabled) x.checked = on; }); }
+/* Liste « Soldés à facturer » de la page Factures FNE. */
+function fneRenderSoldes() {
+  var box = document.getElementById('fac-soldes'); if (!box) return;
+  var lignes = (DATA.clients || []).map(function(c){ return { c: c, e: fneEtatClient(c) }; }).filter(function(x){ return x.e.cle !== 'non_solde' && x.e.cle !== 'exclu'; });
+  var nb = function(k){ return lignes.filter(function(x){ return x.e.cle === k; }).length; };
+  var glob = fneControleGlobal(), bloqGlobal = glob.some(function(x){ return x.bloquant; });
+  var vue = lignes.filter(function(x){ return _fneSoldesFiltre === 'tous' ? true : (_fneSoldesFiltre === 'erreur' ? (x.e.cle === 'erreur' || x.e.cle === 'en_attente') : x.e.cle === _fneSoldesFiltre); })
+    .sort(function(a, b){ return _fneNomClient(a.c).localeCompare(_fneNomClient(b.c), 'fr'); });
+  var prets = lignes.filter(function(x){ return x.e.cle === 'a_facturer' && !fneControleClient(x.c).some(function(y){ return y.bloquant; }); }).length;
+  var prog = function(c){ var pg = (DATA.programmes || []).find(function(x){ return x.id === c.programme_id; }), lt = (DATA.lots || []).find(function(x){ return x.id === c.lot_id; }); return (pg ? escHtml(pg.nom) : '—') + (lt ? ' / Lot ' + escHtml(lt.numero) : ''); };
+  box.innerHTML = '<div class="card" style="margin-bottom:16px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;"><div><strong>✅ Souscripteurs soldés</strong>'
+    + '<div style="font-size:12px;color:var(--blanc-dim);">' + nb('a_facturer') + ' à facturer · ' + (nb('en_attente') + nb('erreur')) + ' à régulariser · ' + nb('facturee') + ' facturé(s) — ' + prets + ' prêt(s) pour l\'émission en lot</div></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><select class="filter-select" onchange="fneSoldesFiltre(this.value)">'
+    + [['a_facturer', 'À facturer'], ['erreur', 'À régulariser (erreur / non certifiée)'], ['facturee', 'Facturés'], ['tous', 'Tous les soldés']].map(function(o){ return '<option value="' + o[0] + '"' + (_fneSoldesFiltre === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
+    + '</select><select class="filter-select" id="fne-lot-paiement" title="Mode de paiement indiqué à la DGI pour les factures émises en lot"><option value="transfer">Virement</option><option value="cash">Espèces</option><option value="mobile-money">Mobile Money</option><option value="check">Chèque</option><option value="card">Carte</option><option value="deferred">À terme</option></select>'
+    + '<button class="btn btn-primary btn-sm" onclick="fneEmettreLot()"' + (bloqGlobal ? ' disabled title="Corrigez d\'abord le paramétrage FNE"' : '') + '>🧾 Émettre la sélection</button></div></div>'
+    + glob.map(function(x){ return '<div style="font-size:12px;color:' + (x.bloquant ? 'var(--rouge)' : 'var(--or)') + ';">' + (x.bloquant ? '⛔ ' : '⚠️ ') + escHtml(x.msg) + '</div>'; }).join('')
+    + '<div class="table-wrap" style="max-height:420px;overflow:auto;margin-top:8px;"><table><thead><tr><th><input type="checkbox" onchange="fneSoldesToutCocher(this.checked)" title="Tout cocher (lignes prêtes)"></th><th>Souscripteur</th><th>Programme / Lot</th><th style="text-align:right;">Montant du contrat</th><th>Contrôle des données</th><th>État</th><th></th></tr></thead><tbody>'
+    + (vue.length ? vue.map(function(x){
+        var pb = fneControleClient(x.c), bloq = pb.some(function(y){ return y.bloquant; }), prêt = x.e.cle === 'a_facturer' && !bloq;
+        return '<tr><td><input type="checkbox" class="fne-lot-ck" value="' + x.c.id + '"' + (prêt ? '' : ' disabled') + '></td>'
+          + '<td><strong>' + escHtml(_fneNomClient(x.c)) + '</strong><div style="font-size:11px;color:var(--blanc-dim);">' + escHtml(x.c.dossier || '') + '</div></td>'
+          + '<td style="font-size:12px;">' + prog(x.c) + '</td><td style="text-align:right;">' + fmtF(fneSoldeClient(x.c).total) + ' FCFA</td>'
+          + '<td style="font-size:11px;">' + (pb.length ? pb.map(function(y){ return '<span style="color:' + (y.bloquant ? 'var(--rouge)' : 'var(--or)') + ';">' + (y.bloquant ? '⛔ ' : '⚠️ ') + escHtml(y.msg) + '</span>'; }).join('<br>') : '<span style="color:var(--vert);">✓ Complet</span>') + '</td>'
+          + '<td><span class="badge ' + x.e.badge + '">' + escHtml(x.e.label) + '</span></td>'
+          + '<td style="white-space:nowrap;">' + (x.e.cle === 'a_facturer' ? '<button class="btn btn-secondary btn-sm" onclick="facturerSouscripteur(\'' + x.c.id + '\')">🧾 Facturer</button> ' : (x.e.facture ? '<button class="btn btn-secondary btn-sm btn-icon" title="Imprimer la facture" onclick="imprimerFactureFNE(\'' + x.e.facture.id + '\')">🖨️</button> ' : ''))
+          + '<button class="btn btn-secondary btn-sm btn-icon" title="Ouvrir le dossier" onclick="openClientModal(\'' + x.c.id + '\')">📁</button></td></tr>'; }).join('')
+      : '<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:18px;">Aucun souscripteur dans cette vue.</td></tr>')
+    + '</tbody></table></div></div>';
+}
+/* Émission en lot : uniquement les lignes cochées, soldées, sans facture et sans donnée bloquante. */
+async function fneEmettreLot() {
+  var p = DATA.params || {};
+  if (fneControleGlobal().some(function(x){ return x.bloquant; })) { toast('Paramétrage FNE incomplet : voir les alertes en haut de la liste.', 'error'); return; }
+  var ids = Array.prototype.map.call(document.querySelectorAll('.fne-lot-ck:checked'), function(x){ return x.value; });
+  var cl = ids.map(function(id){ return (DATA.clients || []).find(function(x){ return x.id === id; }); }).filter(function(c){
+    return c && fneEtatClient(c).cle === 'a_facturer' && !fneControleClient(c).some(function(y){ return y.bloquant; }); });
+  if (!cl.length) { toast('Cochez au moins un souscripteur prêt (soldé, sans facture, données complètes).', 'info'); return; }
+  var mode = (document.getElementById('fne-lot-paiement') || {}).value || 'transfer';
+  var envLib = (p.fne_actif === 'oui') ? ('Chaque facture sera ' + (p.fne_environnement === 'production' ? 'CERTIFIÉE auprès de la DGI (production, irréversible : seul un avoir l\'annule)' : 'envoyée à l\'environnement de TEST de la DGI')) : 'Les factures seront enregistrées hors FNE (sans certification)';
+  if (!confirm('Émettre ' + cl.length + ' facture(s) de solde ?\n\n' + envLib + '.\nMode de paiement indiqué : ' + mode + '.')) return;
+  var ok = 0, err = 0, btn = document.querySelector('#fac-soldes .btn-primary');
+  for (var i = 0; i < cl.length; i++) {
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ ' + (i + 1) + ' / ' + cl.length + '…'; }
+    var f = _fneFactureSouscripteur(cl[i], mode);
+    DATA.factures_client.push(f);
+    await dbPut('factures_client', f);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_factures_client', f);
+    if (p.fne_actif === 'oui') await fneCertifierFacture(f);
+    if (f.statut_fne === 'erreur') err++; else ok++;
+  }
+  toast('Émission terminée : ' + ok + ' facture(s) ' + (p.fne_actif === 'oui' ? 'certifiée(s)' : 'enregistrée(s)') + (err ? ', ' + err + ' en erreur (voir « À régulariser »)' : '') + '.', err ? 'warn' : 'success', 8000);
+  renderFacturesClient();
+}
+/* Bloc « Facture FNE » du relevé de compte (et de son impression). */
+function fneReleveFacturesHtml(c) {
+  var fs = (DATA.factures_client || []).filter(function(f){ return f.client_id === c.id || (!f.client_id && c.lot_id && f.ref_id === c.lot_id); });
+  var e = fneEtatClient(c);
+  if (!fs.length && e.cle !== 'a_facturer') return '';
+  var badge = { certifiee: 'Certifiée DGI', a_certifier: 'En attente', erreur: 'Erreur', hors_fne: 'Hors FNE', non_applicable: 'Facture simple' };
+  return '<div style="margin-top:10px;padding:8px 0 0;border-top:1px dashed var(--bord);font-size:12px;"><strong>🧾 Facture normalisée (FNE)</strong>'
+    + (fs.length ? '<table style="width:100%;margin-top:4px;"><tbody>' + fs.map(function(f){ return '<tr><td>' + escHtml(f.numero) + (f.type === 'avoir' ? ' (avoir)' : '') + '</td><td>' + escHtml(f.date || '') + '</td><td style="text-align:right;">' + fmtF(f.ttc) + ' FCFA TTC</td><td>' + (badge[f.statut_fne] || escHtml(f.statut_fne || '')) + '</td><td class="no-print"><a href="#" onclick="imprimerFactureFNE(\'' + f.id + '\');return false;">🖨️ imprimer</a></td></tr>'; }).join('') + '</tbody></table>'
+      : '<div style="color:var(--or);margin-top:4px;">Souscripteur soldé : facture à émettre. <a href="#" class="no-print" onclick="facturerSouscripteur(\'' + c.id + '\');return false;">🧾 Facturer maintenant</a></div>')
+    + '</div>';
+}
+
 function facturerCession(cesId) {
   var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === cesId; });
   if (!c) { toast('Cession introuvable.', 'error'); return; }
@@ -136965,6 +137196,7 @@ async function _fneEnregistrer() {
     mode_facture: mode,
     type: d.type,
     ref_id: d.ref_id,
+    client_id: d.client_id || '', lot_id: d.lot_id || '', programme_id: d.programme_id || '', dossier: d.dossier || '',
     client: document.getElementById('fne-client').value.trim(),
     client_tel: clientTel,
     client_email: clientEmail,
@@ -136977,6 +137209,10 @@ async function _fneEnregistrer() {
     statut_fne: mode === 'simple' ? 'non_applicable' : ((p.fne_actif === 'oui') ? 'a_certifier' : 'hors_fne'),
     created_at: new Date().toISOString()
   };
+  if (d.client_id && mode === 'fne') {
+    var cDup = (DATA.clients || []).find(function(x){ return x.id === d.client_id; });
+    if (cDup && fneFacturesClient(cDup).length) { toast('Ce souscripteur a déjà une facture (' + fneFacturesClient(cDup)[0].numero + '). Annulez-la par un avoir avant d\'en émettre une autre.', 'error'); return; }
+  }
   DATA.factures_client.push(f);
   await dbPut('factures_client', f);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_factures_client', f);
@@ -136988,6 +137224,7 @@ async function _fneEnregistrer() {
     if (btn) { btn.disabled = false; btn.textContent = '💾 Émettre la facture'; }
   }
 
+  await _fneMajContactClient(f);
   closeModal('modal-fne');
   if (f.statut_fne === 'certifiee') toast('✅ Facture ' + f.numero + ' certifiée par la DGI (réf. ' + f.fne_reference + ').', 'success');
   else if (f.statut_fne === 'erreur') toast('⚠️ Facture ' + f.numero + ' enregistrée, mais la certification FNE a échoué : ' + f.fne_erreur, 'error');
