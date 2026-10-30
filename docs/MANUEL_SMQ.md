@@ -1,6 +1,6 @@
 # Manuel de procédures — Système de management de la qualité (SMQ)
 
-**Réf.** PRO-SMQ · **Version** 1.2 · **Date** Octobre 2026
+**Réf.** PRO-SMQ · **Version** 1.3 · **Date** Octobre 2026
 **Objet** : fixer comment l'entreprise tient son système qualité dans l'ERP : cartographie et fiches de processus, maîtrise des documents, audits internes, revue de direction, non-conformités et actions correctives, réclamations, satisfaction des clients.
 **Principe directeur** : tout écart est **enregistré, analysé, corrigé, puis vérifié** ; aucune clôture sans preuve d'efficacité.
 
@@ -73,6 +73,35 @@
 6. Suivre les décisions jusqu'au statut « Réalisée » ; **Clore la revue** n'est possible que lorsqu'elles le sont toutes.
 7. **🖨️ Compte rendu** imprime les entrées, les conclusions et les décisions ; il reprend, à la revue suivante, l'état des décisions précédentes.
 
+### SMQ-08 — Publier la politique qualité
+
+**Où** : Qualité (SMQ) › **Politique**.
+
+1. **+ Politique qualité** : version, périmètre du SMQ et exclusions justifiées, texte des engagements, diffusion, prochaine revue.
+2. **Approuver** : texte, version, approbateur et date d'approbation obligatoires.
+3. L'approbation d'une nouvelle version marque la précédente « remplacée » ; une politique approuvée ne se modifie plus : créer une nouvelle version.
+4. La revue de direction rappelle la version en vigueur et signale une revue dépassée.
+
+### SMQ-09 — Fixer et suivre les objectifs qualité
+
+**Où** : Qualité (SMQ) › **Objectifs**.
+
+1. Enregistrer l'objectif : processus, intitulé, indicateur de mesure, **cible**, **échéance**, responsable, plan d'action (quoi, qui, quand, moyens, évaluation).
+2. Mettre à jour la valeur actuelle à chaque relevé.
+3. Conclure « atteint » ou « non atteint » exige la **valeur actuelle**.
+4. Un objectif en cours dont l'échéance est passée apparaît **En retard**.
+
+### SMQ-10 — Tenir le registre des risques et opportunités
+
+**Où** : Qualité (SMQ) › **Risques**.
+
+1. Décrire le risque ou l'opportunité, ses causes et conséquences ; coter **probabilité** et **impact** de 1 à 4.
+2. La **criticité** est le produit des deux : 1 à 4 faible, 5 à 8 moyen, 9 à 12 élevé, 13 à 16 critique. La matrice affiche les risques ouverts.
+3. **Traiter** : action, responsable et échéance obligatoires.
+4. **Traitement réalisé** : date de traitement obligatoire.
+5. **Clore un risque** : coter la probabilité et l'impact **résiduels** ; la criticité résiduelle ne peut pas dépasser la criticité initiale. Une opportunité se clôt sans cotation résiduelle.
+6. Les risques élevés ou critiques ouverts et les traitements en retard sont repris dans la revue de direction.
+
 ### SMQ-03 — Traiter une non-conformité
 
 **Où** : Qualité (SMQ) › **Non-conformités** › **+ Non-conformité**.
@@ -115,6 +144,9 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 | SMQ-03 | A | C | R | R |
 | SMQ-06 | A | C | I | R |
 | SMQ-07 | R/A | C | C | I |
+| SMQ-08 | R/A | C | I | I |
+| SMQ-09 | A | R | R | I |
+| SMQ-10 | A | R | R | C |
 | SMQ-04 | A | R | R | C |
 | SMQ-05 | I | R | I | R |
 
@@ -126,6 +158,8 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 - Approuver un document sans date ni approbateur.
 - Faire auditer un processus par son propre pilote.
 - Tenir la revue sans décision ni suivi des actions décidées.
+- Fixer un objectif sans cible ni échéance.
+- Clore un risque sans mesurer son niveau résiduel.
 - Clore un audit alors que ses non-conformités restent ouvertes.
 - Ne pas revoir les documents à leur échéance.
 
@@ -143,3 +177,4 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 | 1.0 | Octobre 2026 | Création |
 | 1.1 | Octobre 2026 | Audits internes (SMQ-06) |
 | 1.2 | Octobre 2026 | Revue de direction (SMQ-07) |
+| 1.3 | Octobre 2026 | Politique, objectifs, risques et opportunités (SMQ-08 à SMQ-10) |

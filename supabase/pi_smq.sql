@@ -106,7 +106,55 @@ exception
   when duplicate_object then null;
 end$$;
 
--- Vérification : doit renvoyer 6 lignes avec rls_active = true.
+create table if not exists public.pi_smq_politiques (
+  id         text        primary key,
+  data       jsonb       not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+grant all on table public.pi_smq_politiques to anon, authenticated;
+alter table public.pi_smq_politiques enable row level security;
+drop policy if exists pi_smq_politiques_all on public.pi_smq_politiques;
+create policy pi_smq_politiques_all on public.pi_smq_politiques for all to anon, authenticated using (true) with check (true);
+do $$
+begin
+  alter publication supabase_realtime add table public.pi_smq_politiques;
+exception
+  when duplicate_object then null;
+end$$;
+
+create table if not exists public.pi_smq_objectifs (
+  id         text        primary key,
+  data       jsonb       not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+grant all on table public.pi_smq_objectifs to anon, authenticated;
+alter table public.pi_smq_objectifs enable row level security;
+drop policy if exists pi_smq_objectifs_all on public.pi_smq_objectifs;
+create policy pi_smq_objectifs_all on public.pi_smq_objectifs for all to anon, authenticated using (true) with check (true);
+do $$
+begin
+  alter publication supabase_realtime add table public.pi_smq_objectifs;
+exception
+  when duplicate_object then null;
+end$$;
+
+create table if not exists public.pi_smq_risques (
+  id         text        primary key,
+  data       jsonb       not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+grant all on table public.pi_smq_risques to anon, authenticated;
+alter table public.pi_smq_risques enable row level security;
+drop policy if exists pi_smq_risques_all on public.pi_smq_risques;
+create policy pi_smq_risques_all on public.pi_smq_risques for all to anon, authenticated using (true) with check (true);
+do $$
+begin
+  alter publication supabase_realtime add table public.pi_smq_risques;
+exception
+  when duplicate_object then null;
+end$$;
+
+-- Vérification : doit renvoyer 9 lignes avec rls_active = true.
 select c.relname as table_name, c.relrowsecurity as rls_active
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
-where n.nspname = 'public' and c.relname in ('pi_smq_documents','pi_smq_nc','pi_smq_reclamations','pi_smq_satisfaction','pi_smq_audits','pi_smq_revues');
+where n.nspname = 'public' and c.relname in ('pi_smq_documents','pi_smq_nc','pi_smq_reclamations','pi_smq_satisfaction','pi_smq_audits','pi_smq_revues','pi_smq_politiques','pi_smq_objectifs','pi_smq_risques');

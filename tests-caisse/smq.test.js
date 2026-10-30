@@ -166,3 +166,69 @@ test('revue de direction : entrées calculées depuis l\'ERP, décisions, clôtu
   assert.equal(r.sansDecision, 'planifiee'); assert.equal(r.nbDec, 1); assert.equal(r.tenue, 'tenue');
   assert.equal(r.closBloque, 'tenue'); assert.equal(r.clos, 'cloturee'); assert.equal(r.prec, r.ref);
 });
+
+test('le libellé de version est une chaîne JavaScript valide', async () => {
+  const app = await ouvrirApp();
+  const v = await app.page.evaluate(function () { return window.IMMOSUITE_VERSION; });
+  assert.equal(typeof v, 'string');
+  assert.match(v, /^v14\.\d+ · /);
+});
+
+test('politique : une seule version approuvée à la fois ; objectifs : conclusion exige la valeur actuelle', async () => {
+  const app = await ouvrir(true);
+  const r = await app.page.evaluate(async function () {
+    window.confirm = function () { return true; };
+    var o = {};
+    smqOnglet('pol');
+    smqNouveau('pol'); document.getElementById('smqf-version').value = '1.0'; document.getElementById('smqf-texte').value = 'Satisfaire nos clients'; await smqEnregistrer();
+    var p1 = DATA.smq_politiques[0]; o.statut0 = p1.statut;
+    await smqTransition('pol', p1.id, 'approuvee'); o.sansApprobateur = p1.statut;
+    p1.approbateur = 'DG'; p1.date_approbation = today(); await smqTransition('pol', p1.id, 'approuvee'); o.v1 = p1.statut;
+    smqNouveau('pol'); document.getElementById('smqf-version').value = '2.0'; document.getElementById('smqf-texte').value = 'Satisfaire nos clients et progresser'; await smqEnregistrer();
+    var p2 = DATA.smq_politiques[1]; p2.approbateur = 'DG'; p2.date_approbation = today(); await smqTransition('pol', p2.id, 'approuvee');
+    o.v1apres = p1.statut; o.v2 = p2.statut;
+    smqOuvrirFiche('pol', p2.id); document.getElementById('smqf-version').value = '2.1'; await smqEnregistrer(); o.modifApprouvee = p2.version;
+    smqOnglet('obj'); smqNouveau('obj');
+    document.getElementById('smqf-intitule').value = 'Recouvrer 90 % des échéances'; document.getElementById('smqf-cible').value = '90 %'; document.getElementById('smqf-echeance').value = '2000-01-01';
+    await smqEnregistrer(); var ob = DATA.smq_objectifs[0]; o.refObj = ob.ref; o.statutObj = ob.statut; o.retard = _smqObjRetard(ob);
+    smqOuvrirFiche('obj', ob.id); document.getElementById('smqf-statut').value = 'atteint'; await smqEnregistrer(); o.sansValeur = DATA.smq_objectifs[0].statut;
+    smqOuvrirFiche('obj', ob.id); document.getElementById('smqf-statut').value = 'atteint'; document.getElementById('smqf-valeur_actuelle').value = '92 %'; await smqEnregistrer();
+    o.atteint = DATA.smq_objectifs[0].statut; o.retardApres = _smqObjRetard(DATA.smq_objectifs[0]);
+    return o;
+  });
+  assert.equal(r.statut0, 'brouillon'); assert.equal(r.sansApprobateur, 'brouillon'); assert.equal(r.v1, 'approuvee');
+  assert.equal(r.v1apres, 'remplacee'); assert.equal(r.v2, 'approuvee'); assert.equal(r.modifApprouvee, '2.0');
+  assert.match(r.refObj, /^OBJ-\d{4}-0001$/); assert.equal(r.statutObj, 'en_cours'); assert.ok(r.retard);
+  assert.equal(r.sansValeur, 'en_cours'); assert.equal(r.atteint, 'atteint'); assert.ok(!r.retardApres);
+});
+
+test('risques : niveau, traitement exigé, clôture conditionnée à une criticité résiduelle plus basse', async () => {
+  const app = await ouvrir(true);
+  const r = await app.page.evaluate(async function () {
+    var o = {};
+    o.niveaux = [_smqNiveau(1, 1), _smqNiveau(2, 3), _smqNiveau(3, 3), _smqNiveau(4, 4)].join(',');
+    smqOnglet('rsq'); smqNouveau('rsq');
+    document.getElementById('smqf-description').value = 'Perte de données de caisse'; document.getElementById('smqf-prob').value = '3'; document.getElementById('smqf-impact').value = '4';
+    await smqEnregistrer(); var k = DATA.smq_risques[0]; o.ref = k.ref; o.statut0 = k.statut; o.niveau = _smqNiveau(k.prob, k.impact);
+    await smqTransition('rsq', k.id, 'en_traitement'); o.sansAction = k.statut;
+    k.action_traitement = 'Sauvegardes quotidiennes'; k.responsable = 'Admin'; k.echeance = '2000-01-01';
+    await smqTransition('rsq', k.id, 'en_traitement'); o.traitement = k.statut; o.retard = _smqRsqRetard(k);
+    await smqTransition('rsq', k.id, 'traite'); o.sansDate = k.statut;
+    k.date_traitement = today(); await smqTransition('rsq', k.id, 'traite'); o.traite = k.statut; o.retardApres = _smqRsqRetard(k);
+    await smqTransition('rsq', k.id, 'clos'); o.sansResiduelle = k.statut;
+    k.prob_res = '4'; k.impact_res = '4'; await smqTransition('rsq', k.id, 'clos'); o.pire = k.statut;
+    k.prob_res = '1'; k.impact_res = '2'; await smqTransition('rsq', k.id, 'clos'); o.clos = k.statut;
+    smqOnglet('rsq'); o.matrice = document.getElementById('smq-contenu').innerHTML.indexOf('Matrice des risques') !== -1;
+    smqNouveau('rsq'); document.getElementById('smqf-type').value = 'Opportunité'; document.getElementById('smqf-description').value = 'Paiement mobile'; await smqEnregistrer();
+    var op = DATA.smq_risques[1]; op.action_traitement = 'Lancer'; op.responsable = 'Com'; op.echeance = '2999-01-01'; await smqTransition('rsq', op.id, 'en_traitement');
+    op.date_traitement = today(); await smqTransition('rsq', op.id, 'traite'); await smqTransition('rsq', op.id, 'clos'); o.opportuniteClose = op.statut;
+    var e = smqEntreesAuto('2000-01-01', '2999-12-31'); o.entrees = e.risques.ouverts + '/' + e.objectifs.total + '/' + (e.politique === null);
+    return o;
+  });
+  assert.equal(r.niveaux, 'Faible,Moyen,Élevé,Critique');
+  assert.match(r.ref, /^RSQ-\d{4}-0001$/); assert.equal(r.statut0, 'identifie'); assert.equal(r.niveau, 'Élevé');
+  assert.equal(r.sansAction, 'identifie'); assert.equal(r.traitement, 'en_traitement'); assert.ok(r.retard);
+  assert.equal(r.sansDate, 'en_traitement'); assert.equal(r.traite, 'traite'); assert.ok(!r.retardApres);
+  assert.equal(r.sansResiduelle, 'traite'); assert.equal(r.pire, 'traite'); assert.equal(r.clos, 'clos');
+  assert.ok(r.matrice); assert.equal(r.opportuniteClose, 'clos'); assert.equal(r.entrees, '0/0/true');
+});
