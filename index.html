@@ -5418,7 +5418,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
               <thead>
                 <tr>
                   <th>Client</th><th>Programme / Lot</th><th>Retard (mois)</th>
-                  <th>Montant Dû</th><th>Niveau</th><th>Dernière relance</th><th>Actions</th>
+                  <th>Montant Dû</th><th title="Part du prix du bien déjà versée (hors frais de souscription)">Taux de cotisation</th><th>Niveau</th><th>Dernière relance</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody id="tbody-relances"></tbody>
@@ -34436,7 +34436,7 @@ function getRetardataires() {
     if (clientFinancementBancaire(c)) return;    // financement bancaire : jamais en retard
     var e = echeancierClient(c, now, verse);     // null : aucune date de départ exploitable
     if (!e || e.ecart <= 0.5) return;
-    result.push({ id: c.id, nom: c.nom, prenoms: c.prenoms, tel: c.tel, dossier: c.dossier, moisRetard: e.moisRetard, montantDu: e.ecart, echeancier: e.mode, mensualite: e.mensualite });
+    result.push({ id: c.id, nom: c.nom, prenoms: c.prenoms, tel: c.tel, dossier: c.dossier, moisRetard: e.moisRetard, montantDu: e.ecart, echeancier: e.mode, mensualite: e.mensualite, verse: verse, total: parseFloat(c.montant_total) || 0, tauxCotisation: Math.min(100, verse / c.montant_total * 100) });
   });
   return result;
 }
@@ -50515,7 +50515,7 @@ function detectRelances() {
 
   var tbody = document.getElementById('tbody-relances');
   if (!retards.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--vert);padding:24px;">✅ Aucun retard de paiement détecté</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--vert);padding:24px;">✅ Aucun retard de paiement détecté</td></tr>';
     return;
   }
 
@@ -50530,8 +50530,8 @@ function detectRelances() {
     return true;
   });
   if (!retardsAffiches.length) {
-    if (_relancesNiveauActif === 'jour' && !searchRel) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--vert);padding:24px;">✅ Rien à traiter aujourd\'hui : promesses en cours ou clients relancés récemment.</td></tr>'; return; }
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun souscripteur en retard ne correspond à ce filtre' + (searchRel ? ' « ' + escHtml(searchRel) + ' »' : '') + '.</td></tr>';
+    if (_relancesNiveauActif === 'jour' && !searchRel) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--vert);padding:24px;">✅ Rien à traiter aujourd\'hui : promesses en cours ou clients relancés récemment.</td></tr>'; return; }
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun souscripteur en retard ne correspond à ce filtre' + (searchRel ? ' « ' + escHtml(searchRel) + ' »' : '') + '.</td></tr>';
     return;
   }
 
@@ -50549,6 +50549,8 @@ function detectRelances() {
       + '<td>' + (prog ? prog.nom : '—') + (lot ? ' / Lot ' + lot.numero : '') + '</td>'
       + '<td style="color:var(--rouge);font-weight:bold;">' + r.moisRetard + ' mois' + (r.echeancier === 'estime' ? ' <span title="Programme sans date de livraison : retard estimé d\'après la durée saisie sur la fiche du souscripteur (l\'apport compte comme avance)" style="font-size:10px;color:var(--or);font-weight:600;white-space:nowrap;">≈ estimé</span>' : '') + '</td>'
       + '<td style="color:var(--rouge);">' + fcfa(r.montantDu) + '</td>'
+      + '<td title="' + fcfa(r.verse) + ' versés sur ' + fcfa(r.total) + '" style="white-space:nowrap;"><strong style="color:' + (r.tauxCotisation >= 70 ? 'var(--vert)' : r.tauxCotisation >= 30 ? 'var(--or)' : 'var(--rouge)') + ';">' + (Math.round(r.tauxCotisation * 10) / 10).toString().replace('.', ',') + ' %</strong>'
+        + '<div style="height:4px;background:rgba(128,128,128,.25);border-radius:2px;margin-top:3px;min-width:60px;"><div style="height:4px;width:' + Math.round(r.tauxCotisation) + '%;background:currentColor;opacity:.7;border-radius:2px;"></div></div></td>'
       + '<td><span class="badge ' + n.badge + '">' + n.icone + ' ' + n.label + '</span>' + promesseChipHtml(r, an) + (dosCtx ? '<br><a href="#" style="font-size:11px;color:var(--rouge);" title="Ouvrir le dossier contentieux" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\');return false;">⚖️ ' + escHtml(dosCtx.ref) + '</a>' : '') + '</td>'
       + '<td style="font-size:11px;">' + (lastRelance ? dateShort(lastRelance.date) : 'Jamais') + '</td>'
       + '<td style="white-space:nowrap;">'
