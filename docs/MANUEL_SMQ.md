@@ -1,6 +1,6 @@
 # Manuel de procédures — Système de management de la qualité (SMQ)
 
-**Réf.** PRO-SMQ · **Version** 1.3 · **Date** Octobre 2026
+**Réf.** PRO-SMQ · **Version** 1.4 · **Date** Octobre 2026
 **Objet** : fixer comment l'entreprise tient son système qualité dans l'ERP : cartographie et fiches de processus, maîtrise des documents, audits internes, revue de direction, non-conformités et actions correctives, réclamations, satisfaction des clients.
 **Principe directeur** : tout écart est **enregistré, analysé, corrigé, puis vérifié** ; aucune clôture sans preuve d'efficacité.
 
@@ -102,6 +102,18 @@
 5. **Clore un risque** : coter la probabilité et l'impact **résiduels** ; la criticité résiduelle ne peut pas dépasser la criticité initiale. Une opportunité se clôt sans cotation résiduelle.
 6. Les risques élevés ou critiques ouverts et les traitements en retard sont repris dans la revue de direction.
 
+### SMQ-11 — Automatiser le relevé des indicateurs
+
+**Où** : fiche d'un processus (Manuels & flux › Cartographie › ✏️ Fiche) ou bandeau de la cartographie.
+
+1. Sur chaque indicateur, choisir un **Calcul automatique** parmi les formules proposées (délai de validation, non-conformités, audits, satisfaction, réclamations, documents, objectifs, risques, factures FNE en erreur, visites commerciales, délai commande → réception, incidents résolus, pilotes désignés).
+2. Choisir le **sens de la cible** : « valeur ≥ cible » ou « valeur ≤ cible », puis saisir la **cible**.
+3. Choisir la **période** : 30 derniers jours, mois en cours, année en cours ou 12 derniers mois. Les indicateurs « instantanés » (éléments en attente, non-conformités ouvertes, documents à revoir) ignorent la période.
+4. **🔄 Actualiser les relevés** (fiche) ou **🔄 Actualiser tous les indicateurs** (cartographie) : le dernier relevé est calculé ; les 24 derniers relevés sont conservés avec leur période.
+5. Enregistrer la fiche. L'état **✅ Dans la cible** ou **❌ Hors cible** s'affiche sur l'indicateur ; la carte du processus signale les indicateurs hors cible.
+6. Seuls les indicateurs **validés** sont calculés. Un indicateur sans donnée sur la période reste sans relevé.
+7. À la revue de direction, les indicateurs automatiques sont recalculés sur **la période de la revue** et marqués « calculé ».
+
 ### SMQ-03 — Traiter une non-conformité
 
 **Où** : Qualité (SMQ) › **Non-conformités** › **+ Non-conformité**.
@@ -147,6 +159,7 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 | SMQ-08 | R/A | C | I | I |
 | SMQ-09 | A | R | R | I |
 | SMQ-10 | A | R | R | C |
+| SMQ-11 | I | R/A | C | I |
 | SMQ-04 | A | R | R | C |
 | SMQ-05 | I | R | I | R |
 
@@ -159,6 +172,8 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 - Faire auditer un processus par son propre pilote.
 - Tenir la revue sans décision ni suivi des actions décidées.
 - Fixer un objectif sans cible ni échéance.
+- Lire un indicateur calculé sans vérifier la période utilisée.
+- Choisir le mauvais sens de cible (≥ ou ≤), ce qui inverse l'état affiché.
 - Clore un risque sans mesurer son niveau résiduel.
 - Clore un audit alors que ses non-conformités restent ouvertes.
 - Ne pas revoir les documents à leur échéance.
@@ -178,3 +193,4 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 | 1.1 | Octobre 2026 | Audits internes (SMQ-06) |
 | 1.2 | Octobre 2026 | Revue de direction (SMQ-07) |
 | 1.3 | Octobre 2026 | Politique, objectifs, risques et opportunités (SMQ-08 à SMQ-10) |
+| 1.4 | Octobre 2026 | Calcul automatique des indicateurs (SMQ-11) |
