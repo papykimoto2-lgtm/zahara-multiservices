@@ -5403,7 +5403,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
           <div class="spacer"></div>
           <input type="text" class="form-control" id="search-relances" placeholder="🔍 Rechercher un souscripteur (nom, tél, dossier)" style="max-width:280px;" oninput="detectRelances()">
-          <button class="btn btn-secondary btn-sm" onclick="detectRelances()">🔄 Actualiser la liste</button>
+          <button class="btn btn-secondary btn-sm" onclick="relancesActualiser()">🔄 Actualiser la liste</button>
         </div>
 
         <div id="relances-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;"></div>
@@ -10892,6 +10892,10 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
         </div>
         <div class="tab-pane" id="tab-juridique-contentieux">
           <div class="card">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+              <button class="btn btn-secondary btn-sm" id="ctx-btn-maj" onclick="ctxActualiser()" title="Recharger les dossiers, clients, versements et relances depuis le cloud">🔄 Actualiser</button>
+              <span id="ctx-maj-info" style="font-size:11px;color:var(--blanc-dim);"></span>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead><tr><th>Référence</th><th>Nature</th><th>Partie adverse</th><th>Tribunal</th><th>Montant litige</th><th>Avocat</th><th>Prochaine audience</th><th>Statut</th><th>Situation du client</th><th></th></tr></thead>
@@ -30779,6 +30783,7 @@ function goTo(page) {
 }
 
 function switchTab(context, tab) {
+  if (context==='juridique' && tab==='contentieux' && typeof ctxActualiserAuto==='function') ctxActualiserAuto();
   // Hook scan pointage
   if (context==='foncier' && tab==='fisc' && typeof fiscInit==='function') { fiscInit(); }
   if (context==='foncier' && tab==='dossiers' && typeof fcRender==='function') fcRender();
@@ -92802,7 +92807,12 @@ function renderContentieuxJuridiques() {
   if (!tbody) return;
   var list = (DATA.dossiersJuridiques || []).filter(function(d){ return d.type === 'contentieux'; })
     .sort(function(a,b){ var pr={urgente:0,haute:1,normale:2,basse:3}; return (pr[a.priorite]||2)-(pr[b.priorite]||2); });
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun contentieux en cours.</td></tr>'; return; }
+  if (!list.length) {
+    var nb3 = getRetardataires().filter(function(r){ return r.moisRetard >= 3; }).length;
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--blanc-dim);padding:24px;line-height:1.6;">Aucun contentieux en cours.<br><span style="font-size:12px;">Un dossier s\'ouvre depuis la page Relances (bouton « ⚖️ Contentieux » dès 3 mois de retard, ou à l\'envoi d\'une relance de niveau Mise en demeure).</span>'
+      + (nb3 ? '<br><strong style="color:var(--rouge);">' + nb3 + ' souscripteur(s) ont 3 mois de retard ou plus.</strong> <a href="#" onclick="goTo(\'relances\');return false;">Voir la page Relances</a>' : '') + '</td></tr>';
+    return;
+  }
   var statMap = { ouvert:'badge-or', en_instruction:'badge-bleu', en_attente:'badge-violet', clos_favorable:'badge-vert', clos_defavorable:'badge-rouge' };
   var retardataires = getRetardataires();
   tbody.innerHTML = list.map(function(d) {
@@ -118759,6 +118769,50 @@ function valSearchChange(txt){
 }
 /* À l'ouverture du module, on ne se contente pas de la copie locale : les demandes faites par d'autres personnes depuis la connexion
    (temps réel coupé, session ancienne) n'y figurent pas. Récupération silencieuse (sans message), au plus une fois toutes les 15 s. */
+/* Récupération silencieuse de données depuis le cloud (sans message à chaque fiche). Renvoie le nombre de fiches reçues, ou -1 si le cloud est injoignable. */
+async function actualiserStoresDepuisCloud(stores) {
+  if (!navigator.onLine || typeof sbFetch !== 'function' || typeof _supaUnwrap !== 'function') return -1;
+  var total = 0;
+  for (var k = 0; k < stores.length; k++) {
+    var store = stores[k], e = SUPA_STORE_MAP.find(function(x){ return x[1] === store; }); if (!e) continue;
+    var rows = await sbFetch(e[0] + '?select=*', 'GET'); if (!Array.isArray(rows)) return -1;
+    DATA[store] = DATA[store] || [];
+    var byId = {}; DATA[store].forEach(function(x){ byId[x.id] = x; });
+    for (var i = 0; i < rows.length; i++) {
+      var r = _supaUnwrap(e[0], rows[i]); if (!r || !r.id) continue;
+      if (typeof tombHas === 'function' && tombHas(store, r.id)) continue;
+      if (typeof _remoteWins === 'function' && _remoteWins(r, byId[r.id])) { byId[r.id] = r; try { await dbPut(store, r); } catch (_) {} total++; }
+    }
+    DATA[store] = Object.keys(byId).map(function(id){ return byId[id]; });
+  }
+  return total;
+}
+/* Onglet Contentieux : bouton « Actualiser » (dossiers, clients, versements, relances) et mise à jour automatique des dossiers à l'ouverture. */
+async function ctxActualiser() {
+  var btn = document.getElementById('ctx-btn-maj'); if (btn) { btn.disabled = true; btn.textContent = '⏳ Mise à jour…'; }
+  var n = await actualiserStoresDepuisCloud(['dossiersJuridiques', 'clients', 'versements', 'relances']);
+  if (btn) { btn.disabled = false; btn.textContent = '🔄 Actualiser'; }
+  var info = document.getElementById('ctx-maj-info');
+  if (n < 0) { toast('Cloud injoignable : données locales conservées.', 'error'); if (info) info.textContent = 'Cloud injoignable.'; return; }
+  if (typeof renderDossiersJuridiques === 'function') renderDossiersJuridiques();
+  var nbCtx = (DATA.dossiersJuridiques || []).filter(function(d){ return d.type === 'contentieux'; }).length;
+  if (info) info.textContent = 'Mis à jour à ' + new Date().toTimeString().slice(0, 5) + ' · ' + nbCtx + ' dossier(s) contentieux';
+  toast(n ? '🔄 ' + n + ' fiche(s) mise(s) à jour depuis le cloud.' : '✅ Déjà à jour avec le cloud.', 'success');
+}
+async function ctxActualiserAuto() {
+  if (APP._ctxPullEnCours || Date.now() - (APP._ctxPullLe || 0) < 15000) return;
+  APP._ctxPullEnCours = true; APP._ctxPullLe = Date.now();
+  try { var n = await actualiserStoresDepuisCloud(['dossiersJuridiques']); if (n > 0 && typeof renderDossiersJuridiques === 'function') renderDossiersJuridiques(); }
+  catch (e) { console.warn('[Contentieux] actualisation cloud', e); }
+  finally { APP._ctxPullEnCours = false; }
+}
+/* Page Relances : « Actualiser la liste » recharge aussi clients, versements, relances et dossiers depuis le cloud. */
+async function relancesActualiser() {
+  var n = await actualiserStoresDepuisCloud(['clients', 'versements', 'relances', 'dossiersJuridiques']);
+  if (n < 0) toast('Cloud injoignable : liste calculée avec les données locales.', 'error');
+  else if (n) toast('🔄 ' + n + ' fiche(s) mise(s) à jour depuis le cloud.', 'success');
+  detectRelances();
+}
 async function valActualiserDepuisCloud(){
   if(APP._valPullEnCours || !navigator.onLine || typeof sbFetch!=='function' || typeof _supaUnwrap!=='function') return;
   if(Date.now()-(APP._valPullLe||0)<15000) return;
