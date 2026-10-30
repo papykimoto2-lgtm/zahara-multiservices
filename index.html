@@ -8738,6 +8738,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
               <div class="form-group"><label>Anticipation alerte vidange (km avant échéance)</label><input type="number" id="param-parcauto-seuil-entretien-km" class="form-control" value="500" min="0" step="100"></div>
               <div class="form-group"><label>Plafond carburant mensuel (FCFA / véhicule)</label><input type="number" id="param-parcauto-plafond-carburant" class="form-control" value="150000" min="0" step="10000"></div>
               <div class="form-group"><label>Alerte consommation (% au-dessus de la moyenne du véhicule)</label><input type="number" id="param-parcauto-seuil-conso" class="form-control" value="30" min="5" step="5"></div>
+              <div class="form-group"><label>Demande préalable de course obligatoire</label><select id="param-parcauto-demande-obligatoire" class="form-control"><option value="non">Non (course sans demande signalée)</option><option value="oui">Oui (course refusée sans autorisation)</option></select></div>
             </div>
           </div>
         </div>
@@ -16884,6 +16885,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
         <div class="tab-pane" id="tab-parc-auto-courses">
           <div class="card" style="border:1px solid var(--or);margin-bottom:14px;">
             <div class="form-section-title">🚕 Enregistrer une course</div>
+            <div style="margin:6px 0 4px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-secondary btn-sm" onclick="paDemandeOuvrir()" title="Demande préalable à faire autoriser par la hiérarchie avant la course">📝 Demande de course (préalable)</button><span style="font-size:11px;color:var(--blanc-dim);align-self:center;">Après la course : 📝 sur la ligne pour rédiger le rapport détaillé et le transmettre à la hiérarchie.</span></div>
             <div style="font-size:11px;color:var(--blanc-dim);margin:2px 0 10px;">Déplacements courts du quotidien (livraison, dépôt de documents, course de bureau…) — différent d'un Ordre de Mission (déplacement formel, plusieurs jours, document officiel).</div>
             <div class="form-grid">
               <div class="form-group"><label>Véhicule *</label><select id="pco-vehicule" class="form-control" onchange="pcoPrefillKm()"></select></div>
@@ -52077,6 +52079,7 @@ async function saveModulesAvancesParams() {
     parcauto_seuil_entretien_km:     gvn0('param-parcauto-seuil-entretien-km', 500),
     parcauto_plafond_carburant:      gvn0('param-parcauto-plafond-carburant', 150000),
     parcauto_seuil_conso_pct:        gvn0('param-parcauto-seuil-conso', 30),
+    parcauto_demande_obligatoire:    ((document.getElementById('param-parcauto-demande-obligatoire')||{}).value) || 'non',
 
     crm_delai_relance_prospect: gvn0('param-crm-delai-relance-prospect', 3),
     crm_score_min_qualif:       gvn0('param-crm-score-min-qualif', 50),
@@ -52731,6 +52734,7 @@ function loadParamFields() {
   sv('param-parcauto-seuil-entretien-km',p.parcauto_seuil_entretien_km||500);
   sv('param-parcauto-plafond-carburant',p.parcauto_plafond_carburant||150000);
   sv('param-parcauto-seuil-conso',p.parcauto_seuil_conso_pct||30);
+  sv('param-parcauto-demande-obligatoire',p.parcauto_demande_obligatoire||'non');
   sv('param-crm-delai-relance-prospect',p.crm_delai_relance_prospect||3);
   sv('param-crm-score-min-qualif',p.crm_score_min_qualif||50);
   sv('param-crm-source-defaut',p.crm_source_defaut||'site_web');
@@ -83142,6 +83146,8 @@ function paCalculerAlertes(){
     var ouvertes = (DATA.vehicule_courses||[]).filter(function(c){ return c.vehicule_id===v.id && paCourseOuverte(c); }).sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
     if (ouvertes.length) alertes.push({ vehicule_id:v.id, niveau:'orange', type:'course', texte: label+' — '+ouvertes.length+' course(s) non clôturée(s) (km retour manquant), la plus ancienne du '+dateShort(ouvertes[0].date) });
     var alConso = paConsoAlerte(v); if (alConso) alertes.push(alConso);
+    var rapRetard = (DATA.vehicule_courses||[]).filter(function(c){ return c.vehicule_id===v.id && paRapportEnRetard(c); }).sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+    if (rapRetard.length) alertes.push({ vehicule_id:v.id, niveau:'orange', type:'rapport', texte: label+' — '+rapRetard.length+' rapport(s) de course à rédiger ou à compléter (le plus ancien : course du '+dateShort(rapRetard[0].date)+')' });
     if (derniereVidange && derniereVidange.prochaine_echeance_date) {
       if (derniereVidange.prochaine_echeance_date < t) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — vidange (date) dépassée depuis le '+dateShort(derniereVidange.prochaine_echeance_date) });
       else if (derniereVidange.prochaine_echeance_date <= seuilVidangeStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — vidange (date) prévue le '+dateShort(derniereVidange.prochaine_echeance_date) });
@@ -83209,9 +83215,10 @@ function paRenderAlertes(){
     + '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">⚠️ '+alertes.length+' alerte(s) échéance(s)</div>'
     + alertes.slice(0,8).map(function(a){
         return '<div style="font-size:12px;padding:3px 0;color:'+(a.niveau==='rouge'?'var(--rouge)':'var(--or,#B87333)')+';cursor:pointer;" onclick="paOuvrirFicheDepuisAlerte(\''+a.vehicule_id+'\')">'
-          + (a.type==='donnee'?'🛠️':(a.type==='course'?'🚕':(a.type==='conso'?'⛽':(a.niveau==='rouge'?'🔴':'🟠')))) + ' ' + escHtml(a.texte)
+          + (a.type==='donnee'?'🛠️':(a.type==='course'?'🚕':(a.type==='rapport'?'📄':(a.type==='conso'?'⛽':(a.niveau==='rouge'?'🔴':'🟠'))))) + ' ' + escHtml(a.texte)
           + (a.type==='donnee' ? ' <button type="button" class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="event.stopPropagation();paKmCorriger(\''+a.vehicule_id+'\')">Corriger le km</button>' : '')
-          + (a.type==='course' ? ' <button type="button" class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="event.stopPropagation();paAllerCoursesOuvertes(\''+a.vehicule_id+'\')">Compléter</button>' : '') + '</div>';
+          + (a.type==='course' ? ' <button type="button" class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="event.stopPropagation();paAllerCoursesOuvertes(\''+a.vehicule_id+'\')">Compléter</button>' : '')
+          + (a.type==='rapport' ? ' <button type="button" class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="event.stopPropagation();paAllerCoursesRapports(\''+a.vehicule_id+'\')">Rédiger</button>' : '') + '</div>';
       }).join('')
     + (alertes.length>8 ? '<div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">+ '+(alertes.length-8)+' autre(s)…</div>' : '')
     + '</div>';
@@ -83254,7 +83261,7 @@ function paControlesPlein(vehiculeId, date, litres, km) {
 }
 function paAllerCoursesOuvertes(vid) { window._paCoursesOuvertesVid = vid; if (typeof switchTab === 'function') switchTab('parc-auto', 'courses'); if (typeof paRenderCourses === 'function') paRenderCourses(); }
 function paRetirerFiltreCourses() { window._paCoursesOuvertesVid = null; paRenderCourses(); }
-function paCourseOuverte(c) { return (c.km_retour == null || c.km_retour === '') && (c.date || '') < today(); }
+function paCourseOuverte(c) { return c.km_depart > 0 && (c.km_retour == null || c.km_retour === '') && (c.date || '') < today(); }
 
 /* ── Écritures comptables manquantes (plein ou entretien enregistré sans écriture) ── */
 function paEcrituresManquantes() {
@@ -83348,6 +83355,137 @@ function paConsoHtml() {
         return '<tr><td>' + lab + '</td><td style="text-align:right;">' + _paF1(c.moyenne) + '</td><td style="text-align:right;">' + _paF1(c.recente) + '</td><td style="text-align:right;color:' + (alerte ? 'var(--rouge)' : 'inherit') + ';">' + (c.ecart > 0 ? '+' : '') + Math.round(c.ecart) + ' %</td>'
           + '<td>' + (c.aberrante ? '<span class="badge badge-rouge">Relevés à vérifier</span>' : (alerte ? '<span class="badge badge-or">⚠ Surconsommation</span>' : '<span class="badge badge-vert">✓ Normale</span>')) + '</td></tr>'; }).join('')
     + '</tbody></table></div><div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">Calcul sur les pleins saisis : une consommation basse ou instable peut signaler des pleins non enregistrés.</div></div>';
+}
+/* ══ Courses quotidiennes : demande préalable, autorisation, rapport détaillé, validation hiérarchique ══
+   Une course peut naître d'une DEMANDE préalable (objectif, entreprise visitée, interlocuteurs, participants) soumise à la hiérarchie par le circuit de validation
+   général (type « demande_course »). Une fois la course faite, un RAPPORT détaillé est rédigé puis transmis à la hiérarchie (type « rapport_course »), qui le valide
+   ou demande des compléments. Tout est porté par l'enregistrement de la course (c.demande, c.rapport) : aucune table nouvelle. */
+var PA_OBJ_ATTEINT = { oui: 'Oui', partiel: 'Partiellement', non: 'Non' }, PA_RAPPORT_DELAI_JOURS = 2;
+function paDemandeObligatoire() { return ((DATA.params || {}).parcauto_demande_obligatoire) === 'oui'; }
+function _paUser() { return (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || '—'; }
+function paCourseEtats(c) {
+  return { demande: c.demande ? ((c.demande.autorisation || {}).statut || 'en_attente') : 'sans', rapport: c.rapport ? (c.rapport.statut || 'brouillon') : 'aucun' };
+}
+function paCourseRealisee(c) { return c.km_depart > 0 && c.km_retour != null && c.km_retour !== ''; }
+function paRapportEnRetard(c) {
+  if (!c.rapport_requis || !paCourseRealisee(c)) return false;
+  var st = paCourseEtats(c).rapport; if (st === 'transmis' || st === 'valide') return false;
+  var lim = new Date(today() + 'T12:00:00'); lim.setDate(lim.getDate() - PA_RAPPORT_DELAI_JOURS);
+  return (c.date || '') <= lim.toISOString().slice(0, 10);
+}
+function paCourseBadges(c) {
+  var e = paCourseEtats(c), b = [];
+  var d = { sans: '<span class="badge badge-neutre" style="font-size:10px;" title="Course faite sans demande préalable">Sans demande</span>', en_attente: '<span class="badge badge-or" style="font-size:10px;">⏳ Autorisation en attente</span>',
+    autorisee: '<span class="badge badge-vert" style="font-size:10px;">✓ Autorisée</span>', refusee: '<span class="badge badge-rouge" style="font-size:10px;">✗ Refusée</span>' };
+  b.push(d[e.demande] || '');
+  if (c.rapport_requis || c.rapport) {
+    var r = { aucun: paCourseRealisee(c) ? '<span class="badge badge-or" style="font-size:10px;">Rapport à rédiger</span>' : '', brouillon: '<span class="badge badge-neutre" style="font-size:10px;">Rapport : brouillon</span>',
+      transmis: '<span class="badge badge-or" style="font-size:10px;">📤 Rapport transmis</span>', valide: '<span class="badge badge-vert" style="font-size:10px;">✓ Rapport validé</span>', a_completer: '<span class="badge badge-rouge" style="font-size:10px;">Rapport à compléter</span>' };
+    b.push(r[e.rapport] || '');
+  }
+  return b.filter(Boolean).join('<br>');
+}
+function paAllerCoursesRapports(vid) { window._paCoursesRapportVid = vid; window._paCoursesOuvertesVid = null; if (typeof switchTab === 'function') switchTab('parc-auto', 'courses'); paRenderCourses(); }
+function _paSetVal(id, v) { var el = document.getElementById(id); if (el) { if (el.type === 'checkbox') el.checked = !!v; else el.value = v == null ? '' : v; } }
+function _paGetVal(id) { return String((document.getElementById(id) || {}).value || '').trim(); }
+
+/* ── Demande préalable ── */
+function paDemandeOuvrir() {
+  var sv = document.getElementById('pdm-vehicule'), sc = document.getElementById('pdm-chauffeur');
+  if (sv) sv.innerHTML = '<option value="">— Choisir —</option>' + (DATA.vehicules || []).filter(function(v){ return v.statut === 'actif'; }).map(function(v){ return '<option value="' + v.id + '">' + escHtml(paLabelVehicule(v)) + '</option>'; }).join('');
+  if (sc) sc.innerHTML = '<option value="">—</option>' + (DATA.employes || []).filter(function(e){ return typeof empEstActif !== 'function' || empEstActif(e); }).map(function(e){ return '<option value="' + e.id + '">' + escHtml(paNomEmploye(e.id)) + '</option>'; }).join('');
+  ['pdm-objectif', 'pdm-entreprise', 'pdm-lieu', 'pdm-interlocuteurs', 'pdm-participants', 'pdm-km', 'pdm-heure', 'pdm-vehicule', 'pdm-chauffeur'].forEach(function(i){ _paSetVal(i, ''); });
+  _paSetVal('pdm-date', today()); _paSetVal('pdm-urgence', 'normale');
+  openModal('modal-pa-demande');
+}
+async function paDemandeEnregistrer() {
+  if (!exigerDroit('Parc Auto', 'c', 'une demande de course')) return;
+  var vid = _paGetVal('pdm-vehicule'), date = _paGetVal('pdm-date'), obj = _paGetVal('pdm-objectif'), ent = _paGetVal('pdm-entreprise');
+  if (!vid || !date) { toast('Véhicule et date prévue sont obligatoires.', 'error'); return; }
+  if (obj.length < 10) { toast('Décrivez l\'objectif de la course (au moins 10 caractères).', 'error'); return; }
+  if (!ent) { toast('Indiquez l\'entreprise ou l\'organisme visité.', 'error'); return; }
+  if (date < today() && !confirm('La date prévue est passée : demande a posteriori. Enregistrer quand même ?')) return;
+  var c = { id: uid(), created_at: new Date().toISOString(), vehicule_id: vid, chauffeur_id: _paGetVal('pdm-chauffeur'), date: date, heure_depart: _paGetVal('pdm-heure'), heure_retour: '',
+    km_depart: 0, km_retour: null, distance: '', motif: ent + ' — ' + obj.slice(0, 80), passagers: _paGetVal('pdm-participants'), rapport_requis: true, statut_course: 'demande',
+    demande: { objectif: obj, entreprise: ent, lieu: _paGetVal('pdm-lieu'), interlocuteurs: _paGetVal('pdm-interlocuteurs'), participants: _paGetVal('pdm-participants'), km_estime: parseFloat(_paGetVal('pdm-km')) || 0,
+      urgence: _paGetVal('pdm-urgence') || 'normale', demandeur: _paUser(), demande_le: new Date().toISOString(), autorisation: { statut: 'en_attente' } } };
+  DATA.vehicule_courses.push(c); await dbPut('vehicule_courses', c); if (typeof syncToSupabase === 'function') syncToSupabase('pi_vehicule_courses', c);
+  var v = await valCreate('demande_course', c.id, 'Demande de course — ' + escHtml(ent) + ' (' + dateShort(date) + ', ' + (paVehicule(vid) || {}).immatriculation + ')', 0, { course_id: c.id, urgence: c.demande.urgence });
+  if (v) { c.demande.validation_id = v.id; await dbPut('vehicule_courses', c); if (typeof syncToSupabase === 'function') syncToSupabase('pi_vehicule_courses', c); }
+  if (typeof notifierValidateurs === 'function') notifierValidateurs('demande de course', c.id);
+  closeModal('modal-pa-demande'); toast('📤 Demande transmise à la hiérarchie pour autorisation.', 'success'); paRenderCourses(); paActualiserBadges();
+}
+
+/* ── Rapport détaillé ── */
+var _paRapportId = null;
+function paRapportOuvrir(id) {
+  var c = (DATA.vehicule_courses || []).filter(function(x){ return x.id === id; })[0]; if (!c) return;
+  _paRapportId = id; var r = c.rapport || {}, d = c.demande || {}, v = paVehicule(c.vehicule_id) || {}, st = paCourseEtats(c).rapport, fige = (st === 'transmis' || st === 'valide');
+  var a = d.autorisation || {};
+  document.getElementById('pra-contexte').innerHTML = '<strong>' + dateShort(c.date) + '</strong> · ' + escHtml(v.immatriculation || '—') + ' · chauffeur : ' + escHtml(c.chauffeur_id ? paNomEmploye(c.chauffeur_id) : '—') + ' · ' + (paCourseRealisee(c) ? fmtF(c.km_retour - c.km_depart) + ' km' : 'course non clôturée')
+    + (c.demande ? '<br>Objectif demandé : ' + escHtml(d.objectif || '—') + '<br>Autorisation : ' + ({ autorisee: '✓ autorisée par ' + escHtml(a.par || '—') + ' le ' + escHtml(a.le || ''), en_attente: '⏳ en attente', refusee: '✗ refusée' }[a.statut || 'en_attente']) : '<br><span style="color:var(--or);">Course faite sans demande préalable.</span>')
+    + (r.validation && r.validation.statut === 'a_completer' ? '<br><span style="color:var(--rouge);">Rapport à compléter — ' + escHtml(r.validation.commentaire || '') + ' (' + escHtml(r.validation.par || '') + ')</span>' : '')
+    + (st === 'valide' ? '<br><span style="color:var(--vert);">✓ Validé par ' + escHtml((r.validation || {}).par || '—') + ' le ' + escHtml((r.validation || {}).le || '') + '</span>' : (st === 'transmis' ? '<br>📤 Transmis à la hiérarchie le ' + escHtml(String(r.transmis_le || '').slice(0, 10)) + ' : en attente de validation.' : ''));
+  _paSetVal('pra-objectif-atteint', r.objectif_atteint || ''); _paSetVal('pra-entreprise', r.entreprise || d.entreprise || ''); _paSetVal('pra-arrivee', r.heure_arrivee); _paSetVal('pra-sortie', r.heure_sortie);
+  _paSetVal('pra-personnes', r.personnes || d.interlocuteurs || ''); _paSetVal('pra-resume', r.resume); _paSetVal('pra-resultats', r.resultats); _paSetVal('pra-suites', r.suites); _paSetVal('pra-documents', r.documents);
+  _paSetVal('pra-depenses', r.depenses); _paSetVal('pra-incidents', r.incidents);
+  document.querySelectorAll('#modal-pa-rapport .pra-in').forEach(function(el){ el.disabled = fige; });
+  ['pra-btn-brouillon', 'pra-btn-transmettre'].forEach(function(i){ var el = document.getElementById(i); if (el) el.style.display = fige ? 'none' : ''; });
+  openModal('modal-pa-rapport');
+}
+async function paRapportEnregistrer(transmettre) {
+  var c = (DATA.vehicule_courses || []).filter(function(x){ return x.id === _paRapportId; })[0]; if (!c) return;
+  if (!exigerDroit('Parc Auto', 'm', 'un rapport de course')) return;
+  var rap = { objectif_atteint: _paGetVal('pra-objectif-atteint'), entreprise: _paGetVal('pra-entreprise'), heure_arrivee: _paGetVal('pra-arrivee'), heure_sortie: _paGetVal('pra-sortie'), personnes: _paGetVal('pra-personnes'),
+    resume: _paGetVal('pra-resume'), resultats: _paGetVal('pra-resultats'), suites: _paGetVal('pra-suites'), documents: _paGetVal('pra-documents'), depenses: parseFloat(_paGetVal('pra-depenses')) || 0, incidents: _paGetVal('pra-incidents') };
+  if (transmettre) {
+    if (!paCourseRealisee(c)) { toast('Clôturez d\'abord la course (km départ et km retour) avant de transmettre le rapport.', 'error', 7000); return; }
+    if (!rap.objectif_atteint) { toast('Indiquez si l\'objectif a été atteint.', 'error'); return; }
+    if (!rap.entreprise) { toast('Indiquez l\'entreprise ou l\'organisme visité.', 'error'); return; }
+    if (rap.resume.length < 30) { toast('Le résumé de la mission doit être détaillé (au moins 30 caractères).', 'error'); return; }
+    if (!rap.personnes) { toast('Indiquez les personnes rencontrées (nom, fonction).', 'error'); return; }
+  }
+  var prec = c.rapport || {};
+  c.rapport = Object.assign({}, prec, rap, { statut: transmettre ? 'transmis' : (prec.statut === 'a_completer' ? 'a_completer' : 'brouillon'), redige_par: prec.redige_par || _paUser(), redige_le: prec.redige_le || new Date().toISOString() });
+  c._modifie = new Date().toISOString();
+  if (transmettre) {
+    c.rapport.transmis_le = new Date().toISOString(); c.rapport.transmis_par = _paUser();
+    var v = await valCreate('rapport_course', c.id, 'Rapport de course — ' + escHtml(rap.entreprise) + ' (' + dateShort(c.date) + ', ' + (paVehicule(c.vehicule_id) || {}).immatriculation + ')', rap.depenses, { course_id: c.id, objectif_atteint: rap.objectif_atteint });
+    if (v) c.rapport.validation_id = v.id;
+  }
+  await dbPut('vehicule_courses', c); if (typeof syncToSupabase === 'function') syncToSupabase('pi_vehicule_courses', c);
+  if (transmettre && typeof notifierValidateurs === 'function') notifierValidateurs('rapport de course', c.id);
+  closeModal('modal-pa-rapport'); toast(transmettre ? '📤 Rapport transmis à la hiérarchie.' : 'Brouillon du rapport enregistré.', 'success'); paRenderCourses(); paActualiserBadges();
+}
+/* Décision de la hiérarchie (appelée par valApply) */
+async function paCourseValApply(type, refId, decision) {
+  var c = (DATA.vehicule_courses || []).filter(function(x){ return x.id === refId; })[0]; if (!c) return;
+  var v = (DATA.validations || []).filter(function(x){ return x.type === type && x.ref_id === refId; }).pop() || {}, ok = decision === 'valide', par = (v.valideur || _paUser()), le = v.date_decision || today();
+  if (type === 'demande_course' && c.demande) { c.demande.autorisation = { statut: ok ? 'autorisee' : 'refusee', par: par, le: le, motif: v.motif || '' }; c.statut_course = ok ? 'autorisee' : 'refusee'; }
+  if (type === 'rapport_course' && c.rapport) { c.rapport.validation = { statut: ok ? 'valide' : 'a_completer', par: par, le: le, commentaire: v.motif || '' }; c.rapport.statut = ok ? 'valide' : 'a_completer'; }
+  c._modifie = new Date().toISOString(); await dbPut('vehicule_courses', c); if (typeof syncToSupabase === 'function') syncToSupabase('pi_vehicule_courses', c);
+  if (typeof paRenderCourses === 'function') paRenderCourses(); if (typeof paActualiserBadges === 'function') paActualiserBadges();
+}
+/* Documents imprimables : demande préalable ou rapport détaillé */
+function paCourseApercu(id, mode) { paImprimerCourse(id, mode); }
+function paImprimerCourse(id, mode) {
+  var c = (DATA.vehicule_courses || []).filter(function(x){ return x.id === id; })[0]; if (!c) return;
+  var E = escHtml, p = DATA.params || {}, v = paVehicule(c.vehicule_id) || {}, d = c.demande || {}, a = d.autorisation || {}, r = c.rapport || {}, rv = r.validation || {};
+  var ligne = function(l, t){ return '<tr><th style="width:30%;">' + l + '</th><td>' + (t === '' || t == null ? '—' : E(t).replace(/\n/g, '<br>')) + '</td></tr>'; };
+  var doc = (mode === 'rapport') ? 'RAPPORT DE COURSE' : 'DEMANDE DE COURSE';
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + doc + '</title><style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:18px;max-width:760px;margin:0 auto;}h1{font-size:17px;color:#B87333;margin:0;}h2{font-size:13px;background:#efeae3;padding:4px 8px;margin:14px 0 4px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #999;padding:5px 7px;text-align:left;vertical-align:top;}th{background:#f6f2ec;font-size:11px;}.sig{display:flex;gap:30px;margin-top:34px;font-size:11px;}.sig div{flex:1;border-top:1px solid #333;padding-top:3px;}</style></head><body>'
+    + '<div style="display:flex;justify-content:space-between;border-bottom:2px solid #B87333;padding-bottom:8px;"><div><strong style="font-size:15px;">' + E(p.societe || '') + '</strong><br><span style="font-size:11px;">' + E(p.adresse || '') + '</span></div><div style="text-align:right;"><h1>' + doc + '</h1><div style="font-size:11px;">Édité le ' + new Date().toLocaleDateString('fr-FR') + '</div></div></div>'
+    + '<h2>Course</h2><table><tbody>' + ligne('Date', dateShort(c.date)) + ligne('Véhicule', v.immatriculation ? v.immatriculation + ' — ' + (v.marque || '') + ' ' + (v.modele || '') : '') + ligne('Chauffeur', c.chauffeur_id ? paNomEmploye(c.chauffeur_id) : '')
+    + ligne('Horaires', (c.heure_depart || c.heure_retour) ? (c.heure_depart || '—') + ' → ' + (c.heure_retour || '—') : '') + ligne('Kilométrage', paCourseRealisee(c) ? c.km_depart + ' → ' + c.km_retour + ' (' + (c.km_retour - c.km_depart) + ' km)' : (d.km_estime ? 'estimé : ' + d.km_estime + ' km' : ''))
+    + ligne('Passagers / participants', c.passagers) + '</tbody></table>'
+    + '<h2>Demande préalable</h2>' + (c.demande ? '<table><tbody>' + ligne('Objectif', d.objectif) + ligne('Entreprise / organisme visité', d.entreprise) + ligne('Lieu', d.lieu) + ligne('Interlocuteurs attendus', d.interlocuteurs) + ligne('Urgence', d.urgence)
+      + ligne('Demandée par', (d.demandeur || '') + (d.demande_le ? ' le ' + String(d.demande_le).slice(0, 10) : '')) + ligne('Autorisation', ({ autorisee: 'AUTORISÉE par ' + (a.par || '—') + ' le ' + (a.le || ''), refusee: 'REFUSÉE par ' + (a.par || '—') + ' — ' + (a.motif || ''), en_attente: 'En attente de la hiérarchie' }[a.statut || 'en_attente'])) + '</tbody></table>' : '<p style="color:#b45309;">Course réalisée sans demande préalable.</p>');
+  if (mode === 'rapport') html += '<h2>Rapport de mission</h2><table><tbody>' + ligne('Objectif atteint', PA_OBJ_ATTEINT[r.objectif_atteint] || '') + ligne('Entreprise / organisme visité', r.entreprise) + ligne('Arrivée / sortie sur site', (r.heure_arrivee || r.heure_sortie) ? (r.heure_arrivee || '—') + ' / ' + (r.heure_sortie || '—') : '')
+    + ligne('Personnes rencontrées', r.personnes) + ligne('Résumé de la mission', r.resume) + ligne('Résultats / décisions', r.resultats) + ligne('Suites à donner', r.suites) + ligne('Documents remis / reçus', r.documents)
+    + ligne('Dépenses engagées', r.depenses ? fmtF(r.depenses) + ' FCFA' : '') + ligne('Incidents / observations', r.incidents) + ligne('Rédigé par', (r.redige_par || '') + (r.redige_le ? ' le ' + String(r.redige_le).slice(0, 10) : ''))
+    + ligne('Transmis à la hiérarchie', r.transmis_le ? 'le ' + String(r.transmis_le).slice(0, 10) + ' par ' + (r.transmis_par || '') : 'Non transmis') + ligne('Validation hiérarchique', rv.statut ? ({ valide: 'VALIDÉ', a_completer: 'À COMPLÉTER' }[rv.statut]) + ' par ' + (rv.par || '—') + ' le ' + (rv.le || '') + (rv.commentaire ? ' — ' + rv.commentaire : '') : 'En attente') + '</tbody></table>';
+  html += '<div class="sig"><div>' + (mode === 'rapport' ? 'Rédacteur : ' + E(r.redige_par || '') : 'Demandeur : ' + E(d.demandeur || '')) + '</div><div>Visa de la hiérarchie</div></div></body></html>';
+  openPrintPreview(html, doc + ' — ' + dateShort(c.date), false);
 }
 function paOuvrirFicheDepuisAlerte(vehiculeId){ paOpenVehicule(vehiculeId); }
 
@@ -83702,6 +83840,11 @@ async function pcoSaveCourse(){
   if (_prec && kmDepart - _prec.km_retour > PA_ECART_COURSE) _msg.push('Le km départ (' + _paKm(kmDepart) + ') dépasse de ' + _paKm(kmDepart - _prec.km_retour) + ' le km retour de la course précédente (' + _paKm(_prec.km_retour) + ', ' + dateShort(_prec.date) + ') : trajets non enregistrés ?');
   if (_msg.length && !confirm(_msg.join('\n') + '\n\nEnregistrer quand même cette course ?')) return;
   var existant = editId ? (DATA.vehicule_courses||[]).find(function(x){ return x.id===editId; }) : null;
+  if (!existant && paDemandeObligatoire()) { toast('Demande préalable obligatoire : créez une demande de course (📝) et attendez l\'autorisation de la hiérarchie.', 'error', 8000); return; }
+  if (existant && existant.demande && paCourseEtats(existant).demande !== 'autorisee') {
+    if (paDemandeObligatoire()) { toast('Cette course n\'est pas autorisée (' + ({ en_attente: 'autorisation en attente', refusee: 'demande refusée' }[paCourseEtats(existant).demande] || '') + ').', 'error', 7000); return; }
+    if (!confirm('Cette course n\'a pas été autorisée par la hiérarchie (' + ({ en_attente: 'autorisation en attente', refusee: 'demande refusée' }[paCourseEtats(existant).demande] || '') + ').\n\nL\'enregistrer quand même ?')) return;
+  }
   var c = existant || { id: uid(), created_at: new Date().toISOString() };
   c.vehicule_id = vehiculeId; c.date = date;
   c.chauffeur_id = (document.getElementById('pco-chauffeur')||{}).value||'';
@@ -83709,6 +83852,8 @@ async function pcoSaveCourse(){
   c.heure_retour = (document.getElementById('pco-heure-retour')||{}).value||'';
   c.km_depart = kmDepart; c.km_retour = kmRetour; c.distance = (kmRetour!==null) ? (kmRetour-kmDepart) : '';
   c.motif = motif; c.passagers = (document.getElementById('pco-passagers')||{}).value.trim()||'';
+  if (!existant) { c.rapport_requis = true; c.sans_demande = true; }
+  c.statut_course = (kmRetour!==null) ? 'realisee' : 'en_cours';
   if (existant) c._modifie = new Date().toISOString();
   else DATA.vehicule_courses.push(c);
   await dbPut('vehicule_courses', c);
@@ -83749,10 +83894,12 @@ function paRenderCourses(){
   var fO = window._paCoursesOuvertesVid || '';
   var liste = (DATA.vehicule_courses||[]).filter(function(c){
     if (fO && !(c.vehicule_id===fO && paCourseOuverte(c))) return false;
+    if (window._paCoursesRapportVid && !(c.vehicule_id===window._paCoursesRapportVid && paRapportEnRetard(c))) return false;
     if (fV && c.vehicule_id!==fV) return false;
     if (fM && (c.date||'').slice(0,7)!==fM) return false;
     return true;
   }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||'') || (b.created_at||'').localeCompare(a.created_at||''); });
+  var chipR = window._paCoursesRapportVid ? '<div class="alert alert-warn" style="font-size:12px;margin-bottom:8px;">📄 Rapports de course à rédiger de '+escHtml((paVehicule(window._paCoursesRapportVid)||{}).immatriculation||'')+' : utilisez 📝 sur chaque ligne. <button type="button" class="btn btn-secondary btn-sm" onclick="window._paCoursesRapportVid=null;paRenderCourses()">Retirer le filtre</button></div>' : '';
   var chipO = fO ? '<div class="alert alert-warn" style="font-size:12px;margin-bottom:8px;">🚕 Courses non clôturées de '+escHtml((paVehicule(fO)||{}).immatriculation||'')+' : complétez le km retour avec ✏️. <button type="button" class="btn btn-secondary btn-sm" onclick="paRetirerFiltreCourses()">Retirer le filtre</button></div>' : '';
 
   var kEl = document.getElementById('pco-kpis');
@@ -83762,8 +83909,9 @@ function paRenderCourses(){
     kEl.innerHTML = kpi('Courses', liste.length) + kpi('Km parcourus', fmtF(totalKm)+' km');
   }
 
+  chipO = chipR + chipO;
   if (!liste.length) { box.innerHTML = chipO + '<div class="alert alert-info">Aucune course enregistrée.</div>'; return; }
-  box.innerHTML = chipO + '<table class="data-table"><thead><tr><th>Date</th><th>Véhicule</th><th>Chauffeur</th><th>Horaires</th><th style="text-align:right;">Distance</th><th>Destination / Motif</th><th>Passager(s)</th><th></th></tr></thead><tbody>'
+  box.innerHTML = chipO + '<table class="data-table"><thead><tr><th>Date</th><th>Véhicule</th><th>Chauffeur</th><th>Horaires</th><th style="text-align:right;">Distance</th><th>Destination / Motif</th><th>Passager(s)</th><th>Demande / Rapport</th><th></th></tr></thead><tbody>'
     + liste.map(function(c){
         var v = paVehicule(c.vehicule_id);
         var horaires = (c.heure_depart||c.heure_retour) ? ((c.heure_depart||'—')+' → '+(c.heure_retour||'—')) : '—';
@@ -83772,7 +83920,11 @@ function paRenderCourses(){
           + '<td style="font-size:11px;">'+horaires+'</td>'
           + '<td style="text-align:right;">'+(c.distance!==''&&c.distance!=null?fmtF(c.distance)+' km':'—')+'</td>'
           + '<td>'+escHtml(c.motif||'—')+'</td><td style="font-size:11px;">'+escHtml(c.passagers||'—')+'</td>'
-          + '<td><button class="btn btn-secondary btn-sm btn-icon" onclick="pcoEditCourse(\''+c.id+'\')" title="Modifier">✏️</button> '
+          + '<td>'+paCourseBadges(c)+'</td>'
+          + '<td style="white-space:nowrap;">'+((c.demande && paCourseEtats(c).demande==='autorisee' && !(c.km_depart>0)) ? '<button class="btn btn-primary btn-sm" onclick="pcoEditCourse(\''+c.id+'\')" title="Saisir les km et réaliser la course autorisée">▶ Réaliser</button> ' : '')
+          + '<button class="btn btn-secondary btn-sm btn-icon" onclick="paRapportOuvrir(\''+c.id+'\')" title="Rapport détaillé de la course">📝</button> '
+          + '<button class="btn btn-secondary btn-sm btn-icon" onclick="paImprimerCourse(\''+c.id+'\',\''+(c.rapport?'rapport':'demande')+'\')" title="Imprimer '+(c.rapport?'le rapport':'la demande')+'">🖨️</button> '
+          + '<button class="btn btn-secondary btn-sm btn-icon" onclick="pcoEditCourse(\''+c.id+'\')" title="Modifier">✏️</button> '
           + '<button class="btn btn-danger btn-sm btn-icon" onclick="pcoDeleteCourse(\''+c.id+'\')" title="Supprimer">🗑</button></td></tr>';
       }).join('')
     + '</tbody></table>';
@@ -119701,7 +119853,7 @@ function printFacture(id){
 /* ══════════════════════════════════════════════════════
    VALIDATIONS HIÉRARCHIQUES — workflow générique
    ══════════════════════════════════════════════════════ */
-function valTypeLabel(t){ var m={bon_commande:'Bon de commande',situation:'Situation de travaux',convention:'Convention',facture_fournisseur:'Facture fournisseur',liberation_garantie:'Libération retenue garantie',reception_travaux:'Réception de travaux',livraison:'Livraison souscripteur',attestation_solde:'Attestation de solde',attestation_solde_finale:'Attestation de solde (valeur finale)',cession:'Cession foncière',attestation_solde_cession:'Attestation de solde (cession foncière)',etape_fonciere:'Étape de dossier foncier',autre:'Autre'}; return m[t]||t; }
+function valTypeLabel(t){ var m={bon_commande:'Bon de commande',situation:'Situation de travaux',convention:'Convention',facture_fournisseur:'Facture fournisseur',liberation_garantie:'Libération retenue garantie',reception_travaux:'Réception de travaux',livraison:'Livraison souscripteur',attestation_solde:'Attestation de solde',attestation_solde_finale:'Attestation de solde (valeur finale)',cession:'Cession foncière',attestation_solde_cession:'Attestation de solde (cession foncière)',etape_fonciere:'Étape de dossier foncier',demande_course:'Demande de course',rapport_course:'Rapport de course',autre:'Autre'}; return m[t]||t; }
 function valStatutBadge(st){ var m={en_attente:'badge-or',valide:'badge-vert',rejete:'badge-rouge',annule:'badge-rouge'}; var l={en_attente:'⏳ En attente',valide:'✅ Validé',rejete:'⛔ Rejeté',annule:'↩ Validation annulée'}; return '<span class="badge '+(m[st]||'badge-or')+'">'+(l[st]||st)+'</span>'; }
 function valPending(type,refId){ return (DATA.validations||[]).find(function(v){return v.type===type&&v.ref_id===refId&&v.statut==='en_attente';}); }
 async function valCreate(type,refId,libelle,montant,meta){
@@ -119728,6 +119880,7 @@ async function valDecide(id,decision,motif){
   toast(decision==='valide'?'✅ Validé.':'⛔ Rejeté.',decision==='valide'?'success':'info');
 }
 async function valApply(type,refId,decision){
+  if(type==='demande_course'||type==='rapport_course'){ await paCourseValApply(type,refId,decision); }
   if(type==='bon_commande'){
     var b=(DATA.bons_commande||[]).find(function(x){return x.id===refId;});
     if(b){ b.statut=(decision==='valide')?'valide':'rejete'; if(decision==='valide'){ b.valide_par=(APP.currentUser&&APP.currentUser.nom)||'—'; b.valide_date=today(); } await dbPut('bons_commande',b); if(typeof syncToSupabase==='function')syncToSupabase('pi_bons_commande',b); }
@@ -120035,6 +120188,7 @@ function renderValidations(){
         else acts='<span style="font-size:11px;color:var(--blanc-dim);">'+(v.type==='etape_fonciere'?'réservé à la fonction « '+escHtml((v.meta||{}).fonction_lib||(v.meta||{}).fonction||'')+' »':'réservé à la hiérarchie')+'</span>';
       } else { acts='<span style="font-size:11px;color:var(--blanc-dim);">'+(v.valideur||'')+' · '+(v.date_decision||'')+(v.motif?(' · '+v.motif):'')+'</span>'; }
       if(v.type==='etape_fonciere') acts='<button class="btn btn-secondary btn-sm" onclick="valApercuEtapeFonciere(\''+v.id+'\')">👁 Aperçu</button> <button class="btn btn-secondary btn-sm" onclick="valOuvrirDossierFoncier(\''+((v.meta||{}).dossier_id||'')+'\',\''+((v.meta||{}).code||'')+'\',\''+v.id+'\')">📁 Dossier</button> '+acts;
+      if(v.type==='demande_course'||v.type==='rapport_course') acts='<button class="btn btn-secondary btn-sm" onclick="paCourseApercu(\''+v.ref_id+'\',\''+(v.type==='rapport_course'?'rapport':'demande')+'\')">👁 Voir</button> '+acts;
       if(v.type==='attestation_solde_cession') acts='<button class="btn btn-secondary btn-sm" onclick="cesAttApercu(\''+v.ref_id+'\')">👁 Voir</button> '+acts;
       if(v.type==='attestation_solde' || v.type==='attestation_solde_finale') acts='<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">👁 Voir</button> <button class="btn btn-secondary btn-sm" title="Versements, reçus, bons de caisse et écritures à l\'appui de l\'attestation" onclick="attSoldePieces(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">🔎 Pièces</button> '+acts;
       return '<tr><td>'+valTypeLabel(v.type)+'</td><td style="font-size:12px;">'+v.libelle+'</td><td style="text-align:right;font-weight:600;">'+fmtF(Math.round(v.montant||0))+'</td><td style="font-size:11px;">'+(v.demandeur||'—')+'</td><td>'+(v.date_demande||'—')+'</td><td>'+valStatutBadge(v.statut)+'</td><td style="white-space:nowrap;">'+acts+'</td></tr>';
@@ -148724,6 +148878,52 @@ goTo = function(page) {
       <div style="font-size:11px;color:var(--blanc-dim);">Cette FNE justifie automatiquement la TVA de l'écriture de la dépense dans « Justif. TVA ».</div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-da-fne')">Annuler</button><button class="btn btn-primary" onclick="daFneEnregistrer()">💾 Enregistrer</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-pa-demande">
+  <div class="modal" style="max-width:720px;width:96vw;">
+    <div class="modal-header"><h3>📝 Demande de course (préalable)</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-pa-demande')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">La demande est transmise à la hiérarchie par le circuit de validation. La course s'effectue une fois autorisée ; un rapport détaillé est rédigé à son retour.</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Véhicule *</label><select id="pdm-vehicule" class="form-control"></select></div>
+        <div class="form-group"><label>Chauffeur</label><select id="pdm-chauffeur" class="form-control"></select></div>
+        <div class="form-group"><label>Date prévue *</label><input type="date" id="pdm-date" class="form-control"></div>
+        <div class="form-group"><label>Heure de départ prévue</label><input type="time" id="pdm-heure" class="form-control"></div>
+        <div class="form-group span-2"><label>Objectif de la course *</label><textarea id="pdm-objectif" class="form-control" rows="2" placeholder="Ex : remettre le dossier de permis de construire et obtenir le récépissé"></textarea></div>
+        <div class="form-group"><label>Entreprise / organisme visité *</label><input id="pdm-entreprise" class="form-control" placeholder="Ex : Mairie de Cocody, Étude Maître X…"></div>
+        <div class="form-group"><label>Lieu / adresse</label><input id="pdm-lieu" class="form-control"></div>
+        <div class="form-group span-2"><label>Interlocuteurs attendus (nom, fonction)</label><textarea id="pdm-interlocuteurs" class="form-control" rows="2"></textarea></div>
+        <div class="form-group"><label>Participants internes</label><input id="pdm-participants" class="form-control" placeholder="Ex : M. Konan (Technique)"></div>
+        <div class="form-group"><label>Distance estimée (km)</label><input type="number" id="pdm-km" class="form-control" min="0"></div>
+        <div class="form-group"><label>Urgence</label><select id="pdm-urgence" class="form-control"><option value="normale">Normale</option><option value="urgente">Urgente</option></select></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-pa-demande')">Annuler</button><button class="btn btn-primary" onclick="paDemandeEnregistrer()">📤 Transmettre à la hiérarchie</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-pa-rapport">
+  <div class="modal" style="max-width:760px;width:96vw;">
+    <div class="modal-header"><h3>📄 Rapport de course</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-pa-rapport')">✕</button></div>
+    <div class="modal-body">
+      <div id="pra-contexte" style="font-size:12px;background:var(--card2);padding:8px 10px;border-radius:6px;margin-bottom:10px;"></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Objectif atteint *</label><select id="pra-objectif-atteint" class="form-control pra-in"><option value="">— Choisir —</option><option value="oui">Oui</option><option value="partiel">Partiellement</option><option value="non">Non</option></select></div>
+        <div class="form-group"><label>Entreprise / organisme visité *</label><input id="pra-entreprise" class="form-control pra-in"></div>
+        <div class="form-group"><label>Heure d'arrivée sur site</label><input type="time" id="pra-arrivee" class="form-control pra-in"></div>
+        <div class="form-group"><label>Heure de sortie</label><input type="time" id="pra-sortie" class="form-control pra-in"></div>
+        <div class="form-group span-2"><label>Personnes rencontrées (nom, fonction) *</label><textarea id="pra-personnes" class="form-control pra-in" rows="2"></textarea></div>
+        <div class="form-group span-2"><label>Résumé détaillé de la mission *</label><textarea id="pra-resume" class="form-control pra-in" rows="4" placeholder="Déroulement, points abordés, éléments obtenus ou refusés…"></textarea></div>
+        <div class="form-group span-2"><label>Résultats / décisions</label><textarea id="pra-resultats" class="form-control pra-in" rows="2"></textarea></div>
+        <div class="form-group span-2"><label>Suites à donner</label><textarea id="pra-suites" class="form-control pra-in" rows="2" placeholder="Actions, échéances, responsables"></textarea></div>
+        <div class="form-group"><label>Documents remis / reçus</label><input id="pra-documents" class="form-control pra-in"></div>
+        <div class="form-group"><label>Dépenses engagées (FCFA)</label><input type="number" id="pra-depenses" class="form-control pra-in" min="0"></div>
+        <div class="form-group span-2"><label>Incidents / observations (véhicule, route, accueil…)</label><textarea id="pra-incidents" class="form-control pra-in" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-pa-rapport')">Fermer</button><button class="btn btn-secondary" onclick="paImprimerCourse(_paRapportId,'rapport')">🖨️ Aperçu / imprimer</button>
+      <button class="btn btn-secondary" id="pra-btn-brouillon" onclick="paRapportEnregistrer(false)">💾 Brouillon</button><button class="btn btn-primary" id="pra-btn-transmettre" onclick="paRapportEnregistrer(true)">📤 Transmettre à la hiérarchie</button></div>
   </div>
 </div>
 
