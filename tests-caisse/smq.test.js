@@ -272,7 +272,7 @@ test('indicateurs automatiques : formules calculées sur les données, relevés,
     o.resume = smqResumeHtml('pilotage').indexOf('hors cible') !== -1;
     return o;
   });
-  assert.equal(r.nb, 22);
+  assert.equal(r.nb, 23);
   assert.equal(r.val, '3|1|50'); assert.equal(r.nc, '1|1|4'); assert.equal(r.sat, '3.67|66.7'); assert.equal(r.rcl, '2|50');
   assert.equal(r.doc, r.docAttendu); assert.equal(r.rsq, 1); assert.equal(r.fne, 1); assert.equal(r.vis, 66.7); assert.equal(r.bc, 6); assert.equal(r.inc, 50);
   assert.equal(r.vide, '|'); assert.equal(r.etats, 'ok|ko||ok');
@@ -306,4 +306,36 @@ test('matrice des compétences : référentiel, évaluation, écarts, périmées
   assert.equal(r.histo, 1); assert.equal(r.apres, 0); assert.equal(r.couvApres, 100);
   assert.equal(r.frm, '1:e1'); assert.equal(r.doublon, '1:true'); assert.equal(r.calc, 50);
   assert.ok(r.html); assert.equal(r.form, 1); assert.equal(r.ro, false);
+});
+
+test('contexte et parties intéressées : nature SWOT, suggestions sans doublon, revue, lien vers un risque, revue de direction, indicateur', async () => {
+  const app = await ouvrir(true);
+  const r = await app.page.evaluate(async function () {
+    var o = {}, an = new Date().getFullYear();
+    DATA.smq_enjeux = []; DATA.smq_parties = []; DATA.smq_risques = [];
+    o.nature = [_smqNatureEnjeu({ type: 'Interne', effet: 'Positif' }), _smqNatureEnjeu({ type: 'Interne', effet: 'Négatif' }), _smqNatureEnjeu({ type: 'Externe', effet: 'Positif' }), _smqNatureEnjeu({ type: 'Externe', effet: 'Négatif' })].join('|');
+    smqOnglet('ctx'); smqNouveau('ctx'); o.statut0 = _smqForm.rec.statut; o.revue0 = _smqForm.rec.prochaine_revue > today();
+    await smqEnregistrer(); o.sansIntitule = DATA.smq_enjeux.length;
+    document.getElementById('smqf-intitule').value = 'Litige foncier majeur'; document.getElementById('smqf-effet').value = 'Négatif'; document.getElementById('smqf-type').value = 'Externe';
+    document.getElementById('smqf-prochaine_revue').value = '2000-01-01'; await smqEnregistrer(); o.revueAvant = DATA.smq_enjeux.length;
+    smqNouveau('ctx'); document.getElementById('smqf-intitule').value = 'Litige foncier majeur'; document.getElementById('smqf-effet').value = 'Négatif'; document.getElementById('smqf-type').value = 'Externe'; await smqEnregistrer();
+    var e = DATA.smq_enjeux[0]; o.ref = e.ref; o.an = an; o.natureEnr = _smqNatureEnjeu(e);
+    smqNouveau('ppi'); await smqEnregistrer(); o.sansNom = DATA.smq_parties.length;
+    document.getElementById('smqf-nom').value = 'Conservation foncière'; document.getElementById('smqf-attentes').value = 'Dossiers complets'; await smqEnregistrer(); o.ppiRef = DATA.smq_parties[0].ref;
+    var s1 = await smqCtxSuggerer(); var n1 = DATA.smq_enjeux.length + ':' + DATA.smq_parties.length; var s2 = await smqCtxSuggerer(); o.sug = n1; o.sug2 = DATA.smq_enjeux.length + ':' + DATA.smq_parties.length; o.sugAjoutes = s1.enjeux + ':' + s1.parties + '/' + s2.enjeux + ':' + s2.parties;
+    o.html = document.getElementById('smq-contenu').innerHTML; o.swot = o.html.indexOf('Menaces') !== -1 && o.html.indexOf('Parties intéressées pertinentes') !== -1; delete o.html;
+    e.prochaine_revue = '2000-01-01'; o.depasse = _smqCtxRevueDepassee(e); var c1 = smqCalculer('ctx_revue', '2000-01-01', '2999-12-31').v;
+    await smqCtxRevu('ctx', e.id); o.apresRevu = _smqCtxRevueDepassee(e); var c2 = smqCalculer('ctx_revue', '2000-01-01', '2999-12-31').v; o.calc = c1 < c2;
+    smqCreerRisqueEnjeu(e.id); o.rsqType = _smqForm.rec.type; o.rsqDesc = _smqForm.rec.description.indexOf(e.ref) !== -1;
+    document.getElementById('smqf-description').value = 'Litige'; await smqEnregistrer(); o.lie = e.risque_ref === DATA.smq_risques[0].ref; smqCreerRisqueEnjeu(e.id); o.deja = _smqForm == null || _smqForm.kind !== 'rsq' || !_smqForm.nouveau;
+    var ent = smqEntreesAuto('2000-01-01', '2999-12-31').contexte; o.entrees = ent.enjeux > 0 && ent.parties > 0;
+    await smqTransition('ctx', e.id, 'archive'); o.archive = e.statut;
+    window.smqPeutEditer = function () { return false; }; o.ro = (await smqCtxSuggerer()).ok;
+    return o;
+  });
+  assert.equal(r.nature, 'Force|Faiblesse|Opportunité|Menace'); assert.equal(r.statut0, 'actif'); assert.ok(r.revue0);
+  assert.equal(r.sansIntitule, 0); assert.equal(r.revueAvant, 1);
+  assert.equal(r.ref, 'ENJ-' + r.an + '-0001'); assert.equal(r.natureEnr, 'Menace'); assert.equal(r.sansNom, 0); assert.equal(r.ppiRef, 'PIN-' + r.an + '-0001');
+  assert.equal(r.sug2, r.sug); assert.ok(r.swot); assert.ok(r.depasse); assert.equal(r.apresRevu, false); assert.ok(r.calc);
+  assert.equal(r.rsqType, 'Risque'); assert.ok(r.rsqDesc); assert.ok(r.lie); assert.ok(r.deja); assert.ok(r.entrees); assert.equal(r.archive, 'archive'); assert.equal(r.ro, false);
 });

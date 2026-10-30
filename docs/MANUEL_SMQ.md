@@ -1,6 +1,6 @@
 # Manuel de procédures — Système de management de la qualité (SMQ)
 
-**Réf.** PRO-SMQ · **Version** 1.5 · **Date** Octobre 2026
+**Réf.** PRO-SMQ · **Version** 1.6 · **Date** Octobre 2026
 **Objet** : fixer comment l'entreprise tient son système qualité dans l'ERP : cartographie et fiches de processus, maîtrise des documents, audits internes, revue de direction, non-conformités et actions correctives, réclamations, satisfaction des clients.
 **Principe directeur** : tout écart est **enregistré, analysé, corrigé, puis vérifié** ; aucune clôture sans preuve d'efficacité.
 
@@ -125,6 +125,18 @@
 5. **Traiter les dépendances** : une compétence détenue au niveau requis par moins de 2 personnes est signalée (risque de continuité) ; former un suppléant ou l'inscrire au registre des risques.
 6. L'indicateur « Compétences requises atteintes » se calcule automatiquement (SMQ-11).
 
+### SMQ-13 — Analyser le contexte et les parties intéressées
+
+**Où** : Paramètres › SMQ › 🌍 Contexte. Écriture réservée à la hiérarchie.
+
+1. **Enjeux** : « + Enjeu » (origine interne ou externe, effet positif ou négatif, catégorie, importance, source de suivi, responsable). La nature est déduite : interne + = force, interne − = faiblesse, externe + = opportunité, externe − = menace. La grille synthétique les regroupe.
+2. **Parties intéressées** : « + Partie intéressée » (catégorie, besoins et attentes, exigences légales ou contractuelles, influence, mode de suivi). Cocher « Exigence obligatoire » pour celles qui s'imposent.
+3. **💡 Proposer enjeux et parties** : base indicative adaptée à l'activité (sans doublon). Chaque élément proposé est marqué « À confirmer » jusqu'à sa revue.
+4. **✔ Revu** : confirme qu'un élément reste pertinent ; la prochaine revue est fixée à un an. Au-delà, « Revue dépassée » s'affiche.
+5. **🛡️ Risque** : depuis un enjeu, ouvre un risque ou une opportunité préremplis (SMQ-10). Une faiblesse ou une menace sans risque lié est signalée.
+6. **Archiver** un élément qui n'est plus pertinent ; il reste consultable.
+7. À la **revue de direction**, les entrées reprennent le nombre d'enjeux et de parties, les revues dépassées et les menaces sans risque. L'indicateur « Enjeux et parties intéressées revus à jour » se calcule automatiquement (SMQ-11).
+
 ### SMQ-03 — Traiter une non-conformité
 
 **Où** : Qualité (SMQ) › **Non-conformités** › **+ Non-conformité**.
@@ -172,6 +184,7 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 | SMQ-10 | A | R | R | C |
 | SMQ-11 | I | R/A | C | I |
 | SMQ-12 | A | R | R | C |
+| SMQ-13 | A | R | R | C |
 | SMQ-04 | A | R | R | C |
 | SMQ-05 | I | R | I | R |
 
@@ -207,3 +220,4 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 | 1.3 | Octobre 2026 | Politique, objectifs, risques et opportunités (SMQ-08 à SMQ-10) |
 | 1.4 | Octobre 2026 | Calcul automatique des indicateurs (SMQ-11) |
 | 1.5 | Octobre 2026 | Matrice des compétences (SMQ-12) |
+| 1.6 | Octobre 2026 | Contexte et parties intéressées (SMQ-13) |
