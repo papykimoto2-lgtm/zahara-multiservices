@@ -18343,6 +18343,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
         <button class="tab-btn active" onclick="switchTab('modal-client','identite')">Identité</button>
         <button class="tab-btn" onclick="switchTab('modal-client','souscription')">Souscription</button>
         <button class="tab-btn" onclick="switchTab('modal-client','documents')">Documents</button>
+        <button class="tab-btn" id="tab-btn-client-releve" style="display:none;" onclick="switchTab('modal-client','releve')">📄 Relevé</button>
       </div>
 
       <div class="tab-pane active" id="tab-modal-client-identite">
@@ -18652,6 +18653,16 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <label>Mensualité calculée</label>
             <input type="text" class="form-control" id="c-mensualite" readonly style="color:var(--or);font-weight:bold;">
           </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="tab-modal-client-releve">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="printReleveClientOnglet()">🖨️ Imprimer</button>
+        </div>
+        <div id="releve-client-box">
+          <div style="font-weight:700;margin-bottom:10px;">📄 Relevé de compte — <span id="releve-client-nom"></span></div>
+          <div id="releve-client-content"></div>
         </div>
       </div>
 
@@ -30814,6 +30825,7 @@ function goTo(page) {
 }
 
 function switchTab(context, tab) {
+  if (context==='modal-client' && tab==='releve' && typeof afficherReleveClientOnglet==='function') afficherReleveClientOnglet();
   if (context==='params' && tab==='alertes' && typeof relCtxParamsCharger==='function') relCtxParamsCharger();
   if (context==='juridique' && tab==='contentieux' && typeof ctxActualiserAuto==='function') ctxActualiserAuto();
   // Hook scan pointage
@@ -33200,6 +33212,9 @@ function openClientModal(id) {
     setSelectValue('c-commercial', 'emp_1788440497496');
   }
   if (typeof updateLotsByProgramme === 'function') updateLotsByProgramme();
+  var _btnRel = document.getElementById('tab-btn-client-releve'); if (_btnRel) _btnRel.style.display = id ? '' : 'none';
+  var _paneRel = document.getElementById('tab-modal-client-releve'); if (_paneRel && _paneRel.classList.contains('active')) switchTab('modal-client', 'identite');
+  var _cRel = document.getElementById('releve-client-content'); if (_cRel) _cRel.innerHTML = '';
   openModal('modal-client');
 }
 
@@ -79414,9 +79429,20 @@ function buildTiers411() {
 
 /* Cible d'affichage du relevé : la page Comptabilité, ou la fenêtre « Relevé de compte tiers » (ouverte depuis Relances, Contentieux…). */
 function _releveCibles() {
-  var m = !!APP._releveModal;
-  return { box: document.getElementById(m ? 'releve-modal-box' : 'releve-tiers-box'), nom: document.getElementById(m ? 'releve-modal-nom' : 'releve-tiers-nom'), content: document.getElementById(m ? 'releve-modal-content' : 'releve-tiers-content') };
+  var m = APP._releveModal, pre = (m === 'onglet') ? 'releve-client' : (m ? 'releve-modal' : 'releve-tiers');
+  return { box: document.getElementById(pre + '-box'), nom: document.getElementById(pre + '-nom'), content: document.getElementById(pre + '-content') };
 }
+/* Onglet « Relevé » du formulaire souscripteur : même calcul que la page Comptabilité, pour le souscripteur en cours d'édition. */
+function afficherReleveClientOnglet() {
+  var id = APP.editingId, content = document.getElementById('releve-client-content'); if (!content) return;
+  var vide = function(t){ return '<div style="padding:16px;color:var(--blanc-dim);">' + t + '</div>'; };
+  if (!id) { content.innerHTML = vide('Enregistrez d\'abord le souscripteur pour consulter son relevé.'); return; }
+  content.innerHTML = '';
+  APP._releveModal = 'onglet';
+  try { showReleveTiersClient(id); } finally { APP._releveModal = false; }
+  if (!content.innerHTML) content.innerHTML = vide('Relevé indisponible : souscripteur introuvable.');
+}
+function printReleveClientOnglet() { _printFromElement('releve-client-box', 'Relevé de compte tiers'); }
 /* Visualiser le relevé de compte d'un tiers (« client:<id> » ou « cession:<id> ») dans une fenêtre, sans quitter la page en cours. */
 function ouvrirReleveTiers(refId) {
   if (/^(constructeur|fournisseur):/.test(String(refId))) return ouvrirReleveFournisseur(refId);
