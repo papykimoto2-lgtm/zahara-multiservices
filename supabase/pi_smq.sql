@@ -170,7 +170,39 @@ exception
   when duplicate_object then null;
 end$$;
 
--- Vérification : doit renvoyer 10 lignes avec rls_active = true.
+create table if not exists public.pi_smq_enjeux (
+  id         text        primary key,
+  data       jsonb       not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+grant all on table public.pi_smq_enjeux to anon, authenticated;
+alter table public.pi_smq_enjeux enable row level security;
+drop policy if exists pi_smq_enjeux_all on public.pi_smq_enjeux;
+create policy pi_smq_enjeux_all on public.pi_smq_enjeux for all to anon, authenticated using (true) with check (true);
+do $$
+begin
+  alter publication supabase_realtime add table public.pi_smq_enjeux;
+exception
+  when duplicate_object then null;
+end$$;
+
+create table if not exists public.pi_smq_parties (
+  id         text        primary key,
+  data       jsonb       not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+grant all on table public.pi_smq_parties to anon, authenticated;
+alter table public.pi_smq_parties enable row level security;
+drop policy if exists pi_smq_parties_all on public.pi_smq_parties;
+create policy pi_smq_parties_all on public.pi_smq_parties for all to anon, authenticated using (true) with check (true);
+do $$
+begin
+  alter publication supabase_realtime add table public.pi_smq_parties;
+exception
+  when duplicate_object then null;
+end$$;
+
+-- Vérification : doit renvoyer 12 lignes avec rls_active = true.
 select c.relname as table_name, c.relrowsecurity as rls_active
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
-where n.nspname = 'public' and c.relname in ('pi_smq_documents','pi_smq_nc','pi_smq_reclamations','pi_smq_satisfaction','pi_smq_audits','pi_smq_revues','pi_smq_politiques','pi_smq_objectifs','pi_smq_risques','pi_smq_evaluations');
+where n.nspname = 'public' and c.relname in ('pi_smq_documents','pi_smq_nc','pi_smq_reclamations','pi_smq_satisfaction','pi_smq_audits','pi_smq_revues','pi_smq_politiques','pi_smq_objectifs','pi_smq_risques','pi_smq_evaluations','pi_smq_enjeux','pi_smq_parties');
