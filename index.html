@@ -44934,7 +44934,7 @@ var TVA_CPT_DUE = '4441', TVA_CPT_CREDIT = '4449';
 function _tvaCfg() {
   var c = (DATA.params && DATA.params.tva) || {};
   return { prorata: (c.prorata === undefined ? 100 : parseFloat(c.prorata)),
-    regime: c.regime || 'RNI', declarations: Array.isArray(c.declarations) ? c.declarations : [], politique_fne: c.politique_fne === 'strict' ? 'strict' : 'signaler' };
+    regime: c.regime || 'RNI', declarations: Array.isArray(c.declarations) ? c.declarations : [], politique_fne: c.politique_fne === 'strict' ? 'strict' : 'signaler', rapprochements: (c.rapprochements && typeof c.rapprochements === 'object') ? c.rapprochements : {} };
 }
 async function _tvaSave(cfg) {
   DATA.params = DATA.params || {}; DATA.params.tva = cfg;
@@ -44992,7 +44992,7 @@ function calculerTVA(mois) {
    un classement des fournisseurs et le manque à gagner. Politique « signaler » (défaut) : la déclaration de TVA ne change pas ; politique « stricte » : seule la TVA
    justifiée par une FNE conforme est déduite, le reste va en charge (6461) lors de la liquidation. */
 var TVA_FNE_DEBUT = '2025-12-01';
-var _tvaJ = { de: '', a: '', onglet: 'justifier', filtre: 'a_traiter', piece: null };
+var _tvaJ = { de: '', a: '', mois: '', onglet: 'justifier', filtre: 'a_traiter', piece: null };
 function _tvaJNomTiers(e) {
   var l = ecrLignes(e).filter(function(x){ return String(x.compte || '').indexOf('401') === 0 && x.sens === 'C'; })[0], id = l ? ecrTiersLigne(e, l) : '', nom = '';
   if (e.tva_justif && e.tva_justif.fournisseur) nom = e.tva_justif.fournisseur;
@@ -45054,8 +45054,117 @@ function tvaJNonJustifieeMois(mois) {
   tvaJListe(mois, mois).forEach(function(x){ if (x.etat === 'a_justifier' || x.etat === 'non_conforme') { s += x.tva; n++; } });
   return { montant: s, nb: n };
 }
-function tvaJOuvrir() {
-  var d = new Date(); _tvaJ.a = d.toISOString().slice(0, 7); _tvaJ.de = TVA_FNE_DEBUT.slice(0, 7); _tvaJ.onglet = 'justifier'; _tvaJ.filtre = 'a_traiter';
+/* ══ Rapprochement mensuel avant la déclaration de TVA ══
+   Liste de contrôle du mois : pièces sans FNE valide, arriéré des mois précédents, FNE utilisée deux fois, fournisseurs non identifiés, mois précédent non liquidé,
+   factures de vente non certifiées, échéance. Lecture seule ; « Valider » enregistre seulement la prise de connaissance (qui, quand, combien de réserves). */
+function _tvaMoisPrec(m) { var d = new Date(m + '-01'); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); }
+function _tvaMoisSuiv(m) { var d = new Date(m + '-01'); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 7); }
+function tvaRapprochement(mois) {
+  var cfg = _tvaCfg(), f = function(v){ return fmtF(Math.round(v || 0)); }, P = [];
+  var add = function(cle, niveau, titre, detail, action){ P.push({ cle: cle, niveau: niveau, titre: titre, detail: detail || '', action: action || null }); };
+  var T = calculerTVA(mois), prec = _tvaMoisPrec(mois), decl = cfg.declarations.filter(function(d){ return d.mois === mois; })[0];
+
+  /* 1. Mois précédent liquidé ? (le crédit reporté en dépend) */
+  var Tp = calculerTVA(prec), mvtPrec = Math.round(Tp.totCol) || Math.round(Tp.totDedBrut), declPrec = cfg.declarations.some(function(d){ return d.mois === prec; });
+  if (mvtPrec && !declPrec) add('prec', 'bloquant', 'Mois précédent (' + prec + ') non liquidé', 'Il comporte de la TVA (collectée ' + f(Tp.totCol) + ', déductible ' + f(Tp.totDedBrut) + ' FCFA) : le crédit de TVA reporté sur ce mois serait faux. Liquidez ' + prec + ' d\'abord.', { lib: 'Ouvrir ' + prec, js: 'tvaJOuvrirDeclaration(\'' + prec + '\')' });
+  else add('prec', 'ok', 'Mois précédent (' + prec + ') ' + (mvtPrec ? 'liquidé' : 'sans mouvement de TVA'));
+
+  /* 2. Pièces du mois sans FNE valide */
+  var L = tvaJListe(mois, mois), nj = L.filter(function(x){ return x.etat === 'a_justifier' || x.etat === 'non_conforme'; }), sj = nj.reduce(function(a, x){ return a + x.tva; }, 0);
+  if (nj.length) add('pieces', 'attention', nj.length + ' pièce(s) sans FNE valide — TVA ' + f(sj) + ' FCFA',
+    (cfg.politique_fne === 'strict' ? 'Politique stricte : cette TVA ne sera pas déduite à la liquidation. ' : 'Politique « signaler » : cette TVA reste déduite mais ne tient pas en cas de contrôle. ') + 'Obtenez la FNE du fournisseur puis enregistrez-la.',
+    { lib: 'Justifier les pièces', js: 'tvaJAller(\'justifier\',\'' + mois + '\')' });
+  else add('pieces', 'ok', L.length ? 'Toutes les pièces du mois (' + L.filter(function(x){ return x.etat !== 'avant_fne'; }).length + ') sont justifiées par une FNE conforme' : 'Aucune pièce avec TVA déductible ce mois');
+
+  /* 3. Arriéré des mois précédents */
+  var arr = {}; tvaJListe(TVA_FNE_DEBUT.slice(0, 7), prec).forEach(function(x){ if (x.etat === 'a_justifier' || x.etat === 'non_conforme') { var o = arr[x.mois] = arr[x.mois] || { n: 0, t: 0 }; o.n++; o.t += x.tva; } });
+  var ma = Object.keys(arr).sort();
+  if (ma.length) add('arriere', 'attention', 'Arriéré : ' + ma.reduce(function(a, k){ return a + arr[k].n; }, 0) + ' pièce(s) non justifiées sur ' + ma.length + ' mois précédent(s)',
+    ma.map(function(k){ return k + ' : ' + arr[k].n + ' pièce(s), TVA ' + f(arr[k].t) + ' FCFA'; }).join(' · '), { lib: 'Voir l\'arriéré', js: 'tvaJAller(\'justifier\',\'' + TVA_FNE_DEBUT.slice(0, 7) + '\',\'' + prec + '\')' });
+  else add('arriere', 'ok', 'Aucun arriéré de pièces non justifiées sur les mois précédents');
+
+  /* 4. FNE utilisée pour plusieurs pièces */
+  var vus = {}; (DATA.ecritures || []).forEach(function(e){ var j = e && e.tva_justif; if (j && j.statut === 'fne' && String(j.fne_numero || '').trim()) { var k = String(j.fne_numero).trim().toUpperCase(); (vus[k] = vus[k] || []).push(e); } });
+  var dbl = Object.keys(vus).filter(function(k){ return vus[k].length > 1; });
+  if (dbl.length) add('doublon', 'attention', dbl.length + ' n° de FNE utilisé(s) sur plusieurs pièces', dbl.slice(0, 6).map(function(k){ return k + ' (' + vus[k].length + ' pièces : ' + vus[k].map(function(e){ return escHtml(e.piece || e.libelle || ''); }).join(', ') + ')'; }).join(' · ') + '. Une même FNE ne justifie qu\'une seule dépense, sauf règlement en plusieurs pièces : à vérifier.');
+  else add('doublon', 'ok', 'Aucune FNE utilisée deux fois');
+
+  /* 5. Fournisseurs non identifiés */
+  var ni = L.filter(function(x){ return x.tiers === 'Fournisseur non identifié' && x.etat !== 'avant_fne'; });
+  if (ni.length) add('tiers', 'attention', ni.length + ' pièce(s) sans fournisseur identifié', 'Sans nom de fournisseur, le classement et le suivi des FNE manquantes sont faussés : renseignez-le dans « Justifier ».', { lib: 'Compléter', js: 'tvaJAller(\'justifier\',\'' + mois + '\')' });
+  else add('tiers', 'ok', 'Fournisseur identifié sur toutes les pièces');
+
+  /* 6. Factures de vente (FNE émises) */
+  var fv = (DATA.factures_client || []).filter(function(x){ return x.date && x.date.slice(0, 7) === mois && x.mode_facture !== 'simple'; });
+  var enErr = fv.filter(function(x){ return x.statut_fne === 'erreur' || x.statut_fne === 'a_certifier'; }), cert = fv.filter(function(x){ return x.statut_fne === 'certifiee'; });
+  var tvaFne = cert.reduce(function(a, x){ return a + (x.type === 'avoir' ? -1 : 1) * (parseFloat(x.tva) || 0); }, 0);
+  if (enErr.length) add('ventes', 'attention', enErr.length + ' facture(s) de vente non certifiée(s) par la DGI', 'Une facture non certifiée n\'est pas une FNE valable pour le client : relancez la certification depuis « Factures FNE ».', { lib: 'Factures FNE', js: 'closeModal(\'modal-tva-justif\');goTo(\'facturation\')' });
+  else add('ventes', 'ok', fv.length ? fv.length + ' facture(s) de vente du mois, toutes certifiées ou hors FNE' : 'Aucune facture de vente émise ce mois');
+  add('collectee', 'info', 'TVA collectée en comptabilité : ' + f(T.totCol) + ' FCFA — TVA des FNE de vente certifiées : ' + f(tvaFne) + ' FCFA',
+    'Les deux montants ne coïncident pas forcément : une vente échelonnée n\'est facturée qu\'au solde, alors que la TVA peut être comptabilisée à l\'encaissement. À expliquer, pas à corriger d\'office.');
+
+  /* 7. État de la liquidation et échéance */
+  var ech = new Date(_tvaMoisSuiv(mois) + '-15T12:00:00'), jours = Math.round((ech - new Date()) / 86400000);
+  if (decl) add('liquid', 'attention', 'Liquidation déjà passée pour ' + mois + ' (le ' + String(decl.le || '').slice(0, 10) + ')', 'Toute modification de pièce après liquidation suppose une déclaration rectificative.');
+  else add('liquid', 'info', 'Liquidation du mois : non passée');
+  add('echeance', jours < 0 ? 'attention' : (jours <= 5 ? 'attention' : 'info'), 'Échéance de dépôt et de paiement : 15/' + _tvaMoisSuiv(mois).slice(5) + '/' + _tvaMoisSuiv(mois).slice(0, 4), jours < 0 ? 'Échéance dépassée de ' + (-jours) + ' jour(s).' : (jours === 0 ? 'C\'est aujourd\'hui.' : 'Il reste ' + jours + ' jour(s).'));
+  add('regles', 'info', 'Paramètres appliqués : prorata ' + cfg.prorata + ' % — politique ' + (cfg.politique_fne === 'strict' ? 'stricte' : 'signaler') + ' — régime ' + cfg.regime,
+    'Résultat provisoire : ' + (T.aPayer ? 'TVA à payer ' + f(T.aPayer) : 'crédit de TVA à reporter ' + f(T.credit)) + ' FCFA (collectée ' + f(T.totCol) + ', déductible ' + f(T.totDed) + ', crédit antérieur ' + f(T.credAnt) + ').');
+  var nb = P.filter(function(p){ return p.niveau === 'bloquant'; }).length, na = P.filter(function(p){ return p.niveau === 'attention'; }).length, val = (cfg.rapprochements || {})[mois] || null;
+  return { mois: mois, points: P, bloquants: nb, attentions: na, valide: val, statut: nb ? 'non_pret' : (na ? 'reserves' : 'pret'), nonJustifie: sj, T: T };
+}
+function tvaJAller(onglet, de, a) { _tvaJ.onglet = onglet; _tvaJ.filtre = 'a_traiter'; _tvaJ.de = de; _tvaJ.a = a || de; tvaJRender(); }
+function tvaJOuvrirDeclaration(mois) { closeModal('modal-tva-justif'); ouvrirDeclarationTVA(); var i = document.getElementById('tva-mois'); if (i) { i.value = mois; renderDeclarationTVA(); } }
+function _tvaRappStatutHtml(R) {
+  var m = { pret: ['var(--vert)', '✅ Prêt à déclarer'], reserves: ['var(--or)', '⚠️ Déclarable avec réserves (' + R.attentions + ')'], non_pret: ['var(--rouge)', '⛔ Non prêt (' + R.bloquants + ' point(s) bloquant(s))'] }[R.statut];
+  return '<span style="color:' + m[0] + ';font-weight:700;">' + m[1] + '</span>';
+}
+function tvaJRapprochementHtml() {
+  var R = tvaRapprochement(_tvaJ.mois), ico = { ok: ['✓', 'var(--vert)'], attention: ['⚠️', 'var(--or)'], bloquant: ['⛔', 'var(--rouge)'], info: ['ℹ️', 'var(--blanc-dim)'] };
+  var val = R.valide, modif = val && Math.round(val.tva_non_justifiee || 0) !== Math.round(R.nonJustifie);
+  return '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;"><div class="form-group" style="margin:0;"><label style="font-size:11px;">Mois à déclarer</label><input type="month" class="form-control" value="' + _tvaJ.mois + '" onchange="_tvaJ.mois=this.value||_tvaJ.mois;tvaJRender()"></div>'
+    + '<div style="flex:1;font-size:14px;">' + _tvaRappStatutHtml(R) + '</div></div>'
+    + _tvaJNav()
+    + '<div class="table-wrap"><table><tbody>' + R.points.map(function(p){
+        return '<tr><td style="width:34px;text-align:center;font-size:16px;color:' + ico[p.niveau][1] + ';">' + ico[p.niveau][0] + '</td><td><strong style="font-size:13px;">' + p.titre + '</strong>' + (p.detail ? '<div style="font-size:12px;color:var(--blanc-dim);">' + p.detail + '</div>' : '') + '</td>'
+          + '<td style="text-align:right;white-space:nowrap;">' + (p.action ? '<button class="btn btn-secondary btn-sm" onclick="' + p.action.js + '">' + p.action.lib + '</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">'
+    + '<button class="btn btn-secondary btn-sm" onclick="tvaJImprimerRapprochement()">🖨️ Imprimer le rapprochement</button>'
+    + '<button class="btn btn-secondary btn-sm" onclick="tvaJOuvrirDeclaration(\'' + R.mois + '\')">🧾 Ouvrir la déclaration du mois</button>'
+    + '<button class="btn btn-primary btn-sm" onclick="tvaJValiderRapprochement()"' + (R.bloquants ? ' disabled title="Résolvez d\'abord les points bloquants"' : '') + '>✔ Valider le rapprochement</button>'
+    + (val ? '<span style="font-size:12px;color:' + (modif ? 'var(--or)' : 'var(--vert)') + ';">' + (modif ? '⚠️ Validé le ' : '✓ Validé le ') + escHtml(String(val.le).slice(0, 10)) + ' par ' + escHtml(val.par || '—') + ' (' + val.attentions + ' réserve(s))' + (modif ? ' — les pièces ont changé depuis' : '') + '</span>' : '') + '</div>';
+}
+async function tvaJValiderRapprochement() {
+  var R = tvaRapprochement(_tvaJ.mois); if (R.bloquants) { toast('Points bloquants à résoudre avant de valider.', 'error'); return; }
+  if (!exigerDroit('Comptabilite', 'v', 'la validation du rapprochement de TVA')) return;
+  if (R.attentions && !confirm('Valider avec ' + R.attentions + ' réserve(s) ? Elles seront enregistrées avec la validation.')) return;
+  var cfg = _tvaCfg(); cfg.rapprochements = cfg.rapprochements || {};
+  cfg.rapprochements[_tvaJ.mois] = { par: (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || '', le: new Date().toISOString(), attentions: R.attentions, tva_non_justifiee: Math.round(R.nonJustifie), politique: cfg.politique_fne };
+  await _tvaSave(cfg); toast('✅ Rapprochement de ' + _tvaJ.mois + ' validé.', 'success'); tvaJRender();
+}
+function tvaJImprimerRapprochement() {
+  var R = tvaRapprochement(_tvaJ.mois), E = escHtml, p = DATA.params || {}, lib = { ok: '✓', attention: '⚠', bloquant: '⛔', info: 'ℹ' };
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapprochement TVA ' + R.mois + '</title><style>body{font-family:Arial;font-size:11px;padding:18px;color:#111;}h1{font-size:15px;text-align:center;margin:4px 0;}table{width:100%;border-collapse:collapse;margin-top:10px;}td{border:1px solid #999;padding:5px 7px;vertical-align:top;}.n{width:26px;text-align:center;font-size:14px;}.sig{display:flex;gap:40px;margin-top:40px;}.sig div{flex:1;border-top:1px solid #333;padding-top:4px;font-size:10px;}</style></head><body>'
+    + '<div style="text-align:right;font-size:10px;">' + E(p.societe || '') + ' · édité le ' + new Date().toLocaleDateString('fr-FR') + '</div><h1>RAPPROCHEMENT AVANT DÉCLARATION DE TVA — ' + R.mois + '</h1>'
+    + '<div style="text-align:center;font-weight:700;">' + ({ pret: 'Prêt à déclarer', reserves: 'Déclarable avec réserves (' + R.attentions + ')', non_pret: 'Non prêt (' + R.bloquants + ' point(s) bloquant(s))' }[R.statut]) + '</div>'
+    + '<table><tbody>' + R.points.map(function(x){ return '<tr><td class="n">' + lib[x.niveau] + '</td><td><strong>' + x.titre + '</strong>' + (x.detail ? '<br>' + x.detail : '') + '</td></tr>'; }).join('') + '</tbody></table>'
+    + (R.valide ? '<p>Validé le ' + E(String(R.valide.le).slice(0, 10)) + ' par ' + E(R.valide.par || '—') + ' (' + R.valide.attentions + ' réserve(s)).</p>' : '')
+    + '<div class="sig"><div>Préparé par (comptabilité)</div><div>Validé par (direction / DAF)</div></div></body></html>';
+  openPrintPreview(html, 'Rapprochement TVA ' + R.mois, false);
+}
+/* Bandeau du rapprochement dans la déclaration de TVA. */
+function tvaJBandeauRapprochement(mois) {
+  var R = tvaRapprochement(mois);
+  return '<div style="font-size:12px;margin-top:8px;padding:8px 12px;background:var(--card2);border-radius:5px;">Rapprochement du mois : ' + _tvaRappStatutHtml(R) + (R.valide ? ' · validé le ' + escHtml(String(R.valide.le).slice(0, 10)) : ' · non validé')
+    + ' <a href="#" onclick="tvaJOuvrir(\'rapprochement\',\'' + mois + '\');return false;">Ouvrir le rapprochement</a></div>';
+}
+
+function _tvaJNav() {
+  var tab = function(k, lib){ return '<button class="tab-btn' + (_tvaJ.onglet === k ? ' active' : '') + '" onclick="tvaJChange(\'onglet\',\'' + k + '\')">' + lib + '</button>'; };
+  return '<div class="tab-nav" style="margin-bottom:10px;">' + tab('rapprochement', '✅ Rapprochement du mois') + tab('justifier', '🧾 Pièces à justifier') + tab('fournisseurs', '🏪 Fournisseurs') + tab('manque', '📉 Manque à gagner') + '</div>';
+}
+function tvaJOuvrir(onglet, mois) {
+  var d = new Date(); _tvaJ.a = d.toISOString().slice(0, 7); _tvaJ.de = TVA_FNE_DEBUT.slice(0, 7); _tvaJ.onglet = onglet || 'justifier'; _tvaJ.filtre = 'a_traiter'; _tvaJ.mois = mois || _tvaMoisPrec(d.toISOString().slice(0, 7));
   openModal('modal-tva-justif'); tvaJRender();
 }
 function tvaJChange(ch, v) { _tvaJ[ch] = v; tvaJRender(); }
@@ -45067,6 +45176,7 @@ function _tvaJBadge(x) {
 function _tvaJBarre(v, t, coul) { var p = t > 0 ? Math.round(v / t * 100) : 0; return '<div style="background:rgba(128,128,128,.2);border-radius:3px;height:6px;min-width:80px;"><div style="width:' + p + '%;height:6px;border-radius:3px;background:' + coul + ';"></div></div>'; }
 function tvaJRender() {
   var host = document.getElementById('tvaj-corps'); if (!host) return;
+  if (_tvaJ.onglet === 'rapprochement') { host.innerHTML = tvaJRapprochementHtml(); return; }
   var L = tvaJListe(_tvaJ.de, _tvaJ.a).filter(function(x){ return x.etat !== 'avant_fne'; }), S = tvaJSynthese(L), f = function(v){ return fmtF(Math.round(v || 0)); };
   var cfg = _tvaCfg(), tx = S.tot > 0 ? Math.round(S.ok / S.tot * 1000) / 10 : 0;
   var tab = function(k, lib){ return '<button class="tab-btn' + (_tvaJ.onglet === k ? ' active' : '') + '" onclick="tvaJChange(\'onglet\',\'' + k + '\')">' + lib + '</button>'; };
@@ -45074,7 +45184,7 @@ function tvaJRender() {
     + '<div class="form-group" style="margin:0;"><label style="font-size:11px;">Du mois</label><input type="month" class="form-control" value="' + _tvaJ.de + '" min="' + TVA_FNE_DEBUT.slice(0, 7) + '" onchange="tvaJChange(\'de\',this.value||\'' + TVA_FNE_DEBUT.slice(0, 7) + '\')"></div>'
     + '<div class="form-group" style="margin:0;"><label style="font-size:11px;">Au mois</label><input type="month" class="form-control" value="' + _tvaJ.a + '" onchange="tvaJChange(\'a\',this.value)"></div>'
     + '<div class="form-group" style="margin:0;flex:1;min-width:240px;"><label style="font-size:11px;">Politique de déduction</label><select class="form-control" onchange="tvaJPolitique(this.value)"><option value="signaler"' + (cfg.politique_fne === 'strict' ? '' : ' selected') + '>Signaler seulement (déclaration inchangée)</option><option value="strict"' + (cfg.politique_fne === 'strict' ? ' selected' : '') + '>Stricte : déduire uniquement la TVA justifiée par une FNE</option></select></div></div>'
-    + '<div class="tab-nav" style="margin-bottom:10px;">' + tab('justifier', '🧾 Pièces à justifier') + tab('fournisseurs', '🏪 Fournisseurs') + tab('manque', '📉 Manque à gagner') + '</div>';
+    + _tvaJNav();
   if (_tvaJ.onglet === 'justifier') {
     var flt = { a_traiter: ['a_justifier', 'non_conforme'], conforme: ['conforme'], toutes: ['a_justifier', 'non_conforme', 'conforme'] }[_tvaJ.filtre];
     var V = L.filter(function(x){ return flt.indexOf(x.etat) !== -1; }).sort(function(a, b){ return b.e.date.localeCompare(a.e.date); });
@@ -45158,7 +45268,7 @@ function ouvrirDeclarationTVA() {
     + '<input type="month" class="form-control" id="tva-mois" value="' + moisDefaut + '" onchange="renderDeclarationTVA()"></div>'
     + '<div class="form-group" style="margin:0;"><label style="font-size:11px;">Prorata de déduction (%)</label>'
     + '<input type="number" class="form-control" id="tva-prorata" value="' + _tvaCfg().prorata + '" min="0" max="100" step="0.01" style="width:110px;" oninput="renderDeclarationTVA()"></div>'
-    + '<button class="btn btn-secondary btn-sm" onclick="tvaJOuvrir()" title="Justifier la TVA déductible par les FNE des fournisseurs">🧾 Justification FNE</button>'
+    + '<button class="btn btn-secondary btn-sm" onclick="tvaJOuvrir(\'rapprochement\',document.getElementById(\'tva-mois\').value)" title="Contrôles avant de déclarer : FNE, arriéré, mois précédent, ventes">✅ Rapprochement</button><button class="btn btn-secondary btn-sm" onclick="tvaJOuvrir()" title="Justifier la TVA déductible par les FNE des fournisseurs">🧾 Justification FNE</button>'
     + '<button class="btn btn-secondary btn-sm" onclick="imprimerDeclarationTVA()">🖨️ Imprimer</button>'
     + '</div><div id="tva-box"></div></div>'
     + '<div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById(\'modal-tva\').classList.remove(\'open\')">Fermer</button>'
@@ -45202,6 +45312,7 @@ function renderDeclarationTVA() {
         : '')
     + '<tr class="tot" style="font-weight:700;"><td colspan="2">TOTAL TVA DÉDUCTIBLE</td><td style="text-align:right;color:var(--rouge);">' + f(T.totDed) + '</td></tr>'
     + '</tbody></table></div>'
+    + tvaJBandeauRapprochement(mois)
     + (T.nbNonJustif ? '<div class="alert alert-warn" style="font-size:12px;margin-top:8px;">🧾 <strong>' + T.nbNonJustif + ' pièce(s)</strong> portent <strong>' + f(T.nonJustifSignale) + ' FCFA</strong> de TVA sans FNE valide enregistrée. '
         + (T.strict ? 'Politique stricte : cette TVA est exclue de la déduction.' : 'Politique « signaler » : cette TVA reste déduite, au risque d\'un redressement.') + ' <a href="#" onclick="tvaJOuvrir();return false;">Justifier maintenant</a></div>' : '')
     + '<div style="margin-top:12px;padding:12px 14px;background:var(--card2);border-left:3px solid var(--or);border-radius:5px;">'
@@ -45231,6 +45342,8 @@ async function passerEcritureTVA() {
   if ((DATA.ecritures || []).some(function(e){ return e.source === 'liquidation_tva' && e.tva_mois === mois; })) {
     if (!confirm('Une liquidation existe déjà pour ' + mois + '. En passer une seconde ?')) return;
   }
+  var _R = tvaRapprochement(mois);
+  if ((_R.bloquants || !_R.valide) && !confirm('Rapprochement du mois ' + (_R.bloquants ? 'NON PRÊT : ' + _R.bloquants + ' point(s) bloquant(s)' : 'non validé') + '.\n\nPasser quand même la liquidation ?')) return;
   if (!confirm('Passer l\'écriture de liquidation de TVA du mois ' + mois + ' ?\n\n'
     + (T.aPayer ? 'TVA à payer : ' + fmtF(Math.round(T.aPayer)) : 'Crédit à reporter : ' + fmtF(Math.round(T.credit))) + ' FCFA')) return;
 
