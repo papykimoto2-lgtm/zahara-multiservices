@@ -7251,6 +7251,23 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
               ℹ️ Ces seuils sont utilisés pour déclencher les alertes du tableau de bord direction et les calculs de provision sur créances (compte 682).
             </div>
           </div>
+          <div class="card" style="margin-top:14px;">
+            <div class="form-section-title">📨 Relances et contentieux</div>
+            <div class="form-grid cols-3" style="margin-top:10px;">
+              <div class="form-group">
+                <label>Relancer un souscripteur sans relance depuis (jours)</label>
+                <input type="number" id="param-relance-delai" class="form-control" value="15" min="1" max="120">
+              </div>
+              <div class="form-group">
+                <label>Délai accordé après une mise en demeure (jours)</label>
+                <input type="number" id="param-ctx-delai-med" class="form-control" value="15" min="1" max="180">
+              </div>
+            </div>
+            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="relCtxParamsSauver()">💾 Enregistrer</button>
+              <span style="font-size:11px;color:var(--blanc-dim);">Le premier alimente l'onglet « À traiter aujourd'hui » de la page Relances ; le second est proposé par défaut à l'enregistrement d'une mise en demeure (modifiable à chaque saisie).</span>
+            </div>
+          </div>
         </div>
 
         <!-- Utilisateurs -->
@@ -18326,6 +18343,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
         <button class="tab-btn active" onclick="switchTab('modal-client','identite')">Identité</button>
         <button class="tab-btn" onclick="switchTab('modal-client','souscription')">Souscription</button>
         <button class="tab-btn" onclick="switchTab('modal-client','documents')">Documents</button>
+        <button class="tab-btn" id="tab-btn-client-releve" style="display:none;" onclick="switchTab('modal-client','releve')">📄 Relevé</button>
       </div>
 
       <div class="tab-pane active" id="tab-modal-client-identite">
@@ -18483,7 +18501,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
 
           <div class="form-group span-2">
             <label>Programme *</label>
-            <select class="form-control" id="c-programme" onchange="updateLotsByProgramme()">
+            <select class="form-control" id="c-programme" onchange="updateLotsByProgramme();majIndicationDureeProjet()">
               <option value="">— Choisir —</option>
             </select>
           </div>
@@ -18622,6 +18640,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <div class="form-group">
             <label>Durée mensualités (mois)</label>
             <input type="number" class="form-control" id="c-duree" value="60" oninput="calcEcheancier()">
+            <div id="c-duree-hint"></div>
           </div>
           <div class="form-group">
             <label>📅 Date de souscription</label>
@@ -18629,12 +18648,22 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
           <div class="form-group">
             <label>Date de 1ère mensualité</label>
-            <input type="date" class="form-control" id="c-date-debut">
+            <input type="date" class="form-control" id="c-date-debut" onchange="majIndicationDureeProjet()">
           </div>
           <div class="form-group span-2">
             <label>Mensualité calculée</label>
             <input type="text" class="form-control" id="c-mensualite" readonly style="color:var(--or);font-weight:bold;">
           </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="tab-modal-client-releve">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="printReleveClientOnglet()">🖨️ Imprimer</button>
+        </div>
+        <div id="releve-client-box">
+          <div style="font-weight:700;margin-bottom:10px;">📄 Relevé de compte — <span id="releve-client-nom"></span></div>
+          <div id="releve-client-content"></div>
         </div>
       </div>
 
@@ -30797,6 +30826,8 @@ function goTo(page) {
 }
 
 function switchTab(context, tab) {
+  if (context==='modal-client' && tab==='releve' && typeof afficherReleveClientOnglet==='function') afficherReleveClientOnglet();
+  if (context==='params' && tab==='alertes' && typeof relCtxParamsCharger==='function') relCtxParamsCharger();
   if (context==='juridique' && tab==='contentieux' && typeof ctxActualiserAuto==='function') ctxActualiserAuto();
   // Hook scan pointage
   if (context==='foncier' && tab==='fisc' && typeof fiscInit==='function') { fiscInit(); }
@@ -33182,6 +33213,10 @@ function openClientModal(id) {
     setSelectValue('c-commercial', 'emp_1788440497496');
   }
   if (typeof updateLotsByProgramme === 'function') updateLotsByProgramme();
+  var _btnRel = document.getElementById('tab-btn-client-releve'); if (_btnRel) _btnRel.style.display = id ? '' : 'none';
+  var _paneRel = document.getElementById('tab-modal-client-releve'); if (_paneRel && _paneRel.classList.contains('active')) switchTab('modal-client', 'identite');
+  var _cRel = document.getElementById('releve-client-content'); if (_cRel) _cRel.innerHTML = '';
+  if (typeof majIndicationDureeProjet === 'function') majIndicationDureeProjet();
   openModal('modal-client');
 }
 
@@ -33285,6 +33320,21 @@ function calcEcheancier() {
   var reste = total - apport;
   var mensualite = duree > 0 ? Math.ceil(reste / duree) : 0;
   document.getElementById('c-mensualite').value = mensualite > 0 ? fcfa(mensualite) : '—';
+  if (typeof majIndicationDureeProjet === 'function') majIndicationDureeProjet();
+}
+/* Sous la durée : durée du projet (jusqu'à la livraison du programme) et mensualité théorique de suivi, ou avertissement « estimé ». */
+function majIndicationDureeProjet() {
+  var box = document.getElementById('c-duree-hint'); if (!box) return;
+  var progId = (document.getElementById('c-programme') || {}).value, prog = progId ? (DATA.programmes || []).find(function(p){ return p.id === progId; }) : null;
+  if (!prog) { box.innerHTML = ''; return; }
+  var ancre = (document.getElementById('c-date-debut') || {}).value || (document.getElementById('c-date-souscription') || {}).value, dp = dureeProjetDepuis(prog, ancre);
+  var st = 'style="margin-top:6px;padding:7px 9px;border-left:3px solid #f59e0b;background:rgba(245,158,11,.10);border-radius:6px;font-size:11px;line-height:1.5;"';
+  if (!dp) { box.innerHTML = '<div ' + st + '>⚠️ ' + (ancre ? 'Ce programme n\'a pas de date de livraison' : 'Renseignez la date de début') + ' : le retard de ce souscripteur sera <strong>estimé</strong> d\'après la durée saisie ci-dessus. Dates à compléter dans Programmes.</div>'; return; }
+  var cc = APP.editingId ? (DATA.clients || []).find(function(x){ return x.id === APP.editingId; }) : null;
+  var valeur = cc && typeof attSoldePrix === 'function' ? attSoldePrix(cc).initial : (parseFloat((document.getElementById('c-montant-total') || {}).value) || 0);
+  box.innerHTML = '<div ' + st.replace('#f59e0b', '#2e7d4f').replace('245,158,11', '46,125,79') + '>📐 Durée du projet : <strong>' + dp.n + ' mois</strong> jusqu\'à la livraison du ' + dateShort(dp.livraison)
+    + (valeur > 0 ? ' — mensualité théorique de suivi : <strong>' + fcfa(Math.ceil(valeur / dp.n)) + '</strong> (valeur initiale ÷ durée du projet)' : '')
+    + '. <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById(\'c-duree\').value=' + dp.n + ';calcEcheancier()">Utiliser ' + dp.n + ' mois</button></div>';
 }
 
 /* Vérifie que l'apport initial déclaré sur la fiche a bien un versement réel
@@ -34332,30 +34382,59 @@ function clientFinancementBancaire(c) {
   return /(cr[eé]dit|pr[eê]t|financement) bancaire|^cb\b/.test(m);
 }
 
+/* ══ Échéancier théorique d'un souscripteur — SOURCE UNIQUE du retard de paiement ══
+   Programme daté (livraison renseignée) : la valeur INITIALE V (prix − modifications facturées) est répartie linéairement sur la durée du
+   projet n (mois entre la date de début du souscripteur et la livraison du programme). L'apport reste dû dès le départ et vaut avance :
+       attendu(t) = min(V, max(apport, V × mois écoulés ÷ n))      mensualité théorique = V ÷ n
+   Un souscripteur qui suit son échéancier contractuel n'est donc jamais en retard, et un gros apport met en avance.
+   Programme sans date de livraison : même principe avec la durée saisie sur la fiche (échéancier « estimé », marqué « ≈ estimé »).
+   Retard en mois = écart ÷ mensualité théorique, plafonné aux mois réellement écoulés (jamais « 40 mois » le premier mois, jamais infini). */
+function _dateLocale(s) { var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+function _moisEntre(a, b) { return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()); }
+/* Durée du projet pour un souscripteur qui démarre à « ancre » : mois jusqu'à la livraison du programme, ou null si elle n'est pas renseignée. */
+function dureeProjetDepuis(prog, ancre) {
+  if (!prog || !prog.date_livraison) return null;
+  var livr = _dateLocale(prog.date_livraison), debut = _dateLocale(ancre);
+  if (!livr || !debut) return null;
+  return { n: Math.max(1, _moisEntre(debut, livr)), livraison: String(prog.date_livraison).slice(0, 10) };
+}
+function echeancierClient(c, now, verse) {
+  now = now || new Date();
+  var dateAncre = c.date_debut || c.date_souscription, debut = _dateLocale(dateAncre), total = parseFloat(c.montant_total) || 0;
+  if (!debut || total <= 0) return null;
+  if (verse == null) verse = (DATA.versements || []).filter(function(v){ return v.client_id === c.id && v.statut !== 'annule' && _versementSurPrix(v); })
+    .reduce(function(a, v){ return a + (parseFloat(v.montant) || 0); }, 0);
+  var apport = parseFloat(c.apport) || 0, moisEcoules = Math.max(0, _moisEntre(debut, now));
+  var prog = c.programme_id ? (DATA.programmes || []).find(function(x){ return x.id === c.programme_id; }) : null, dp = dureeProjetDepuis(prog, dateAncre);
+  var mode, n, valeur, mensualite, attendu;
+  if (dp) {
+    mode = 'projet'; n = dp.n;
+    valeur = (typeof attSoldePrix === 'function') ? attSoldePrix(c).initial : total;
+    if (!(valeur > 0)) valeur = total;
+    mensualite = Math.ceil(valeur / n);
+    attendu = Math.min(valeur, Math.max(apport, valeur * Math.min(1, moisEcoules / n)));
+  } else {
+    mode = 'estime'; n = parseInt(c.duree, 10) || 0; valeur = total;
+    mensualite = n > 0 ? Math.ceil(total / n) : 0;
+    attendu = n > 0 ? Math.min(total, Math.max(apport, total * Math.min(1, moisEcoules / n))) : Math.min(total, apport);
+  }
+  var ecart = Math.max(0, attendu - verse);
+  var exact = ecart <= 0.5 ? 0 : (mensualite > 0 ? Math.min(ecart / mensualite, moisEcoules) : moisEcoules);
+  return { mode: mode, n: n, valeurInitiale: valeur, apport: apport, mensualite: mensualite, moisEcoules: moisEcoules, attendu: attendu, verse: verse, ecart: ecart,
+           moisRetardExact: exact, moisRetard: Math.round(exact), livraison: dp ? dp.livraison : '', dateAncre: String(dateAncre).slice(0, 10) };
+}
+
 function getRetardataires() {
-  var now = new Date();
-  var result = [];
+  var now = new Date(), result = [], verses = {};
+  _dashArr('versements').forEach(function(v) { if (v.statut !== 'annule' && _versementSurPrix(v)) verses[v.client_id] = (verses[v.client_id] || 0) + (parseFloat(v.montant) || 0); });
   _dashArr('clients').forEach(function(c) {
-    /* date_debut (1ère mensualité) reste l'ancre correcte de l'échéancier ;
-       repli sur date_souscription si elle manque, pour ne pas faire
-       disparaître silencieusement un dossier de la liste des retards. */
-    var dateAncre = c.date_debut || c.date_souscription;
-    if (!dateAncre || !c.montant_total) return;
-    var versements = _dashArr('versements').filter(function(v) { return v.client_id === c.id && _versementSurPrix(v); });
-    var verse = versements.reduce(function(a, v) { return a + (parseFloat(v.montant) || 0); }, 0);
-    if (verse >= c.montant_total) return; // soldé
-    if (clientFinancementBancaire(c)) return;   // financement bancaire : jamais en retard
-
-    var debut = new Date(dateAncre);
-    var moisEcoules = Math.max(0, (now.getFullYear() - debut.getFullYear()) * 12 + (now.getMonth() - debut.getMonth()));
-    var mensualite = c.duree > 0 ? Math.ceil((c.montant_total - c.apport) / c.duree) : 0;
-    var attendu = (c.apport || 0) + moisEcoules * mensualite;
-    attendu = Math.min(attendu, c.montant_total);
-
-    if (verse < attendu) {
-      var retard = Math.round((attendu - verse) / mensualite);
-      result.push({ id: c.id, nom: c.nom, prenoms: c.prenoms, tel: c.tel, dossier: c.dossier, moisRetard: retard, montantDu: attendu - verse });
-    }
+    if (!(parseFloat(c.montant_total) > 0)) return;
+    var verse = verses[c.id] || 0;
+    if (verse >= c.montant_total) return;        // soldé
+    if (clientFinancementBancaire(c)) return;    // financement bancaire : jamais en retard
+    var e = echeancierClient(c, now, verse);     // null : aucune date de départ exploitable
+    if (!e || e.ecart <= 0.5) return;
+    result.push({ id: c.id, nom: c.nom, prenoms: c.prenoms, tel: c.tel, dossier: c.dossier, moisRetard: e.moisRetard, montantDu: e.ecart, echeancier: e.mode, mensualite: e.mensualite });
   });
   return result;
 }
@@ -39524,6 +39603,24 @@ function renderSuiviAgrements() {
     + ' <button class="btn btn-secondary btn-sm" onclick="agrSauverSeuil()">💾 Enregistrer</button>'
     + '<span style="font-size:11px;">Rouge à moins de 60 j. Chaque renouvellement archive le cycle précédent.</span></div>'
     + '</div>';
+}
+/* Réglages « Relances et contentieux » (onglet Alertes des Paramètres). */
+function relCtxParamsCharger() {
+  var a = document.getElementById('param-relance-delai'), b = document.getElementById('param-ctx-delai-med');
+  if (a) a.value = relanceDelaiJours();
+  if (b) b.value = ctxDelaiMedDefaut();
+}
+async function relCtxParamsSauver() {
+  var j = parseInt(document.getElementById('param-relance-delai').value, 10), m = parseInt(document.getElementById('param-ctx-delai-med').value, 10);
+  if (!(j >= 1 && j <= 120)) { toast('Délai de relance invalide : entre 1 et 120 jours.', 'warning'); return; }
+  if (!(m >= 1 && m <= 180)) { toast('Délai de mise en demeure invalide : entre 1 et 180 jours.', 'warning'); return; }
+  DATA.params = DATA.params || {};
+  DATA.params.relance_delai_jours = j; DATA.params.ctx_delai_mise_en_demeure = m;
+  _paramsToucher(); DATA.params._modifie = new Date().toISOString();
+  await dbPut('params', DATA.params);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
+  if (document.getElementById('tbody-relances') && typeof detectRelances === 'function') detectRelances();
+  toast('Réglages enregistrés : relance après ' + j + ' j, délai de mise en demeure ' + m + ' j.', 'success');
 }
 async function agrSauverSeuil() {
   var v = parseInt(document.getElementById('agr-seuil-j').value);
@@ -49520,15 +49617,9 @@ function rarCollecter() {
        l'a été. Un dossier peut avoir un reste élevé sans être en retard (il
        vient d'être signé) — ne pas confondre les deux, sinon la relance
        harcèle des clients à jour. */
-    var mensualite = _rarMensualite(c);
-    var moisRetard = 0, duAJour = 0;
-    var dateAncreRar = c.date_debut || c.date_souscription;
-    if (dateAncreRar && mensualite > 0 && !clientFinancementBancaire(c)) {
-      var debut = new Date(dateAncreRar);
-      var moisEcoules = Math.max(0, (now.getFullYear()-debut.getFullYear())*12 + (now.getMonth()-debut.getMonth()));
-      var attendu = Math.min((parseFloat(c.apport)||0) + moisEcoules*mensualite, du);
-      if (verse < attendu) { duAJour = attendu - verse; moisRetard = Math.round(duAJour / mensualite); }
-    }
+    var ech = clientFinancementBancaire(c) ? null : echeancierClient(c, now, verse);   /* même calcul que getRetardataires */
+    var mensualite = ech ? ech.mensualite : _rarMensualite(c);
+    var moisRetard = ech ? ech.moisRetard : 0, duAJour = ech ? ech.ecart : 0;
 
     var lot = c.lot_id ? (DATA.lots || []).find(function(l){ return l.id === c.lot_id; }) : null;
     var bien = lot
@@ -49554,7 +49645,7 @@ function rarCollecter() {
       bien: bien, typeBien: typeBien, natureLot: natureLot,
       du: du, verse: verse, reste: reste,
       pctVerse: du > 0 ? Math.round(verse/du*100) : 0,
-      duAJour: duAJour, moisRetard: moisRetard,
+      duAJour: duAJour, moisRetard: moisRetard, echeancier: ech ? ech.mode : '',
       mensualite: mensualite, dateDebut: c.date_debut || ''
     });
   });
@@ -50195,6 +50286,14 @@ function relanceEfficacite(retardataires) {
   (DATA.clients || []).forEach(function(c){ (c.promesses_paiement || []).forEach(function(p){ if (p.statut === 'annulee') return; var e = promesseEtat(c, p); if (e === 'tenue') tenues++; else if (e === 'non_tenue') nonTenues++; }); });
   return { relances: ids.length, regularises: regularises, taux: ids.length ? Math.round(regularises / ids.length * 100) : null, tenues: tenues, nonTenues: nonTenues };
 }
+/* Avertissement : souscripteurs jugés sur un échéancier estimé (programme sans date de livraison). */
+function relanceAvisEstime(retardataires) {
+  var est = (retardataires || []).filter(function(r){ return r.echeancier === 'estime'; }); if (!est.length) return '';
+  var parProg = {};
+  est.forEach(function(r){ var c = (DATA.clients || []).find(function(x){ return x.id === r.id; }), pr = c && (DATA.programmes || []).find(function(x){ return x.id === c.programme_id; }), nom = pr ? (pr.nom || '—') : '—'; parProg[nom] = (parProg[nom] || 0) + 1; });
+  var liste = Object.keys(parProg).sort(function(a, b){ return parProg[b] - parProg[a]; }).slice(0, 6).map(function(n){ return escHtml(n) + ' (' + parProg[n] + ')'; }).join(' · ');
+  return '<div class="alert alert-warn" style="margin-top:10px;font-size:12px;">⚠️ <strong>' + est.length + ' souscripteur(s) sur ' + retardataires.length + '</strong> sont jugés sur un <strong>échéancier estimé</strong> : leur programme n\'a pas de date de livraison, le retard est calculé d\'après la durée saisie sur la fiche (souvent 60 mois par défaut). Programmes à compléter : ' + liste + '. <a href="#" onclick="goTo(\'programmes\');return false;">Ouvrir les programmes</a></div>';
+}
 function relanceDashHtml(retardataires) {
   var tr = ctxTranchesRetard(retardataires), tot = tr.reduce(function(a, t){ return a + t.montant; }, 0), ef = relanceEfficacite(retardataires);
   var ouverts = (DATA.dossiersJuridiques || []).filter(function(d){ return d.type === 'contentieux' && d.statut !== 'clos_favorable' && d.statut !== 'clos_defavorable'; });
@@ -50206,7 +50305,7 @@ function relanceDashHtml(retardataires) {
   h += carte('⚖️ En contentieux', fcfa(ctx.reclame), ouverts.length + ' dossier(s) · récupéré ' + fcfa(ctx.recupere) + ' · frais ' + fcfa(ctx.frais), 'var(--violet)');
   h += carte('Régularisation après relance (90 j)', ef.taux === null ? '—' : ef.taux + ' %', ef.relances ? ef.regularises + ' sur ' + ef.relances + ' client(s) relancé(s) ne sont plus en retard' : 'Aucune relance sur la période', 'var(--vert)');
   h += carte('Promesses de paiement', (ef.tenues + ef.nonTenues) ? Math.round(ef.tenues / (ef.tenues + ef.nonTenues) * 100) + ' % tenues' : '—', ef.tenues + ' tenue(s) · ' + ef.nonTenues + ' non tenue(s)', 'var(--or)');
-  return h + '</div></div>';
+  return h + '</div></div>' + relanceAvisEstime(retardataires);
 }
 /* ══ Promesses de paiement et file « à traiter aujourd'hui » ══
    Une promesse (date + montant) est portée par la fiche du client (client.promesses_paiement), comme le journal commercial : elle se
@@ -50257,26 +50356,22 @@ async function promesseNouvelle(clientId) {
   var r = getRetardataires().find(function(x){ return x.id === clientId; });
   if (!c || !r) { toast('Ce souscripteur n\'est plus en retard.', 'info'); return; }
   if (typeof exigerDroit === 'function' && !exigerDroit('Relances', 'm', 'enregistrer une promesse de paiement')) return;
-  var dv = prompt('Le souscripteur promet de payer pour quelle date ? (JJ/MM/AAAA ou AAAA-MM-JJ)', '');
-  if (dv === null) return;
-  var d = (typeof fcDateSaisie === 'function') ? fcDateSaisie(dv) : dv;
-  if (!d) { toast('Date invalide : saisir JJ/MM/AAAA ou AAAA-MM-JJ.', 'error'); return; }
-  if (d < today()) { toast('La date promise ne peut pas être dans le passé.', 'error'); return; }
-  var mv = prompt('Montant promis (FCFA) :', String(Math.round(r.montantDu || 0)));
-  if (mv === null) return;
-  var montant = parseFloat(String(mv).replace(/[\s\u00a0]/g, '').replace(',', '.'));
-  if (!(montant > 0)) { toast('Montant invalide.', 'error'); return; }
-  var note = prompt('Remarque (facultatif) :', '') || '';
-  var par = (APP.currentUser && (APP.currentUser.nom || APP.currentUser.email || APP.currentUser.login)) || '';
-  if (!c.promesses_paiement) c.promesses_paiement = [];
-  c.promesses_paiement.push({ id: uid(), date_creation: today(), date_promise: d, montant: montant, note: note, par: par, statut: 'active' });
-  if (!c.actions_commerciales) c.actions_commerciales = [];
-  c.actions_commerciales.push({ date: today(), code: 'promesse_paiement', canal: '', note: 'Promesse de ' + fcfa(montant) + ' pour le ' + dateShort(d) + (note ? ' — ' + note : ''), par: par });
-  c._baseModifie = c._modifie || c._baseModifie || null;
-  await dbPut('clients', c);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
-  toast('🤝 Promesse enregistrée : ' + fcfa(montant) + ' pour le ' + dateShort(d) + '.', 'success');
-  detectRelances();
+  formulaireSaisie('Promesse de paiement — ' + ((c.nom || '') + ' ' + (c.prenoms || '')).trim(), [
+    { cle: 'date', label: 'Date promise pour le paiement', type: 'date', valeur: '', requis: true, min: today() },
+    { cle: 'montant', label: 'Montant promis (FCFA)', type: 'number', valeur: Math.round(r.montantDu || 0), requis: true, positif: true, aide: 'Montant en retard : ' + fcfa(r.montantDu) },
+    { cle: 'note', label: 'Remarque', type: 'text', valeur: '' }
+  ], async function(v){
+    var par = (APP.currentUser && (APP.currentUser.nom || APP.currentUser.email || APP.currentUser.login)) || '';
+    if (!c.promesses_paiement) c.promesses_paiement = [];
+    c.promesses_paiement.push({ id: uid(), date_creation: today(), date_promise: v.date, montant: v.montant, note: v.note, par: par, statut: 'active' });
+    if (!c.actions_commerciales) c.actions_commerciales = [];
+    c.actions_commerciales.push({ date: today(), code: 'promesse_paiement', canal: '', note: 'Promesse de ' + fcfa(v.montant) + ' pour le ' + dateShort(v.date) + (v.note ? ' — ' + v.note : ''), par: par });
+    c._baseModifie = c._modifie || c._baseModifie || null;
+    await dbPut('clients', c);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+    toast('🤝 Promesse enregistrée : ' + fcfa(v.montant) + ' pour le ' + dateShort(v.date) + '.', 'success');
+    detectRelances();
+  }, 'Enregistrer la promesse');
 }
 async function promesseAnnuler(clientId, promesseId) {
   var c = (DATA.clients || []).find(function(x){ return x.id === clientId; });
@@ -50353,7 +50448,7 @@ function detectRelances() {
       + '<td><a href="#" style="color:inherit;" title="Ouvrir le dossier du souscripteur" onclick="openClientModal(\'' + r.id + '\');return false;"><strong>' + r.nom + ' ' + r.prenoms + '</strong></a><br><span style="font-size:11px;color:var(--blanc-dim);">' + r.tel + '</span>'
         + an.motifs.map(function(m){ return '<br><span style="font-size:11px;color:' + (m.prio === 1 ? 'var(--rouge)' : 'var(--or)') + ';font-weight:600;">' + m.label + '</span>'; }).join('') + '</td>'
       + '<td>' + (prog ? prog.nom : '—') + (lot ? ' / Lot ' + lot.numero : '') + '</td>'
-      + '<td style="color:var(--rouge);font-weight:bold;">' + r.moisRetard + ' mois</td>'
+      + '<td style="color:var(--rouge);font-weight:bold;">' + r.moisRetard + ' mois' + (r.echeancier === 'estime' ? ' <span title="Programme sans date de livraison : retard estimé d\'après la durée saisie sur la fiche du souscripteur (l\'apport compte comme avance)" style="font-size:10px;color:var(--or);font-weight:600;white-space:nowrap;">≈ estimé</span>' : '') + '</td>'
       + '<td style="color:var(--rouge);">' + fcfa(r.montantDu) + '</td>'
       + '<td><span class="badge ' + n.badge + '">' + n.icone + ' ' + n.label + '</span>' + promesseChipHtml(r, an) + (dosCtx ? '<br><a href="#" style="font-size:11px;color:var(--rouge);" title="Ouvrir le dossier contentieux" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\');return false;">⚖️ ' + escHtml(dosCtx.ref) + '</a>' : '') + '</td>'
       + '<td style="font-size:11px;">' + (lastRelance ? dateShort(lastRelance.date) : 'Jamais') + '</td>'
@@ -77937,7 +78032,8 @@ function buildTiersEcheances() {
   /* ── 411 — Clients : date d'échéance précise ── */
   var lignes411 = [];
   DATA.clients.forEach(function(c) {
-    var mensualite = _rarMensualite(c);
+    var ech0 = echeancierClient(c, today);
+    var mensualite = ech0 ? ech0.mensualite : _rarMensualite(c);
     if (!mensualite) return; /* pas de plan d'échéancier — rien à dater précisément */
     var versements = DATA.versements.filter(function(v){ return v.client_id===c.id && _versementSurPrix(v); });
     var totalVerse = versements.reduce(function(s,v){return s+(v.montant||0);},0);
@@ -77955,9 +78051,9 @@ function buildTiersEcheances() {
     var moisEcoules = Math.floor((today - dateDebut) / (1000*60*60*24*30.5));
     var nbMensualitesAttendues = moisEcoules + 1; /* la prochaine échéance à venir */
     var prochaine = new Date(dateDebut); prochaine.setMonth(prochaine.getMonth() + nbMensualitesAttendues);
-    var enRetard = prochaine < today;
+    var enRetard = !!(ech0 && ech0.ecart > 0.5 && !clientFinancementBancaire(c));   /* même critère que les relances */
     var prog = DATA.programmes.find(function(p){return p.id===c.programme_id;})||{nom:'—'};
-    lignes411.push({ date: prochaine, client: c, prog: prog, montant: Math.min(mensualite, solde), enRetard: enRetard });
+    lignes411.push({ date: prochaine, client: c, prog: prog, montant: enRetard ? ech0.ecart : Math.min(mensualite, solde), enRetard: enRetard });
   });
   lignes411.sort(function(a,b){ return a.date - b.date; });
 
@@ -79291,15 +79387,9 @@ function buildTiers411() {
        getRetardataires (repli date_souscription, mensualité recalculée
        plutôt que le champ c.mensualite qui peut être désynchronisé après
        une modification du prix, de l'apport ou de la durée). */
-    var dateAncre411 = c.date_debut || c.date_souscription;
-    var mensualite = _rarMensualite(c);
-    var retardMois = 0;
-    if (dateAncre411 && mensualite > 0 && !clientFinancementBancaire(c)) {
-      var debutRef = new Date(dateAncre411);
-      var moisEcoules = Math.max(0, (today.getFullYear()-debutRef.getFullYear())*12 + (today.getMonth()-debutRef.getMonth()));
-      var attendu = Math.min(c.montant_total||0, (c.apport||0) + mensualite*moisEcoules);
-      retardMois = Math.max(0, Math.round((attendu - totalVerse) / mensualite));
-    }
+    var ech411 = clientFinancementBancaire(c) ? null : echeancierClient(c, today, totalVerse);
+    var mensualite = ech411 ? ech411.mensualite : _rarMensualite(c);
+    var retardMois = ech411 ? ech411.moisRetard : 0;
 
     // Antériorité
     if (solde > 0) {
@@ -79382,15 +79472,79 @@ function buildTiers411() {
 
 /* Cible d'affichage du relevé : la page Comptabilité, ou la fenêtre « Relevé de compte tiers » (ouverte depuis Relances, Contentieux…). */
 function _releveCibles() {
-  var m = !!APP._releveModal;
-  return { box: document.getElementById(m ? 'releve-modal-box' : 'releve-tiers-box'), nom: document.getElementById(m ? 'releve-modal-nom' : 'releve-tiers-nom'), content: document.getElementById(m ? 'releve-modal-content' : 'releve-tiers-content') };
+  var m = APP._releveModal, pre = (m === 'onglet') ? 'releve-client' : (m ? 'releve-modal' : 'releve-tiers');
+  return { box: document.getElementById(pre + '-box'), nom: document.getElementById(pre + '-nom'), content: document.getElementById(pre + '-content') };
 }
+/* Onglet « Relevé » du formulaire souscripteur : même calcul que la page Comptabilité, pour le souscripteur en cours d'édition. */
+function afficherReleveClientOnglet() {
+  var id = APP.editingId, content = document.getElementById('releve-client-content'); if (!content) return;
+  var vide = function(t){ return '<div style="padding:16px;color:var(--blanc-dim);">' + t + '</div>'; };
+  if (!id) { content.innerHTML = vide('Enregistrez d\'abord le souscripteur pour consulter son relevé.'); return; }
+  content.innerHTML = '';
+  APP._releveModal = 'onglet';
+  try { showReleveTiersClient(id); } finally { APP._releveModal = false; }
+  if (!content.innerHTML) content.innerHTML = vide('Relevé indisponible : souscripteur introuvable.');
+}
+function printReleveClientOnglet() { _printFromElement('releve-client-box', 'Relevé de compte tiers'); }
 /* Visualiser le relevé de compte d'un tiers (« client:<id> » ou « cession:<id> ») dans une fenêtre, sans quitter la page en cours. */
 function ouvrirReleveTiers(refId) {
+  if (/^(constructeur|fournisseur):/.test(String(refId))) return ouvrirReleveFournisseur(refId);
   var content = document.getElementById('releve-modal-content'); if (content) content.innerHTML = '';
   APP._releveModal = true;
   try { showReleveTiers(refId); } finally { APP._releveModal = false; }
   if (!content || !content.innerHTML) { toast('Relevé indisponible : tiers introuvable.', 'error'); return; }
+  openModal('modal-releve-tiers');
+}
+/* ── Relevé de compte fournisseur / constructeur (401) ──
+   Mêmes règles que le tableau « Tiers 401 » : constructeur = conventions (crédit) - avances et situations validées (débit) ;
+   fournisseur de matériaux = écritures du compte 401x. Le solde à payer ne descend jamais sous zéro (comme le tableau). */
+function releveFournisseur401Donnees(refId, divisionId) {
+  var type = String(refId).split(':')[0], id = String(refId).split(':').slice(1).join(':'), lignes = [], titre = '', note = '', retenue = 0;
+  if (type === 'constructeur') {
+    var constr = (DATA.constructeurs || []).find(function(x){ return x.id === id; }); if (!constr) return null;
+    titre = (constr.raison_sociale || '—') + (constr.specialite ? ' — ' + constr.specialite : '');
+    (DATA.conventions || []).filter(function(cv){ return cv.constructeur_id === id && (!divisionId || _progDivId(cv.programme_id) === divisionId); }).forEach(function(cv){
+      var num = cv.numero || '—';
+      lignes.push({ date: cv.date_signature || '', ordre: 0, libelle: 'Convention N° ' + num + (cv.objet ? ' — ' + cv.objet : ''), ref: cv.numero || '', debit: 0, credit: cv.montant_ttc || 0 });
+      if ((cv.avance_montant || 0) > 0) lignes.push({ date: cv.date_signature || '', ordre: 1, libelle: 'Avance de démarrage — convention N° ' + num, ref: cv.numero || '', debit: cv.avance_montant, credit: 0 });
+      retenue += cv.retenue_montant || 0;
+      (DATA.situations || []).filter(function(si){ return si.convention_id === cv.id && (si.montant_valide || 0) > 0; }).forEach(function(si){
+        lignes.push({ date: si.date || '', ordre: 2, libelle: 'Situation N° ' + (si.numero || '—') + (si.periode ? ' (' + si.periode + ')' : '') + ' — convention ' + num, ref: si.numero || '', debit: si.montant_valide, credit: 0 });
+      });
+    });
+    if (retenue > 0) note = 'Retenue de garantie : ' + fmtF(retenue) + ' FCFA — non déduite du solde ci-dessus (même règle que le tableau des tiers 401).';
+  } else {
+    var fr = (DATA.fournisseurs || []).find(function(x){ return x.id === id; }); if (!fr) return null;
+    titre = (fr.nom || '—') + (fr.compte ? ' (' + fr.compte + ')' : '');
+    if (fr.compte) (DATA.ecritures || []).filter(function(e){ return (e.compte_credit === fr.compte || e.compte_debit === fr.compte) && (!divisionId || (e.division || '') === divisionId); }).forEach(function(e){
+      if (e.compte_credit === fr.compte) lignes.push({ date: e.date || '', ordre: 0, libelle: e.libelle || '—', ref: e.piece || e.ref || '', debit: 0, credit: e.montant || 0 });
+      if (e.compte_debit === fr.compte) lignes.push({ date: e.date || '', ordre: 2, libelle: e.libelle || '—', ref: e.piece || e.ref || '', debit: e.montant || 0, credit: 0 });
+    });
+  }
+  lignes.sort(function(a, b){ return (a.date || '').localeCompare(b.date || '') || (a.ordre - b.ordre); });
+  var cumul = 0, totalDebit = 0, totalCredit = 0;
+  lignes.forEach(function(l){ cumul += (l.credit || 0) - (l.debit || 0); l.solde = cumul; totalDebit += l.debit || 0; totalCredit += l.credit || 0; });
+  return { type: type, titre: titre, lignes: lignes, totalDebit: totalDebit, totalCredit: totalCredit, solde: Math.max(0, totalCredit - totalDebit), avanceSurplus: Math.max(0, totalDebit - totalCredit), note: note };
+}
+function ouvrirReleveFournisseur(refId) {
+  var d = releveFournisseur401Donnees(refId, (typeof _comptaDivisionFilter === 'function') ? _comptaDivisionFilter() : '');
+  if (!d) { toast('Relevé indisponible : fournisseur introuvable.', 'error'); return; }
+  var nom = document.getElementById('releve-modal-nom'), content = document.getElementById('releve-modal-content'); if (!content) return;
+  if (nom) nom.textContent = d.titre;
+  var td = 'style="padding:5px 8px;font-size:12px;"', num = 'style="padding:5px 8px;font-size:12px;text-align:right;"';
+  content.innerHTML = '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">' + (d.type === 'constructeur' ? '🏗️ Constructeur — compte 401' : '🏢 Fournisseur de matériaux — compte 401') + '</div>'
+    + (d.lignes.length
+      ? '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Libellé</th><th>Réf.</th><th style="text-align:right;">Débit (réglé)</th><th style="text-align:right;">Crédit (dû)</th><th style="text-align:right;">Solde à payer</th></tr></thead><tbody>'
+        + d.lignes.map(function(l){ return '<tr><td ' + td + '>' + (l.date ? dateShort(l.date) : '—') + '</td><td ' + td + '>' + escHtml(l.libelle) + '</td><td ' + td + '>' + escHtml(l.ref || '—') + '</td>'
+            + '<td ' + num + '>' + (l.debit ? fmtF(l.debit) : '—') + '</td><td ' + num + '>' + (l.credit ? fmtF(l.credit) : '—') + '</td>'
+            + '<td ' + num + ' title="Solde cumulé après cette ligne"><strong style="color:' + (l.solde > 0 ? 'var(--rouge)' : 'var(--vert)') + ';">' + fmtF(Math.abs(l.solde)) + (l.solde < 0 ? ' (DB)' : '') + '</strong></td></tr>'; }).join('')
+        + '</tbody></table></div>'
+      : '<div style="padding:16px;color:var(--blanc-dim);">Aucun mouvement enregistré pour ce tiers.</div>')
+    + '<div style="display:flex;justify-content:flex-end;gap:24px;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--bord);font-weight:700;font-size:13px;margin-top:8px;">'
+    + '<span>Total dû : ' + fmtF(d.totalCredit) + ' FCFA</span><span>Total réglé : <span style="color:var(--vert);">' + fmtF(d.totalDebit) + ' FCFA</span></span>'
+    + '<span>Solde à payer : <span style="color:' + (d.solde > 0 ? 'var(--rouge)' : 'var(--vert)') + ';font-size:15px;">' + (d.solde > 0 ? fmtF(d.solde) + ' FCFA' : 'Soldé') + '</span></span></div>'
+    + (d.avanceSurplus > 0 ? '<div style="font-size:11px;color:var(--or);padding:4px 0;">ℹ️ Les règlements dépassent les montants dus de ' + fmtF(d.avanceSurplus) + ' FCFA (créance sur le tiers).</div>' : '')
+    + (d.note ? '<div style="font-size:11px;color:var(--dim);padding:4px 0;">ℹ️ ' + escHtml(d.note) + '</div>' : '');
   openModal('modal-releve-tiers');
 }
 function printReleveModal() { _printFromElement('releve-modal-content', 'Relevé de compte tiers'); }
@@ -79881,7 +80035,7 @@ function buildTiers401() {
         +'<td style="font-weight:700;color:'+(r.solde401>0?'var(--rouge)':'var(--vert)')+';">'+(r.solde401>0?fmtF(r.solde401)+' FCFA':'Soldé')+'</td>'
         +'<td style="color:'+(r.solde401>0?ancColorM:'var(--dim)')+';" title="Calculée depuis la date des écritures 401 (facture/paiement)">'+ancLabelM+'</td>'
         +'<td><span class="badge '+(r.statut==='solde'?'badge-vert':'badge-rouge')+'">'+(r.statut==='solde'?'Soldé':'À payer')+'</span></td>'
-        +'<td><button class="btn btn-secondary btn-sm btn-icon" onclick="openFournisseurs()">🏢</button></td>'
+        +'<td><button class="btn btn-secondary btn-sm btn-icon" title="Relevé de compte" onclick="ouvrirReleveTiers(\'fournisseur:'+fr.id+'\')">📄</button> <button class="btn btn-secondary btn-sm btn-icon" onclick="openFournisseurs()">🏢</button></td>'
         +'</tr>';
     }
     var convNums = r.convs.map(function(cv){return cv.numero;}).join(', ');
@@ -79903,7 +80057,7 @@ function buildTiers401() {
       +'<td style="font-weight:700;color:'+(r.solde401>0?'var(--rouge)':'var(--vert)')+';">'+(r.solde401>0?fmtF(r.solde401)+' FCFA':'Soldé')+'</td>'
       +'<td style="color:'+(r.solde401>0?ancColor:'var(--dim)')+';" title="'+ancTitle+'">'+ancLabel+ancTag+'</td>'
       +'<td><span class="badge '+(r.statut==='solde'?'badge-vert':'badge-rouge')+'">'+(r.statut==='solde'?'Soldé':'À payer')+'</span></td>'
-      +'<td><button class="btn btn-secondary btn-sm btn-icon" onclick="goTo(\'conventions\')">📋</button></td>'
+      +'<td><button class="btn btn-secondary btn-sm btn-icon" title="Relevé de compte" onclick="ouvrirReleveTiers(\'constructeur:'+r.constr.id+'\')">📄</button> <button class="btn btn-secondary btn-sm btn-icon" onclick="goTo(\'conventions\')">📋</button></td>'
       +'</tr>';
   }).join('');
 }
@@ -93038,6 +93192,56 @@ async function deleteDossierJur(id) {
    si un dossier existe déjà pour ce client/cession et n'est pas clos,
    on le met à jour (priorité, montant, note datée) au lieu d'en recréer un.
 ══════════════════════════════════════════════════════ */
+/* ── Formulaire de saisie générique ──
+   champs : [{ cle, label, type: 'text'|'textarea'|'number'|'date'|'select', valeur, requis, min, max, options: [{v, l}], aide, positif, entier }]
+   soumettre(valeurs) peut renvoyer un message d'erreur (le formulaire reste ouvert) ou rien (il se ferme). */
+function formulaireSaisie(titre, champs, soumettre, libelleBouton) {
+  var ov = document.getElementById('modal-form-saisie');
+  if (!ov) {
+    ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'modal-form-saisie';
+    ov.innerHTML = '<div class="modal" style="max-width:520px;width:96vw;"><div class="modal-header"><h3 id="fs-titre"></h3><button class="btn btn-secondary btn-icon" onclick="closeModal(\'modal-form-saisie\')">✕</button></div>'
+      + '<div class="modal-body"><div id="fs-corps"></div><div id="fs-erreur" style="color:var(--rouge);font-size:12px;margin-top:8px;display:none;"></div></div>'
+      + '<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal(\'modal-form-saisie\')">Annuler</button><button class="btn btn-primary" id="fs-valider">Enregistrer</button></div></div>';
+    document.body.appendChild(ov);
+  }
+  document.getElementById('fs-titre').textContent = titre;
+  var E = function(v){ return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };
+  document.getElementById('fs-corps').innerHTML = champs.map(function(c){
+    var id = 'fs-c-' + c.cle, attr = ' id="' + id + '" class="form-control"' + (c.min != null ? ' min="' + E(c.min) + '"' : '') + (c.max != null ? ' max="' + E(c.max) + '"' : ''), v = E(c.valeur);
+    var ctrl = c.type === 'textarea' ? '<textarea' + attr + ' rows="3">' + v + '</textarea>'
+      : c.type === 'select' ? '<select' + attr + '>' + (c.options || []).map(function(o){ return '<option value="' + E(o.v) + '"' + (String(o.v) === String(c.valeur) ? ' selected' : '') + '>' + E(o.l) + '</option>'; }).join('') + '</select>'
+      : '<input type="' + (c.type === 'number' ? 'number' : (c.type === 'date' ? 'date' : 'text')) + '"' + attr + (c.type === 'number' ? ' step="any" inputmode="decimal"' : '') + ' value="' + v + '">';
+    return '<div class="form-group" style="margin-bottom:10px;"><label for="' + id + '">' + E(c.label) + (c.requis ? ' *' : '') + '</label>' + ctrl + (c.aide ? '<div style="font-size:11px;color:var(--blanc-dim);margin-top:2px;">' + E(c.aide) + '</div>' : '') + '</div>';
+  }).join('');
+  var err = document.getElementById('fs-erreur'), btn = document.getElementById('fs-valider');
+  err.style.display = 'none'; btn.disabled = false; btn.textContent = libelleBouton || 'Enregistrer';
+  var montrer = function(m){ err.textContent = m; err.style.display = 'block'; };
+  btn.onclick = async function() {
+    var vals = {};
+    for (var i = 0; i < champs.length; i++) {
+      var c = champs[i], el = document.getElementById('fs-c-' + c.cle), brut = el ? String(el.value).trim() : '';
+      if (c.requis && !brut) { montrer(c.label + ' est obligatoire.'); if (el) el.focus(); return; }
+      if (c.type === 'number') {
+        var n = brut === '' ? null : parseFloat(brut.replace(',', '.'));
+        if (brut !== '' && isNaN(n)) { montrer(c.label + ' : nombre invalide.'); if (el) el.focus(); return; }
+        if (n != null && c.positif && !(n > 0)) { montrer(c.label + ' doit être supérieur à zéro.'); if (el) el.focus(); return; }
+        if (n != null && c.entier && Math.floor(n) !== n) { montrer(c.label + ' doit être un nombre entier.'); if (el) el.focus(); return; }
+        if (n != null && c.min != null && n < parseFloat(c.min)) { montrer(c.label + ' : minimum ' + c.min + '.'); if (el) el.focus(); return; }
+        if (n != null && c.max != null && n > parseFloat(c.max)) { montrer(c.label + ' : maximum ' + c.max + '.'); if (el) el.focus(); return; }
+        vals[c.cle] = n;
+      } else {
+        if (c.type === 'date' && brut && c.min && brut < c.min) { montrer(c.label + ' ne peut pas être antérieure au ' + dateShort(c.min) + '.'); if (el) el.focus(); return; }
+        vals[c.cle] = brut;
+      }
+    }
+    btn.disabled = true;
+    try { var r = await soumettre(vals); if (r) { montrer(r); btn.disabled = false; return; } closeModal('modal-form-saisie'); }
+    catch (e) { console.error('[Formulaire]', e); montrer('Enregistrement impossible : ' + (e && e.message ? e.message : e)); btn.disabled = false; }
+  };
+  openModal('modal-form-saisie');
+  var premier = document.querySelector('#fs-corps .form-control'); if (premier && premier.focus) setTimeout(function(){ premier.focus(); }, 50);
+}
+
 /* ══ Suivi du contentieux : mises en demeure, tribunal, audiences, frais, sommes récupérées ══
    Tout vit dans le dossier juridique (d.tribunal, d.mises_en_demeure, d.audiences, d.frais, d.recouvrements) : il se synchronise
    avec lui, sans nouvelle table. Le délai d'une mise en demeure court depuis la réception si elle est renseignée, sinon depuis l'envoi. */
@@ -93077,68 +93281,72 @@ async function ctxSauver(d) {
 function ctxDossierCourant() { return (DATA.dossiersJuridiques || []).find(function(x){ return x.id === APP._jurDetId; }) || null; }
 function ctxDroitOk(action) { return (typeof exigerDroit !== 'function') || exigerDroit('Dossiers Juridiques', 'm', action); }
 function ctxParQui() { return (APP.currentUser && (APP.currentUser.nom || APP.currentUser.email || APP.currentUser.login)) || ''; }
-function ctxSaisieDate(msg, defaut) { var v = prompt(msg, defaut || today()); if (v === null) return null; var d = (typeof fcDateSaisie === 'function') ? fcDateSaisie(v) : v; if (!d) { toast('Date invalide : saisir JJ/MM/AAAA ou AAAA-MM-JJ.', 'error'); return null; } return d; }
-function ctxSaisieMontant(msg, defaut) { var v = prompt(msg, defaut == null ? '' : String(defaut)); if (v === null) return null; var m = parseFloat(String(v).replace(/[\s ]/g, '').replace(',', '.')); if (!(m > 0)) { toast('Montant invalide.', 'error'); return null; } return m; }
-
 async function ctxTribunalEditer() {
   var d = ctxDossierCourant(); if (!d || !ctxDroitOk('modifier ce dossier')) return;
-  var v = prompt('Tribunal compétent (juridiction, ville) :', d.tribunal || ''); if (v === null) return;
-  d.tribunal = v.trim(); await ctxSauver(d);
+  formulaireSaisie('Tribunal compétent', [{ cle: 'tribunal', label: 'Juridiction, ville', type: 'text', valeur: d.tribunal || '' }], async function(v){ d.tribunal = v.tribunal; await ctxSauver(d); });
 }
 async function ctxMedAjouter() {
   var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer une mise en demeure')) return;
-  var date = ctxSaisieDate('Date d\'envoi de la mise en demeure :'); if (!date) return;
-  var cles = Object.keys(CTX_MODES_MED), txt = cles.map(function(k, i){ return (i + 1) + '. ' + CTX_MODES_MED[k]; }).join('\n');
-  var c = parseInt(prompt('Mode d\'envoi :\n' + txt + '\n\nNuméro :', '2'), 10); if (!c || !cles[c - 1]) { toast('Mode d\'envoi obligatoire.', 'error'); return; }
-  var ref = prompt('N° de l\'acte, du recommandé ou référence (facultatif) :', ''); if (ref === null) return;
-  var dl = prompt('Délai accordé au débiteur pour régulariser (en jours) :', String(ctxDelaiMedDefaut())); if (dl === null) return;
-  var delai = parseInt(dl, 10); if (!(delai >= 0)) { toast('Délai invalide.', 'error'); return; }
-  if (!d.mises_en_demeure) d.mises_en_demeure = [];
-  d.mises_en_demeure.push({ id: uid(), date_envoi: date, mode: cles[c - 1], reference: ref.trim(), delai_jours: delai, accuse_le: '', par: ctxParQui() });
-  await ctxSauver(d); toast('📨 Mise en demeure enregistrée.', 'success');
+  formulaireSaisie('Enregistrer une mise en demeure', [
+    { cle: 'date', label: 'Date d\'envoi', type: 'date', valeur: today(), requis: true },
+    { cle: 'mode', label: 'Mode d\'envoi', type: 'select', valeur: 'recommande', options: Object.keys(CTX_MODES_MED).map(function(k){ return { v: k, l: CTX_MODES_MED[k] }; }), requis: true },
+    { cle: 'ref', label: 'N° de l\'acte, du recommandé ou référence', type: 'text', valeur: '' },
+    { cle: 'delai', label: 'Délai accordé au débiteur (jours)', type: 'number', valeur: ctxDelaiMedDefaut(), requis: true, min: 0, max: 365, entier: true, aide: 'Le délai court depuis la réception si elle est saisie, sinon depuis l\'envoi.' }
+  ], async function(v){
+    if (!d.mises_en_demeure) d.mises_en_demeure = [];
+    d.mises_en_demeure.push({ id: uid(), date_envoi: v.date, mode: v.mode, reference: v.ref, delai_jours: v.delai, accuse_le: '', par: ctxParQui() });
+    await ctxSauver(d); toast('📨 Mise en demeure enregistrée.', 'success');
+  });
 }
 async function ctxMedAccuse(medId) {
   var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer un accusé de réception')) return;
   var m = (d.mises_en_demeure || []).find(function(x){ return x.id === medId; }); if (!m) return;
-  var date = ctxSaisieDate('Date de réception par le débiteur (accusé de réception, signification…) :', m.accuse_le || m.date_envoi); if (!date) return;
-  if (date < m.date_envoi) { toast('La réception ne peut pas précéder l\'envoi.', 'error'); return; }
-  m.accuse_le = date; await ctxSauver(d); toast('Réception enregistrée : le délai court depuis cette date.', 'success');
+  formulaireSaisie('Réception de la mise en demeure', [{ cle: 'date', label: 'Date de réception par le débiteur', type: 'date', valeur: m.accuse_le || m.date_envoi, requis: true, min: m.date_envoi, aide: 'Accusé de réception, signification…' }],
+    async function(v){ m.accuse_le = v.date; await ctxSauver(d); toast('Réception enregistrée : le délai court depuis cette date.', 'success'); });
 }
 async function ctxAudienceAjouter() {
   var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer une audience')) return;
   var med = ctxDerniereMed(d), et = med ? ctxMedEtat(med, today()) : null;
   if (!med && !confirm('Aucune mise en demeure n\'est enregistrée pour ce dossier.\n\nEnregistrer quand même une audience ?')) return;
   if (med && et.etat === 'en_cours' && !confirm('Le délai de la dernière mise en demeure court encore jusqu\'au ' + dateShort(et.fin) + ' (' + et.jours + ' j).\n\nEnregistrer quand même une audience ?')) return;
-  var date = ctxSaisieDate('Date de l\'audience :'); if (!date) return;
-  var objet = prompt('Objet de l\'audience (mise en état, plaidoirie, délibéré…) :', ''); if (objet === null) return;
-  if (!d.audiences) d.audiences = [];
-  d.audiences.push({ id: uid(), date: date, objet: objet.trim(), resultat: '' });
-  await ctxSauver(d);
+  formulaireSaisie('Enregistrer une audience', [
+    { cle: 'date', label: 'Date de l\'audience', type: 'date', valeur: today(), requis: true },
+    { cle: 'objet', label: 'Objet', type: 'text', valeur: '', aide: 'Mise en état, plaidoirie, délibéré…' }
+  ], async function(v){
+    if (!d.audiences) d.audiences = [];
+    d.audiences.push({ id: uid(), date: v.date, objet: v.objet, resultat: '' });
+    await ctxSauver(d);
+  });
 }
 async function ctxAudienceResultat(audId) {
   var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer le résultat d\'une audience')) return;
   var a = (d.audiences || []).find(function(x){ return x.id === audId; }); if (!a) return;
-  var v = prompt('Résultat ou décision de l\'audience du ' + dateShort(a.date) + ' :', a.resultat || ''); if (v === null) return;
-  a.resultat = v.trim(); await ctxSauver(d);
+  formulaireSaisie('Résultat de l\'audience du ' + dateShort(a.date), [{ cle: 'resultat', label: 'Résultat ou décision', type: 'textarea', valeur: a.resultat || '', requis: true }],
+    async function(v){ a.resultat = v.resultat; await ctxSauver(d); });
 }
 async function ctxFraisAjouter() {
   var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer des frais')) return;
-  var date = ctxSaisieDate('Date de la dépense :'); if (!date) return;
-  var lib = prompt('Nature des frais (honoraires d\'avocat, huissier, greffe…) :', ''); if (lib === null) return;
-  if (!lib.trim()) { toast('Nature des frais obligatoire.', 'error'); return; }
-  var montant = ctxSaisieMontant('Montant des frais (FCFA) :'); if (!montant) return;
-  if (!d.frais) d.frais = [];
-  d.frais.push({ id: uid(), date: date, libelle: lib.trim(), montant: montant });
-  await ctxSauver(d);
+  formulaireSaisie('Enregistrer des frais', [
+    { cle: 'date', label: 'Date de la dépense', type: 'date', valeur: today(), requis: true },
+    { cle: 'libelle', label: 'Nature des frais', type: 'text', valeur: '', requis: true, aide: 'Honoraires d\'avocat, huissier, greffe…' },
+    { cle: 'montant', label: 'Montant (FCFA)', type: 'number', valeur: '', requis: true, positif: true }
+  ], async function(v){
+    if (!d.frais) d.frais = [];
+    d.frais.push({ id: uid(), date: v.date, libelle: v.libelle, montant: v.montant });
+    await ctxSauver(d);
+  });
 }
 async function ctxRecouvrementAjouter() {
   var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer une somme récupérée')) return;
-  var date = ctxSaisieDate('Date de l\'encaissement :'); if (!date) return;
-  var montant = ctxSaisieMontant('Somme récupérée (FCFA) :'); if (!montant) return;
-  var note = prompt('Remarque (versement, exécution, accord amiable…) — facultatif :', ''); if (note === null) return;
-  if (!d.recouvrements) d.recouvrements = [];
-  d.recouvrements.push({ id: uid(), date: date, montant: montant, note: note.trim() });
-  await ctxSauver(d);
+  formulaireSaisie('Enregistrer une somme récupérée', [
+    { cle: 'date', label: 'Date de l\'encaissement', type: 'date', valeur: today(), requis: true },
+    { cle: 'montant', label: 'Somme récupérée (FCFA)', type: 'number', valeur: '', requis: true, positif: true },
+    { cle: 'note', label: 'Remarque', type: 'text', valeur: '', aide: 'Versement, exécution, accord amiable…' }
+  ], async function(v){
+    if (!d.recouvrements) d.recouvrements = [];
+    d.recouvrements.push({ id: uid(), date: v.date, montant: v.montant, note: v.note });
+    await ctxSauver(d);
+  });
 }
 async function ctxItemSupprimer(liste, itemId) {
   var d = ctxDossierCourant(); if (!d || !ctxDroitOk('modifier ce dossier')) return;
@@ -137618,14 +137826,9 @@ function _caisseCollecterClients411() {
     var totalVerse = versements.reduce(function(s,v){return s+(v.montant||0);},0);
     var solde = (c.montant_total||0) - totalVerse;
     if (solde <= 0) return;
-    var mensualite = c.mensualite || 0;
     var joursRetard = 0;
-    if (mensualite > 0 && !clientFinancementBancaire(c)) {
-      var dateDebut = c.date_debut ? new Date(c.date_debut) : new Date('2023-01-01');
-      var moisEcoules = Math.floor((today - dateDebut) / (1000*60*60*24*30.5));
-      var attendu = Math.min(c.montant_total||0, (c.apport||0) + mensualite*moisEcoules);
-      joursRetard = Math.max(0, Math.round((attendu - totalVerse) / Math.max(mensualite,1) * 30.5));
-    }
+    var echC = clientFinancementBancaire(c) ? null : echeancierClient(c, today, totalVerse);   /* même calcul que les relances (plus de repli sur 2023) */
+    if (echC) joursRetard = Math.round(echC.moisRetardExact * 30.5);
     out.push({ compte:'411', tiers: ((c.prenoms||'')+' '+(c.nom||'')).trim() || c.dossier || c.id, solde: solde, joursRetard: joursRetard,
                division: (typeof _divisionDeProgramme === 'function') ? _divisionDeProgramme(c.programme_id) : '' });
   });
