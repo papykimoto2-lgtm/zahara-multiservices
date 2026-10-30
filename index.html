@@ -83074,8 +83074,9 @@ function _paJours(dateStr) { var d = new Date(String(dateStr || '').slice(0, 10)
 function paDernierReleveKm(v) {
   var L = [], add = function(k, date){ k = parseFloat(k); if (k > 0 && k <= PA_KM_MAX) L.push({ km: k, date: String(date || '').slice(0, 10) }); };
   (DATA.vehicule_courses || []).forEach(function(c){ if (c.vehicule_id === v.id) { add(c.km_depart, c.date); add(c.km_retour, c.date); } });
-  (DATA.vehicule_carburant || []).forEach(function(c){ if (c.vehicule_id === v.id) add(c.km, c.date); });
-  (DATA.vehicule_entretiens || []).forEach(function(e){ if (e.vehicule_id === v.id) add(e.km, e.date); });
+  /* Les pleins et entretiens stockent le relevé dans « km_compteur » (« km » en repli pour d'anciennes fiches) */
+  (DATA.vehicule_carburant || []).forEach(function(c){ if (c.vehicule_id === v.id) add(c.km_compteur != null ? c.km_compteur : c.km, c.date); });
+  (DATA.vehicule_entretiens || []).forEach(function(e){ if (e.vehicule_id === v.id) add(e.km_compteur != null ? e.km_compteur : e.km, e.date); });
   L.sort(function(a, b){ return b.date.localeCompare(a.date) || b.km - a.km; });
   return L[0] || null;
 }
@@ -83135,6 +83136,8 @@ function paCalculerAlertes(){
       if (ecart <= 0) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — vidange dépassée de '+_paKm(Math.abs(ecart)) });
       else if (ecart <= seuilKm) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — vidange due dans '+_paKm(ecart) });
     }
+    var ouvertes = (DATA.vehicule_courses||[]).filter(function(c){ return c.vehicule_id===v.id && paCourseOuverte(c); }).sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+    if (ouvertes.length) alertes.push({ vehicule_id:v.id, niveau:'orange', type:'course', texte: label+' — '+ouvertes.length+' course(s) non clôturée(s) (km retour manquant), la plus ancienne du '+dateShort(ouvertes[0].date) });
     if (derniereVidange && derniereVidange.prochaine_echeance_date) {
       if (derniereVidange.prochaine_echeance_date < t) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — vidange (date) dépassée depuis le '+dateShort(derniereVidange.prochaine_echeance_date) });
       else if (derniereVidange.prochaine_echeance_date <= seuilVidangeStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — vidange (date) prévue le '+dateShort(derniereVidange.prochaine_echeance_date) });
@@ -83155,6 +83158,20 @@ function paAlertesInformatives() {
       var manq = []; if (!v.assurance_fin) manq.push('assurance'); if (!v.visite_technique_expiration) manq.push('visite technique');
       if (manq.length) out.push({ vehicule_id:v.id, texte: label+' — date d\'expiration non renseignée : '+manq.join(', ') });
     }
+  });
+  /* Cohérence usage / affectations / valeur */
+  var actives = (DATA.vehicule_affectations||[]).filter(function(a){ return a.statut==='active'; });
+  (DATA.vehicules||[]).forEach(function(v){
+    var label = v.immatriculation || 'Véhicule sans plaque', aff = actives.filter(function(a){ return a.vehicule_id===v.id; });
+    if (v.statut!=='vendu' && v.usage==='fonction' && !aff.length) out.push({ vehicule_id:v.id, texte: label+' — véhicule de fonction sans affectataire actif (onglet Affectations)' });
+    if (v.statut!=='vendu' && v.usage==='service' && aff.length) out.push({ vehicule_id:v.id, texte: label+' — usage « service » mais affecté à '+paNomEmploye(aff[0].employe_id)+' : corrigez l\'usage ou terminez l\'affectation' });
+    var val = parseFloat(v.valeur_acquisition) || 0;
+    if (val > 0 && val < PA_VALEUR_MIN) out.push({ vehicule_id:v.id, texte: label+' — valeur d\'acquisition de '+fmtF(val)+' FCFA probablement erronée (saisie en millions ?) : l\'immobilisation et l\'amortissement seraient faux' });
+  });
+  actives.forEach(function(a){
+    var v = paVehicule(a.vehicule_id), emp = (DATA.employes||[]).find(function(e){ return e.id===a.employe_id; }), label = v ? (v.immatriculation||'Véhicule') : 'Véhicule supprimé';
+    if (!v || v.statut==='vendu' || v.statut==='hors_service') out.push({ vehicule_id:a.vehicule_id, texte: label+' — affectation active à '+paNomEmploye(a.employe_id)+' alors que le véhicule est '+(v ? (PA_STATUTS[v.statut]||v.statut).toLowerCase() : 'introuvable')+' : à terminer' });
+    else if (emp && typeof empEstActif==='function' && !empEstActif(emp)) out.push({ vehicule_id:a.vehicule_id, texte: label+' — affecté à '+paNomEmploye(a.employe_id)+', qui n\'est plus en activité : à terminer' });
   });
   return out;
 }
@@ -83188,14 +83205,90 @@ function paRenderAlertes(){
     + '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">⚠️ '+alertes.length+' alerte(s) échéance(s)</div>'
     + alertes.slice(0,8).map(function(a){
         return '<div style="font-size:12px;padding:3px 0;color:'+(a.niveau==='rouge'?'var(--rouge)':'var(--or,#B87333)')+';cursor:pointer;" onclick="paOuvrirFicheDepuisAlerte(\''+a.vehicule_id+'\')">'
-          + (a.type==='donnee'?'🛠️':(a.niveau==='rouge'?'🔴':'🟠')) + ' ' + escHtml(a.texte)
-          + (a.type==='donnee' ? ' <button type="button" class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="event.stopPropagation();paKmCorriger(\''+a.vehicule_id+'\')">Corriger le km</button>' : '') + '</div>';
+          + (a.type==='donnee'?'🛠️':(a.type==='course'?'🚕':(a.niveau==='rouge'?'🔴':'🟠'))) + ' ' + escHtml(a.texte)
+          + (a.type==='donnee' ? ' <button type="button" class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="event.stopPropagation();paKmCorriger(\''+a.vehicule_id+'\')">Corriger le km</button>' : '')
+          + (a.type==='course' ? ' <button type="button" class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="event.stopPropagation();paAllerCoursesOuvertes(\''+a.vehicule_id+'\')">Compléter</button>' : '') + '</div>';
       }).join('')
     + (alertes.length>8 ? '<div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">+ '+(alertes.length-8)+' autre(s)…</div>' : '')
     + '</div>';
+  var manq = paEcrituresManquantes();
+  if (manq.length) h += '<div class="card" style="padding:10px 16px;margin-top:8px;border-left:3px solid var(--or);"><div style="font-weight:700;font-size:12px;">📒 '+manq.length+' dépense(s) du parc sans écriture comptable — '+fmtF(manq.reduce(function(a,x){ return a+x.montant; },0))+' FCFA</div>'
+    + '<div style="font-size:11px;color:var(--blanc-dim);margin:3px 0 6px;">'+manq.slice(0,4).map(function(x){ var v=paVehicule(x.rec.vehicule_id); return (x.type==='carburant'?'Plein':'Entretien')+' '+escHtml(v?v.immatriculation:'')+' du '+dateShort(x.rec.date)+' ('+fmtF(x.montant)+' F)'; }).join(' · ')+(manq.length>4?' …':'')+'</div>'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="paRegenererEcritures()">Générer les écritures manquantes</button></div>';
   if (infos.length) h += '<div class="card" style="padding:10px 16px;margin-top:8px;border-left:3px solid var(--blanc-dim);"><div style="font-weight:700;font-size:12px;margin-bottom:4px;">ℹ️ À noter ('+infos.length+')</div>'
     + infos.map(function(a){ return '<div style="font-size:12px;padding:2px 0;color:var(--blanc-dim);cursor:pointer;" onclick="paOuvrirFicheDepuisAlerte(\''+a.vehicule_id+'\')">• '+escHtml(a.texte)+'</div>'; }).join('') + '</div>';
   box.innerHTML = h;
+}
+/* ── Contrôles de saisie du Parc auto ───────────────────────────────── */
+var PA_VALEUR_MIN = 100000, PA_DISTANCE_MAX_COURSE = 500, PA_ECART_COURSE = 100;
+/* Tous les relevés de compteur connus d'un véhicule (courses, pleins, entretiens), hors enregistrement en cours de modification. */
+function paReleves(vehiculeId, exclureId) {
+  var L = [], add = function(k, date, src, id){ k = parseFloat(k); if (k > 0 && k <= PA_KM_MAX && id !== exclureId) L.push({ km: k, date: String(date || '').slice(0, 10), src: src }); };
+  (DATA.vehicule_courses || []).forEach(function(c){ if (c.vehicule_id === vehiculeId) { add(c.km_depart, c.date, 'course', c.id); add(c.km_retour, c.date, 'course', c.id); } });
+  (DATA.vehicule_carburant || []).forEach(function(c){ if (c.vehicule_id === vehiculeId) add(c.km_compteur != null ? c.km_compteur : c.km, c.date, 'plein', c.id); });
+  (DATA.vehicule_entretiens || []).forEach(function(e){ if (e.vehicule_id === vehiculeId) add(e.km_compteur != null ? e.km_compteur : e.km, e.date, 'entretien', e.id); });
+  return L;
+}
+/* Le compteur ne recule pas : un relevé inférieur au dernier relevé daté d'avant ou du même jour est suspect. */
+function paCompteurRecule(vehiculeId, date, km, exclureId) {
+  var L = paReleves(vehiculeId, exclureId).filter(function(r){ return r.date && r.date <= date; }).sort(function(a, b){ return b.date.localeCompare(a.date) || b.km - a.km; });
+  return (L[0] && km < L[0].km) ? L[0] : null;
+}
+function _paMsgRecule(r, km) { return 'Le compteur semble reculer : ' + _paKm(km) + ' alors que le relevé du ' + dateShort(r.date) + ' (' + r.src + ') indique ' + _paKm(r.km) + '.'; }
+/* Plein : compteur qui recule, doublon (même jour et mêmes litres, ou même relevé à moins de 7 jours). Retourne le message ou ''. */
+function paControlesPlein(vehiculeId, date, litres, km) {
+  var m = [], r = paCompteurRecule(vehiculeId, date, km); if (r) m.push(_paMsgRecule(r, km));
+  var t = new Date(date + 'T12:00:00').getTime();
+  var dbl = (DATA.vehicule_carburant || []).filter(function(c){
+    if (c.vehicule_id !== vehiculeId) return false;
+    var cl = parseFloat(c.litres) || 0, same = c.date === date && Math.abs(cl - litres) < 0.5;
+    var ck = parseFloat(c.km_compteur != null ? c.km_compteur : c.km) || 0, proche = Math.abs(new Date((c.date || date) + 'T12:00:00').getTime() - t) <= 7 * 86400000;
+    return same || (ck === km && proche && Math.abs(cl - litres) < 0.5);
+  })[0];
+  if (dbl) m.push('Un plein identique existe déjà (' + dateShort(dbl.date) + ', ' + dbl.litres + ' L, relevé ' + _paKm(dbl.km_compteur != null ? dbl.km_compteur : dbl.km) + ') : doublon possible.');
+  return m.join('\n');
+}
+function paAllerCoursesOuvertes(vid) { window._paCoursesOuvertesVid = vid; if (typeof switchTab === 'function') switchTab('parc-auto', 'courses'); if (typeof paRenderCourses === 'function') paRenderCourses(); }
+function paRetirerFiltreCourses() { window._paCoursesOuvertesVid = null; paRenderCourses(); }
+function paCourseOuverte(c) { return (c.km_retour == null || c.km_retour === '') && (c.date || '') < today(); }
+
+/* ── Écritures comptables manquantes (plein ou entretien enregistré sans écriture) ── */
+function paEcrituresManquantes() {
+  var ids = {}; (DATA.ecritures || []).forEach(function(e){ ids[e.id] = 1; });
+  var out = [];
+  (DATA.vehicule_carburant || []).forEach(function(c){ var m = parseFloat(c.montant) || 0; if (m > 0 && !ids['ecr_parc_carb_' + c.id]) out.push({ type: 'carburant', rec: c, montant: m }); });
+  (DATA.vehicule_entretiens || []).forEach(function(e){ var m = parseFloat(e.cout) || 0; if (m > 0 && !ids['ecr_parc_ent_' + e.id]) out.push({ type: 'entretien', rec: e, montant: m }); });
+  return out;
+}
+function _paEcritureDe(x) {
+  var r = x.rec, v = paVehicule(r.vehicule_id), immat = v ? v.immatriculation : '', cpt;
+  if (x.type === 'carburant') {
+    cpt = requireCompteDefaut('parc_carburant');
+    var tc = r.mode_paiement === 'especes' ? requireCompteDefaut('treso_caisse') : r.mode_paiement === 'mobile_money' ? requireCompteDefaut('treso_mobile') : requireCompteDefaut('treso_banque');
+    return { id: 'ecr_parc_carb_' + r.id, ref: 'CARB-' + r.id.slice(-6).toUpperCase(), date: r.date, piece: 'CARB/' + immat,
+      libelle: 'Carburant — ' + immat + ' — ' + r.litres + ' L' + (r.station ? ' — ' + r.station : ''), compte: cpt, compte_debit: cpt, compte_credit: tc, montant: x.montant,
+      type: 'charge', mode: r.mode_paiement, division: v ? (v.division_id || '') : '', source: 'parc_auto_carburant', vehicule_id: r.vehicule_id, created_at: today() };
+  }
+  cpt = requireCompteDefaut('parc_entretien');
+  var cc = r.mode_paiement === 'a_credit' ? requireCompteDefaut('fournisseur') : r.mode_paiement === 'especes' ? requireCompteDefaut('treso_caisse') : r.mode_paiement === 'mobile_money' ? requireCompteDefaut('treso_mobile') : requireCompteDefaut('treso_banque');
+  return { id: 'ecr_parc_ent_' + r.id, ref: 'ENT-' + r.id.slice(-6).toUpperCase(), date: r.date, piece: 'ENT/' + immat,
+    libelle: (PA_ENTRETIEN_TYPES[r.type] || r.type) + ' — ' + immat + (r.atelier ? ' — ' + r.atelier : ''), compte: cpt, compte_debit: cpt, compte_credit: cc, montant: x.montant,
+    type: r.mode_paiement === 'a_credit' ? 'dette' : 'charge', mode: r.mode_paiement, division: v ? (v.division_id || '') : '', source: 'parc_auto_entretien', vehicule_id: r.vehicule_id, created_at: today() };
+}
+async function paRegenererEcritures() {
+  var L = paEcrituresManquantes(); if (!L.length) { toast('Aucune écriture manquante.', 'info'); return; }
+  if (!exigerDroit('Comptabilite', 'c', 'la régénération des écritures du parc auto')) return;
+  if (!confirm('Générer ' + L.length + ' écriture(s) manquante(s) pour ' + fmtF(L.reduce(function(a, x){ return a + x.montant; }, 0)) + ' FCFA (dates d\'origine des dépenses) ?')) return;
+  var ok = 0, clos = 0, stop = false;
+  for (var i = 0; i < L.length && !stop; i++) {
+    if (typeof exerciceEstClos === 'function' && exerciceEstClos(L[i].rec.date)) { clos++; continue; }
+    var ecr; try { ecr = _paEcritureDe(L[i]); } catch (e) { stop = true; break; }
+    if (!ecr) { stop = true; break; }
+    DATA.ecritures.push(ecr); await dbPut('ecritures', ecr); if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', ecr); ok++;
+  }
+  if (ok && typeof buildBalance === 'function') buildBalance();
+  toast(ok + ' écriture(s) générée(s)' + (clos ? ' · ' + clos + ' ignorée(s) (exercice clos)' : '') + (stop ? ' · arrêt : compte par défaut non paramétré (Paramètres → Comptes par défaut)' : '') + '.', stop || clos ? 'warn' : 'success', 8000);
+  paRenderAlertes();
 }
 function paOuvrirFicheDepuisAlerte(vehiculeId){ paOpenVehicule(vehiculeId); }
 
@@ -83351,6 +83444,7 @@ function paCreerImmobilisation(vehiculeId){
   var v = paVehicule(vehiculeId);
   if (!v) return;
   if (!v.valeur_acquisition) { toast('Renseignez d\'abord la valeur d\'acquisition sur la fiche véhicule.', 'error'); return; }
+  if (v.valeur_acquisition < PA_VALEUR_MIN) { toast('Valeur d\'acquisition de ' + fmtF(v.valeur_acquisition) + ' FCFA : vérifiez-la (saisie en millions ?) avant de créer l\'immobilisation.', 'error', 8000); return; }
   closeModal('modal-pa-vehicule');
   openImmoSocieteModal(null);
   setTimeout(function(){
@@ -83373,6 +83467,10 @@ async function paSaveVehicule(){
   var id = (document.getElementById('pav-id')||{}).value || uid();
   var _kmSaisi = parseFloat((document.getElementById('pav-km')||{}).value) || 0;
   if (_kmSaisi > PA_KM_MAX) { toast('Kilométrage improbable (plus de ' + _paKm(PA_KM_MAX) + ') : vérifiez la saisie.', 'error'); return; }
+  var _valSaisie = parseFloat((document.getElementById('pav-valeur-acq')||{}).value) || 0;
+  if (_valSaisie > 0 && _valSaisie < PA_VALEUR_MIN) {
+    if (confirm('Valeur d\'acquisition de ' + fmtF(_valSaisie) + ' FCFA : probablement saisie en millions.\n\nOK = la lire comme ' + fmtF(_valSaisie * 1000000) + ' FCFA\nAnnuler = la garder telle quelle')) { var _elVal = document.getElementById('pav-valeur-acq'); if (_elVal) _elVal.value = _valSaisie * 1000000; }
+  }
   var existant = paVehicule(id);
   var v = existant || { id: id, created_at: new Date().toISOString() };
   v.immatriculation = immat.trim().toUpperCase();
@@ -83425,6 +83523,9 @@ async function paSaveCarburant(){
   var km = parseFloat((document.getElementById('pac-km')||{}).value)||0;
   if (!vehiculeId || !date || !litres || !montant || !km) { toast('Véhicule, date, litres, montant et km sont obligatoires.', 'error'); return; }
 
+  var _ctl = paControlesPlein(vehiculeId, date, litres, km);
+  if (km > PA_KM_MAX) { toast('Kilométrage improbable (plus de ' + _paKm(PA_KM_MAX) + ') : vérifiez la saisie.', 'error'); return; }
+  if (_ctl && !confirm(_ctl + '\n\nEnregistrer quand même ce plein ?')) return;
   var c = {
     id: uid(), vehicule_id: vehiculeId, date: date, litres: litres, montant: montant, km_compteur: km,
     station: (document.getElementById('pac-station')||{}).value||'',
@@ -83535,6 +83636,12 @@ async function pcoSaveCourse(){
   if (!kmDepart) { toast('Km départ est obligatoire.', 'error'); return; }
   if (kmRetour!==null && kmRetour < kmDepart) { toast('Le km retour ne peut pas être inférieur au km départ.', 'error'); return; }
 
+  if (kmDepart > PA_KM_MAX || (kmRetour !== null && kmRetour > PA_KM_MAX)) { toast('Kilométrage improbable (plus de ' + _paKm(PA_KM_MAX) + ') : vérifiez la saisie.', 'error'); return; }
+  var _msg = [], _rd = paCompteurRecule(vehiculeId, date, kmDepart, editId); if (_rd) _msg.push(_paMsgRecule(_rd, kmDepart));
+  if (kmRetour !== null && kmRetour - kmDepart > PA_DISTANCE_MAX_COURSE) _msg.push('Distance de ' + _paKm(kmRetour - kmDepart) + ' pour une seule course (plus de ' + _paKm(PA_DISTANCE_MAX_COURSE) + ').');
+  var _prec = (DATA.vehicule_courses||[]).filter(function(x){ return x.vehicule_id===vehiculeId && x.id!==editId && x.km_retour!=null && x.km_retour!=='' && (x.date||'') <= date; }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||'') || (b.km_retour - a.km_retour); })[0];
+  if (_prec && kmDepart - _prec.km_retour > PA_ECART_COURSE) _msg.push('Le km départ (' + _paKm(kmDepart) + ') dépasse de ' + _paKm(kmDepart - _prec.km_retour) + ' le km retour de la course précédente (' + _paKm(_prec.km_retour) + ', ' + dateShort(_prec.date) + ') : trajets non enregistrés ?');
+  if (_msg.length && !confirm(_msg.join('\n') + '\n\nEnregistrer quand même cette course ?')) return;
   var existant = editId ? (DATA.vehicule_courses||[]).find(function(x){ return x.id===editId; }) : null;
   var c = existant || { id: uid(), created_at: new Date().toISOString() };
   c.vehicule_id = vehiculeId; c.date = date;
@@ -83580,11 +83687,14 @@ function paRenderCourses(){
   if (!box) return;
   var fV = (document.getElementById('pco-filter-vehicule')||{}).value||'';
   var fM = (document.getElementById('pco-filter-mois')||{}).value||'';
+  var fO = window._paCoursesOuvertesVid || '';
   var liste = (DATA.vehicule_courses||[]).filter(function(c){
+    if (fO && !(c.vehicule_id===fO && paCourseOuverte(c))) return false;
     if (fV && c.vehicule_id!==fV) return false;
     if (fM && (c.date||'').slice(0,7)!==fM) return false;
     return true;
   }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||'') || (b.created_at||'').localeCompare(a.created_at||''); });
+  var chipO = fO ? '<div class="alert alert-warn" style="font-size:12px;margin-bottom:8px;">🚕 Courses non clôturées de '+escHtml((paVehicule(fO)||{}).immatriculation||'')+' : complétez le km retour avec ✏️. <button type="button" class="btn btn-secondary btn-sm" onclick="paRetirerFiltreCourses()">Retirer le filtre</button></div>' : '';
 
   var kEl = document.getElementById('pco-kpis');
   if (kEl) {
@@ -83593,8 +83703,8 @@ function paRenderCourses(){
     kEl.innerHTML = kpi('Courses', liste.length) + kpi('Km parcourus', fmtF(totalKm)+' km');
   }
 
-  if (!liste.length) { box.innerHTML = '<div class="alert alert-info">Aucune course enregistrée.</div>'; return; }
-  box.innerHTML = '<table class="data-table"><thead><tr><th>Date</th><th>Véhicule</th><th>Chauffeur</th><th>Horaires</th><th style="text-align:right;">Distance</th><th>Destination / Motif</th><th>Passager(s)</th><th></th></tr></thead><tbody>'
+  if (!liste.length) { box.innerHTML = chipO + '<div class="alert alert-info">Aucune course enregistrée.</div>'; return; }
+  box.innerHTML = chipO + '<table class="data-table"><thead><tr><th>Date</th><th>Véhicule</th><th>Chauffeur</th><th>Horaires</th><th style="text-align:right;">Distance</th><th>Destination / Motif</th><th>Passager(s)</th><th></th></tr></thead><tbody>'
     + liste.map(function(c){
         var v = paVehicule(c.vehicule_id);
         var horaires = (c.heure_depart||c.heure_retour) ? ((c.heure_depart||'—')+' → '+(c.heure_retour||'—')) : '—';
@@ -83627,6 +83737,11 @@ async function paSaveEntretien(){
   var km = parseFloat((document.getElementById('pae-km')||{}).value)||0;
   if (!vehiculeId || !date || !km) { toast('Véhicule, date et km sont obligatoires.', 'error'); return; }
 
+  var _proch = parseFloat((document.getElementById('pae-prochain-km')||{}).value) || 0;
+  if (_proch && _proch <= km) { toast('La prochaine échéance (' + _paKm(_proch) + ') doit dépasser le kilométrage de l\'entretien (' + _paKm(km) + ').', 'error', 7000); return; }
+  if (km > PA_KM_MAX) { toast('Kilométrage improbable (plus de ' + _paKm(PA_KM_MAX) + ') : vérifiez la saisie.', 'error'); return; }
+  var _rec = paCompteurRecule(vehiculeId, date, km);
+  if (_rec && !confirm(_paMsgRecule(_rec, km) + '\n\nEnregistrer quand même cet entretien ?')) return;
   var e = {
     id: uid(), vehicule_id: vehiculeId, date: date,
     type: (document.getElementById('pae-type')||{}).value||'autre',
@@ -83706,6 +83821,10 @@ async function paSaveAffectation(){
      n'importe qui. L'affecter durablement à une personne le transforme de
      fait en véhicule de fonction, mais rien ne met à jour son usage
      automatiquement — on le signale plutôt que de le faire en silence. */
+  var _vA = paVehicule(vehiculeId), _eA = (DATA.employes||[]).find(function(e){ return e.id===employeId; });
+  if (_vA && (_vA.statut === 'vendu' || _vA.statut === 'hors_service')) { toast('Affectation impossible : le véhicule est ' + (PA_STATUTS[_vA.statut] || _vA.statut).toLowerCase() + '.', 'error'); return; }
+  if (_eA && typeof empEstActif === 'function' && !empEstActif(_eA)) { toast('Affectation impossible : cet employé n\'est plus en activité.', 'error'); return; }
+  if (_vA && _vA.statut === 'en_reparation' && !confirm('Ce véhicule est en réparation. L\'affecter quand même ?')) return;
   var vAff = paVehicule(vehiculeId);
   if (vAff && paVehiculeUsage(vAff) === 'service') {
     if (!confirm('Ce véhicule est marqué « Service » (pool, sans affectataire fixe). L\'affecter durablement à '+ (DATA.employes.find(function(e){return e.id===employeId;})||{}).nom + ' le transformera en usage réel « Fonction ».\n\nContinuer, puis pensez à mettre à jour son usage sur la fiche véhicule ?')) return;
