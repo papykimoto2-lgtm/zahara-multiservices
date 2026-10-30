@@ -34,3 +34,17 @@ test("les diagrammes n'apparaissent qu'au clic sur un manuel", async () => {
   assert.equal(r.ferme, 'none');
   assert.ok(r.lignes >= 1 && r.lignes < r.nm);
 });
+
+test('chaque diagramme renvoie vers le manuel qui détaille ses procédures', async () => {
+  const app = await ouvrirApp();
+  const r = await app.page.evaluate(function () {
+    var sansManuel = Object.keys(MANUELS_FLUX).filter(function (id) { return !MANUELS_CATALOGUE.some(function (m) { return m.ref === MANUELS_FLUX[id].ref; }); });
+    switchTab('params', 'manuels');
+    manuelsSelectionner('GUI-FON');
+    var liens = Array.prototype.map.call(document.querySelectorAll('#manuels-flux a[href^="docs/"]'), function (a) { return a.getAttribute('href'); });
+    return { sansManuel: sansManuel, liens: liens };
+  });
+  assert.deepEqual(r.sansManuel, []);
+  assert.ok(r.liens.length >= 1);
+  assert.ok(r.liens.every(function (h) { return h === 'docs/MANUEL_PROCEDURES_FONCIER.pdf'; }));
+});
