@@ -10892,7 +10892,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <div class="card">
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Référence</th><th>Nature</th><th>Partie adverse</th><th>Tribunal</th><th>Montant litige</th><th>Avocat</th><th>Prochaine audience</th><th>Statut</th></tr></thead>
+                <thead><tr><th>Référence</th><th>Nature</th><th>Partie adverse</th><th>Tribunal</th><th>Montant litige</th><th>Avocat</th><th>Prochaine audience</th><th>Statut</th><th>Situation du client</th><th></th></tr></thead>
                 <tbody id="tbody-contentieux"></tbody>
               </table>
             </div>
@@ -50214,16 +50214,19 @@ function detectRelances() {
     var lot = client ? DATA.lots.find(function(l) { return l.id === client.lot_id; }) : null;
     var n = _relanceNiveauDe(r.moisRetard);
     var lastRelance = DATA.relances.filter(function(rel) { return rel.client_id === r.id; }).sort(function(a, b) { return new Date(b.date) - new Date(a.date); })[0];
+    var dosCtx = (typeof ctxDossierDuClient === 'function') ? ctxDossierDuClient(r.id) : null;
     return '<tr>'
       + '<td><strong>' + r.nom + ' ' + r.prenoms + '</strong><br><span style="font-size:11px;color:var(--blanc-dim);">' + r.tel + '</span></td>'
       + '<td>' + (prog ? prog.nom : '—') + (lot ? ' / Lot ' + lot.numero : '') + '</td>'
       + '<td style="color:var(--rouge);font-weight:bold;">' + r.moisRetard + ' mois</td>'
       + '<td style="color:var(--rouge);">' + fcfa(r.montantDu) + '</td>'
-      + '<td><span class="badge ' + n.badge + '">' + n.icone + ' ' + n.label + '</span></td>'
+      + '<td><span class="badge ' + n.badge + '">' + n.icone + ' ' + n.label + '</span>' + (dosCtx ? '<br><a href="#" style="font-size:11px;color:var(--rouge);" title="Ouvrir le dossier contentieux" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\');return false;">⚖️ ' + escHtml(dosCtx.ref) + '</a>' : '') + '</td>'
       + '<td style="font-size:11px;">' + (lastRelance ? dateShort(lastRelance.date) : 'Jamais') + '</td>'
       + '<td style="white-space:nowrap;">'
       + '<button class="btn btn-primary btn-sm" onclick="openRelanceModal(\'' + r.id + '\')">📨 Relancer</button> '
       + '<button class="btn btn-secondary btn-sm" onclick="etatRelance(\'' + r.id + '\')">📄 Lettre PDF</button>'
+      + (dosCtx ? ' <button class="btn btn-secondary btn-sm" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\')">⚖️ Voir le contentieux</button>'
+                : (r.moisRetard >= 3 ? ' <button class="btn btn-danger btn-sm" title="Ouvrir un dossier contentieux dans le module Juridique" onclick="ctxEscalader(\'' + r.id + '\')">⚖️ Contentieux</button>' : ''))
       + '</td></tr>';
   }).join('');
 }
@@ -92679,9 +92682,15 @@ function renderContentieuxJuridiques() {
   if (!tbody) return;
   var list = (DATA.dossiersJuridiques || []).filter(function(d){ return d.type === 'contentieux'; })
     .sort(function(a,b){ var pr={urgente:0,haute:1,normale:2,basse:3}; return (pr[a.priorite]||2)-(pr[b.priorite]||2); });
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun contentieux en cours.</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun contentieux en cours.</td></tr>'; return; }
   var statMap = { ouvert:'badge-or', en_instruction:'badge-bleu', en_attente:'badge-violet', clos_favorable:'badge-vert', clos_defavorable:'badge-rouge' };
+  var retardataires = getRetardataires();
   tbody.innerHTML = list.map(function(d) {
+    var clos = d.statut === 'clos_favorable' || d.statut === 'clos_defavorable';
+    var sit = clos ? null : ctxSituationSource(d, retardataires), sitHtml = '—';
+    if (sit) sitHtml = sit.retard ? '<span style="color:var(--rouge);font-weight:600;">⚠ ' + sit.mois + ' mois de retard<br>' + fmtF(Math.round(sit.montant || 0)) + ' F dû</span>'
+                                  : '<span style="color:var(--vert);font-weight:600;" title="Le souscripteur n\'est plus en retard : le dossier peut être clôturé">✅ À jour<br><span style="font-size:11px;">à clôturer ?</span></span>';
+    var lienRelance = (!clos && d.source_type === 'souscripteur') ? '<button class="btn btn-secondary btn-sm" title="Voir la fiche de relance du souscripteur" onclick="ctxVoirRelance(\'' + d.source_id + '\')">👤 Relance</button> ' : '';
     var audience = d.date_ech ? (new Date(d.date_ech) < new Date() ? '<span style="color:var(--rouge);">⚠ ' + d.date_ech + '</span>' : d.date_ech) : '—';
     return '<tr>'
       + '<td style="font-weight:700;color:var(--or);font-family:monospace;">' + escHtml(d.ref) + '</td>'
@@ -92692,6 +92701,8 @@ function renderContentieuxJuridiques() {
       + '<td style="font-size:12px;">' + escHtml(d.avocat || '—') + '</td>'
       + '<td style="font-size:11px;">' + audience + '</td>'
       + '<td><span class="badge ' + (statMap[d.statut]||'badge-bleu') + '">' + d.statut.replace(/_/g,' ') + '</span></td>'
+      + '<td style="font-size:12px;">' + sitHtml + '</td>'
+      + '<td style="white-space:nowrap;">' + lienRelance + '<button class="btn btn-secondary btn-sm" title="Documents et analyse" onclick="openDossierDetails(\'' + d.id + '\')">📎</button></td>'
       + '</tr>';
   }).join('');
 }
@@ -92862,6 +92873,59 @@ async function deleteDossierJur(id) {
    si un dossier existe déjà pour ce client/cession et n'est pas clos,
    on le met à jour (priorité, montant, note datée) au lieu d'en recréer un.
 ══════════════════════════════════════════════════════ */
+/* ── Lien Relances ↔ Contentieux ──
+   Un souscripteur en retard est rattaché à son dossier contentieux (source_type « souscripteur ») : visible depuis la page Relances,
+   et la situation actuelle du client (retard, montant dû) est reportée dans l'onglet Contentieux. */
+function ctxDossierDuClient(clientId) {
+  return (DATA.dossiersJuridiques || []).find(function(d){
+    return d.type === 'contentieux' && d.source_type === 'souscripteur' && d.source_id === clientId && d.statut !== 'clos_favorable' && d.statut !== 'clos_defavorable';
+  }) || null;
+}
+function ctxOuvrirDossier(dossierId) {
+  if (typeof goTo === 'function') goTo('juridique');
+  if (typeof switchTab === 'function') switchTab('juridique', 'contentieux');
+  setTimeout(function(){ if (typeof openDossierDetails === 'function') openDossierDetails(dossierId); }, 60);
+}
+function ctxVoirRelance(clientId) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === clientId; }); if (!c) { toast('Client introuvable.', 'error'); return; }
+  if (typeof goTo === 'function') goTo('relances');
+  setTimeout(function(){
+    var inp = document.getElementById('search-relances'); if (inp) inp.value = ((c.nom || '') + ' ' + (c.prenoms || '')).trim();
+    if (typeof setRelancesNiveau === 'function') setRelancesNiveau('tous');
+    if (typeof detectRelances === 'function') detectRelances();
+  }, 60);
+}
+/* Ouvre (ou met à jour) le dossier contentieux d'un souscripteur en retard, sans attendre l'envoi d'une relance. */
+async function ctxEscalader(clientId) {
+  var client = (DATA.clients || []).find(function(c){ return c.id === clientId; });
+  var r = getRetardataires().find(function(x){ return x.id === clientId; });
+  if (!client || !r) { toast('Ce souscripteur n\'est plus en retard.', 'info'); return; }
+  var existant = ctxDossierDuClient(clientId);
+  if (existant) { ctxOuvrirDossier(existant.id); return; }
+  if (!confirm('Ouvrir un dossier contentieux pour ' + (client.nom || '') + ' ' + (client.prenoms || '') + ' ?\n\n' + r.moisRetard + ' mois de retard — ' + fcfa(r.montantDu) + ' dû.')) return;
+  var prog = DATA.programmes.find(function(p){ return p.id === client.programme_id; });
+  var lot = DATA.lots.find(function(l){ return l.id === client.lot_id; });
+  var d = await ensureDossierContentieux('souscripteur', client.id, {
+    titre: (client.nom || '') + ' ' + (client.prenoms || '') + (prog ? ' — ' + prog.nom : '') + (lot ? ' / Lot ' + lot.numero : ''),
+    interlocuteur: (client.nom || '') + ' ' + (client.prenoms || ''),
+    montant: r.montantDu, moisRetard: r.moisRetard, niveau: r.moisRetard >= 6 ? 3 : 2
+  });
+  if (typeof detectRelances === 'function') detectRelances();
+  if (d && confirm('Dossier ' + d.ref + ' ouvert. L\'afficher maintenant ?')) ctxOuvrirDossier(d.id);
+}
+/* Situation actuelle de la personne visée par un dossier contentieux (retard et montant dû), ou null si la source est inconnue. */
+function ctxSituationSource(d, retardataires) {
+  if (d.source_type === 'souscripteur') {
+    var r = (retardataires || getRetardataires()).find(function(x){ return x.id === d.source_id; });
+    return r ? { retard: true, mois: r.moisRetard, montant: r.montantDu } : { retard: false };
+  }
+  if (d.source_type === 'cession_fonciere') {
+    var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === d.source_id; });
+    var rc = c ? crecRetard(c) : null;
+    return rc ? { retard: true, mois: rc.moisRetard, montant: rc.montantDu } : { retard: false };
+  }
+  return null;
+}
 async function ensureDossierContentieux(sourceType, sourceId, opts) {
   opts = opts || {};
   if (!DATA.dossiersJuridiques) DATA.dossiersJuridiques = [];
