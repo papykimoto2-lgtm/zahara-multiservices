@@ -5408,6 +5408,8 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
 
         <div id="relances-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;"></div>
 
+        <div id="relances-dash" style="margin-bottom:16px;"></div>
+
         <div id="relances-tabs" class="tab-nav" style="margin-bottom:14px;"></div>
 
         <div class="card">
@@ -22283,8 +22285,10 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
         <button class="tab-btn active" id="tab-btn-jur-det-docs" onclick="switchTab('jur-det','docs')">📎 Documents</button>
         <button class="tab-btn" id="tab-btn-jur-det-ia" onclick="switchTab('jur-det','ia');lancerAnalyseIA()">🤖 Analyse IA</button>
         <button class="tab-btn" id="tab-btn-jur-det-chronologie" onclick="switchTab('jur-det','chronologie')">📅 Chronologie</button>
+        <button class="tab-btn" id="tab-btn-jur-det-procedure" style="display:none;" onclick="switchTab('jur-det','procedure');ctxProcRender(APP._jurDetId)">⚖️ Procédure</button>
       </div>
     </div>
+    <div class="tab-pane" id="tab-jur-det-procedure" style="padding:16px 18px;max-height:65vh;overflow-y:auto;"></div>
 
     <div class="tab-pane active" id="tab-jur-det-docs" style="padding:16px 18px;max-height:65vh;overflow-y:auto;">
       <div class="jur-upload-zone" id="jur-upload-zone"
@@ -50163,6 +50167,28 @@ function _relanceNiveauDe(moisRetard) {
   }
   return trouve;
 }
+/* Efficacité des relances sur les 90 derniers jours : part des clients relancés qui ne sont plus en retard, et promesses tenues. */
+function relanceEfficacite(retardataires) {
+  var lim = ctxAjouterJours(today(), -90), enRetard = {}; retardataires.forEach(function(r){ enRetard[r.id] = true; });
+  var relances = {}; (DATA.relances || []).forEach(function(x){ if (x.client_id && (x.date || '') >= lim) relances[x.client_id] = true; });
+  var ids = Object.keys(relances), regularises = ids.filter(function(id){ return !enRetard[id]; }).length;
+  var tenues = 0, nonTenues = 0;
+  (DATA.clients || []).forEach(function(c){ (c.promesses_paiement || []).forEach(function(p){ if (p.statut === 'annulee') return; var e = promesseEtat(c, p); if (e === 'tenue') tenues++; else if (e === 'non_tenue') nonTenues++; }); });
+  return { relances: ids.length, regularises: regularises, taux: ids.length ? Math.round(regularises / ids.length * 100) : null, tenues: tenues, nonTenues: nonTenues };
+}
+function relanceDashHtml(retardataires) {
+  var tr = ctxTranchesRetard(retardataires), tot = tr.reduce(function(a, t){ return a + t.montant; }, 0), ef = relanceEfficacite(retardataires);
+  var ouverts = (DATA.dossiersJuridiques || []).filter(function(d){ return d.type === 'contentieux' && d.statut !== 'clos_favorable' && d.statut !== 'clos_defavorable'; });
+  var ctx = ouverts.reduce(function(a, d){ var sy = ctxSynthese(d); a.reclame += sy.reclame; a.recupere += sy.recupere; a.frais += sy.frais; return a; }, { reclame: 0, recupere: 0, frais: 0 });
+  var carte = function(titre, grand, detail, coul){ return '<div class="kpi-card" style="border-top-color:' + coul + ';"><div class="kpi-label">' + titre + '</div><div class="kpi-value" style="font-size:16px;color:' + coul + ';">' + grand + '</div><div style="font-size:11px;color:var(--blanc-dim);margin-top:2px;">' + detail + '</div></div>'; };
+  var h = '<div class="card" style="padding:12px;"><div class="card-title" style="margin-bottom:8px;">📊 Vue d\'ensemble des impayés — ' + fcfa(tot) + ' en retard</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;">';
+  var coul = ['var(--bleu)', 'var(--or)', 'var(--rouge)'];
+  tr.forEach(function(t, i){ h += carte(t.lib, fcfa(t.montant), t.n + ' souscripteur(s)' + (tot > 0 ? ' · ' + Math.round(t.montant / tot * 100) + ' %' : ''), coul[i]); });
+  h += carte('⚖️ En contentieux', fcfa(ctx.reclame), ouverts.length + ' dossier(s) · récupéré ' + fcfa(ctx.recupere) + ' · frais ' + fcfa(ctx.frais), 'var(--violet)');
+  h += carte('Régularisation après relance (90 j)', ef.taux === null ? '—' : ef.taux + ' %', ef.relances ? ef.regularises + ' sur ' + ef.relances + ' client(s) relancé(s) ne sont plus en retard' : 'Aucune relance sur la période', 'var(--vert)');
+  h += carte('Promesses de paiement', (ef.tenues + ef.nonTenues) ? Math.round(ef.tenues / (ef.tenues + ef.nonTenues) * 100) + ' % tenues' : '—', ef.tenues + ' tenue(s) · ' + ef.nonTenues + ' non tenue(s)', 'var(--or)');
+  return h + '</div></div>';
+}
 /* ══ Promesses de paiement et file « à traiter aujourd'hui » ══
    Une promesse (date + montant) est portée par la fiche du client (client.promesses_paiement), comme le journal commercial : elle se
    synchronise avec la fiche, sans nouvelle table. Son état se déduit des versements : tenue si le montant promis a été versé depuis
@@ -50260,6 +50286,7 @@ function detectRelances() {
     return '<div class="kpi-card" style="border-top-color:' + n.couleur + ';cursor:pointer;" onclick="setRelancesNiveau(\'' + n.cle + '\')" title="Filtrer sur ce niveau"><div class="kpi-label">' + n.icone + ' ' + n.label + '</div><div class="kpi-value" style="color:' + n.couleur + ';">' + compteurs[n.cle] + '</div></div>';
   }).join('');
 
+  var dashEl = document.getElementById('relances-dash'); if (dashEl) dashEl.innerHTML = relanceDashHtml(retards);
   var analyses = {}, nbJour = 0, nbPromNonTenues = 0;
   retards.forEach(function(r){ var a = relanceAnalyse(r); analyses[r.id] = a; if (a.motifs.length) nbJour++; if (a.motifs.some(function(m){ return m.cle === 'promesse'; })) nbPromNonTenues++; });
   if (nbPromNonTenues && !APP._promAlerte) { APP._promAlerte = true; toast('⛔ ' + nbPromNonTenues + ' promesse(s) de paiement non tenue(s) : à relancer en priorité.', 'warn', 8000); }
@@ -92780,22 +92807,27 @@ function renderContentieuxJuridiques() {
   var retardataires = getRetardataires();
   tbody.innerHTML = list.map(function(d) {
     var clos = d.statut === 'clos_favorable' || d.statut === 'clos_defavorable';
+    var prochAud = ctxProchaineAudience(d, today()), synC = ctxSynthese(d);
+    var med = ctxDerniereMed(d), medEt = med ? ctxMedEtat(med, today()) : null;
+    var medHtml = med ? '<br><span style="font-size:11px;color:' + (medEt.etat === 'expire' ? 'var(--rouge)' : 'var(--or)') + ';">📨 Mise en demeure du ' + dateShort(med.date_envoi) + (medEt.etat === 'en_cours' ? ' · délai jusqu\'au ' + dateShort(medEt.fin) : (medEt.etat === 'expire' ? ' · délai expiré' : '')) + '</span>' : '';
     var sit = clos ? null : ctxSituationSource(d, retardataires), sitHtml = '—';
     if (sit) sitHtml = sit.retard ? '<span style="color:var(--rouge);font-weight:600;">⚠ ' + sit.mois + ' mois de retard<br>' + fmtF(Math.round(sit.montant || 0)) + ' F dû</span>'
                                   : '<span style="color:var(--vert);font-weight:600;" title="Le souscripteur n\'est plus en retard : le dossier peut être clôturé">✅ À jour<br><span style="font-size:11px;">à clôturer ?</span></span>';
-    var lienRelance = (!clos && d.source_type === 'souscripteur') ? '<button class="btn btn-secondary btn-sm" title="Voir la fiche de relance du souscripteur" onclick="ctxVoirRelance(\'' + d.source_id + '\')">👤 Relance</button> ' : '';
+    var btnClore = (!clos && sit && !sit.retard) ? '<button class="btn btn-primary btn-sm" title="Le souscripteur n\'est plus en retard : clore le dossier comme régularisé" onclick="ctxCloreRegularise(\'' + d.id + '\')">✅ Clore (régularisé)</button> ' : '';
+    var lienRelance = btnClore + ((!clos && d.source_type === 'souscripteur') ? '<button class="btn btn-secondary btn-sm" title="Voir la fiche de relance du souscripteur" onclick="ctxVoirRelance(\'' + d.source_id + '\')">👤 Relance</button> ' : '');
     var audience = d.date_ech ? (new Date(d.date_ech) < new Date() ? '<span style="color:var(--rouge);">⚠ ' + d.date_ech + '</span>' : d.date_ech) : '—';
+    if (prochAud) audience = '<strong>' + dateShort(prochAud.date) + '</strong>';
     return '<tr>'
       + '<td style="font-weight:700;color:var(--or);font-family:monospace;">' + escHtml(d.ref) + '</td>'
-      + '<td>' + escHtml(d.objet) + '</td>'
+      + '<td>' + escHtml(d.objet) + medHtml + '</td>'
       + '<td style="font-size:12px;">' + escHtml(d.interlocuteur || '—') + '</td>'
-      + '<td style="font-size:11px;">—</td>'
-      + '<td style="text-align:right;">' + (d.montant ? fmtF(d.montant) + ' F' : '—') + '</td>'
+      + '<td style="font-size:11px;">' + escHtml(d.tribunal || '—') + '</td>'
+      + '<td style="text-align:right;">' + (d.montant ? fmtF(d.montant) + ' F' : '—') + (synC.recupere > 0 ? '<br><span style="font-size:11px;color:var(--vert);">récupéré : ' + fmtF(Math.round(synC.recupere)) + ' F</span>' : '') + '</td>'
       + '<td style="font-size:12px;">' + escHtml(d.avocat || '—') + '</td>'
       + '<td style="font-size:11px;">' + audience + '</td>'
       + '<td><span class="badge ' + (statMap[d.statut]||'badge-bleu') + '">' + d.statut.replace(/_/g,' ') + '</span></td>'
       + '<td style="font-size:12px;">' + sitHtml + '</td>'
-      + '<td style="white-space:nowrap;">' + lienRelance + '<button class="btn btn-secondary btn-sm" title="Documents et analyse" onclick="openDossierDetails(\'' + d.id + '\')">📎</button></td>'
+      + '<td style="white-space:nowrap;">' + lienRelance + '<button class="btn btn-secondary btn-sm" title="Procédure, documents et analyse" onclick="openDossierDetails(\'' + d.id + '\',\'procedure\')">⚖️</button></td>'
       + '</tr>';
   }).join('');
 }
@@ -92966,6 +92998,168 @@ async function deleteDossierJur(id) {
    si un dossier existe déjà pour ce client/cession et n'est pas clos,
    on le met à jour (priorité, montant, note datée) au lieu d'en recréer un.
 ══════════════════════════════════════════════════════ */
+/* ══ Suivi du contentieux : mises en demeure, tribunal, audiences, frais, sommes récupérées ══
+   Tout vit dans le dossier juridique (d.tribunal, d.mises_en_demeure, d.audiences, d.frais, d.recouvrements) : il se synchronise
+   avec lui, sans nouvelle table. Le délai d'une mise en demeure court depuis la réception si elle est renseignée, sinon depuis l'envoi. */
+var CTX_MODES_MED = { huissier: 'Huissier', recommande: 'Courrier recommandé', courriel: 'Courriel', main_propre: 'Remise en main propre' };
+function ctxAjouterJours(d, n) { var x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+function ctxJoursEntre(a, b) { return Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000); }
+function ctxDelaiMedDefaut() { var n = parseInt((DATA.params || {}).ctx_delai_mise_en_demeure, 10); return n > 0 ? n : 15; }
+/* État du délai d'une mise en demeure à la date « auj ». */
+function ctxMedEtat(m, auj) {
+  var debut = m.accuse_le || m.date_envoi, delai = parseInt(m.delai_jours, 10) || 0;
+  if (!debut || !delai) return { etat: 'sans_delai', fin: '', jours: 0 };
+  var fin = ctxAjouterJours(debut, delai), jours = ctxJoursEntre(auj, fin);
+  return { etat: jours >= 0 ? 'en_cours' : 'expire', fin: fin, jours: jours };
+}
+/* Dernière mise en demeure du dossier, ou null. */
+function ctxDerniereMed(d) { var l = (d.mises_en_demeure || []).slice().sort(function(a, b){ return (b.date_envoi || '').localeCompare(a.date_envoi || ''); }); return l[0] || null; }
+function ctxSynthese(d) {
+  var somme = function(l, k){ return (l || []).reduce(function(a, x){ return a + (parseFloat(x[k]) || 0); }, 0); };
+  var reclame = parseFloat(d.montant) || 0, recupere = somme(d.recouvrements, 'montant'), frais = somme(d.frais, 'montant');
+  return { reclame: reclame, recupere: recupere, frais: frais, reste: Math.max(0, reclame - recupere) };
+}
+/* Prochaine audience à venir (date >= auj), sinon null. */
+function ctxProchaineAudience(d, auj) { var l = (d.audiences || []).filter(function(a){ return (a.date || '') >= auj; }).sort(function(a, b){ return a.date.localeCompare(b.date); }); return l[0] || null; }
+/* Répartition des créances en retard par ancienneté (retardataires = getRetardataires()). */
+function ctxTranchesRetard(retardataires) {
+  var t = [{ cle: 'm0', lib: 'Moins de 3 mois', n: 0, montant: 0 }, { cle: 'm3', lib: '3 à 5 mois', n: 0, montant: 0 }, { cle: 'm6', lib: '6 mois et plus', n: 0, montant: 0 }];
+  (retardataires || []).forEach(function(r){ var i = r.moisRetard >= 6 ? 2 : (r.moisRetard >= 3 ? 1 : 0); t[i].n++; t[i].montant += r.montantDu || 0; });
+  return t;
+}
+async function ctxSauver(d) {
+  DATA.dossiersJuridiques = DATA.dossiersJuridiques.map(function(x){ return x.id === d.id ? d : x; });
+  await dbPut('dossiersJuridiques', d);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_dossiers_juridiques', d);
+  ctxProcRender(d.id);
+  if (document.getElementById('tbody-dossiers-jur')) renderDossiersJuridiques();
+}
+function ctxDossierCourant() { return (DATA.dossiersJuridiques || []).find(function(x){ return x.id === APP._jurDetId; }) || null; }
+function ctxDroitOk(action) { return (typeof exigerDroit !== 'function') || exigerDroit('Dossiers Juridiques', 'm', action); }
+function ctxParQui() { return (APP.currentUser && (APP.currentUser.nom || APP.currentUser.email || APP.currentUser.login)) || ''; }
+function ctxSaisieDate(msg, defaut) { var v = prompt(msg, defaut || today()); if (v === null) return null; var d = (typeof fcDateSaisie === 'function') ? fcDateSaisie(v) : v; if (!d) { toast('Date invalide : saisir JJ/MM/AAAA ou AAAA-MM-JJ.', 'error'); return null; } return d; }
+function ctxSaisieMontant(msg, defaut) { var v = prompt(msg, defaut == null ? '' : String(defaut)); if (v === null) return null; var m = parseFloat(String(v).replace(/[\s ]/g, '').replace(',', '.')); if (!(m > 0)) { toast('Montant invalide.', 'error'); return null; } return m; }
+
+async function ctxTribunalEditer() {
+  var d = ctxDossierCourant(); if (!d || !ctxDroitOk('modifier ce dossier')) return;
+  var v = prompt('Tribunal compétent (juridiction, ville) :', d.tribunal || ''); if (v === null) return;
+  d.tribunal = v.trim(); await ctxSauver(d);
+}
+async function ctxMedAjouter() {
+  var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer une mise en demeure')) return;
+  var date = ctxSaisieDate('Date d\'envoi de la mise en demeure :'); if (!date) return;
+  var cles = Object.keys(CTX_MODES_MED), txt = cles.map(function(k, i){ return (i + 1) + '. ' + CTX_MODES_MED[k]; }).join('\n');
+  var c = parseInt(prompt('Mode d\'envoi :\n' + txt + '\n\nNuméro :', '2'), 10); if (!c || !cles[c - 1]) { toast('Mode d\'envoi obligatoire.', 'error'); return; }
+  var ref = prompt('N° de l\'acte, du recommandé ou référence (facultatif) :', ''); if (ref === null) return;
+  var dl = prompt('Délai accordé au débiteur pour régulariser (en jours) :', String(ctxDelaiMedDefaut())); if (dl === null) return;
+  var delai = parseInt(dl, 10); if (!(delai >= 0)) { toast('Délai invalide.', 'error'); return; }
+  if (!d.mises_en_demeure) d.mises_en_demeure = [];
+  d.mises_en_demeure.push({ id: uid(), date_envoi: date, mode: cles[c - 1], reference: ref.trim(), delai_jours: delai, accuse_le: '', par: ctxParQui() });
+  await ctxSauver(d); toast('📨 Mise en demeure enregistrée.', 'success');
+}
+async function ctxMedAccuse(medId) {
+  var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer un accusé de réception')) return;
+  var m = (d.mises_en_demeure || []).find(function(x){ return x.id === medId; }); if (!m) return;
+  var date = ctxSaisieDate('Date de réception par le débiteur (accusé de réception, signification…) :', m.accuse_le || m.date_envoi); if (!date) return;
+  if (date < m.date_envoi) { toast('La réception ne peut pas précéder l\'envoi.', 'error'); return; }
+  m.accuse_le = date; await ctxSauver(d); toast('Réception enregistrée : le délai court depuis cette date.', 'success');
+}
+async function ctxAudienceAjouter() {
+  var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer une audience')) return;
+  var med = ctxDerniereMed(d), et = med ? ctxMedEtat(med, today()) : null;
+  if (!med && !confirm('Aucune mise en demeure n\'est enregistrée pour ce dossier.\n\nEnregistrer quand même une audience ?')) return;
+  if (med && et.etat === 'en_cours' && !confirm('Le délai de la dernière mise en demeure court encore jusqu\'au ' + dateShort(et.fin) + ' (' + et.jours + ' j).\n\nEnregistrer quand même une audience ?')) return;
+  var date = ctxSaisieDate('Date de l\'audience :'); if (!date) return;
+  var objet = prompt('Objet de l\'audience (mise en état, plaidoirie, délibéré…) :', ''); if (objet === null) return;
+  if (!d.audiences) d.audiences = [];
+  d.audiences.push({ id: uid(), date: date, objet: objet.trim(), resultat: '' });
+  await ctxSauver(d);
+}
+async function ctxAudienceResultat(audId) {
+  var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer le résultat d\'une audience')) return;
+  var a = (d.audiences || []).find(function(x){ return x.id === audId; }); if (!a) return;
+  var v = prompt('Résultat ou décision de l\'audience du ' + dateShort(a.date) + ' :', a.resultat || ''); if (v === null) return;
+  a.resultat = v.trim(); await ctxSauver(d);
+}
+async function ctxFraisAjouter() {
+  var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer des frais')) return;
+  var date = ctxSaisieDate('Date de la dépense :'); if (!date) return;
+  var lib = prompt('Nature des frais (honoraires d\'avocat, huissier, greffe…) :', ''); if (lib === null) return;
+  if (!lib.trim()) { toast('Nature des frais obligatoire.', 'error'); return; }
+  var montant = ctxSaisieMontant('Montant des frais (FCFA) :'); if (!montant) return;
+  if (!d.frais) d.frais = [];
+  d.frais.push({ id: uid(), date: date, libelle: lib.trim(), montant: montant });
+  await ctxSauver(d);
+}
+async function ctxRecouvrementAjouter() {
+  var d = ctxDossierCourant(); if (!d || !ctxDroitOk('enregistrer une somme récupérée')) return;
+  var date = ctxSaisieDate('Date de l\'encaissement :'); if (!date) return;
+  var montant = ctxSaisieMontant('Somme récupérée (FCFA) :'); if (!montant) return;
+  var note = prompt('Remarque (versement, exécution, accord amiable…) — facultatif :', ''); if (note === null) return;
+  if (!d.recouvrements) d.recouvrements = [];
+  d.recouvrements.push({ id: uid(), date: date, montant: montant, note: note.trim() });
+  await ctxSauver(d);
+}
+async function ctxItemSupprimer(liste, itemId) {
+  var d = ctxDossierCourant(); if (!d || !ctxDroitOk('modifier ce dossier')) return;
+  if (['mises_en_demeure', 'audiences', 'frais', 'recouvrements'].indexOf(liste) === -1) return;
+  if (!confirm('Supprimer cette ligne ?')) return;
+  d[liste] = (d[liste] || []).filter(function(x){ return x.id !== itemId; });
+  await ctxSauver(d);
+}
+/* Clôture assistée : le souscripteur n'est plus en retard, on propose de clore le dossier comme « régularisé ». */
+async function ctxCloreRegularise(dossierId) {
+  var d = (DATA.dossiersJuridiques || []).find(function(x){ return x.id === dossierId; }); if (!d) return;
+  if (typeof exigerDroit === 'function' && !exigerDroit('Dossiers Juridiques', 'm', 'clore ce dossier')) return;
+  var sit = ctxSituationSource(d);
+  if (!sit || sit.retard) { toast('Le souscripteur est toujours en retard : dossier non clos.', 'info'); return; }
+  var syn = ctxSynthese(d);
+  if (!confirm('Clore ' + d.ref + ' comme « régularisé » ?\n\nLe souscripteur n\'est plus en retard de paiement.' + (syn.frais > 0 ? '\nFrais engagés : ' + fcfa(syn.frais) + '.' : ''))) return;
+  d.statut = 'clos_favorable'; d.date_cloture = today(); d.motif_cloture = 'regularise';
+  d.notes = (d.notes ? d.notes + '\n' : '') + '[Clôture ' + dateShort(today()) + '] Régularisé : le souscripteur n\'est plus en retard de paiement (par ' + (ctxParQui() || '—') + ').';
+  DATA.dossiersJuridiques = DATA.dossiersJuridiques.map(function(x){ return x.id === d.id ? d : x; });
+  await dbPut('dossiersJuridiques', d);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_dossiers_juridiques', d);
+  if (document.getElementById('tbody-dossiers-jur')) renderDossiersJuridiques();
+  if (typeof detectRelances === 'function' && document.getElementById('tbody-relances')) detectRelances();
+  toast('✅ Dossier ' + d.ref + ' clos : régularisé.', 'success');
+}
+/* Volet « Procédure » de la fiche d'un dossier contentieux. */
+function ctxProcRender(id) {
+  var box = document.getElementById('tab-jur-det-procedure'); var d = (DATA.dossiersJuridiques || []).find(function(x){ return x.id === id; });
+  if (!box || !d || d.type !== 'contentieux') return;
+  var E = escHtml, syn = ctxSynthese(d), auj = today(), th = 'style="text-align:left;font-size:11px;color:var(--blanc-dim);padding:3px 6px;"', td = 'style="padding:4px 6px;font-size:12px;"';
+  var del = function(l, i){ return '<button class="btn btn-secondary btn-sm btn-icon" title="Supprimer" onclick="ctxItemSupprimer(\'' + l + '\',\'' + i + '\')">🗑</button>'; };
+  var bloc = function(titre, bouton, corps){ return '<div class="card" style="margin-bottom:12px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><div class="card-title" style="margin:0;flex:1;">' + titre + '</div>' + bouton + '</div>' + corps + '</div>'; };
+  var vide = function(t){ return '<div style="font-size:12px;color:var(--blanc-dim);padding:6px 0;">' + t + '</div>'; };
+  var kpi = function(l, v, c){ return '<div class="kpi-card" style="padding:8px 10px;"><div class="kpi-label">' + l + '</div><div class="kpi-value" style="font-size:15px;' + (c ? 'color:' + c + ';' : '') + '">' + v + '</div></div>'; };
+  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px;">'
+    + kpi('Montant réclamé', fcfa(syn.reclame)) + kpi('Déjà récupéré', fcfa(syn.recupere), 'var(--vert)') + kpi('Reste à récupérer', fcfa(syn.reste), syn.reste > 0 ? 'var(--rouge)' : 'var(--vert)') + kpi('Frais engagés', fcfa(syn.frais), 'var(--or)') + '</div>';
+  h += '<div style="font-size:13px;margin-bottom:12px;">🏛️ <strong>Tribunal :</strong> ' + (d.tribunal ? E(d.tribunal) : '<em style="color:var(--blanc-dim);">non renseigné</em>') + ' <button class="btn btn-secondary btn-sm" onclick="ctxTribunalEditer()">✏️</button>'
+    + (d.avocat ? ' &nbsp; ⚖️ <strong>Avocat :</strong> ' + E(d.avocat) : '') + '</div>';
+  var meds = (d.mises_en_demeure || []).slice().sort(function(a, b){ return (b.date_envoi || '').localeCompare(a.date_envoi || ''); });
+  h += bloc('📨 Mises en demeure', '<button class="btn btn-primary btn-sm" onclick="ctxMedAjouter()">+ Enregistrer</button>',
+    meds.length ? '<table style="width:100%;border-collapse:collapse;"><thead><tr><th ' + th + '>Envoi</th><th ' + th + '>Mode</th><th ' + th + '>Réf.</th><th ' + th + '>Réception</th><th ' + th + '>Délai</th><th></th></tr></thead><tbody>'
+      + meds.map(function(m){
+          var et = ctxMedEtat(m, auj), dl = et.etat === 'sans_delai' ? '—' : (et.etat === 'en_cours' ? '<span style="color:var(--or);">⏳ jusqu\'au ' + dateShort(et.fin) + ' (' + et.jours + ' j)</span>' : '<span style="color:var(--rouge);">⌛ expiré le ' + dateShort(et.fin) + '</span>');
+          return '<tr><td ' + td + '>' + dateShort(m.date_envoi) + '</td><td ' + td + '>' + E(CTX_MODES_MED[m.mode] || m.mode) + '</td><td ' + td + '>' + E(m.reference || '—') + '</td>'
+            + '<td ' + td + '>' + (m.accuse_le ? dateShort(m.accuse_le) : '<button class="btn btn-secondary btn-sm" onclick="ctxMedAccuse(\'' + m.id + '\')">Saisir la réception</button>') + '</td><td ' + td + '>' + dl + '</td><td>' + del('mises_en_demeure', m.id) + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : vide('Aucune mise en demeure enregistrée. Le délai court depuis la réception si elle est saisie, sinon depuis l\'envoi.'));
+  var auds = (d.audiences || []).slice().sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
+  h += bloc('🏛️ Audiences', '<button class="btn btn-primary btn-sm" onclick="ctxAudienceAjouter()">+ Audience</button>',
+    auds.length ? '<table style="width:100%;border-collapse:collapse;"><thead><tr><th ' + th + '>Date</th><th ' + th + '>Objet</th><th ' + th + '>Résultat</th><th></th></tr></thead><tbody>'
+      + auds.map(function(a){ return '<tr><td ' + td + '>' + (a.date >= auj ? '<strong>' + dateShort(a.date) + '</strong>' : dateShort(a.date)) + '</td><td ' + td + '>' + E(a.objet || '—') + '</td><td ' + td + '>' + (a.resultat ? E(a.resultat) : '<button class="btn btn-secondary btn-sm" onclick="ctxAudienceResultat(\'' + a.id + '\')">Saisir le résultat</button>') + '</td><td>' + del('audiences', a.id) + '</td></tr>'; }).join('') + '</tbody></table>'
+      : vide('Aucune audience enregistrée.'));
+  var frs = (d.frais || []).slice().sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
+  h += bloc('💼 Frais engagés', '<button class="btn btn-primary btn-sm" onclick="ctxFraisAjouter()">+ Frais</button>',
+    frs.length ? '<table style="width:100%;border-collapse:collapse;"><tbody>' + frs.map(function(f){ return '<tr><td ' + td + '>' + dateShort(f.date) + '</td><td ' + td + '>' + E(f.libelle) + '</td><td ' + td + ' align="right">' + fcfa(f.montant) + '</td><td>' + del('frais', f.id) + '</td></tr>'; }).join('') + '</tbody></table>' : vide('Aucun frais enregistré.'));
+  var recs = (d.recouvrements || []).slice().sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
+  h += bloc('💰 Sommes récupérées', '<button class="btn btn-primary btn-sm" onclick="ctxRecouvrementAjouter()">+ Encaissement</button>',
+    recs.length ? '<table style="width:100%;border-collapse:collapse;"><tbody>' + recs.map(function(r){ return '<tr><td ' + td + '>' + dateShort(r.date) + '</td><td ' + td + '>' + E(r.note || '—') + '</td><td ' + td + ' align="right" style="color:var(--vert);">' + fcfa(r.montant) + '</td><td>' + del('recouvrements', r.id) + '</td></tr>'; }).join('') + '</tbody></table>' : vide('Aucune somme récupérée enregistrée.'));
+  box.innerHTML = h;
+}
+
 /* ── Lien Relances ↔ Contentieux ──
    Un souscripteur en retard est rattaché à son dossier contentieux (source_type « souscripteur ») : visible depuis la page Relances,
    et la situation actuelle du client (retard, montant dû) est reportée dans l'onglet Contentieux. */
@@ -92977,7 +93171,7 @@ function ctxDossierDuClient(clientId) {
 function ctxOuvrirDossier(dossierId) {
   if (typeof goTo === 'function') goTo('juridique');
   if (typeof switchTab === 'function') switchTab('juridique', 'contentieux');
-  setTimeout(function(){ if (typeof openDossierDetails === 'function') openDossierDetails(dossierId); }, 60);
+  setTimeout(function(){ if (typeof openDossierDetails === 'function') openDossierDetails(dossierId, 'procedure'); }, 60);
 }
 function ctxVoirRelance(clientId) {
   var c = (DATA.clients || []).find(function(x){ return x.id === clientId; }); if (!c) { toast('Client introuvable.', 'error'); return; }
@@ -93099,12 +93293,15 @@ function openDossierDetails(id, tab) {
     + (d.montant>0 ? '<span>💰 '+new Intl.NumberFormat('fr-CI').format(d.montant)+' FCFA</span>' : '');
 
   // Activer le bon onglet
-  ['docs','ia','chronologie'].forEach(function(t){
+  ['docs','ia','chronologie','procedure'].forEach(function(t){
     var pane = document.getElementById('tab-jur-det-'+t);
     var btn = document.getElementById('tab-btn-jur-det-'+t);
     if(pane) pane.classList.toggle('active', t===(tab||'docs'));
     if(btn) btn.classList.toggle('active', t===(tab||'docs'));
   });
+
+  var btnProc = document.getElementById('tab-btn-jur-det-procedure'); if (btnProc) btnProc.style.display = d.type === 'contentieux' ? '' : 'none';
+  if (d.type === 'contentieux') ctxProcRender(id);
 
   // Charger les docs
   renderJurDocs(id);
