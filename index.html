@@ -21226,6 +21226,20 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
 </div>
 
 <!-- Modal Relance -->
+<div class="modal-overlay" id="modal-releve-tiers">
+  <div class="modal" style="max-width:1000px;width:96vw;">
+    <div class="modal-header">
+      <h3>📄 Relevé de compte tiers — <span id="releve-modal-nom"></span></h3>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="printReleveModal()">🖨️ Imprimer</button>
+        <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-releve-tiers')">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="releve-modal-box" style="max-height:72vh;overflow-y:auto;"><div id="releve-modal-content"></div></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-releve-tiers')">Fermer</button></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-relance">
   <div class="modal">
     <div class="modal-header">
@@ -50347,6 +50361,7 @@ function detectRelances() {
       + '<button class="btn btn-primary btn-sm" onclick="openRelanceModal(\'' + r.id + '\')">📨 Relancer</button> '
       + '<button class="btn btn-secondary btn-sm" onclick="etatRelance(\'' + r.id + '\')">📄 Lettre PDF</button> '
       + '<button class="btn btn-secondary btn-sm" title="Ouvrir le dossier du souscripteur (fiche, documents, échéancier)" onclick="openClientModal(\'' + r.id + '\')">📁 Dossier</button> '
+      + '<button class="btn btn-secondary btn-sm" title="Visualiser le relevé de compte du tiers" onclick="ouvrirReleveTiers(\'client:' + r.id + '\')">📄 Relevé</button> '
       + '<button class="btn btn-secondary btn-sm" title="Enregistrer une promesse de paiement" onclick="promesseNouvelle(\'' + r.id + '\')">🤝 Promesse</button>'
       + (dosCtx ? ' <button class="btn btn-secondary btn-sm" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\')">⚖️ Voir le contentieux</button>'
                 : (r.moisRetard >= 3 ? ' <button class="btn btn-danger btn-sm" title="Ouvrir un dossier contentieux dans le module Juridique" onclick="ctxEscalader(\'' + r.id + '\')">⚖️ Contentieux</button>' : ''))
@@ -50381,6 +50396,7 @@ function openRelanceModal(clientId) {
     + '<a class="btn btn-secondary btn-sm" href="sms:' + client.tel + '" target="_blank">📱 Ouvrir SMS</a>'
     + '<a class="btn btn-secondary btn-sm" href="https://wa.me/' + telWhatsApp(client.tel) + '?text=' + encodeURIComponent(msgSMS) + '" target="_blank">💬 WhatsApp</a>'
     + '<button class="btn btn-secondary btn-sm" title="Ouvrir le dossier du souscripteur" onclick="closeModal(\'modal-relance\');openClientModal(\'' + client.id + '\')">📁 Dossier</button>'
+    + '<button class="btn btn-secondary btn-sm" title="Visualiser le relevé de compte du tiers" onclick="ouvrirReleveTiers(\'client:' + client.id + '\')">📄 Relevé</button>'
     + '</div>';
 
   document.getElementById('relance-body').innerHTML = body;
@@ -79364,6 +79380,20 @@ function buildTiers411() {
   }).join('');
 }
 
+/* Cible d'affichage du relevé : la page Comptabilité, ou la fenêtre « Relevé de compte tiers » (ouverte depuis Relances, Contentieux…). */
+function _releveCibles() {
+  var m = !!APP._releveModal;
+  return { box: document.getElementById(m ? 'releve-modal-box' : 'releve-tiers-box'), nom: document.getElementById(m ? 'releve-modal-nom' : 'releve-tiers-nom'), content: document.getElementById(m ? 'releve-modal-content' : 'releve-tiers-content') };
+}
+/* Visualiser le relevé de compte d'un tiers (« client:<id> » ou « cession:<id> ») dans une fenêtre, sans quitter la page en cours. */
+function ouvrirReleveTiers(refId) {
+  var content = document.getElementById('releve-modal-content'); if (content) content.innerHTML = '';
+  APP._releveModal = true;
+  try { showReleveTiers(refId); } finally { APP._releveModal = false; }
+  if (!content || !content.innerHTML) { toast('Relevé indisponible : tiers introuvable.', 'error'); return; }
+  openModal('modal-releve-tiers');
+}
+function printReleveModal() { _printFromElement('releve-modal-content', 'Relevé de compte tiers'); }
 function showReleveTiers(refId) {
   /* [FIX 2026-06-30] refId peut être "client:<id>" (souscripteur classique)
      ou "cession:<id>" (acquéreur cession foncière). Conserve la compatibilité
@@ -79379,13 +79409,11 @@ function showReleveTiers(refId) {
 function showReleveTiersClient(clientId) {
   var c = DATA.clients.find(function(x){return x.id===clientId;});
   if (!c) return;
-  var box = document.getElementById('releve-tiers-box');
-  var nomEl = document.getElementById('releve-tiers-nom');
-  var content = document.getElementById('releve-tiers-content');
+  var _cib = _releveCibles(), box = _cib.box, nomEl = _cib.nom, content = _cib.content;
   if (!box||!content) return;
   box.style.display='block';
   if (nomEl) nomEl.textContent = c.nom+' '+c.prenoms+' ('+c.dossier+')';
-  box.scrollIntoView({behavior:'smooth'});
+  if (!APP._releveModal) box.scrollIntoView({behavior:'smooth'});
 
   /* [FIX SYSCOHADA] Le relevé du compte TIERS 411 ne doit porter que ce qui
      transite réellement par le 411 (apport, mensualités, régularisations…).
@@ -79460,13 +79488,11 @@ function showReleveTiersClient(clientId) {
 function showReleveTiersCession(cessionId) {
   var c = (DATA.cessions_foncieres || []).find(function(x){return x.id===cessionId;});
   if (!c) return;
-  var box = document.getElementById('releve-tiers-box');
-  var nomEl = document.getElementById('releve-tiers-nom');
-  var content = document.getElementById('releve-tiers-content');
+  var _cib = _releveCibles(), box = _cib.box, nomEl = _cib.nom, content = _cib.content;
   if (!box||!content) return;
   box.style.display='block';
   if (nomEl) nomEl.textContent = (c.acquereur||'—')+' (CES-'+c.id.slice(-6).toUpperCase()+')';
-  box.scrollIntoView({behavior:'smooth'});
+  if (!APP._releveModal) box.scrollIntoView({behavior:'smooth'});
 
   var paiements = (c.paiements || []).slice()
     .sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
@@ -92826,7 +92852,9 @@ function renderContentieuxJuridiques() {
     if (sit) sitHtml = sit.retard ? '<span style="color:var(--rouge);font-weight:600;">⚠ ' + sit.mois + ' mois de retard<br>' + fmtF(Math.round(sit.montant || 0)) + ' F dû</span>'
                                   : '<span style="color:var(--vert);font-weight:600;" title="Le souscripteur n\'est plus en retard : le dossier peut être clôturé">✅ À jour<br><span style="font-size:11px;">à clôturer ?</span></span>';
     var btnClore = (!clos && sit && !sit.retard) ? '<button class="btn btn-primary btn-sm" title="Le souscripteur n\'est plus en retard : clore le dossier comme régularisé" onclick="ctxCloreRegularise(\'' + d.id + '\')">✅ Clore (régularisé)</button> ' : '';
-    var lienRelance = btnClore + ((!clos && d.source_type === 'souscripteur') ? '<button class="btn btn-secondary btn-sm" title="Voir la fiche de relance du souscripteur" onclick="ctxVoirRelance(\'' + d.source_id + '\')">👤 Relance</button> ' : '');
+    var refTiers = d.source_type === 'souscripteur' ? 'client:' + d.source_id : (d.source_type === 'cession_fonciere' ? 'cession:' + d.source_id : '');
+    var btnReleve = refTiers ? '<button class="btn btn-secondary btn-sm" title="Visualiser le relevé de compte du tiers" onclick="ouvrirReleveTiers(\'' + refTiers + '\')">📄 Relevé</button> ' : '';
+    var lienRelance = btnReleve + btnClore + ((!clos && d.source_type === 'souscripteur') ? '<button class="btn btn-secondary btn-sm" title="Voir la fiche de relance du souscripteur" onclick="ctxVoirRelance(\'' + d.source_id + '\')">👤 Relance</button> ' : '');
     var audience = d.date_ech ? (new Date(d.date_ech) < new Date() ? '<span style="color:var(--rouge);">⚠ ' + d.date_ech + '</span>' : d.date_ech) : '—';
     if (prochAud) audience = '<strong>' + dateShort(prochAud.date) + '</strong>';
     return '<tr>'
@@ -93148,7 +93176,8 @@ function ctxProcRender(id) {
   var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px;">'
     + kpi('Montant réclamé', fcfa(syn.reclame)) + kpi('Déjà récupéré', fcfa(syn.recupere), 'var(--vert)') + kpi('Reste à récupérer', fcfa(syn.reste), syn.reste > 0 ? 'var(--rouge)' : 'var(--vert)') + kpi('Frais engagés', fcfa(syn.frais), 'var(--or)') + '</div>';
   h += '<div style="font-size:13px;margin-bottom:12px;">🏛️ <strong>Tribunal :</strong> ' + (d.tribunal ? E(d.tribunal) : '<em style="color:var(--blanc-dim);">non renseigné</em>') + ' <button class="btn btn-secondary btn-sm" onclick="ctxTribunalEditer()">✏️</button>'
-    + (d.avocat ? ' &nbsp; ⚖️ <strong>Avocat :</strong> ' + E(d.avocat) : '') + '</div>';
+    + (d.avocat ? ' &nbsp; ⚖️ <strong>Avocat :</strong> ' + E(d.avocat) : '')
+    + ((d.source_type === 'souscripteur' || d.source_type === 'cession_fonciere') ? ' &nbsp; <button class="btn btn-secondary btn-sm" onclick="ouvrirReleveTiers(\'' + (d.source_type === 'souscripteur' ? 'client:' : 'cession:') + d.source_id + '\')">📄 Relevé de compte du tiers</button>' : '') + '</div>';
   var meds = (d.mises_en_demeure || []).slice().sort(function(a, b){ return (b.date_envoi || '').localeCompare(a.date_envoi || ''); });
   h += bloc('📨 Mises en demeure', '<button class="btn btn-primary btn-sm" onclick="ctxMedAjouter()">+ Enregistrer</button>',
     meds.length ? '<table style="width:100%;border-collapse:collapse;"><thead><tr><th ' + th + '>Envoi</th><th ' + th + '>Mode</th><th ' + th + '>Réf.</th><th ' + th + '>Réception</th><th ' + th + '>Délai</th><th></th></tr></thead><tbody>'
