@@ -232,3 +232,50 @@ test('risques : niveau, traitement exigé, clôture conditionnée à une critici
   assert.equal(r.sansResiduelle, 'traite'); assert.equal(r.pire, 'traite'); assert.equal(r.clos, 'clos');
   assert.ok(r.matrice); assert.equal(r.opportuniteClose, 'clos'); assert.equal(r.entrees, '0/0/true');
 });
+
+test('indicateurs automatiques : formules calculées sur les données, relevés, état vs cible, fiche et revue', async () => {
+  const app = await ouvrir(true);
+  const r = await app.page.evaluate(async function () {
+    var o = {}, auj = today(), a = '2000-01-01', b = '2999-12-31';
+    var jour = function (n) { var d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+    o.nb = Object.keys(SMQ_CALCULS).length;
+    DATA.validations = [{ statut: 'valide', date_demande: jour(10), date_decision: jour(6) }, { statut: 'rejete', date_demande: jour(5), date_decision: jour(3) }, { statut: 'en_attente', date_demande: jour(1) }];
+    var g = function (k) { var x = smqCalculer(k, a, b); return x ? x.v : null; };
+    o.val = [g('val_delai'), g('val_attente'), g('val_rejet')].join('|');
+    DATA.smq_nc = [{ statut: 'ouverte', echeance: '2000-01-01', date: jour(9) }, { statut: 'cloturee', date: jour(9), cloture_le: jour(5) }];
+    o.nc = [g('nc_ouvertes'), g('nc_retard'), g('nc_delai')].join('|');
+    DATA.smq_satisfaction = [{ date: auj, note: 5 }, { date: auj, note: 4 }, { date: auj, note: 2 }, { date: auj, note: 'x' }];
+    o.sat = [g('sat_note'), g('sat_pct')].join('|');
+    DATA.smq_reclamations = [{ date: jour(4), statut: 'traitee', date_reponse: jour(2) }, { date: jour(4), statut: 'recue' }];
+    o.rcl = [g('rcl_delai'), g('rcl_traitees')].join('|');
+    DATA.smq_documents = [{ statut: 'approuve', prochaine_revue: '2000-01-01' }]; o.doc = [g('doc_approuves'), g('doc_revue')].join('|'); o.docAttendu = Math.round(1000 / MANUELS_CATALOGUE.length) / 10 + '|1';
+    DATA.smq_risques = [{ type: 'Risque', statut: 'identifie', prob: '4', impact: '3' }, { type: 'Risque', statut: 'clos', prob: '4', impact: '4' }, { type: 'Opportunité', statut: 'identifie', prob: '4', impact: '4' }]; o.rsq = g('rsq_eleves');
+    DATA.factures_client = [{ statut_fne: 'erreur' }, { statut_fne: 'certifiee' }]; o.fne = g('fne_erreur');
+    DATA.etapes_itineraire = [{ statut: 'realise', date: auj }, { statut: 'planifie', date: auj }, { statut: 'annule', date: auj }, { statut: 'realise', date: auj }]; o.vis = g('visites_realisees');
+    DATA.bons_commande = [{ id: 'b1', date: jour(8) }]; DATA.receptions = [{ bc_id: 'b1', date: jour(2) }, { bc_id: 'zz', date: auj }]; o.bc = g('bc_delai');
+    DATA.incidents = [{ date: auj, statut: 'resolu' }, { date: auj, statut: 'nouveau' }, { date: auj, statut: 'en_cours' }, { date: auj, statut: 'resolu' }]; o.inc = g('inc_resolus');
+    DATA.smq_audits = []; o.vide = [smqCalculer('val_delai', '3000-01-01', '3000-12-31'), smqCalculer('inconnu', a, b)].join('|');
+    o.etats = [smqEtat({ valeur: '95', cible: '90', sens: 'min' }), smqEtat({ valeur: '5', cible: '3', sens: 'max' }), smqEtat({ valeur: '5', cible: '', sens: 'max' }), smqEtat({ valeur: '4,5', cible: '4', sens: 'min' })].join('|');
+    // fiche : actualisation, relevés conservés, valeur écrite
+    DATA.params = DATA.params || {}; DATA.params.smq_processus = {};
+    switchTab('params', 'manuels'); manuelsChangerVue('carto'); smqOuvrir('pilotage'); smqSuggerer('k');
+    var iNc = _smqEdit.indicateurs.findIndex(function (k) { return k.calcul === 'nc_ouvertes'; });
+    document.getElementById('smq-k-valide-' + iNc).checked = true; document.getElementById('smq-k-cible-' + iNc).value = '0';
+    var iSens = document.getElementById('smq-k-sens-' + iNc).value; o.sensSuggere = iSens;
+    smqActualiserFiche(); var k = _smqEdit.indicateurs[iNc]; o.valeur = k.valeur; o.releves = k.releves.length; o.etat = smqEtat(k);
+    smqActualiserFiche(); o.relevesJour = _smqEdit.indicateurs[iNc].releves.length;
+    var iNon = _smqEdit.indicateurs.findIndex(function (x) { return x.calcul === 'nc_retard'; }); o.nonValide = _smqEdit.indicateurs[iNon].valeur;
+    await smqSauver(); var d = smqDonnees('pilotage'); o.sauve = d.indicateurs.filter(function (x) { return x.calcul === 'nc_ouvertes'; })[0].valeur;
+    // actualisation globale + revue
+    DATA.smq_nc.push({ statut: 'ouverte', date: auj }); await smqActualiserTout(); o.global = smqDonnees('pilotage').indicateurs.filter(function (x) { return x.calcul === 'nc_ouvertes'; })[0].valeur;
+    var e = smqEntreesAuto('2000-01-01', '2999-12-31'); var ik = e.indicateurs.filter(function (x) { return x.lib === 'Non-conformités ouvertes'; })[0]; o.revue = ik.valeur + '|' + ik.auto + '|' + ik.etat;
+    o.resume = smqResumeHtml('pilotage').indexOf('hors cible') !== -1;
+    return o;
+  });
+  assert.equal(r.nb, 21);
+  assert.equal(r.val, '3|1|50'); assert.equal(r.nc, '1|1|4'); assert.equal(r.sat, '3.67|66.7'); assert.equal(r.rcl, '2|50');
+  assert.equal(r.doc, r.docAttendu); assert.equal(r.rsq, 1); assert.equal(r.fne, 1); assert.equal(r.vis, 66.7); assert.equal(r.bc, 6); assert.equal(r.inc, 50);
+  assert.equal(r.vide, '|'); assert.equal(r.etats, 'ok|ko||ok');
+  assert.equal(r.sensSuggere, 'max'); assert.equal(r.valeur, '1'); assert.equal(r.releves, 1); assert.equal(r.etat, 'ko'); assert.equal(r.relevesJour, 1);
+  assert.equal(r.nonValide, ''); assert.equal(r.sauve, '1'); assert.equal(r.global, '2'); assert.equal(r.revue, '2|true|ko'); assert.ok(r.resume);
+});
