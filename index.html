@@ -50163,6 +50163,86 @@ function _relanceNiveauDe(moisRetard) {
   }
   return trouve;
 }
+/* ══ Promesses de paiement et file « à traiter aujourd'hui » ══
+   Une promesse (date + montant) est portée par la fiche du client (client.promesses_paiement), comme le journal commercial : elle se
+   synchronise avec la fiche, sans nouvelle table. Son état se déduit des versements : tenue si le montant promis a été versé depuis
+   sa saisie, non tenue si la date est passée sans ce versement. Une promesse non tenue PRÉVIENT (tête de liste, alerte) mais ne
+   fait pas monter le client de niveau toute seule : la décision d'escalader reste humaine. */
+var RELANCE_DELAI_JOURS_DEFAUT = 15;
+function relanceDelaiJours() { var n = parseInt((DATA.params || {}).relance_delai_jours, 10); return n > 0 ? n : RELANCE_DELAI_JOURS_DEFAUT; }
+function promesseEtat(c, p) {
+  if (!p || p.statut === 'annulee') return 'annulee';
+  var verse = (DATA.versements || []).filter(function(v){ return v.client_id === c.id && _versementSurPrix(v) && (v.date || '') >= (p.date_creation || ''); })
+    .reduce(function(a, v){ return a + (parseFloat(v.montant) || 0); }, 0);
+  if (verse >= (parseFloat(p.montant) || 0)) return 'tenue';
+  return (p.date_promise || '') < today() ? 'non_tenue' : 'en_cours';
+}
+function promesseCourante(c) {
+  var l = ((c && c.promesses_paiement) || []).filter(function(p){ return p.statut !== 'annulee'; }).sort(function(a, b){ return (b.date_creation || '').localeCompare(a.date_creation || ''); });
+  return l.length ? l[0] : null;
+}
+/* Pour un souscripteur en retard : motifs de relance du jour (par priorité) et état de sa promesse. */
+function relanceAnalyse(r) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === r.id; }) || { id: r.id };
+  var p = promesseCourante(c), etat = p ? promesseEtat(c, p) : '';
+  var rels = (DATA.relances || []).filter(function(x){ return x.client_id === r.id; }).sort(function(a, b){ return (b.date || '').localeCompare(a.date || ''); });
+  var derniere = rels[0] || null, motifs = [];
+  var jours = derniere ? Math.max(0, Math.floor((new Date(today()) - new Date(derniere.date)) / 86400000)) : null;
+  if (etat === 'non_tenue' && !(derniere && (derniere.date || '') >= p.date_promise))
+    motifs.push({ prio: 1, cle: 'promesse', label: '⛔ Promesse du ' + dateShort(p.date_promise) + ' non tenue' });
+  if (etat !== 'en_cours') {
+    var niv = _relanceNiveauDe(r.moisRetard), idx = RELANCE_NIVEAUX.indexOf(niv);
+    var idxAvant = derniere && derniere.niveau ? RELANCE_NIVEAUX.findIndex(function(x){ return x.cle === derniere.niveau; }) : -1;
+    if (idxAvant >= 0 && idx > idxAvant) motifs.push({ prio: 2, cle: 'seuil', label: '📈 Passé au niveau « ' + niv.label + ' »' });
+    if (!derniere) motifs.push({ prio: 3, cle: 'jamais', label: '🆕 Jamais relancé' });
+    else if (jours >= relanceDelaiJours()) motifs.push({ prio: 3, cle: 'delai', label: '🕓 Sans relance depuis ' + jours + ' j' });
+  }
+  motifs.sort(function(a, b){ return a.prio - b.prio; });
+  return { client: c, promesse: p, etat: etat, motifs: motifs, prio: motifs.length ? motifs[0].prio : 9 };
+}
+function promesseChipHtml(r, info) {
+  var p = info.promesse; if (!p || info.etat === 'annulee') return '';
+  var q = "'" + r.id + "','" + p.id + "'", ann = ' <a href="#" title="Annuler cette promesse" style="color:var(--blanc-dim);text-decoration:none;" onclick="promesseAnnuler(' + q + ');return false;">✕</a>';
+  if (info.etat === 'en_cours') return '<br><span style="font-size:11px;color:var(--or);">🤝 Promesse le ' + dateShort(p.date_promise) + ' · ' + fcfa(p.montant) + ann + '</span>';
+  if (info.etat === 'non_tenue') return '<br><span style="font-size:11px;color:var(--rouge);font-weight:600;">⛔ Promesse du ' + dateShort(p.date_promise) + ' non tenue' + ann + '</span>';
+  return '<br><span style="font-size:11px;color:var(--vert);">✅ Promesse tenue (' + dateShort(p.date_promise) + ')</span>';
+}
+async function promesseNouvelle(clientId) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === clientId; });
+  var r = getRetardataires().find(function(x){ return x.id === clientId; });
+  if (!c || !r) { toast('Ce souscripteur n\'est plus en retard.', 'info'); return; }
+  if (typeof exigerDroit === 'function' && !exigerDroit('Relances', 'm', 'enregistrer une promesse de paiement')) return;
+  var dv = prompt('Le souscripteur promet de payer pour quelle date ? (JJ/MM/AAAA ou AAAA-MM-JJ)', '');
+  if (dv === null) return;
+  var d = (typeof fcDateSaisie === 'function') ? fcDateSaisie(dv) : dv;
+  if (!d) { toast('Date invalide : saisir JJ/MM/AAAA ou AAAA-MM-JJ.', 'error'); return; }
+  if (d < today()) { toast('La date promise ne peut pas être dans le passé.', 'error'); return; }
+  var mv = prompt('Montant promis (FCFA) :', String(Math.round(r.montantDu || 0)));
+  if (mv === null) return;
+  var montant = parseFloat(String(mv).replace(/[\s\u00a0]/g, '').replace(',', '.'));
+  if (!(montant > 0)) { toast('Montant invalide.', 'error'); return; }
+  var note = prompt('Remarque (facultatif) :', '') || '';
+  var par = (APP.currentUser && (APP.currentUser.nom || APP.currentUser.email || APP.currentUser.login)) || '';
+  if (!c.promesses_paiement) c.promesses_paiement = [];
+  c.promesses_paiement.push({ id: uid(), date_creation: today(), date_promise: d, montant: montant, note: note, par: par, statut: 'active' });
+  if (!c.actions_commerciales) c.actions_commerciales = [];
+  c.actions_commerciales.push({ date: today(), code: 'promesse_paiement', canal: '', note: 'Promesse de ' + fcfa(montant) + ' pour le ' + dateShort(d) + (note ? ' — ' + note : ''), par: par });
+  c._baseModifie = c._modifie || c._baseModifie || null;
+  await dbPut('clients', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+  toast('🤝 Promesse enregistrée : ' + fcfa(montant) + ' pour le ' + dateShort(d) + '.', 'success');
+  detectRelances();
+}
+async function promesseAnnuler(clientId, promesseId) {
+  var c = (DATA.clients || []).find(function(x){ return x.id === clientId; });
+  var p = c && (c.promesses_paiement || []).find(function(x){ return x.id === promesseId; }); if (!p) return;
+  if (!confirm('Annuler cette promesse de paiement du ' + dateShort(p.date_promise) + ' (' + fcfa(p.montant) + ') ?')) return;
+  p.statut = 'annulee';
+  c._baseModifie = c._modifie || c._baseModifie || null;
+  await dbPut('clients', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+  detectRelances();
+}
 var _relancesNiveauActif = 'tous';
 function setRelancesNiveau(cle) {
   _relancesNiveauActif = cle;
@@ -50180,9 +50260,14 @@ function detectRelances() {
     return '<div class="kpi-card" style="border-top-color:' + n.couleur + ';cursor:pointer;" onclick="setRelancesNiveau(\'' + n.cle + '\')" title="Filtrer sur ce niveau"><div class="kpi-label">' + n.icone + ' ' + n.label + '</div><div class="kpi-value" style="color:' + n.couleur + ';">' + compteurs[n.cle] + '</div></div>';
   }).join('');
 
+  var analyses = {}, nbJour = 0, nbPromNonTenues = 0;
+  retards.forEach(function(r){ var a = relanceAnalyse(r); analyses[r.id] = a; if (a.motifs.length) nbJour++; if (a.motifs.some(function(m){ return m.cle === 'promesse'; })) nbPromNonTenues++; });
+  if (nbPromNonTenues && !APP._promAlerte) { APP._promAlerte = true; toast('⛔ ' + nbPromNonTenues + ' promesse(s) de paiement non tenue(s) : à relancer en priorité.', 'warn', 8000); }
+
   var tabs = document.getElementById('relances-tabs');
   if (tabs) {
-    tabs.innerHTML = '<button type="button" class="tab-btn' + (_relancesNiveauActif==='tous'?' active':'') + '" onclick="setRelancesNiveau(\'tous\')">📋 Tous (' + retards.length + ')</button>'
+    tabs.innerHTML = '<button type="button" class="tab-btn' + (_relancesNiveauActif==='jour'?' active':'') + '" onclick="setRelancesNiveau(\'jour\')" title="Promesses non tenues, nouveaux seuils, clients sans relance récente">📌 À traiter aujourd\'hui (' + nbJour + ')</button>'
+      + '<button type="button" class="tab-btn' + (_relancesNiveauActif==='tous'?' active':'') + '" onclick="setRelancesNiveau(\'tous\')">📋 Tous (' + retards.length + ')</button>'
       + RELANCE_NIVEAUX.map(function(n){
           return '<button type="button" class="tab-btn' + (_relancesNiveauActif===n.cle?' active':'') + '" onclick="setRelancesNiveau(\'' + n.cle + '\')">' + n.icone + ' ' + n.label + ' (' + compteurs[n.cle] + ')</button>';
         }).join('');
@@ -50199,16 +50284,19 @@ function detectRelances() {
      du portefeuille entier). */
   var searchRel = ((document.getElementById('search-relances')||{}).value || '').toLowerCase().trim();
   var retardsAffiches = retards.filter(function(r){
-    if (_relancesNiveauActif !== 'tous' && _relanceNiveauDe(r.moisRetard).cle !== _relancesNiveauActif) return false;
+    if (_relancesNiveauActif === 'jour') { if (!analyses[r.id].motifs.length) return false; }
+    else if (_relancesNiveauActif !== 'tous' && _relanceNiveauDe(r.moisRetard).cle !== _relancesNiveauActif) return false;
     if (searchRel && ((r.nom||'') + ' ' + (r.prenoms||'') + ' ' + (r.tel||'') + ' ' + (r.dossier||'')).toLowerCase().indexOf(searchRel) === -1) return false;
     return true;
   });
   if (!retardsAffiches.length) {
+    if (_relancesNiveauActif === 'jour' && !searchRel) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--vert);padding:24px;">✅ Rien à traiter aujourd\'hui : promesses en cours ou clients relancés récemment.</td></tr>'; return; }
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun souscripteur en retard ne correspond à ce filtre' + (searchRel ? ' « ' + escHtml(searchRel) + ' »' : '') + '.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = retardsAffiches.sort(function(a, b) { return b.moisRetard - a.moisRetard; }).map(function(r) {
+  tbody.innerHTML = retardsAffiches.sort(function(a, b) { return _relancesNiveauActif === 'jour' ? (analyses[a.id].prio - analyses[b.id].prio) || (b.montantDu - a.montantDu) : b.moisRetard - a.moisRetard; }).map(function(r) {
+    var an = analyses[r.id];
     var client = DATA.clients.find(function(c) { return c.id === r.id; });
     var prog = client ? DATA.programmes.find(function(p) { return p.id === client.programme_id; }) : null;
     var lot = client ? DATA.lots.find(function(l) { return l.id === client.lot_id; }) : null;
@@ -50216,15 +50304,17 @@ function detectRelances() {
     var lastRelance = DATA.relances.filter(function(rel) { return rel.client_id === r.id; }).sort(function(a, b) { return new Date(b.date) - new Date(a.date); })[0];
     var dosCtx = (typeof ctxDossierDuClient === 'function') ? ctxDossierDuClient(r.id) : null;
     return '<tr>'
-      + '<td><strong>' + r.nom + ' ' + r.prenoms + '</strong><br><span style="font-size:11px;color:var(--blanc-dim);">' + r.tel + '</span></td>'
+      + '<td><strong>' + r.nom + ' ' + r.prenoms + '</strong><br><span style="font-size:11px;color:var(--blanc-dim);">' + r.tel + '</span>'
+        + an.motifs.map(function(m){ return '<br><span style="font-size:11px;color:' + (m.prio === 1 ? 'var(--rouge)' : 'var(--or)') + ';font-weight:600;">' + m.label + '</span>'; }).join('') + '</td>'
       + '<td>' + (prog ? prog.nom : '—') + (lot ? ' / Lot ' + lot.numero : '') + '</td>'
       + '<td style="color:var(--rouge);font-weight:bold;">' + r.moisRetard + ' mois</td>'
       + '<td style="color:var(--rouge);">' + fcfa(r.montantDu) + '</td>'
-      + '<td><span class="badge ' + n.badge + '">' + n.icone + ' ' + n.label + '</span>' + (dosCtx ? '<br><a href="#" style="font-size:11px;color:var(--rouge);" title="Ouvrir le dossier contentieux" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\');return false;">⚖️ ' + escHtml(dosCtx.ref) + '</a>' : '') + '</td>'
+      + '<td><span class="badge ' + n.badge + '">' + n.icone + ' ' + n.label + '</span>' + promesseChipHtml(r, an) + (dosCtx ? '<br><a href="#" style="font-size:11px;color:var(--rouge);" title="Ouvrir le dossier contentieux" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\');return false;">⚖️ ' + escHtml(dosCtx.ref) + '</a>' : '') + '</td>'
       + '<td style="font-size:11px;">' + (lastRelance ? dateShort(lastRelance.date) : 'Jamais') + '</td>'
       + '<td style="white-space:nowrap;">'
       + '<button class="btn btn-primary btn-sm" onclick="openRelanceModal(\'' + r.id + '\')">📨 Relancer</button> '
-      + '<button class="btn btn-secondary btn-sm" onclick="etatRelance(\'' + r.id + '\')">📄 Lettre PDF</button>'
+      + '<button class="btn btn-secondary btn-sm" onclick="etatRelance(\'' + r.id + '\')">📄 Lettre PDF</button> '
+      + '<button class="btn btn-secondary btn-sm" title="Enregistrer une promesse de paiement" onclick="promesseNouvelle(\'' + r.id + '\')">🤝 Promesse</button>'
       + (dosCtx ? ' <button class="btn btn-secondary btn-sm" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\')">⚖️ Voir le contentieux</button>'
                 : (r.moisRetard >= 3 ? ' <button class="btn btn-danger btn-sm" title="Ouvrir un dossier contentieux dans le module Juridique" onclick="ctxEscalader(\'' + r.id + '\')">⚖️ Contentieux</button>' : ''))
       + '</td></tr>';
@@ -50272,6 +50362,9 @@ async function envoyerRelance() {
     notes: document.getElementById('relance-msg') ? document.getElementById('relance-msg').value : '',
     created_at: today()
   };
+  /* Niveau et retard au moment de la relance : permet de repérer plus tard qu'un client a passé un nouveau seuil. */
+  var rNiv = getRetardataires().find(function(x) { return x.id === APP.relanceEditId; });
+  if (rNiv) { relance.niveau = _relanceNiveauDe(rNiv.moisRetard).cle; relance.mois_retard = rNiv.moisRetard; }
   DATA.relances.push(relance);
   await dbPut('relances', relance);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_relances', relance);
