@@ -103,3 +103,132 @@ test('la satisfaction calcule la note moyenne et la lecture seule bloque l\'écr
   });
   assert.equal(r.nb, 3); assert.ok(r.moy); assert.ok(r.satisfaits); assert.equal(r.lectureSeule, 3);
 });
+
+test('audit interne : programme, indépendance, constats, NC liées et clôture conditionnée', async () => {
+  const app = await ouvrir(true);
+  const r = await app.page.evaluate(async function () {
+    var o = {}, nom = MANUELS_PROCESSUS.filter(function (p) { return p.id === 'encaissement'; })[0].nom;
+    smqOnglet('aud'); smqNouveau('aud'); o.statutNouveau = _smqForm.rec.statut; smqAnnuler();
+    await smqProposerProgramme(); o.prog = DATA.smq_audits.length; o.nbProc = MANUELS_PROCESSUS.length;
+    await smqProposerProgramme(); o.apresDoublon = DATA.smq_audits.length;
+    DATA.params = DATA.params || {}; DATA.params.smq_processus = { encaissement: { pilote: 'Awa Koné', indicateurs: [], documents: [] } };
+    var a = DATA.smq_audits.filter(function (x) { return x.processus === nom; })[0];
+    a.auditeur = 'Awa Koné'; a.date_realisation = today();
+    await smqTransition('aud', a.id, 'realise'); o.independance = a.statut;
+    a.auditeur = 'Yao Traoré'; await smqTransition('aud', a.id, 'realise'); o.realise = a.statut;
+    a.constats = [{ type: 'Non-conformité majeure', description: 'Reçus non remis', nc_ref: '' }, { type: 'Observation', description: 'Classement à améliorer', nc_ref: '' }];
+    await smqTransition('aud', a.id, 'rapport'); o.sansConclusion = a.statut;
+    a.conclusion = 'Système globalement conforme'; await smqTransition('aud', a.id, 'rapport'); o.rapport = a.statut;
+    smqOuvrirFiche('aud', a.id);
+    await smqCreerNCConstat(0); o.ncRef = a.constats[0].nc_ref; var nc = DATA.smq_nc[0]; o.nc = nc.source + '|' + nc.gravite + '|' + nc.statut;
+    await smqCreerNCConstat(0); o.unSeulNc = DATA.smq_nc.length;
+    await smqTransition('aud', a.id, 'clos'); o.closBloque = a.statut;
+    nc.statut = 'cloturee'; await smqTransition('aud', a.id, 'clos'); o.clos = a.statut;
+    return o;
+  });
+  assert.equal(r.statutNouveau, 'planifie');
+  assert.equal(r.prog, r.nbProc); assert.equal(r.apresDoublon, r.nbProc);
+  assert.equal(r.independance, 'planifie'); assert.equal(r.realise, 'realise');
+  assert.equal(r.sansConclusion, 'realise'); assert.equal(r.rapport, 'rapport');
+  assert.match(r.ncRef, /^NC-\d{4}-0001$/); assert.equal(r.nc, 'Audit interne|Majeure|ouverte'); assert.equal(r.unSeulNc, 1);
+  assert.equal(r.closBloque, 'rapport'); assert.equal(r.clos, 'clos');
+});
+
+test('revue de direction : entrées calculées depuis l\'ERP, décisions, clôture conditionnée', async () => {
+  const app = await ouvrir(true);
+  const r = await app.page.evaluate(async function () {
+    var o = {}, an = new Date().getFullYear();
+    DATA.smq_nc = [{ id: 'n1', ref: 'NC-1', date: today(), statut: 'ouverte' }, { id: 'n2', ref: 'NC-2', date: today(), statut: 'cloturee', cloture_le: today() }];
+    DATA.smq_satisfaction = [{ id: 's1', date: today(), note: 5 }, { id: 's2', date: today(), note: 3 }];
+    DATA.smq_reclamations = [{ id: 'r1', date: today(), statut: 'traitee', date_reponse: today() }];
+    smqOnglet('rev'); smqNouveau('rev');
+    document.getElementById('smqf-date_prevue').value = today(); await smqEnregistrer();
+    var r = DATA.smq_revues[0]; o.ref = r.ref; o.an = an; o.statut0 = r.statut;
+    document.getElementById('smqf-date_tenue') || smqOuvrirFiche('rev', r.id);
+    document.getElementById('smqf-date_tenue').value = today(); document.getElementById('smqf-participants').value = 'DG, Qualité'; document.getElementById('smqf-conclusion').value = 'SMQ pertinent';
+    smqPreremplirEntrees();
+    var e = _smqForm.rec.entrees_auto; o.nc = e.nc.ouvertes + '/' + e.nc.cloturees; o.note = e.satisfaction.note_moyenne; o.rec = e.satisfaction.reclamations;
+    await smqEnregistrer();
+    r = DATA.smq_revues[0];
+    await smqTransition('rev', r.id, 'tenue'); o.sansDecision = r.statut;
+    smqOuvrirFiche('rev', r.id); smqAjouterDecision();
+    document.getElementById('smq-dc-desc-0').value = 'Renforcer le contrôle des reçus'; document.getElementById('smq-dc-resp-0').value = 'Comptable'; document.getElementById('smq-dc-ech-0').value = '2000-01-01';
+    await smqEnregistrer(); r = DATA.smq_revues[0]; o.nbDec = r.decisions.length;
+    await smqTransition('rev', r.id, 'tenue'); o.tenue = r.statut;
+    await smqTransition('rev', r.id, 'cloturee'); o.closBloque = r.statut;
+    r.decisions[0].statut = 'Réalisée'; await smqTransition('rev', r.id, 'cloturee'); o.clos = r.statut;
+    smqNouveau('rev'); document.getElementById('smqf-date_prevue').value = '2999-01-01'; document.getElementById('smqf-date_tenue').value = '2999-02-01';
+    var prec = _smqDecisionsPrecedentes({ id: 'x', date_prevue: '2999-01-01', date_tenue: '2999-02-01' }); o.prec = prec ? prec.ref : null;
+    return o;
+  });
+  assert.match(r.ref, /^RDD-\d{4}-0001$/); assert.equal(r.statut0, 'planifiee');
+  assert.equal(r.nc, '1/1'); assert.equal(r.note, 4); assert.equal(r.rec, 1);
+  assert.equal(r.sansDecision, 'planifiee'); assert.equal(r.nbDec, 1); assert.equal(r.tenue, 'tenue');
+  assert.equal(r.closBloque, 'tenue'); assert.equal(r.clos, 'cloturee'); assert.equal(r.prec, r.ref);
+});
+
+test('le libellé de version est une chaîne JavaScript valide', async () => {
+  const app = await ouvrirApp();
+  const v = await app.page.evaluate(function () { return window.IMMOSUITE_VERSION; });
+  assert.equal(typeof v, 'string');
+  assert.match(v, /^v14\.\d+ · /);
+});
+
+test('politique : une seule version approuvée à la fois ; objectifs : conclusion exige la valeur actuelle', async () => {
+  const app = await ouvrir(true);
+  const r = await app.page.evaluate(async function () {
+    window.confirm = function () { return true; };
+    var o = {};
+    smqOnglet('pol');
+    smqNouveau('pol'); document.getElementById('smqf-version').value = '1.0'; document.getElementById('smqf-texte').value = 'Satisfaire nos clients'; await smqEnregistrer();
+    var p1 = DATA.smq_politiques[0]; o.statut0 = p1.statut;
+    await smqTransition('pol', p1.id, 'approuvee'); o.sansApprobateur = p1.statut;
+    p1.approbateur = 'DG'; p1.date_approbation = today(); await smqTransition('pol', p1.id, 'approuvee'); o.v1 = p1.statut;
+    smqNouveau('pol'); document.getElementById('smqf-version').value = '2.0'; document.getElementById('smqf-texte').value = 'Satisfaire nos clients et progresser'; await smqEnregistrer();
+    var p2 = DATA.smq_politiques[1]; p2.approbateur = 'DG'; p2.date_approbation = today(); await smqTransition('pol', p2.id, 'approuvee');
+    o.v1apres = p1.statut; o.v2 = p2.statut;
+    smqOuvrirFiche('pol', p2.id); document.getElementById('smqf-version').value = '2.1'; await smqEnregistrer(); o.modifApprouvee = p2.version;
+    smqOnglet('obj'); smqNouveau('obj');
+    document.getElementById('smqf-intitule').value = 'Recouvrer 90 % des échéances'; document.getElementById('smqf-cible').value = '90 %'; document.getElementById('smqf-echeance').value = '2000-01-01';
+    await smqEnregistrer(); var ob = DATA.smq_objectifs[0]; o.refObj = ob.ref; o.statutObj = ob.statut; o.retard = _smqObjRetard(ob);
+    smqOuvrirFiche('obj', ob.id); document.getElementById('smqf-statut').value = 'atteint'; await smqEnregistrer(); o.sansValeur = DATA.smq_objectifs[0].statut;
+    smqOuvrirFiche('obj', ob.id); document.getElementById('smqf-statut').value = 'atteint'; document.getElementById('smqf-valeur_actuelle').value = '92 %'; await smqEnregistrer();
+    o.atteint = DATA.smq_objectifs[0].statut; o.retardApres = _smqObjRetard(DATA.smq_objectifs[0]);
+    return o;
+  });
+  assert.equal(r.statut0, 'brouillon'); assert.equal(r.sansApprobateur, 'brouillon'); assert.equal(r.v1, 'approuvee');
+  assert.equal(r.v1apres, 'remplacee'); assert.equal(r.v2, 'approuvee'); assert.equal(r.modifApprouvee, '2.0');
+  assert.match(r.refObj, /^OBJ-\d{4}-0001$/); assert.equal(r.statutObj, 'en_cours'); assert.ok(r.retard);
+  assert.equal(r.sansValeur, 'en_cours'); assert.equal(r.atteint, 'atteint'); assert.ok(!r.retardApres);
+});
+
+test('risques : niveau, traitement exigé, clôture conditionnée à une criticité résiduelle plus basse', async () => {
+  const app = await ouvrir(true);
+  const r = await app.page.evaluate(async function () {
+    var o = {};
+    o.niveaux = [_smqNiveau(1, 1), _smqNiveau(2, 3), _smqNiveau(3, 3), _smqNiveau(4, 4)].join(',');
+    smqOnglet('rsq'); smqNouveau('rsq');
+    document.getElementById('smqf-description').value = 'Perte de données de caisse'; document.getElementById('smqf-prob').value = '3'; document.getElementById('smqf-impact').value = '4';
+    await smqEnregistrer(); var k = DATA.smq_risques[0]; o.ref = k.ref; o.statut0 = k.statut; o.niveau = _smqNiveau(k.prob, k.impact);
+    await smqTransition('rsq', k.id, 'en_traitement'); o.sansAction = k.statut;
+    k.action_traitement = 'Sauvegardes quotidiennes'; k.responsable = 'Admin'; k.echeance = '2000-01-01';
+    await smqTransition('rsq', k.id, 'en_traitement'); o.traitement = k.statut; o.retard = _smqRsqRetard(k);
+    await smqTransition('rsq', k.id, 'traite'); o.sansDate = k.statut;
+    k.date_traitement = today(); await smqTransition('rsq', k.id, 'traite'); o.traite = k.statut; o.retardApres = _smqRsqRetard(k);
+    await smqTransition('rsq', k.id, 'clos'); o.sansResiduelle = k.statut;
+    k.prob_res = '4'; k.impact_res = '4'; await smqTransition('rsq', k.id, 'clos'); o.pire = k.statut;
+    k.prob_res = '1'; k.impact_res = '2'; await smqTransition('rsq', k.id, 'clos'); o.clos = k.statut;
+    smqOnglet('rsq'); o.matrice = document.getElementById('smq-contenu').innerHTML.indexOf('Matrice des risques') !== -1;
+    smqNouveau('rsq'); document.getElementById('smqf-type').value = 'Opportunité'; document.getElementById('smqf-description').value = 'Paiement mobile'; await smqEnregistrer();
+    var op = DATA.smq_risques[1]; op.action_traitement = 'Lancer'; op.responsable = 'Com'; op.echeance = '2999-01-01'; await smqTransition('rsq', op.id, 'en_traitement');
+    op.date_traitement = today(); await smqTransition('rsq', op.id, 'traite'); await smqTransition('rsq', op.id, 'clos'); o.opportuniteClose = op.statut;
+    var e = smqEntreesAuto('2000-01-01', '2999-12-31'); o.entrees = e.risques.ouverts + '/' + e.objectifs.total + '/' + (e.politique === null);
+    return o;
+  });
+  assert.equal(r.niveaux, 'Faible,Moyen,Élevé,Critique');
+  assert.match(r.ref, /^RSQ-\d{4}-0001$/); assert.equal(r.statut0, 'identifie'); assert.equal(r.niveau, 'Élevé');
+  assert.equal(r.sansAction, 'identifie'); assert.equal(r.traitement, 'en_traitement'); assert.ok(r.retard);
+  assert.equal(r.sansDate, 'en_traitement'); assert.equal(r.traite, 'traite'); assert.ok(!r.retardApres);
+  assert.equal(r.sansResiduelle, 'traite'); assert.equal(r.pire, 'traite'); assert.equal(r.clos, 'clos');
+  assert.ok(r.matrice); assert.equal(r.opportuniteClose, 'clos'); assert.equal(r.entrees, '0/0/true');
+});
