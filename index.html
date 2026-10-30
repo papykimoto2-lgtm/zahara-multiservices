@@ -4041,6 +4041,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <div class="spacer"></div>
           <button class="btn btn-secondary btn-sm" onclick="openFlux('montage')">📊 Schéma des flux</button>
           <button class="btn btn-primary btn-sm" onclick="pgmRemplirSelect();pgmOuvrirPilotage()" title="Cycle de vie de l'opération et prochaine étape">🧭 Pilotage</button>
+          <button class="btn btn-secondary btn-sm" onclick="progDatesOuvrir()" title="Renseigner en masse les dates de lancement et de livraison : elles fixent le calcul du retard des souscripteurs">📅 Dates des programmes</button>
           <button class="btn btn-secondary btn-sm" onclick="exportProgrammesCSV()">⬇ Export</button>
           <button class="btn btn-primary" onclick="openProgrammeModal()">+ Nouveau Programme</button>
         </div>
@@ -50535,7 +50536,7 @@ function relancesControleRender() {
   var chip = function(k){ return '<button type="button" class="btn btn-secondary btn-sm" style="margin:2px;' + (_ctrlFiltre === k ? 'border-color:var(--or);font-weight:700;' : '') + '" onclick="relancesControleFiltrer(\'' + k + '\')" title="' + E(A[k].aide) + '">' + (A[k].grave ? '⛔ ' : '⚠️ ') + E(A[k].lib) + ' <strong>' + r.compteurs[k] + '</strong></button>'; };
   var estimes = Object.keys(r.parProg).sort(function(a, b){ return r.parProg[b] - r.parProg[a]; }).slice(0, 6).map(function(n){ return E(n) + ' (' + r.parProg[n] + ')'; }).join(' · ');
   var h = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;"><div class="card-title" style="margin:0;flex:1;">🔎 Contrôle des échéanciers — ' + r.lignes.length + ' souscripteur(s) à vérifier sur ' + (DATA.clients || []).length + '</div>'
-    + '<button class="btn btn-secondary btn-sm" onclick="relancesControleCSV()">⬇ Exporter (CSV)</button></div>'
+    + '<button class="btn btn-secondary btn-sm" onclick="progDatesOuvrir()" title="Renseigner les dates de lancement et de livraison des programmes">📅 Dates des programmes</button> <button class="btn btn-secondary btn-sm" onclick="relancesControleCSV()">⬇ Exporter (CSV)</button></div>'
     + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Lecture seule : rien n\'est modifié. ⛔ = à corriger (le calcul du retard est impossible ou inexact), ⚠️ = incohérence probable à vérifier. Cliquez sur une anomalie pour filtrer, sur un souscripteur pour ouvrir sa fiche.</div>'
     + (r.nbEstimes ? '<div class="alert alert-warn" style="font-size:12px;margin-bottom:8px;">📐 <strong>' + r.nbEstimes + ' souscripteur(s)</strong> sont sur un échéancier <strong>estimé</strong> (programme sans date de livraison) : ' + estimes + '. Complétez les dates dans <a href="#" onclick="goTo(\'programmes\');return false;">Programmes</a>.</div>' : '')
     + (codes.length ? '<div style="margin-bottom:8px;">' + codes.map(chip).join('') + (_ctrlFiltre ? ' <button type="button" class="btn btn-secondary btn-sm" onclick="relancesControleFiltrer(\'' + _ctrlFiltre + '\')">✕ Tout afficher</button>' : '') + '</div>' : '');
@@ -137406,6 +137407,83 @@ function coordImporter(input) {
   var rd = new FileReader(); rd.onload = function(e){ coordTraiterTexte(e.target.result); input.value = ''; }; rd.readAsText(f, 'utf-8');
 }
 
+/* ══ Dates des programmes en masse (lancement / livraison) ══
+   La date de livraison d'un programme décide du calcul du retard de ses souscripteurs : renseignée, l'échéancier suit la durée réelle du projet ;
+   absente, le retard n'est qu'« estimé » d'après la durée saisie sur chaque fiche. Un seul tableau pour tous les programmes, avec l'effet immédiat sur les fiches. */
+var _progDates = {};
+function progDatesOuvrir() { _progDates = {}; openModal('modal-prog-dates'); progDatesRender(); }
+function _progDateOk(s) { return !s || (/^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime()) && +s.slice(0, 4) >= 2000 && +s.slice(0, 4) <= 2100); }
+function _progDateVal(p, ch) { var b = _progDates[p.id]; return b && b[ch] !== undefined ? b[ch] : (p[ch] || ''); }
+function progDatesSaisie(id, ch, v) {
+  var p = (DATA.programmes || []).find(function(x){ return x.id === id; }); if (!p) return;
+  var b = _progDates[id] = _progDates[id] || {};
+  if (String(v) === String(p[ch] || '')) delete b[ch]; else b[ch] = v;
+  if (!Object.keys(b).length) delete _progDates[id];
+  progDatesLigne(id); progDatesCompteur();
+}
+/* Contrôle + effet sur les souscripteurs actifs non soldés (ceux dont le retard est calculé). */
+function progDatesAnalyse(p) {
+  var lanc = _progDateVal(p, 'date_lancement'), livr = _progDateVal(p, 'date_livraison'), err = [], warn = [];
+  if (!_progDateOk(lanc)) err.push('Date de lancement invalide'); if (!_progDateOk(livr)) err.push('Date de livraison invalide');
+  if (!err.length && lanc && livr && livr <= lanc) err.push('La livraison doit suivre le lancement');
+  var cl = (DATA.clients || []).filter(function(c){ return c.programme_id === p.id && c.statut !== 'resilie' && !clientFinancementBancaire(c) && !fneSoldeClient(c).solde; });
+  var proj = 0, sansDate = 0, apres = 0;
+  cl.forEach(function(c){
+    var anc = c.date_debut || c.date_souscription; if (!_dateLocale(anc)) { sansDate++; return; }
+    if (!livr || !_progDateOk(livr)) return;
+    var d = dureeProjetDepuis({ date_livraison: livr }, anc), debut = _dateLocale(anc), fin = _dateLocale(livr);
+    if (d && fin && _moisEntre(debut, fin) < 1) apres++; else proj++;
+  });
+  if (livr && !err.length && livr < today() && cl.length) warn.push('Livraison déjà passée : les souscripteurs non soldés sont en retard sur la totalité de leur solde restant (à confirmer)');
+  return { err: err, warn: warn, nb: cl.length, proj: proj, sansDate: sansDate, apres: apres, livr: livr };
+}
+function progDatesLigne(id) {
+  var p = (DATA.programmes || []).find(function(x){ return x.id === id; }), cell = document.getElementById('pgd-info-' + id); if (!p || !cell) return;
+  var a = progDatesAnalyse(p), h = [];
+  a.err.forEach(function(m){ h.push('<span style="color:var(--rouge);">⛔ ' + escHtml(m) + '</span>'); });
+  if (a.livr && !a.err.length) h.push('<span style="color:var(--vert);">✓ ' + a.proj + ' / ' + a.nb + ' calculé(s) sur la durée du projet</span>');
+  else if (!a.livr && a.nb) h.push('<span style="color:var(--or);">≈ ' + a.nb + ' souscripteur(s) en échéancier estimé</span>');
+  if (a.sansDate) h.push('<span style="color:var(--or);">⚠️ ' + a.sansDate + ' sans date de départ</span>');
+  if (a.apres) h.push('<span style="color:var(--or);">⚠️ ' + a.apres + ' démarrent à moins d\'un mois (ou après) la livraison</span>');
+  a.warn.forEach(function(m){ h.push('<span style="color:var(--or);">⚠️ ' + escHtml(m) + '</span>'); });
+  cell.innerHTML = h.join('<br>');
+}
+function progDatesCompteur() {
+  var ids = Object.keys(_progDates), nbErr = ids.filter(function(id){ var p = (DATA.programmes || []).find(function(x){ return x.id === id; }); return p && progDatesAnalyse(p).err.length; }).length;
+  var el = document.getElementById('pgd-compteur'); if (el) el.textContent = ids.length + ' programme(s) modifié(s)' + (nbErr ? ' dont ' + nbErr + ' en erreur' : '');
+  var bt = document.getElementById('pgd-enregistrer'); if (bt) bt.disabled = !ids.length || nbErr > 0;
+}
+function progDatesRender() {
+  var host = document.getElementById('pgd-corps'); if (!host) return;
+  var filtre = (document.getElementById('pgd-filtre') || {}).value || 'manquantes';
+  var nbCl = function(p){ return (DATA.clients || []).filter(function(c){ return c.programme_id === p.id && c.statut !== 'resilie'; }).length; };
+  var L = (DATA.programmes || []).map(function(p){ return { p: p, n: nbCl(p) }; }).filter(function(x){
+    if (filtre === 'tous') return true; if (_progDates[x.p.id]) return true;
+    return !x.p.date_livraison || !x.p.date_lancement; }).sort(function(a, b){ return b.n - a.n || String(a.p.nom).localeCompare(String(b.p.nom), 'fr'); });
+  host.innerHTML = '<div class="table-wrap" style="max-height:55vh;overflow:auto;"><table><thead><tr><th>Programme</th><th style="text-align:right;">Souscripteurs</th><th>Lancement</th><th>Livraison</th><th>Effet sur les retards</th></tr></thead><tbody>'
+    + (L.length ? L.map(function(x){ var p = x.p;
+        return '<tr><td><strong>' + escHtml(p.nom || '—') + '</strong><div style="font-size:11px;color:var(--blanc-dim);">' + escHtml(p.localisation || '') + '</div></td><td style="text-align:right;">' + x.n + '</td>'
+          + '<td><input type="date" class="form-control" value="' + escHtml(_progDateVal(p, 'date_lancement')) + '" onchange="progDatesSaisie(\'' + p.id + '\',\'date_lancement\',this.value)"></td>'
+          + '<td><input type="date" class="form-control" value="' + escHtml(_progDateVal(p, 'date_livraison')) + '" onchange="progDatesSaisie(\'' + p.id + '\',\'date_livraison\',this.value)"></td>'
+          + '<td id="pgd-info-' + p.id + '" style="font-size:11px;"></td></tr>'; }).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:var(--vert);padding:18px;">✅ Tous les programmes ont leurs dates.</td></tr>')
+    + '</tbody></table></div>';
+  L.forEach(function(x){ progDatesLigne(x.p.id); }); progDatesCompteur();
+}
+async function progDatesEnregistrer() {
+  var ids = Object.keys(_progDates), n = 0;
+  for (var i = 0; i < ids.length; i++) {
+    var p = (DATA.programmes || []).find(function(x){ return x.id === ids[i]; }), b = _progDates[ids[i]]; if (!p || progDatesAnalyse(p).err.length) continue;
+    if (b.date_lancement !== undefined) { p.date_lancement = b.date_lancement; p.date_debut = b.date_lancement; }
+    if (b.date_livraison !== undefined) p.date_livraison = b.date_livraison;
+    await dbPut('programmes', p); if (typeof syncToSupabase === 'function') syncToSupabase('pi_programmes', p);
+    delete _progDates[ids[i]]; n++;
+  }
+  toast('✅ Dates enregistrées pour ' + n + ' programme(s). Les retards des souscripteurs concernés sont recalculés.', 'success');
+  try { if (typeof renderProgrammes === 'function') renderProgrammes(); if (typeof detectRelances === 'function' && document.getElementById('tbody-relances')) detectRelances(); } catch (e) { /* page non affichée */ }
+  progDatesRender();
+}
+
 function facturerCession(cesId) {
   var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === cesId; });
   if (!c) { toast('Cession introuvable.', 'error'); return; }
@@ -148037,6 +148115,25 @@ goTo = function(page) {
       <div class="form-group"><label>Note</label><input class="form-control" id="tvajp-note"></div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-tva-justif-piece')">Annuler</button><button class="btn btn-primary" onclick="tvaJEnregistrerPiece()">💾 Enregistrer</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-prog-dates">
+  <div class="modal" style="max-width:1000px;width:96vw;">
+    <div class="modal-header">
+      <h3>📅 Dates des programmes — lancement et livraison</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-prog-dates')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">La date de livraison fixe l'échéancier théorique des souscripteurs du programme : sans elle, le retard n'est qu'« estimé » d'après la durée saisie sur chaque fiche. Renseignez les dates, contrôlez l'effet à droite, puis enregistrez.</div>
+      <div style="margin-bottom:10px;"><select class="filter-select" id="pgd-filtre" onchange="progDatesRender()"><option value="manquantes">Programmes avec date manquante</option><option value="tous">Tous les programmes</option></select></div>
+      <div id="pgd-corps"></div>
+    </div>
+    <div class="modal-footer">
+      <span id="pgd-compteur" style="margin-right:auto;font-size:12px;color:var(--blanc-dim);"></span>
+      <button class="btn btn-secondary" onclick="closeModal('modal-prog-dates')">Fermer</button>
+      <button class="btn btn-primary" id="pgd-enregistrer" onclick="progDatesEnregistrer()" disabled>💾 Enregistrer</button>
+    </div>
   </div>
 </div>
 
