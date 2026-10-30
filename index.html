@@ -49436,7 +49436,7 @@ function ckActions() {
         push({
           aid: 'vehdoc_' + vid,
           prio: rouge ? 92 : 55, urgent: rouge, icone: '🚗',
-          titre: (rouge ? 'Document véhicule expiré' : 'Échéance véhicule proche') + ' — ' + (v ? v.immatriculation : 'véhicule'),
+          titre: (al.every(function(a){ return a.type==='donnee'; }) ? 'Kilométrage véhicule à corriger' : (rouge ? 'Document véhicule expiré' : 'Échéance véhicule proche')) + ' — ' + (v ? v.immatriculation : 'véhicule'),
           detail: al.map(function(a){ return a.texte; }).join(' · '),
           boutons: [ { lib:'🚗 Ouvrir le Parc Auto', fn:"goTo('parc-auto')" } ]
         });
@@ -83065,6 +83065,43 @@ function paFillSelects(){
 }
 
 /* ── Alertes d'échéances ────────────────────────────────────────────── */
+/* Kilométrage : une saisie aberrante (ex. un chiffre en trop) bloquait la fiche pour toujours, puisque le km ne fait que monter. On ne s'y fie plus :
+   au-delà de PA_KM_MAX, ou d'un écart anormal avec le dernier relevé fiable (courses, carburant, entretiens), l'alerte de vidange par km est remplacée
+   par une alerte « kilométrage incohérent » avec correction en un clic. */
+var PA_KM_MAX = 1000000, PA_KM_SAUT = 50000;
+function _paKm(n) { return fmtF(Math.round(n || 0)) + ' km'; }
+function _paJours(dateStr) { var d = new Date(String(dateStr || '').slice(0, 10) + 'T12:00:00'); return isNaN(d.getTime()) ? 0 : Math.round((Date.now() - d.getTime()) / 86400000); }
+function paDernierReleveKm(v) {
+  var L = [], add = function(k, date){ k = parseFloat(k); if (k > 0 && k <= PA_KM_MAX) L.push({ km: k, date: String(date || '').slice(0, 10) }); };
+  (DATA.vehicule_courses || []).forEach(function(c){ if (c.vehicule_id === v.id) { add(c.km_depart, c.date); add(c.km_retour, c.date); } });
+  (DATA.vehicule_carburant || []).forEach(function(c){ if (c.vehicule_id === v.id) add(c.km, c.date); });
+  (DATA.vehicule_entretiens || []).forEach(function(e){ if (e.vehicule_id === v.id) add(e.km, e.date); });
+  L.sort(function(a, b){ return b.date.localeCompare(a.date) || b.km - a.km; });
+  return L[0] || null;
+}
+function paKmSuspect(v) {
+  var km = parseFloat(v.km_actuel) || 0; if (!km) return null;
+  var r = paDernierReleveKm(v);
+  return (km > PA_KM_MAX || (r && km - r.km > PA_KM_SAUT)) ? { km: km, releve: r } : null;
+}
+/* Garde-fou à la saisie : refuse l'improbable, demande confirmation pour un grand saut. */
+function paKmAcceptable(v, km) {
+  if (km > PA_KM_MAX) { toast('⚠️ Kilométrage ' + _paKm(km) + ' ignoré pour la fiche du véhicule : valeur improbable (plus de ' + _paKm(PA_KM_MAX) + '). Vérifiez la saisie.', 'warn', 8000); return false; }
+  var prec = parseFloat(v.km_actuel) || 0;
+  if (prec > 0 && km - prec > PA_KM_SAUT) return confirm('Ce relevé (' + _paKm(km) + ') dépasse de ' + _paKm(km - prec) + ' le dernier kilométrage connu (' + _paKm(prec) + ').\n\nMettre à jour la fiche du véhicule ?');
+  return true;
+}
+async function paKmCorriger(vehiculeId) {
+  var v = paVehicule(vehiculeId); if (!v) return;
+  var ks = paKmSuspect(v);
+  if (!ks || !ks.releve) { paOpenVehicule(vehiculeId); toast('Aucun relevé fiable : corrigez le kilométrage sur la fiche.', 'info'); return; }
+  if (!confirm('Remplacer le kilométrage ' + _paKm(ks.km) + ' par le dernier relevé fiable : ' + _paKm(ks.releve.km) + ' (relevé du ' + dateShort(ks.releve.date) + ') ?')) return;
+  v.km_actuel = ks.releve.km; v._modifie = new Date().toISOString();
+  await dbPut('vehicules', v); if (typeof syncToSupabase === 'function') syncToSupabase('pi_vehicules', v);
+  toast('✅ Kilométrage corrigé : ' + _paKm(v.km_actuel) + '.', 'success'); paActualiserBadges();
+  if (typeof paRenderVehicules === 'function') paRenderVehicules();
+}
+function _paImmobilise(v) { return v.statut === 'en_reparation' || v.statut === 'hors_service'; }
 function paCalculerAlertes(){
   var alertes = [];
   var t = today();
@@ -83077,23 +83114,26 @@ function paCalculerAlertes(){
   var seuilVisiteStr    = dansJours(joursVisite);
   var seuilVidangeStr   = dansJours(Math.max(joursAssurance, joursVisite));
 
-  (DATA.vehicules||[]).filter(function(v){ return v.statut!=='vendu'; }).forEach(function(v){
+  /* Véhicules vendus, en réparation ou hors service : pas d'alerte d'urgence (voir paAlertesInformatives) */
+  (DATA.vehicules||[]).filter(function(v){ return v.statut!=='vendu' && !_paImmobilise(v); }).forEach(function(v){
     var label = v.immatriculation || 'Véhicule sans plaque';
     if (v.assurance_fin) {
-      if (v.assurance_fin < t) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — assurance expirée depuis le '+dateShort(v.assurance_fin) });
-      else if (v.assurance_fin <= seuilAssuranceStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — assurance expire le '+dateShort(v.assurance_fin) });
+      if (v.assurance_fin < t) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — assurance expirée depuis le '+dateShort(v.assurance_fin)+' ('+_paJours(v.assurance_fin)+' j)' });
+      else if (v.assurance_fin <= seuilAssuranceStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — assurance expire le '+dateShort(v.assurance_fin)+' (dans '+Math.abs(_paJours(v.assurance_fin))+' j)' });
     }
     if (v.visite_technique_expiration) {
-      if (v.visite_technique_expiration < t) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — visite technique expirée depuis le '+dateShort(v.visite_technique_expiration) });
-      else if (v.visite_technique_expiration <= seuilVisiteStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — visite technique expire le '+dateShort(v.visite_technique_expiration) });
+      if (v.visite_technique_expiration < t) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — visite technique expirée depuis le '+dateShort(v.visite_technique_expiration)+' ('+_paJours(v.visite_technique_expiration)+' j)' });
+      else if (v.visite_technique_expiration <= seuilVisiteStr) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — visite technique expire le '+dateShort(v.visite_technique_expiration)+' (dans '+Math.abs(_paJours(v.visite_technique_expiration))+' j)' });
     }
     /* Vidange due par km : dernier entretien de type vidange + son seuil km (anticipation paramétrable) */
     var derniereVidange = (DATA.vehicule_entretiens||[]).filter(function(e){ return e.vehicule_id===v.id && e.type==='vidange'; })
       .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); })[0];
-    if (derniereVidange && derniereVidange.prochaine_echeance_km && v.km_actuel) {
+    var ks = paKmSuspect(v);
+    if (ks) alertes.push({ vehicule_id:v.id, niveau:'orange', type:'donnee', texte: label+' — kilométrage incohérent ('+_paKm(ks.km)+')'+(ks.releve ? ' : dernier relevé '+_paKm(ks.releve.km)+' le '+dateShort(ks.releve.date) : '')+' — vidange par km non calculable' });
+    else if (derniereVidange && derniereVidange.prochaine_echeance_km && v.km_actuel) {
       var ecart = derniereVidange.prochaine_echeance_km - v.km_actuel;
-      if (ecart <= 0) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — vidange dépassée de '+Math.abs(ecart)+' km' });
-      else if (ecart <= seuilKm) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — vidange due dans '+ecart+' km' });
+      if (ecart <= 0) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — vidange dépassée de '+_paKm(Math.abs(ecart)) });
+      else if (ecart <= seuilKm) alertes.push({ vehicule_id:v.id, niveau:'orange', texte: label+' — vidange due dans '+_paKm(ecart) });
     }
     if (derniereVidange && derniereVidange.prochaine_echeance_date) {
       if (derniereVidange.prochaine_echeance_date < t) alertes.push({ vehicule_id:v.id, niveau:'rouge', texte: label+' — vidange (date) dépassée depuis le '+dateShort(derniereVidange.prochaine_echeance_date) });
@@ -83102,23 +83142,60 @@ function paCalculerAlertes(){
   });
   return alertes;
 }
+/* À noter (non comptées dans le badge) : véhicules immobilisés dont les documents ont expiré, et documents non renseignés. */
+function paAlertesInformatives() {
+  var out = [], t = today();
+  (DATA.vehicules||[]).filter(function(v){ return v.statut!=='vendu'; }).forEach(function(v){
+    var label = v.immatriculation || 'Véhicule sans plaque', exp = [];
+    if (_paImmobilise(v)) {
+      if (v.assurance_fin && v.assurance_fin < t) exp.push('assurance expirée depuis le '+dateShort(v.assurance_fin));
+      if (v.visite_technique_expiration && v.visite_technique_expiration < t) exp.push('visite technique expirée depuis le '+dateShort(v.visite_technique_expiration));
+      if (exp.length) out.push({ vehicule_id:v.id, texte: label+' — '+(PA_STATUTS[v.statut]||v.statut).toLowerCase()+' : '+exp.join(' et ')+' (à renouveler avant remise en circulation)' });
+    } else {
+      var manq = []; if (!v.assurance_fin) manq.push('assurance'); if (!v.visite_technique_expiration) manq.push('visite technique');
+      if (manq.length) out.push({ vehicule_id:v.id, texte: label+' — date d\'expiration non renseignée : '+manq.join(', ') });
+    }
+  });
+  return out;
+}
+/* Rafraîchit badge de la barre, cockpit et module sans recharger : au retour sur l'application (mobile), à intervalle régulier et après chaque saisie. */
+function paActualiserBadges() {
+  try {
+    if (typeof paCalculerAlertes !== 'function') return;
+    var n = paCalculerAlertes().length, b = document.getElementById('badge-parc-auto');
+    if (b) { b.textContent = String(n); b.style.display = n ? 'inline-block' : 'none'; }
+    if (typeof APP !== 'undefined' && APP.currentPage === 'parc-auto') { if (typeof paRenderKPIs === 'function') paRenderKPIs(); if (typeof paRenderAlertes === 'function') paRenderAlertes(); }
+    if (typeof iaaRefreshAlertes === 'function') iaaRefreshAlertes();
+  } catch (e) { /* ne jamais bloquer l'application pour un badge */ }
+}
+if (!window._paBadgesBranches) {
+  window._paBadgesBranches = true;
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') paActualiserBadges(); });
+  window.addEventListener('focus', paActualiserBadges);
+  setInterval(paActualiserBadges, 30 * 60 * 1000);
+}
 
 function paRenderAlertes(){
   var box = document.getElementById('pa-alertes-box');
   if (!box) return;
-  var alertes = paCalculerAlertes();
+  var alertes = paCalculerAlertes(), infos = paAlertesInformatives();
   var badge = document.getElementById('badge-parc-auto');
   var nbRouge = alertes.filter(function(a){ return a.niveau==='rouge'; }).length;
   if (badge) { badge.textContent = String(alertes.length); badge.style.display = alertes.length ? 'inline-block' : 'none'; }
-  if (!alertes.length) { box.innerHTML = '<div class="alert alert-success" style="font-size:12px;">✅ Aucune échéance urgente sur le parc.</div>'; return; }
-  box.innerHTML = '<div class="card" style="padding:12px 16px;'+(nbRouge?'border-left:3px solid var(--rouge);':'border-left:3px solid var(--or);')+'">'
+  var h = '';
+  if (!alertes.length) h += '<div class="alert alert-success" style="font-size:12px;">✅ Aucune échéance urgente sur le parc.</div>';
+  else h += '<div class="card" style="padding:12px 16px;'+(nbRouge?'border-left:3px solid var(--rouge);':'border-left:3px solid var(--or);')+'">'
     + '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">⚠️ '+alertes.length+' alerte(s) échéance(s)</div>'
     + alertes.slice(0,8).map(function(a){
         return '<div style="font-size:12px;padding:3px 0;color:'+(a.niveau==='rouge'?'var(--rouge)':'var(--or,#B87333)')+';cursor:pointer;" onclick="paOuvrirFicheDepuisAlerte(\''+a.vehicule_id+'\')">'
-          + (a.niveau==='rouge'?'🔴':'🟠') + ' ' + escHtml(a.texte) + '</div>';
+          + (a.type==='donnee'?'🛠️':(a.niveau==='rouge'?'🔴':'🟠')) + ' ' + escHtml(a.texte)
+          + (a.type==='donnee' ? ' <button type="button" class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="event.stopPropagation();paKmCorriger(\''+a.vehicule_id+'\')">Corriger le km</button>' : '') + '</div>';
       }).join('')
     + (alertes.length>8 ? '<div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">+ '+(alertes.length-8)+' autre(s)…</div>' : '')
     + '</div>';
+  if (infos.length) h += '<div class="card" style="padding:10px 16px;margin-top:8px;border-left:3px solid var(--blanc-dim);"><div style="font-weight:700;font-size:12px;margin-bottom:4px;">ℹ️ À noter ('+infos.length+')</div>'
+    + infos.map(function(a){ return '<div style="font-size:12px;padding:2px 0;color:var(--blanc-dim);cursor:pointer;" onclick="paOuvrirFicheDepuisAlerte(\''+a.vehicule_id+'\')">• '+escHtml(a.texte)+'</div>'; }).join('') + '</div>';
+  box.innerHTML = h;
 }
 function paOuvrirFicheDepuisAlerte(vehiculeId){ paOpenVehicule(vehiculeId); }
 
@@ -83294,6 +83371,8 @@ async function paSaveVehicule(){
   var immat = (document.getElementById('pav-immat')||{}).value||'';
   if (!immat.trim()) { toast('Immatriculation obligatoire.', 'error'); return; }
   var id = (document.getElementById('pav-id')||{}).value || uid();
+  var _kmSaisi = parseFloat((document.getElementById('pav-km')||{}).value) || 0;
+  if (_kmSaisi > PA_KM_MAX) { toast('Kilométrage improbable (plus de ' + _paKm(PA_KM_MAX) + ') : vérifiez la saisie.', 'error'); return; }
   var existant = paVehicule(id);
   var v = existant || { id: id, created_at: new Date().toISOString() };
   v.immatriculation = immat.trim().toUpperCase();
@@ -83359,7 +83438,7 @@ async function paSaveCarburant(){
 
   /* Mettre à jour le km du véhicule si celui-ci est plus récent */
   var v = paVehicule(vehiculeId);
-  if (v && km > (v.km_actuel||0)) { v.km_actuel = km; v._modifie = new Date().toISOString(); await dbPut('vehicules', v); if (typeof syncToSupabase==='function') syncToSupabase('pi_vehicules', v); }
+  if (v && km > (v.km_actuel||0) && paKmAcceptable(v, km)) { v.km_actuel = km; v._modifie = new Date().toISOString(); await dbPut('vehicules', v); if (typeof syncToSupabase==='function') syncToSupabase('pi_vehicules', v); }
 
   /* Comptabilisation SYSCOHADA : charge carburant / trésorerie selon mode
      de paiement. requireCompteDefaut() refuse plutôt que deviner un compte —
@@ -83471,7 +83550,7 @@ async function pcoSaveCourse(){
 
   /* Même logique que le carburant : le km course fait référence si plus récent. */
   var v = paVehicule(vehiculeId);
-  if (v && kmRetour!==null && kmRetour > (v.km_actuel||0)) { v.km_actuel = kmRetour; v._modifie = new Date().toISOString(); await dbPut('vehicules', v); if (typeof syncToSupabase==='function') syncToSupabase('pi_vehicules', v); }
+  if (v && kmRetour!==null && kmRetour > (v.km_actuel||0) && paKmAcceptable(v, kmRetour)) { v.km_actuel = kmRetour; v._modifie = new Date().toISOString(); await dbPut('vehicules', v); if (typeof syncToSupabase==='function') syncToSupabase('pi_vehicules', v); }
 
   toast(existant ? '✅ Course modifiée.' : '✅ Course enregistrée.', 'success');
   pcoResetForm();
@@ -83564,7 +83643,7 @@ async function paSaveEntretien(){
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_vehicule_entretiens', e);
 
   var v = paVehicule(vehiculeId);
-  if (v && km > (v.km_actuel||0)) { v.km_actuel = km; v._modifie = new Date().toISOString(); await dbPut('vehicules', v); if (typeof syncToSupabase==='function') syncToSupabase('pi_vehicules', v); }
+  if (v && km > (v.km_actuel||0) && paKmAcceptable(v, km)) { v.km_actuel = km; v._modifie = new Date().toISOString(); await dbPut('vehicules', v); if (typeof syncToSupabase==='function') syncToSupabase('pi_vehicules', v); }
   if (v && (document.getElementById('pae-type')||{}).value === 'en_reparation') { /* pas d'auto-statut ici : laissé au choix manuel */ }
 
   /* Comptabilisation SYSCOHADA : charge entretien / trésorerie ou fournisseur
@@ -90342,6 +90421,12 @@ function verifierEcheancesEtNotifier() {
   });
   if (permisAlerte.length) {
     notifierTitre('📜 Permis expirant bientôt', { body: permisAlerte.map(function(p){ return p.numero; }).join(', ') });
+  }
+
+  /* Parc auto : documents et vidanges dépassés */
+  if (typeof paCalculerAlertes === 'function') {
+    var vehRouges = paCalculerAlertes().filter(function(a){ return a.niveau === 'rouge'; });
+    if (vehRouges.length) notifierTitre('🚗 ' + vehRouges.length + ' échéance(s) véhicule dépassée(s)', { body: vehRouges.slice(0, 3).map(function(a){ return a.texte; }).join(' · ') });
   }
 }
 
