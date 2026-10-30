@@ -30910,7 +30910,7 @@ function pmCtlCalculer() {
   var vers = DATA.versements || [], ecrs = DATA.ecritures || [];
   var parEcr = {}; ecrs.forEach(function (e) { parEcr[e.id] = e; });
   var parVers = {}; vers.forEach(function (v) { parVers[v.id] = v; });
-  var r = { manquantes: [], orphelines: [], ecarts: [], commOrph: [], synth: {} };
+  var r = { manquantes: [], orphelines: [], ecarts: [], commOrph: [], sansfiche: [], synth: {} };
   var syn = function (an) { return r.synth[an] = r.synth[an] || { an: an, nv: 0, mv: 0, ne: 0, me: 0, nm: 0, mm: 0, no: 0, mo: 0 }; };
   vers.forEach(function (v) {
     var m = parseFloat(v.montant) || 0, s = syn(_pmAn(v.date)); s.nv++; s.mv += m;
@@ -30934,16 +30934,18 @@ function pmCtlCalculer() {
   var comms = {}; (DATA.commissions || []).forEach(function (c) { comms[c.id] = 1; });
   var ext = {}; ecrs.forEach(function (x) { if (x.source === 'extourne_commission' && x.commission_id) ext[x.commission_id] = 1; });
   ecrs.forEach(function (e) { if (e.source === 'commission' && e.commission_id && !comms[e.commission_id] && !ext[e.commission_id]) r.commOrph.push(e); });
+  var parClient = {}; (DATA.clients || []).forEach(function (x) { parClient[x.id] = x; });
+  r.sansfiche = _pmSfGroupes(vers, parClient, parEcr);
   return r;
 }
-function pmCtlTotal(r) { r = r || pmCtlCalculer(); return r.manquantes.length + r.orphelines.filter(function (x) { return !x.deja; }).length + r.ecarts.length + r.commOrph.length; }
+function pmCtlTotal(r) { r = r || pmCtlCalculer(); return r.manquantes.length + r.orphelines.filter(function (x) { return !x.deja; }).length + r.ecarts.length + r.commOrph.length + r.sansfiche.length; }
 function pmCtlOuvrir(onglet) { _pmCtl.onglet = onglet || _pmCtl.onglet || 'synthese'; openModal('modal-pm-ctl'); pmCtlRender(); }
 function pmCtlOnglet(o) { _pmCtl.onglet = o; pmCtlRender(); }
 function pmCtlRender() {
   var box = document.getElementById('pmctl-corps'); if (!box) return;
   var r = pmCtlCalculer(), mgr = hasRole('manager'), CAP = 100, F = function (v) { return fmtF(Math.round(v || 0)); };
   var orphA = r.orphelines.filter(function (x) { return !x.deja; });
-  var onglets = [['synthese', 'Synthèse', ''], ['manquantes', 'Versements sans écriture', r.manquantes.length], ['orphelines', 'Écritures sans versement', orphA.length], ['ecarts', 'Écarts montant / date', r.ecarts.length], ['comm', 'Charges de commission sans commission', r.commOrph.length]];
+  var onglets = [['synthese', 'Synthèse', ''], ['manquantes', 'Versements sans écriture', r.manquantes.length], ['orphelines', 'Écritures sans versement', orphA.length], ['ecarts', 'Écarts montant / date', r.ecarts.length], ['sansfiche', 'Versements sans fiche', r.sansfiche.length], ['comm', 'Charges de commission sans commission', r.commOrph.length]];
   var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">' + onglets.map(function (o) { return '<button class="btn btn-sm ' + (_pmCtl.onglet === o[0] ? 'btn-primary' : 'btn-secondary') + '" onclick="pmCtlOnglet(\'' + o[0] + '\')">' + o[1] + (o[2] !== '' ? ' <strong>' + o[2] + '</strong>' : '') + '</button>'; }).join('') + '</div>';
   var th = function (a) { return '<thead><tr>' + a.map(function (x) { return '<th>' + x + '</th>'; }).join('') + '</tr></thead>'; };
   var vide = '<div style="color:#10B981;padding:12px 0;">✅ Aucune anomalie.</div>';
@@ -30972,6 +30974,8 @@ function pmCtlRender() {
       var e = x.e;
       return '<tr><td>' + escHtml(e.date || '') + '</td><td>' + escHtml(e.piece || e.ref || '') + '</td><td>' + escHtml(e.libelle || '') + '</td><td>' + F(e.montant) + ' F</td><td style="font-size:11px;">' + (x.clos ? 'Exercice clos' : '') + '</td><td>' + (mgr && !x.clos ? '<button class="btn btn-warning btn-sm" onclick="pmCtlContrePasser(\'' + String(e.id).replace(/'/g, '') + '\')">↩️ Contre-passer</button>' : '') + '</td></tr>';
     }).join('') + '</tbody></table>' + suite(orphA.length) : vide;
+  } else if (o === 'sansfiche') {
+    h += _pmSfRender(r, mgr, F, th, vide);
   } else if (o === 'ecarts') {
     h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Écriture dont le montant ou la date diffère du versement. « Régénérer » réécrit l\'écriture d\'après le versement, sauf pièce visée ou exercice clos (contre-passation à la main).</div>';
     h += r.ecarts.length ? '<table class="data-table">' + th(['Souscripteur', 'Versement', 'Écriture', 'Écart', '']) + '<tbody>' + r.ecarts.map(function (x) {
@@ -30986,6 +30990,84 @@ function pmCtlRender() {
     }).join('') + '</tbody></table>' + suite(r.commOrph.length) : vide;
   }
   box.innerHTML = h;
+}
+var _pmSf = [];
+function _pmSfGroupes(vers, parClient, parEcr) {
+  var grp = {};
+  vers.forEach(function (v) {
+    if (parClient[v.client_id]) return;
+    var e = parEcr['ecr_vrs_' + v.id], nom = e ? String(e.libelle || '').split(' — ').slice(1).join(' — ').trim() : '';
+    var g = grp[v.client_id] = grp[v.client_id] || { cid: v.client_id, nom: '', vers: [], total: 0, cands: [] };
+    if (!g.nom && nom) g.nom = nom;
+    g.vers.push(v); g.total += parseFloat(v.montant) || 0;
+  });
+  var nbV = {}; vers.forEach(function (v) { nbV[v.client_id] = (nbV[v.client_id] || 0) + 1; });
+  var cles = {};
+  (DATA.clients || []).forEach(function (c) { var k = _cmNomCle((c.prenoms || '') + ' ' + (c.nom || '')); if (k) (cles[k] = cles[k] || []).push(c); });
+  return Object.keys(grp).map(function (k) {
+    var g = grp[k], cle = _cmNomCle(g.nom);
+    g.cands = (cle && cles[cle]) ? cles[cle].map(function (c) {
+      var lot = (typeof _lotIdsDeClient === 'function' ? _lotIdsDeClient(c) : []).map(function (id) { var l = (DATA.lots || []).find(function (x) { return x.id === id; }); return l ? l.numero : ''; }).filter(Boolean).join('+');
+      return { c: c, lot: lot, nbV: nbV[c.id] || 0 };
+    }) : [];
+    return g;
+  }).sort(function (a, b) { return b.total - a.total; });
+}
+function _pmSfRender(r, mgr, F, th, vide) {
+  _pmSf = r.sansfiche;
+  var uniques = r.sansfiche.filter(function (g) { return g.cands.length === 1; });
+  var h = '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Versements dont la fiche souscripteur n\'existe pas (identifiant inconnu, souvent après un import). Le nom est retrouvé dans l\'écriture comptable. <strong>Un client peut avoir plusieurs fiches</strong> (une par appartement) : quand plusieurs fiches portent le même nom, choisissez la bonne d\'après le lot, le montant total et les versements déjà présents. « Rattacher » corrige le souscripteur du versement, de son écriture (tiers) et de ses commissions ; les montants ne changent pas. Les pièces visées ou d\'un exercice clos sont écartées. Les statuts des lots ne sont pas recalculés ici.</div>';
+  if (mgr && uniques.length) h += '<div style="margin-bottom:8px;"><button class="btn btn-primary btn-sm" onclick="pmCtlRattacherUniques()">🔗 Rattacher les ' + uniques.length + ' groupe(s) à fiche unique (' + F(uniques.reduce(function (s, g) { return s + g.vers.length; }, 0)) + ' versements)</button></div>';
+  h += r.sansfiche.length ? '<table class="data-table">' + th(['Identifiant d\'origine', 'Nom retrouvé', 'Versements', 'Fiche', '']) + '<tbody>' + r.sansfiche.slice(0, 150).map(function (g, i) {
+    var sel;
+    if (!g.cands.length) sel = '<span style="color:#EF4444;font-size:11px;">Aucune fiche de ce nom</span>';
+    else sel = '<select id="pmsf_' + i + '" style="max-width:340px;">' + (g.cands.length > 1 ? '<option value="">— choisir la fiche —</option>' : '') + g.cands.map(function (x) { return '<option value="' + x.c.id + '">' + escHtml((x.c.dossier || '') + ' · lot ' + (x.lot || '—') + ' · ' + F(x.c.montant_total || 0) + ' F · ' + x.nbV + ' versement(s)' + (x.c.statut === 'resilie' ? ' · résilié' : '')) + '</option>'; }).join('') + '</select>';
+    return '<tr><td style="font-size:11px;">' + escHtml(g.cid || '—') + '</td><td>' + escHtml(g.nom || '(nom introuvable)') + '</td><td>' + g.vers.length + ' (' + F(g.total) + ' F)</td><td>' + sel + '</td><td>' + (mgr && g.cands.length ? '<button class="btn btn-secondary btn-sm" onclick="pmCtlRattacherGroupe(' + i + ')">🔗 Rattacher</button>' : '') + '</td></tr>';
+  }).join('') + '</tbody></table>' + (r.sansfiche.length > 150 ? '<div style="font-size:11px;color:var(--blanc-dim);margin-top:6px;">150 premiers groupes sur ' + r.sansfiche.length + '.</div>' : '') : vide;
+  return h;
+}
+async function _pmRattacherGroupe(g, clientId) {
+  var cl = (DATA.clients || []).find(function (x) { return x.id === clientId; }); if (!cl) return { ok: 0, bloques: 0, err: 'fiche introuvable' };
+  var nomCl = ((cl.prenoms || '') + ' ' + (cl.nom || '')).trim(), ok = 0, bloques = 0, now = new Date().toISOString();
+  var liste = (DATA.versements || []).filter(function (v) { return v.client_id === g.cid; });
+  for (var i = 0; i < liste.length; i++) {
+    var v = liste[i];
+    if (typeof vrsEcritureVerrouillee === 'function' && vrsEcritureVerrouillee(v.id)) { bloques++; continue; }
+    var avant = JSON.parse(JSON.stringify(v));
+    v.client_id = clientId; v._modifie = now;
+    await dbPut('versements', v); if (typeof syncToSupabase === 'function') syncToSupabase('pi_versements', v);
+    await logAudit('versements', v.id, 'update', avant, v);
+    var e = (DATA.ecritures || []).find(function (x) { return x.id === 'ecr_vrs_' + v.id; });
+    if (e) {
+      e.client_id = clientId; e._modifie = now;
+      (e.lignes || []).forEach(function (l) { if (l.tiers_id === g.cid) l.tiers_id = clientId; });
+      await dbPut('ecritures', e); if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', e);
+    }
+    var cms = (DATA.commissions || []).filter(function (c) { return c.versement_id === v.id && c.client_id === g.cid; });
+    for (var k = 0; k < cms.length; k++) {
+      cms[k].client_id = clientId; cms[k].client_nom = nomCl; cms[k]._modifie = now;
+      await dbPut('commissions', cms[k]); if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', cms[k]);
+    }
+    ok++;
+  }
+  return { ok: ok, bloques: bloques };
+}
+async function pmCtlRattacherGroupe(i) {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var g = _pmSf[i]; if (!g) return;
+  var el = document.getElementById('pmsf_' + i), cid = el ? el.value : '';
+  if (!cid) { toast('Choisissez la fiche du souscripteur.', 'error'); return; }
+  var cl = (DATA.clients || []).find(function (x) { return x.id === cid; });
+  if (!confirm('Rattacher ' + g.vers.length + ' versement(s) (' + fmtF(Math.round(g.total)) + ' F) de « ' + (g.nom || g.cid) + ' » à la fiche ' + ((cl && cl.dossier) || '') + ' ?')) return;
+  var r = await _pmRattacherGroupe(g, cid);
+  toast(r.err ? '❌ ' + r.err : r.ok + ' versement(s) rattaché(s)' + (r.bloques ? ', ' + r.bloques + ' écarté(s) (pièce visée ou exercice clos)' : '') + '.', r.err || r.bloques ? 'error' : 'success'); _pmRafraichir();
+}
+async function pmCtlRattacherUniques() {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var l = pmCtlCalculer().sansfiche.filter(function (g) { return g.cands.length === 1; });
+  if (!l.length || !confirm('Rattacher ' + l.length + ' groupe(s) de versements à la fiche portant exactement le même nom ?')) return;
+  var ok = 0, bl = 0; for (var i = 0; i < l.length; i++) { var r = await _pmRattacherGroupe(l[i], l[i].cands[0].c.id); ok += r.ok; bl += r.bloques; }
+  toast(ok + ' versement(s) rattaché(s)' + (bl ? ', ' + bl + ' écarté(s)' : '') + '.', bl ? 'error' : 'success'); _pmRafraichir();
 }
 function _pmRafraichir() {
   if (typeof filterEcritures === 'function') filterEcritures();
