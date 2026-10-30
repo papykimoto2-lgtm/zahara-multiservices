@@ -45023,7 +45023,7 @@ function tvaJAnalyse(e) {
   } else if (j.statut === 'sans_fne') { etat = 'non_conforme'; raison = 'Fournisseur sans FNE'; }
   else { etat = 'non_conforme'; raison = 'Fournisseur non assujetti : pas de TVA déductible'; }
   var prog = e.programme_id ? (DATA.programmes || []).filter(function(p){ return p.id === e.programme_id; })[0] : null;
-  return { e: e, tva: tva, tiers: _tvaJNomTiers(e), etat: etat, raison: raison, mois: e.date.slice(0, 7), prog: prog ? prog.nom : (e.programme_id ? '—' : 'Hors programme'),
+  return { e: e, tva: tva, tiers: _tvaJNomTiers(e), etat: etat, raison: raison, verifiee: !!(j && j.verifie), mois: e.date.slice(0, 7), prog: prog ? prog.nom : (e.programme_id ? '—' : 'Hors programme'),
            acheteur: e.created_by || e.auteur || e.saisi_par || e.user || '' };
 }
 function tvaJListe(de, a) {
@@ -45100,6 +45100,8 @@ function tvaRapprochement(mois) {
   /* 5 bis. Demandes d'achat payées dans le mois sans FNE enregistrée */
   var daSans = (DATA.fiches_engagement_depense || []).filter(function(d){ return d.statut === 'decaissee' && String(d.decaisse_le || '').slice(0, 7) === mois && daFneEtat(d).cle === 'retard'; });
   if (daSans.length) add('da', 'attention', daSans.length + ' demande(s) d\'achat payée(s) sans FNE enregistrée depuis plus de ' + FNE_DELAI_HEURES + ' h', daSans.slice(0, 8).map(function(d){ return escHtml(d.numero_da || d.numero_fed || '') + ' (' + escHtml(d.beneficiaire || 'fournisseur') + ', ' + fmtF(d.montant) + ' F)'; }).join(' · ') + '. Réclamez la FNE à l\'acheteur ou enregistrez « sans FNE ».', { lib: 'Demandes d\'achat', js: 'closeModal(\'modal-tva-justif\');goTo(\'budget\');switchTab(\'budget\',\'da\')' });
+  var nv = L.filter(function(x){ return x.etat === 'conforme' && !x.verifiee; });
+  if (nv.length) add('verif', 'attention', nv.length + ' FNE conforme(s) non vérifiée(s) sur le site de la DGI', 'Pour chaque pièce : ouvrir le lien du QR code, comparer fournisseur, NCC et montant, puis cocher « Vérifiée ». Contrôle croisé conseillé avec l\'onglet « Reçus et factures réceptionnés » de votre espace FNE.', { lib: 'Vérifier', js: 'tvaJAller(\'justifier\',\'' + mois + '\');_tvaJ.filtre=\'conforme\';tvaJRender()' });
   /* 6. Factures de vente (FNE émises) */
   var fv = (DATA.factures_client || []).filter(function(x){ return x.date && x.date.slice(0, 7) === mois && x.mode_facture !== 'simple'; });
   var enErr = fv.filter(function(x){ return x.statut_fne === 'erreur' || x.statut_fne === 'a_certifier'; }), cert = fv.filter(function(x){ return x.statut_fne === 'certifiee'; });
@@ -45240,7 +45242,7 @@ function tvaJChange(ch, v) { _tvaJ[ch] = v; tvaJRender(); }
 function tvaJPolitique(v) { var cfg = _tvaCfg(); cfg.politique_fne = (v === 'strict') ? 'strict' : 'signaler'; _tvaSave(cfg); toast(cfg.politique_fne === 'strict' ? 'Politique stricte : seule la TVA justifiée par une FNE conforme sera déduite à la prochaine liquidation.' : 'Politique « signaler » : la déclaration de TVA n\'est pas modifiée.', 'info', 7000); tvaJRender(); }
 function _tvaJBadge(x) {
   var m = { conforme: ['badge-vert', '✓ Conforme'], a_justifier: ['badge-or', '⏳ À justifier'], non_conforme: ['badge-rouge', '✗ Non déductible'], avant_fne: ['badge-neutre', 'Avant FNE'] }[x.etat];
-  return '<span class="badge ' + m[0] + '">' + m[1] + '</span>' + (x.raison ? '<div style="font-size:11px;color:var(--blanc-dim);">' + escHtml(x.raison) + '</div>' : '');
+  return '<span class="badge ' + m[0] + '">' + m[1] + '</span>' + (x.etat === 'conforme' ? (x.verifiee ? ' <span title="Vérifiée sur le site de la DGI" style="color:var(--vert);font-size:11px;">🔎 vérifiée</span>' : ' <span style="font-size:11px;color:var(--or);">non vérifiée</span>') : '') + (x.raison ? '<div style="font-size:11px;color:var(--blanc-dim);">' + escHtml(x.raison) + '</div>' : '');
 }
 function _tvaJBarre(v, t, coul) { var p = t > 0 ? Math.round(v / t * 100) : 0; return '<div style="background:rgba(128,128,128,.2);border-radius:3px;height:6px;min-width:80px;"><div style="width:' + p + '%;height:6px;border-radius:3px;background:' + coul + ';"></div></div>'; }
 function tvaJRender() {
@@ -45300,7 +45302,7 @@ function tvaJPiece(id) {
   var e = (DATA.ecritures || []).filter(function(x){ return x.id === id; })[0]; if (!e) return;
   var a = tvaJAnalyse(e), j = e.tva_justif || {}; _tvaJ.piece = id;
   var set = function(i, v){ var el = document.getElementById(i); if (el) { if (el.type === 'checkbox') el.checked = !!v; else el.value = v == null ? '' : v; } };
-  set('tvajp-statut', j.statut || 'fne'); set('tvajp-numero', j.fne_numero); set('tvajp-tva', j.fne_tva != null ? j.fne_tva : Math.round(a.tva)); set('tvajp-ncc', j.ncc_ok); set('tvajp-fourn', j.fournisseur || (a.tiers === 'Fournisseur non identifié' ? '' : a.tiers)); set('tvajp-note', j.note);
+  set('tvajp-statut', j.statut || 'fne'); set('tvajp-numero', j.fne_numero); set('tvajp-tva', j.fne_tva != null ? j.fne_tva : Math.round(a.tva)); set('tvajp-ncc', j.ncc_ok); set('tvajp-qr', j.qr_url); set('tvajp-verif', !!j.verifie); set('tvajp-fourn', j.fournisseur || (a.tiers === 'Fournisseur non identifié' ? '' : a.tiers)); set('tvajp-note', j.note);
   document.getElementById('tvajp-titre').textContent = (e.piece || e.libelle || '') + ' — TVA ' + fmtF(Math.round(a.tva)) + ' FCFA (' + e.date + ')';
   tvaJPieceStatut(); openModal('modal-tva-justif-piece');
 }
@@ -45310,7 +45312,9 @@ async function tvaJEnregistrerPiece() {
   var e = (DATA.ecritures || []).filter(function(x){ return x.id === _tvaJ.piece; })[0]; if (!e) return;
   var v = function(i){ return (document.getElementById(i) || {}).value || ''; }, statut = v('tvajp-statut');
   if (statut === 'fne' && !v('tvajp-numero').trim()) { toast('Saisissez le numéro de la FNE.', 'error'); return; }
-  e.tva_justif = { statut: statut, fne_numero: v('tvajp-numero').trim(), fne_tva: v('tvajp-tva') === '' ? '' : (parseFloat(v('tvajp-tva')) || 0), ncc_ok: !!(document.getElementById('tvajp-ncc') || {}).checked,
+  var _vp = _fneLireVerification('tvajp', (e.tva_justif || {}).verifie); if (_vp.erreur && statut === 'fne') { toast(_vp.erreur, 'error', 7000); return; }
+  if (statut !== 'fne') _vp = { qr_url: '', verifie: null };
+  e.tva_justif = { qr_url: _vp.qr_url, verifie: _vp.verifie, statut: statut, fne_numero: v('tvajp-numero').trim(), fne_tva: v('tvajp-tva') === '' ? '' : (parseFloat(v('tvajp-tva')) || 0), ncc_ok: !!(document.getElementById('tvajp-ncc') || {}).checked,
     fournisseur: v('tvajp-fourn').trim(), note: v('tvajp-note').trim(), le: new Date().toISOString() };
   await dbPut('ecritures', e); if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', e);
   closeModal('modal-tva-justif-piece'); toast('Justification enregistrée.', 'success'); tvaJRender();
@@ -117201,9 +117205,31 @@ function budgetRenderDA() {
    Une Demande d'Achat validée donne lieu à un bon d'achat imprimable remis à l'acheteur : il rappelle ce qui est autorisé et exige la FNE au NCC de l'entreprise.
    La FNE reçue est ensuite enregistrée sur la DA ; elle justifie automatiquement la TVA de l'écriture de la dépense (module « Justif. TVA »). */
 var BON_ACHAT_VALIDITE_JOURS = 7, FNE_DELAI_HEURES = 48;
+/* Vérification assistée : seul le domaine de la DGI (ou la plateforme de test publiée par la DGI) est ouvert ; la comparaison est faite par la personne, le logiciel en garde la trace. */
+function fneUrlVerification(brut) {
+  var u; try { u = new URL(String(brut || '').trim()); } catch (e) { return { ok: false, msg: 'Collez d\'abord le lien du QR code de la FNE.' }; }
+  var h = u.hostname.toLowerCase();
+  if (u.protocol === 'https:' && (h === 'dgi.gouv.ci' || /\.dgi\.gouv\.ci$/.test(h))) return { ok: true, env: 'production', url: u.href };
+  if (u.protocol === 'http:' && h === '54.247.95.108') return { ok: true, env: 'test', url: u.href };
+  return { ok: false, msg: 'Adresse non reconnue : seules les adresses de vérification de la DGI sont ouvertes (domaine dgi.gouv.ci).' };
+}
+function fneVerifierOuvrir(idInput) {
+  var r = fneUrlVerification((document.getElementById(idInput) || {}).value);
+  if (!r.ok) { toast(r.msg, 'error', 7000); return; }
+  if (r.env === 'test') toast('Page de la plateforme de TEST de la DGI : une FNE de production n\'y figure pas.', 'info', 6000);
+  window.open(r.url, '_blank', 'noopener,noreferrer');
+}
+/* Lit le lien et la case « vérifiée » d'un formulaire ; refuse une vérification sans lien valide. Conserve l'auteur/la date d'une vérification déjà enregistrée. */
+function _fneLireVerification(pre, precedent) {
+  var qr = ((document.getElementById(pre + '-qr') || {}).value || '').trim(), coche = !!(document.getElementById(pre + '-verif') || {}).checked;
+  if (coche) { var r = fneUrlVerification(qr); if (!r.ok) return { erreur: 'Pour cocher « vérifiée », collez le lien du QR code de la FNE (adresse de la DGI). ' + (qr ? r.msg : '') }; }
+  var verifie = null;
+  if (coche) verifie = (precedent && precedent.par) ? precedent : { par: (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || '', le: new Date().toISOString() };
+  return { qr_url: qr, verifie: verifie };
+}
 function daFneEtat(d) {
   var s = d.fne_suivi || {};
-  if (s.statut === 'recue') return { cle: 'recue', lib: '✓ FNE reçue' + (s.numero ? ' ' + s.numero : ''), badge: 'badge-vert' };
+  if (s.statut === 'recue') return { cle: 'recue', lib: '✓ FNE reçue' + (s.numero ? ' ' + s.numero : '') + (s.verifie ? ' · vérifiée' : ''), badge: 'badge-vert' };
   if (s.statut === 'sans_fne') return { cle: 'sans_fne', lib: '✗ Sans FNE', badge: 'badge-rouge' };
   if (d.statut === 'decaissee') {
     var h = (Date.now() - new Date(d.decaisse_le || 0).getTime()) / 3600000;
@@ -117217,7 +117243,7 @@ function daFneVersJustif(e) {
   if (!e || String(e.id || '').indexOf('ecr_cse_') !== 0) return null;
   var mvt = String(e.id).slice(8), d = (DATA.fiches_engagement_depense || []).filter(function(x){ return x.mouvement_caisse_id === mvt; })[0], s = d && d.fne_suivi;
   if (!s || (s.statut !== 'recue' && s.statut !== 'sans_fne')) return null;
-  return { statut: s.statut === 'recue' ? 'fne' : 'sans_fne', fne_numero: s.numero || '', fne_tva: s.tva == null ? '' : s.tva, ncc_ok: !!s.ncc_ok, fournisseur: d.beneficiaire || '', note: 'Demande d\'achat ' + (d.numero_da || ''), le: s.recue_le || '' };
+  return { statut: s.statut === 'recue' ? 'fne' : 'sans_fne', fne_numero: s.numero || '', fne_tva: s.tva == null ? '' : s.tva, ncc_ok: !!s.ncc_ok, qr_url: s.qr_url || '', verifie: s.verifie || null, fournisseur: d.beneficiaire || '', note: 'Demande d\'achat ' + (d.numero_da || ''), le: s.recue_le || '' };
 }
 async function imprimerBonAchat(id) {
   var d = (DATA.fiches_engagement_depense || []).filter(function(x){ return x.id === id; })[0]; if (!d) return;
@@ -117256,7 +117282,7 @@ var _daFneId = null;
 function daFneOuvrir(id) {
   var d = (DATA.fiches_engagement_depense || []).filter(function(x){ return x.id === id; })[0]; if (!d) return;
   _daFneId = id; var s = d.fne_suivi || {}, set = function(i, v){ var el = document.getElementById(i); if (el) { if (el.type === 'checkbox') el.checked = !!v; else el.value = v == null ? '' : v; } };
-  set('dafne-statut', s.statut === 'sans_fne' ? 'sans_fne' : 'recue'); set('dafne-numero', s.numero); set('dafne-ttc', s.ttc != null ? s.ttc : d.montant); set('dafne-tva', s.tva); set('dafne-ncc', s.ncc_ok); set('dafne-note', s.note);
+  set('dafne-statut', s.statut === 'sans_fne' ? 'sans_fne' : 'recue'); set('dafne-numero', s.numero); set('dafne-ttc', s.ttc != null ? s.ttc : d.montant); set('dafne-tva', s.tva); set('dafne-ncc', s.ncc_ok); set('dafne-note', s.note); set('dafne-qr', s.qr_url); set('dafne-verif', !!s.verifie);
   document.getElementById('dafne-titre').textContent = (d.numero_da || d.numero_fed || '') + ' — ' + (d.beneficiaire || 'fournisseur') + ' — ' + fmtF(d.montant) + ' FCFA'; daFneStatut(); openModal('modal-da-fne');
 }
 function daFneStatut() { var r = document.getElementById('dafne-statut').value === 'recue'; var el = document.getElementById('dafne-bloc'); if (el) el.style.display = r ? '' : 'none'; }
@@ -117266,8 +117292,10 @@ async function daFneEnregistrer() {
   var v = function(i){ return (document.getElementById(i) || {}).value || ''; }, st = v('dafne-statut');
   if (st === 'recue' && !v('dafne-numero').trim()) { toast('Saisissez le numéro de la FNE.', 'error'); return; }
   var prec = d.fne_suivi || {};
+  var _vf = _fneLireVerification('dafne', prec.verifie); if (_vf.erreur && st === 'recue') { toast(_vf.erreur, 'error', 7000); return; }
+  if (st !== 'recue') _vf = { qr_url: '', verifie: null };
   d.fne_suivi = { bon_imprime_le: prec.bon_imprime_le, statut: st, numero: st === 'recue' ? v('dafne-numero').trim() : '', ttc: parseFloat(v('dafne-ttc')) || 0, tva: v('dafne-tva') === '' ? null : (parseFloat(v('dafne-tva')) || 0),
-    ncc_ok: !!(document.getElementById('dafne-ncc') || {}).checked, note: v('dafne-note').trim(), recue_le: new Date().toISOString(), par: (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || '' };
+    ncc_ok: !!(document.getElementById('dafne-ncc') || {}).checked, qr_url: _vf.qr_url, verifie: _vf.verifie, note: v('dafne-note').trim(), recue_le: new Date().toISOString(), par: (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || '' };
   d._modifie = new Date().toISOString();
   await dbPut('fiches_engagement_depense', d); if (typeof syncToSupabase === 'function') syncToSupabase('pi_fiches_engagement_depense', d);
   closeModal('modal-da-fne'); toast(st === 'recue' ? '✅ FNE enregistrée sur la demande d\'achat ' + (d.numero_da || '') + '.' : 'Achat enregistré « sans FNE » : la TVA ne sera pas récupérable.', st === 'recue' ? 'success' : 'warn');
@@ -148382,6 +148410,9 @@ goTo = function(page) {
           <div class="form-group"><label>TVA indiquée sur la FNE (FCFA)</label><input type="number" class="form-control" id="tvajp-tva"></div>
         </div>
         <div class="form-group"><label style="font-weight:normal;"><input type="checkbox" id="tvajp-ncc"> Le NCC de l'entreprise figure bien sur la FNE (condition de déduction)</label></div>
+        <div class="form-group"><label>Lien du QR code de la FNE (adresse de vérification de la DGI)</label>
+          <div style="display:flex;gap:6px;"><input class="form-control" id="tvajp-qr" placeholder="https://…dgi.gouv.ci/fr/verification/…" style="flex:1;"><button type="button" class="btn btn-secondary btn-sm" onclick="fneVerifierOuvrir('tvajp-qr')">🔎 Vérifier sur le site de la DGI</button></div></div>
+        <div class="form-group"><label style="font-weight:normal;"><input type="checkbox" id="tvajp-verif"> Vérifiée sur le site de la DGI : fournisseur, NCC de l'entreprise et montant TTC concordent avec la FNE</label></div>
       </div>
       <div class="form-group"><label>Fournisseur (si non identifié ou à corriger)</label><input class="form-control" id="tvajp-fourn" placeholder="ex : Quincaillerie Le Bâtisseur"></div>
       <div class="form-group"><label>Note</label><input class="form-control" id="tvajp-note"></div>
@@ -148422,6 +148453,9 @@ goTo = function(page) {
           <div class="form-group"><label>dont TVA (FCFA)</label><input type="number" class="form-control" id="dafne-tva"></div>
         </div>
         <div class="form-group"><label style="font-weight:normal;"><input type="checkbox" id="dafne-ncc"> Le NCC de l'entreprise figure sur la FNE</label></div>
+        <div class="form-group"><label>Lien du QR code de la FNE (adresse de vérification de la DGI)</label>
+          <div style="display:flex;gap:6px;"><input class="form-control" id="dafne-qr" placeholder="https://…dgi.gouv.ci/fr/verification/…" style="flex:1;"><button type="button" class="btn btn-secondary btn-sm" onclick="fneVerifierOuvrir('dafne-qr')">🔎 Vérifier sur le site de la DGI</button></div></div>
+        <div class="form-group"><label style="font-weight:normal;"><input type="checkbox" id="dafne-verif"> Vérifiée sur le site de la DGI : fournisseur, NCC de l'entreprise et montant TTC concordent avec la FNE</label></div>
       </div>
       <div class="form-group"><label>Note</label><input class="form-control" id="dafne-note"></div>
       <div style="font-size:11px;color:var(--blanc-dim);">Cette FNE justifie automatiquement la TVA de l'écriture de la dépense dans « Justif. TVA ».</div>
