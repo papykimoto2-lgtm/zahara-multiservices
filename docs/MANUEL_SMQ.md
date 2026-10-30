@@ -1,7 +1,7 @@
 # Manuel de procédures — Système de management de la qualité (SMQ)
 
-**Réf.** PRO-SMQ · **Version** 1.1 · **Date** Octobre 2026
-**Objet** : fixer comment l'entreprise tient son système qualité dans l'ERP : cartographie et fiches de processus, maîtrise des documents, audits internes, non-conformités et actions correctives, réclamations, satisfaction des clients.
+**Réf.** PRO-SMQ · **Version** 1.2 · **Date** Octobre 2026
+**Objet** : fixer comment l'entreprise tient son système qualité dans l'ERP : cartographie et fiches de processus, maîtrise des documents, audits internes, revue de direction, non-conformités et actions correctives, réclamations, satisfaction des clients.
 **Principe directeur** : tout écart est **enregistré, analysé, corrigé, puis vérifié** ; aucune clôture sans preuve d'efficacité.
 
 > Les noms de boutons sont ceux de **Paramètres › Qualité (SMQ)** et de **Paramètres › Manuels & flux › Cartographie des processus**. L'écriture est réservée aux rôles de niveau manager et administrateur ; les autres consultent.
@@ -61,6 +61,18 @@
 7. **Clore l'audit** : possible seulement lorsque toutes les non-conformités du rapport sont **clôturées** (SMQ-03).
 8. Suivre les indicateurs : audits réalisés dans l'année, processus couverts, audits en retard.
 
+### SMQ-07 — Tenir la revue de direction
+
+**Où** : Qualité (SMQ) › **Revue de direction**.
+
+1. **+ Revue** : date prévue obligatoire ; renseigner participants et période couverte.
+2. **🔄 Préremplir depuis l'ERP** : calcule les éléments d'entrée sur la période : décisions des revues précédentes, non-conformités (ouvertes, créées, clôturées, en retard, délai moyen), audits internes, satisfaction et réclamations, documents approuvés, pilotes désignés, indicateurs de performance et leur dernier relevé.
+3. Compléter les éléments que l'ERP ne connaît pas : évolution des enjeux, adéquation des ressources, performance des prestataires externes, efficacité des actions face aux risques, opportunités d'amélioration, conclusion.
+4. Enregistrer les **décisions et actions** (amélioration du SMQ, changement du SMQ, besoin en ressources, autre) avec responsable et échéance.
+5. **Revue tenue** : exige date de tenue, participants, conclusion, éléments d'entrée calculés et au moins une décision.
+6. Suivre les décisions jusqu'au statut « Réalisée » ; **Clore la revue** n'est possible que lorsqu'elles le sont toutes.
+7. **🖨️ Compte rendu** imprime les entrées, les conclusions et les décisions ; il reprend, à la revue suivante, l'état des décisions précédentes.
+
 ### SMQ-03 — Traiter une non-conformité
 
 **Où** : Qualité (SMQ) › **Non-conformités** › **+ Non-conformité**.
@@ -102,6 +114,7 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 | SMQ-02 | A | R | C | I |
 | SMQ-03 | A | C | R | R |
 | SMQ-06 | A | C | I | R |
+| SMQ-07 | R/A | C | C | I |
 | SMQ-04 | A | R | R | C |
 | SMQ-05 | I | R | I | R |
 
@@ -112,6 +125,7 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 - Laisser une suggestion non validée dans la fiche et la croire retenue.
 - Approuver un document sans date ni approbateur.
 - Faire auditer un processus par son propre pilote.
+- Tenir la revue sans décision ni suivi des actions décidées.
 - Clore un audit alors que ses non-conformités restent ouvertes.
 - Ne pas revoir les documents à leur échéance.
 
@@ -128,3 +142,4 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 |---|---|---|
 | 1.0 | Octobre 2026 | Création |
 | 1.1 | Octobre 2026 | Audits internes (SMQ-06) |
+| 1.2 | Octobre 2026 | Revue de direction (SMQ-07) |

@@ -90,7 +90,23 @@ exception
   when duplicate_object then null;
 end$$;
 
--- Vérification : doit renvoyer 5 lignes avec rls_active = true.
+create table if not exists public.pi_smq_revues (
+  id         text        primary key,
+  data       jsonb       not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+grant all on table public.pi_smq_revues to anon, authenticated;
+alter table public.pi_smq_revues enable row level security;
+drop policy if exists pi_smq_revues_all on public.pi_smq_revues;
+create policy pi_smq_revues_all on public.pi_smq_revues for all to anon, authenticated using (true) with check (true);
+do $$
+begin
+  alter publication supabase_realtime add table public.pi_smq_revues;
+exception
+  when duplicate_object then null;
+end$$;
+
+-- Vérification : doit renvoyer 6 lignes avec rls_active = true.
 select c.relname as table_name, c.relrowsecurity as rls_active
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
-where n.nspname = 'public' and c.relname in ('pi_smq_documents','pi_smq_nc','pi_smq_reclamations','pi_smq_satisfaction','pi_smq_audits');
+where n.nspname = 'public' and c.relname in ('pi_smq_documents','pi_smq_nc','pi_smq_reclamations','pi_smq_satisfaction','pi_smq_audits','pi_smq_revues');

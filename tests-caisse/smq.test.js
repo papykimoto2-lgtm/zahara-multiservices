@@ -108,7 +108,7 @@ test('audit interne : programme, indépendance, constats, NC liées et clôture 
   const app = await ouvrir(true);
   const r = await app.page.evaluate(async function () {
     var o = {}, nom = MANUELS_PROCESSUS.filter(function (p) { return p.id === 'encaissement'; })[0].nom;
-    smqOnglet('aud');
+    smqOnglet('aud'); smqNouveau('aud'); o.statutNouveau = _smqForm.rec.statut; smqAnnuler();
     await smqProposerProgramme(); o.prog = DATA.smq_audits.length; o.nbProc = MANUELS_PROCESSUS.length;
     await smqProposerProgramme(); o.apresDoublon = DATA.smq_audits.length;
     DATA.params = DATA.params || {}; DATA.params.smq_processus = { encaissement: { pilote: 'Awa Koné', indicateurs: [], documents: [] } };
@@ -126,9 +126,43 @@ test('audit interne : programme, indépendance, constats, NC liées et clôture 
     nc.statut = 'cloturee'; await smqTransition('aud', a.id, 'clos'); o.clos = a.statut;
     return o;
   });
+  assert.equal(r.statutNouveau, 'planifie');
   assert.equal(r.prog, r.nbProc); assert.equal(r.apresDoublon, r.nbProc);
   assert.equal(r.independance, 'planifie'); assert.equal(r.realise, 'realise');
   assert.equal(r.sansConclusion, 'realise'); assert.equal(r.rapport, 'rapport');
   assert.match(r.ncRef, /^NC-\d{4}-0001$/); assert.equal(r.nc, 'Audit interne|Majeure|ouverte'); assert.equal(r.unSeulNc, 1);
   assert.equal(r.closBloque, 'rapport'); assert.equal(r.clos, 'clos');
+});
+
+test('revue de direction : entrées calculées depuis l\'ERP, décisions, clôture conditionnée', async () => {
+  const app = await ouvrir(true);
+  const r = await app.page.evaluate(async function () {
+    var o = {}, an = new Date().getFullYear();
+    DATA.smq_nc = [{ id: 'n1', ref: 'NC-1', date: today(), statut: 'ouverte' }, { id: 'n2', ref: 'NC-2', date: today(), statut: 'cloturee', cloture_le: today() }];
+    DATA.smq_satisfaction = [{ id: 's1', date: today(), note: 5 }, { id: 's2', date: today(), note: 3 }];
+    DATA.smq_reclamations = [{ id: 'r1', date: today(), statut: 'traitee', date_reponse: today() }];
+    smqOnglet('rev'); smqNouveau('rev');
+    document.getElementById('smqf-date_prevue').value = today(); await smqEnregistrer();
+    var r = DATA.smq_revues[0]; o.ref = r.ref; o.an = an; o.statut0 = r.statut;
+    document.getElementById('smqf-date_tenue') || smqOuvrirFiche('rev', r.id);
+    document.getElementById('smqf-date_tenue').value = today(); document.getElementById('smqf-participants').value = 'DG, Qualité'; document.getElementById('smqf-conclusion').value = 'SMQ pertinent';
+    smqPreremplirEntrees();
+    var e = _smqForm.rec.entrees_auto; o.nc = e.nc.ouvertes + '/' + e.nc.cloturees; o.note = e.satisfaction.note_moyenne; o.rec = e.satisfaction.reclamations;
+    await smqEnregistrer();
+    r = DATA.smq_revues[0];
+    await smqTransition('rev', r.id, 'tenue'); o.sansDecision = r.statut;
+    smqOuvrirFiche('rev', r.id); smqAjouterDecision();
+    document.getElementById('smq-dc-desc-0').value = 'Renforcer le contrôle des reçus'; document.getElementById('smq-dc-resp-0').value = 'Comptable'; document.getElementById('smq-dc-ech-0').value = '2000-01-01';
+    await smqEnregistrer(); r = DATA.smq_revues[0]; o.nbDec = r.decisions.length;
+    await smqTransition('rev', r.id, 'tenue'); o.tenue = r.statut;
+    await smqTransition('rev', r.id, 'cloturee'); o.closBloque = r.statut;
+    r.decisions[0].statut = 'Réalisée'; await smqTransition('rev', r.id, 'cloturee'); o.clos = r.statut;
+    smqNouveau('rev'); document.getElementById('smqf-date_prevue').value = '2999-01-01'; document.getElementById('smqf-date_tenue').value = '2999-02-01';
+    var prec = _smqDecisionsPrecedentes({ id: 'x', date_prevue: '2999-01-01', date_tenue: '2999-02-01' }); o.prec = prec ? prec.ref : null;
+    return o;
+  });
+  assert.match(r.ref, /^RDD-\d{4}-0001$/); assert.equal(r.statut0, 'planifiee');
+  assert.equal(r.nc, '1/1'); assert.equal(r.note, 4); assert.equal(r.rec, 1);
+  assert.equal(r.sansDecision, 'planifiee'); assert.equal(r.nbDec, 1); assert.equal(r.tenue, 'tenue');
+  assert.equal(r.closBloque, 'tenue'); assert.equal(r.clos, 'cloturee'); assert.equal(r.prec, r.ref);
 });
