@@ -1,6 +1,6 @@
 # Manuel de procédures — Validations et délégations
 
-**Réf.** PRO-VAL · **Version** 1.0 · **Date** Octobre 2026
+**Réf.** PRO-VAL · **Version** 1.1 · **Date** Octobre 2026
 **Objet** : fixer qui valide quoi dans l'ERP, à quelles conditions, comment rejeter, et comment assurer la continuité quand le validateur est absent.
 **Principe directeur** : on ne valide **jamais sa propre demande**, et on ne valide **que dans la limite de son plafond** ; toute décision est tracée avec son auteur et sa date.
 
@@ -13,6 +13,7 @@
 | Zone de la page | Ce qui attend une décision | Droit requis |
 |---|---|---|
 | **1 · Chantier & achats** (circuit général) | Bon de commande, réception de travaux, libération de retenue de garantie, attestation de solde (souscripteur, valeur finale, cession foncière) | Rôle administrateur ou manager |
+| **1 · Étapes de dossier foncier** (même zone) | Étapes dont la fiche exige une validation par fonction (ex. identification de la procédure, contrat d’exclusivité, autorisation de lotir, clôture) ; bouton **📁 Dossier** pour ouvrir le dossier | Rôle de la fonction validatrice (Direction : admin, manager, dg, direction ; Service foncier : service_foncier) ou administrateur |
 | **2 · Mouvements de caisse** | Entrées et sorties de caisse | Droit de validation sur Caisse, plafond suffisant |
 | **2 · Engagements de dépense** | Fiches d'engagement (FED) soumises | Droit de validation sur Budget, plafond suffisant |
 | **2 · Transferts budgétaires** | Transferts entre lignes | Droit de validation sur Budget, plafond suffisant |
