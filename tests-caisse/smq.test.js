@@ -103,3 +103,32 @@ test('la satisfaction calcule la note moyenne et la lecture seule bloque l\'écr
   });
   assert.equal(r.nb, 3); assert.ok(r.moy); assert.ok(r.satisfaits); assert.equal(r.lectureSeule, 3);
 });
+
+test('audit interne : programme, indépendance, constats, NC liées et clôture conditionnée', async () => {
+  const app = await ouvrir(true);
+  const r = await app.page.evaluate(async function () {
+    var o = {}, nom = MANUELS_PROCESSUS.filter(function (p) { return p.id === 'encaissement'; })[0].nom;
+    smqOnglet('aud');
+    await smqProposerProgramme(); o.prog = DATA.smq_audits.length; o.nbProc = MANUELS_PROCESSUS.length;
+    await smqProposerProgramme(); o.apresDoublon = DATA.smq_audits.length;
+    DATA.params = DATA.params || {}; DATA.params.smq_processus = { encaissement: { pilote: 'Awa Koné', indicateurs: [], documents: [] } };
+    var a = DATA.smq_audits.filter(function (x) { return x.processus === nom; })[0];
+    a.auditeur = 'Awa Koné'; a.date_realisation = today();
+    await smqTransition('aud', a.id, 'realise'); o.independance = a.statut;
+    a.auditeur = 'Yao Traoré'; await smqTransition('aud', a.id, 'realise'); o.realise = a.statut;
+    a.constats = [{ type: 'Non-conformité majeure', description: 'Reçus non remis', nc_ref: '' }, { type: 'Observation', description: 'Classement à améliorer', nc_ref: '' }];
+    await smqTransition('aud', a.id, 'rapport'); o.sansConclusion = a.statut;
+    a.conclusion = 'Système globalement conforme'; await smqTransition('aud', a.id, 'rapport'); o.rapport = a.statut;
+    smqOuvrirFiche('aud', a.id);
+    await smqCreerNCConstat(0); o.ncRef = a.constats[0].nc_ref; var nc = DATA.smq_nc[0]; o.nc = nc.source + '|' + nc.gravite + '|' + nc.statut;
+    await smqCreerNCConstat(0); o.unSeulNc = DATA.smq_nc.length;
+    await smqTransition('aud', a.id, 'clos'); o.closBloque = a.statut;
+    nc.statut = 'cloturee'; await smqTransition('aud', a.id, 'clos'); o.clos = a.statut;
+    return o;
+  });
+  assert.equal(r.prog, r.nbProc); assert.equal(r.apresDoublon, r.nbProc);
+  assert.equal(r.independance, 'planifie'); assert.equal(r.realise, 'realise');
+  assert.equal(r.sansConclusion, 'realise'); assert.equal(r.rapport, 'rapport');
+  assert.match(r.ncRef, /^NC-\d{4}-0001$/); assert.equal(r.nc, 'Audit interne|Majeure|ouverte'); assert.equal(r.unSeulNc, 1);
+  assert.equal(r.closBloque, 'rapport'); assert.equal(r.clos, 'clos');
+});

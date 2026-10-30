@@ -1,7 +1,7 @@
 # Manuel de procédures — Système de management de la qualité (SMQ)
 
-**Réf.** PRO-SMQ · **Version** 1.0 · **Date** Octobre 2026
-**Objet** : fixer comment l'entreprise tient son système qualité dans l'ERP : cartographie et fiches de processus, maîtrise des documents, non-conformités et actions correctives, réclamations, satisfaction des clients.
+**Réf.** PRO-SMQ · **Version** 1.1 · **Date** Octobre 2026
+**Objet** : fixer comment l'entreprise tient son système qualité dans l'ERP : cartographie et fiches de processus, maîtrise des documents, audits internes, non-conformités et actions correctives, réclamations, satisfaction des clients.
 **Principe directeur** : tout écart est **enregistré, analysé, corrigé, puis vérifié** ; aucune clôture sans preuve d'efficacité.
 
 > Les noms de boutons sont ceux de **Paramètres › Qualité (SMQ)** et de **Paramètres › Manuels & flux › Cartographie des processus**. L'écriture est réservée aux rôles de niveau manager et administrateur ; les autres consultent.
@@ -48,6 +48,19 @@
 4. À chaque nouvelle version, indiquer le **motif** ; la version précédente est archivée dans l'historique.
 5. Contrôler chaque mois les documents **dont la revue est dépassée**.
 
+### SMQ-06 — Conduire un audit interne
+
+**Où** : Qualité (SMQ) › **Audits internes**.
+
+1. **💡 Proposer le programme annuel** crée un audit par processus non encore audité dans l'année ; fixer ensuite la date prévue et l'auditeur de chacun.
+2. **Indépendance** : l'auditeur ne peut pas être le pilote du processus audité ; l'ERP refuse l'enregistrement ou le passage à « Réalisé » dans ce cas.
+3. **Audit réalisé** : date de réalisation et auditeur obligatoires.
+4. Saisir les **constats** : non-conformité majeure, non-conformité mineure, observation, point sensible.
+5. **Émettre le rapport** : conclusion obligatoire.
+6. Pour chaque non-conformité du rapport, **⚠️ Créer la NC** : elle est préremplie (source « Audit interne ») et liée au constat.
+7. **Clore l'audit** : possible seulement lorsque toutes les non-conformités du rapport sont **clôturées** (SMQ-03).
+8. Suivre les indicateurs : audits réalisés dans l'année, processus couverts, audits en retard.
+
 ### SMQ-03 — Traiter une non-conformité
 
 **Où** : Qualité (SMQ) › **Non-conformités** › **+ Non-conformité**.
@@ -88,6 +101,7 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 | SMQ-01 | A | R | I | C |
 | SMQ-02 | A | R | C | I |
 | SMQ-03 | A | C | R | R |
+| SMQ-06 | A | C | I | R |
 | SMQ-04 | A | R | R | C |
 | SMQ-05 | I | R | I | R |
 
@@ -97,6 +111,8 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 - Traiter l'effet sans chercher la cause racine.
 - Laisser une suggestion non validée dans la fiche et la croire retenue.
 - Approuver un document sans date ni approbateur.
+- Faire auditer un processus par son propre pilote.
+- Clore un audit alors que ses non-conformités restent ouvertes.
 - Ne pas revoir les documents à leur échéance.
 
 ## 7. Liste de contrôle
@@ -111,3 +127,4 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 | Version | Date | Objet |
 |---|---|---|
 | 1.0 | Octobre 2026 | Création |
+| 1.1 | Octobre 2026 | Audits internes (SMQ-06) |
