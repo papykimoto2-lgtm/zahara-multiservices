@@ -83074,8 +83074,9 @@ function _paJours(dateStr) { var d = new Date(String(dateStr || '').slice(0, 10)
 function paDernierReleveKm(v) {
   var L = [], add = function(k, date){ k = parseFloat(k); if (k > 0 && k <= PA_KM_MAX) L.push({ km: k, date: String(date || '').slice(0, 10) }); };
   (DATA.vehicule_courses || []).forEach(function(c){ if (c.vehicule_id === v.id) { add(c.km_depart, c.date); add(c.km_retour, c.date); } });
-  (DATA.vehicule_carburant || []).forEach(function(c){ if (c.vehicule_id === v.id) add(c.km, c.date); });
-  (DATA.vehicule_entretiens || []).forEach(function(e){ if (e.vehicule_id === v.id) add(e.km, e.date); });
+  /* Les pleins et entretiens stockent le relevé dans « km_compteur » (« km » en repli pour d'anciennes fiches) */
+  (DATA.vehicule_carburant || []).forEach(function(c){ if (c.vehicule_id === v.id) add(c.km_compteur != null ? c.km_compteur : c.km, c.date); });
+  (DATA.vehicule_entretiens || []).forEach(function(e){ if (e.vehicule_id === v.id) add(e.km_compteur != null ? e.km_compteur : e.km, e.date); });
   L.sort(function(a, b){ return b.date.localeCompare(a.date) || b.km - a.km; });
   return L[0] || null;
 }
