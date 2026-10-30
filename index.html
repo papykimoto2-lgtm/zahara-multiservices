@@ -8598,7 +8598,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
                 </select>
               </div>
               <div class="form-group" style="display:flex;align-items:center;gap:10px;">
-                <input type="checkbox" id="param-treso-double-validation" style="width:auto;"><label for="param-treso-double-validation" style="margin:0;">Double validation obligatoire pour toute sortie de fonds</label>
+                <input type="checkbox" id="param-treso-double-validation" style="width:auto;"><label for="param-treso-double-validation" style="margin:0;">Double validation obligatoire pour toute sortie de fonds <span style="color:var(--or);font-weight:400;">(pas encore appliquée : les validations existantes du module Caisse restent en vigueur)</span></label>
               </div>
             </div>
           </div>
@@ -26116,6 +26116,12 @@ function iaaCalculerAlertes() {
     var nbOrangeVeh = alertesVehicules.filter(function(a){ return a.niveau==='orange'; }).length;
     if (nbOrangeVeh) alertes.push({ niveau: 'orange', texte: nbOrangeVeh + " échéance(s) véhicule sous 30j" });
   }
+  /* Trésorerie — plafonds, soldes, rapprochement bancaire, mouvements non ventilés */
+  if (typeof tresoAlertes === 'function') {
+    var alT = tresoAlertes(), nT1 = alT.filter(function(a){ return a.niveau==='rouge'; }).length, nT2 = alT.filter(function(a){ return a.niveau==='orange'; }).length;
+    if (nT1) alertes.push({ niveau: 'rouge', texte: nT1 + " alerte(s) de trésorerie critique(s) (solde négatif, découvert)" });
+    if (nT2) alertes.push({ niveau: 'orange', texte: nT2 + " alerte(s) de trésorerie (plafond de caisse, solde bas, rapprochement, mouvements à ventiler)" });
+  }
   /* Suivi budgétaire caisse — dépassements et seuils atteints */
   if (typeof caisseBudgetAlertesGlobales === 'function') {
     var alertesBudget = caisseBudgetAlertesGlobales();
@@ -37321,6 +37327,8 @@ async function savePaiement() {
   if (!_typeV) { toast('Choisissez le type de versement (apport, mensualité, frais de souscription…).', 'error'); return; }
   var _alerteFrais = vrsTypeSuspect(cid, _typeV, montant);
   if (_alerteFrais && !confirm(_alerteFrais)) return;
+  var _pEsp = tresoControleEspeces(document.getElementById('v-mode').value, montant, 'entree');
+  if (_pEsp && !confirm(_pEsp)) return;
   var _manque = _vrsComptesManquants(document.getElementById('v-mode').value, document.getElementById('v-type').value);
   if (_manque.length) {
     toast('⛔ Versement NON enregistré : paramétrage comptable manquant — ' + _manque.join(' ; ') + '. Aucune donnée n\'a été enregistrée : corrigez puis revalidez.', 'error', 12000);
@@ -50768,6 +50776,96 @@ function printBilan() { etatBilan(); }
 
 function printResultat() { etatCompteResultat(); }
 
+/* ══ Trésorerie : position par compte, contrôles paramétrés, arriéré des mouvements de caisse non ventilés ══
+   La position vient de la COMPTABILITÉ (comptes de classe 5, écritures datées d'aujourd'hui au plus) ; les paramètres de Paramètres → Trésorerie s'appliquent ici :
+   plafond de caisse, seuil de solde bas, délai de rapprochement bancaire (alertes) et plafond de paiement en espèces (confirmation à la saisie). */
+function tresoParams() {
+  var p = DATA.params || {}, n = function(v, d){ var x = parseFloat(v); return isNaN(x) ? d : x; };
+  return { plafondCaisse: n(p.treso_plafond_caisse, 2000000), plafondEspeces: n(p.treso_plafond_especes, 5000000), seuilSolde: n(p.treso_seuil_alerte_solde, 500000), delaiRapprochement: parseInt(p.treso_delai_rapprochement, 10) || 5 };
+}
+function _tresoGenre(code) {
+  if (code.indexOf('57') === 0) return 'caisse';
+  if (code.indexOf('52') === 0 || code.indexOf('51') === 0 || code.indexOf('55') === 0 || code.indexOf('53') === 0) return 'banque';
+  if (code.indexOf('56') === 0) return 'credit';
+  if (code.indexOf('58') === 0) return 'virement';
+  return 'autre';
+}
+function tresoPosition() {
+  var S = {}, lim = today();
+  (DATA.ecritures || []).forEach(function(e){
+    var d = String(e.date || '').slice(0, 10); if (!d || d > lim) return;
+    ecrLignes(e).forEach(function(l){
+      var c = String(l.compte || ''); if (c.charAt(0) !== '5') return;
+      var o = S[c] = S[c] || { code: c, debit: 0, credit: 0, n: 0, dernier: '', premier: '' }, m = parseFloat(l.montant) || 0;
+      if (l.sens === 'D') o.debit += m; else o.credit += m; o.n++; if (d > o.dernier) o.dernier = d; if (!o.premier || d < o.premier) o.premier = d;
+    });
+  });
+  var pl = tresoParams(), plan = {}; (APP.planComptable || []).forEach(function(c){ if (c && c.code) plan[c.code] = c.label || ''; });
+  var rows = Object.keys(S).sort().map(function(c){
+    var o = S[c], solde = o.debit - o.credit, g = _tresoGenre(c), al = [];
+    if (g === 'caisse') { if (solde < -0.5) al.push({ niveau: 'rouge', t: 'solde négatif' }); else if (pl.plafondCaisse > 0 && solde > pl.plafondCaisse) al.push({ niveau: 'orange', t: 'au-dessus du plafond de caisse (' + fmtF(pl.plafondCaisse) + ') : à déposer en banque' }); }
+    if (g === 'banque') { if (solde < -0.5) al.push({ niveau: 'rouge', t: 'découvert' }); else if (pl.seuilSolde > 0 && solde < pl.seuilSolde) al.push({ niveau: 'orange', t: 'solde bas (seuil ' + fmtF(pl.seuilSolde) + ')' }); }
+    if (g === 'virement' && Math.abs(solde) > 0.5) al.push({ niveau: 'orange', t: 'virements de fonds non soldés : partie banque ou caisse à saisir' });
+    return { code: c, label: plan[c] || '', genre: g, solde: solde, n: o.n, dernier: o.dernier, premier: o.premier, alertes: al };
+  });
+  var tot = function(g){ return rows.filter(function(r){ return r.genre === g; }).reduce(function(a, r){ return a + r.solde; }, 0); };
+  return { rows: rows, caisses: tot('caisse'), banques: tot('banque'), credits: tot('credit'), virements: tot('virement') };
+}
+function tresoControleEspeces(mode, montant, type) {
+  var pl = tresoParams();
+  if (mode !== 'especes' || !(pl.plafondEspeces > 0) || !(montant > pl.plafondEspeces)) return '';
+  return '⚠️ Paiement en espèces de ' + fmtF(montant) + ' FCFA : supérieur au plafond de ' + fmtF(pl.plafondEspeces) + ' FCFA (Paramètres → Trésorerie, réglementation sur les paiements en espèces).\n\nPrivilégiez un virement ou un chèque. Continuer en espèces ?';
+}
+function tresoRapprochementsEnRetard() {
+  var pl = tresoParams(), now = new Date(today() + 'T12:00:00'), ref = new Date(now.getFullYear(), now.getMonth() - (now.getDate() > pl.delaiRapprochement ? 1 : 2), 1), mois = ref.getFullYear() + '-' + String(ref.getMonth() + 1).padStart(2, '0'), out = [];
+  var pos = tresoPosition(), sansReleve = !(DATA.releves_bank || []).length;
+  pos.rows.filter(function(r){ return r.genre === 'banque' && r.premier && r.premier.slice(0, 7) <= mois && r.n > 0; }).forEach(function(r){
+    var fait = (DATA.rapprochements || []).some(function(x){ return (x.banque === r.code || !x.banque) && String(x.periode || '') >= mois; });
+    if (!fait) out.push({ code: r.code, mois: mois, sansReleve: sansReleve });
+  });
+  return out;
+}
+function tresoNonVentiles() {
+  var caisses = {}; (DATA.caisses || []).forEach(function(c){ caisses[c.id] = c.nom || c.id; });
+  var L = (DATA.caisse_mouvements || []).filter(function(m){ return m.statut === 'a_ventiler'; }), t0 = new Date(today() + 'T12:00:00').getTime(), par = {};
+  L.forEach(function(m){
+    var k = caisses[m.caisse_id] || '—', o = par[k] = par[k] || { nom: k, n: 0, entrees: 0, sorties: 0, b: [0, 0, 0, 0] }, mt = parseFloat(m.montant) || 0, age = Math.max(0, Math.round((t0 - new Date(String(m.date || today()).slice(0, 10) + 'T12:00:00').getTime()) / 86400000));
+    o.n++; if (m.type === 'entree') o.entrees += mt; else o.sorties += mt; o.b[age < 30 ? 0 : age < 90 ? 1 : age < 180 ? 2 : 3] += mt;
+  });
+  var anciens = L.filter(function(m){ return new Date(String(m.date || today()).slice(0, 10) + 'T12:00:00').getTime() < t0 - 30 * 86400000; });
+  return { n: L.length, total: L.reduce(function(a, m){ return a + (parseFloat(m.montant) || 0); }, 0), caisses: Object.keys(par).map(function(k){ return par[k]; }).sort(function(a, b){ return b.n - a.n; }), anciens: anciens.length, montantAnciens: anciens.reduce(function(a, m){ return a + (parseFloat(m.montant) || 0); }, 0),
+    plusAnciens: L.slice().sort(function(a, b){ return String(a.date || '').localeCompare(String(b.date || '')); }).slice(0, 8).map(function(m){ return { date: String(m.date || '').slice(0, 10), caisse: caisses[m.caisse_id] || '—', type: m.type, montant: parseFloat(m.montant) || 0, motif: m.motif || '' }; }) };
+}
+/* Alertes de trésorerie (centre d'alertes) */
+function tresoAlertes() {
+  var out = [], pos = tresoPosition();
+  pos.rows.forEach(function(r){ r.alertes.forEach(function(a){ out.push({ niveau: a.niveau, texte: 'Compte ' + r.code + (r.label ? ' (' + r.label + ')' : '') + ' : ' + a.t }); }); });
+  tresoRapprochementsEnRetard().forEach(function(x){ out.push({ niveau: 'orange', texte: 'Rapprochement bancaire de ' + x.mois + ' non fait pour le compte ' + x.code + (x.sansReleve ? ' (aucun relevé importé)' : '') }); });
+  var nv = tresoNonVentiles(); if (nv.anciens) out.push({ niveau: 'orange', texte: nv.anciens + ' mouvement(s) de caisse à ventiler depuis plus de 30 jours (' + fmtF(nv.montantAnciens) + ' FCFA)' });
+  return out;
+}
+function tresoPanneauHtml() {
+  var E = escHtml, f = function(v){ return fmtF(Math.round(v || 0)); }, pos = tresoPosition(), pl = tresoParams(), nv = tresoNonVentiles(), al = tresoAlertes();
+  var genreLib = { caisse: 'Caisse', banque: 'Banque', credit: 'Crédit de trésorerie', virement: 'Virements de fonds', autre: 'Autre' };
+  var h = '<div class="card" style="margin-bottom:16px;"><div class="card-title" style="margin-bottom:6px;">🏦 Position de trésorerie (d\'après la comptabilité, au ' + dateShort(today()) + ')</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px;"><div class="kpi-card"><div class="kpi-label">Caisses et mobile money</div><div class="kpi-value" style="font-size:16px;">' + f(pos.caisses) + ' F</div></div>'
+    + '<div class="kpi-card"><div class="kpi-label">Banques</div><div class="kpi-value" style="font-size:16px;">' + f(pos.banques) + ' F</div></div>'
+    + '<div class="kpi-card"><div class="kpi-label">Virements de fonds non soldés</div><div class="kpi-value" style="font-size:16px;color:' + (Math.abs(pos.virements) > 0.5 ? 'var(--or)' : 'var(--vert)') + ';">' + f(pos.virements) + ' F</div></div>'
+    + '<div class="kpi-card"><div class="kpi-label">Alertes</div><div class="kpi-value" style="font-size:16px;color:' + (al.length ? 'var(--rouge)' : 'var(--vert)') + ';">' + al.length + '</div></div></div>'
+    + '<div class="table-wrap" style="max-height:320px;overflow:auto;"><table><thead><tr><th>Compte</th><th>Type</th><th style="text-align:right;">Solde</th><th>Dernier mouvement</th><th>Contrôle</th></tr></thead><tbody>'
+    + (pos.rows.length ? pos.rows.map(function(r){ return '<tr><td><strong>' + E(r.code) + '</strong><div style="font-size:11px;color:var(--blanc-dim);">' + E(r.label) + '</div></td><td style="font-size:12px;">' + genreLib[r.genre] + '</td><td style="text-align:right;font-weight:600;color:' + (r.solde < -0.5 && r.genre !== 'credit' ? 'var(--rouge)' : 'inherit') + ';">' + f(r.solde) + '</td><td style="font-size:12px;">' + (r.dernier ? dateShort(r.dernier) : '—') + '</td>'
+        + '<td style="font-size:11px;">' + (r.alertes.length ? r.alertes.map(function(a){ return '<span style="color:' + (a.niveau === 'rouge' ? 'var(--rouge)' : 'var(--or)') + ';">' + (a.niveau === 'rouge' ? '⛔ ' : '⚠️ ') + E(a.t) + '</span>'; }).join('<br>') : '<span style="color:var(--vert);">✓</span>') + '</td></tr>'; }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--blanc-dim);padding:14px;">Aucune écriture de trésorerie.</td></tr>')
+    + '</tbody></table></div>'
+    + '<div style="font-size:11px;color:var(--blanc-dim);margin-top:6px;">Contrôles appliqués : plafond de caisse ' + f(pl.plafondCaisse) + ' F · solde bancaire bas ' + f(pl.seuilSolde) + ' F · rapprochement bancaire sous ' + pl.delaiRapprochement + ' j après la fin du mois · paiement en espèces limité à ' + f(pl.plafondEspeces) + ' F par opération (confirmation à la saisie).</div>'
+    + (al.filter(function(a){ return /Rapprochement/.test(a.texte); }).length ? '<div style="font-size:12px;margin-top:6px;color:var(--or);">' + al.filter(function(a){ return /Rapprochement/.test(a.texte); }).map(function(a){ return '⚠️ ' + E(a.texte); }).join('<br>') + '</div>' : '') + '</div>';
+  h += '<div class="card" style="margin-bottom:16px;"><div class="card-title" style="margin-bottom:6px;">🧾 Mouvements de caisse à ventiler — ' + nv.n + ' (' + f(nv.total) + ' FCFA)</div>'
+    + (nv.n ? '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">Tant qu\'un mouvement n\'est pas ventilé, il manque au compte de résultat et fausse les soldes par compte. ' + nv.anciens + ' ont plus de 30 jours (' + f(nv.montantAnciens) + ' F). <button class="btn btn-secondary btn-sm" onclick="goTo(\'caisse\');setTimeout(function(){switchTab(\'caisse\',\'ventilation\');},300)">Ouvrir la ventilation</button></div>'
+      + '<div class="table-wrap"><table><thead><tr><th>Caisse</th><th style="text-align:right;">Mouvements</th><th style="text-align:right;">Entrées</th><th style="text-align:right;">Sorties</th><th style="text-align:right;">&lt; 30 j</th><th style="text-align:right;">30–90 j</th><th style="text-align:right;">90–180 j</th><th style="text-align:right;">&gt; 180 j</th></tr></thead><tbody>'
+      + nv.caisses.map(function(c){ return '<tr><td>' + E(c.nom) + '</td><td style="text-align:right;">' + c.n + '</td><td style="text-align:right;">' + f(c.entrees) + '</td><td style="text-align:right;">' + f(c.sorties) + '</td>' + c.b.map(function(x, i){ return '<td style="text-align:right;' + (i === 3 && x ? 'color:var(--rouge);font-weight:600;' : '') + '">' + f(x) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>'
+      + '<div style="font-size:12px;margin-top:8px;"><strong>Les plus anciens :</strong> ' + nv.plusAnciens.map(function(m){ return dateShort(m.date) + ' ' + E(m.caisse) + ' (' + (m.type === 'entree' ? '+' : '−') + f(m.montant) + ' F, ' + E(String(m.motif).slice(0, 40)) + ')'; }).join(' · ') + '</div>'
+      : '<div style="color:var(--vert);font-size:12px;">✅ Tous les mouvements de caisse sont ventilés.</div>') + '</div>';
+  return h;
+}
 function buildTresorerie() {
   var year = document.getElementById('filter-annee-compta').value || new Date().getFullYear();
   var divFTreso = (typeof _comptaDivisionFilter === 'function') ? _comptaDivisionFilter() : '';
@@ -50812,7 +50910,7 @@ function buildTresorerie() {
       + '<td style="color:' + (m.solde >= 0 ? 'var(--vert)' : 'var(--rouge)') + ';font-weight:bold;">' + (m.solde >= 0 ? '+' : '') + fcfa(m.solde) + '</td></tr>';
   });
   html += '</tbody></table></div></div>';
-  document.getElementById('tresorerie-box').innerHTML = html;
+  document.getElementById('tresorerie-box').innerHTML = tresoPanneauHtml() + html;
 }
 
 async function deleteEcriture(id) {
@@ -140889,6 +140987,7 @@ async function caisseSaveBon() {
   if (CAISSE_UI._remise && !editId && !piece) { toast('⚠️ Une remise exige la pièce : ' + (CAISSE_UI._remise === 'banque' ? 'n° du bordereau de versement' : 'n° du reçu signé par la direction') + '.', 'error', 7000); return; }
 
   var c = (DATA.caisses || []).find(function(x){ return x.id === caisseId; });
+  if (!CAISSE_UI._remise) { var _pEsp2 = tresoControleEspeces((c && String(c.compte || '').indexOf('572') === 0) ? 'mobile_money' : 'especes', montant, type); if (_pEsp2 && !confirm(_pEsp2)) return; }
 
   /* ── MODE ÉDITION ─────────────────────────────────────────────────────── */
   if (editId) {
