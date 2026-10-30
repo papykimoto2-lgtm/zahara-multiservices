@@ -4268,6 +4268,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <button class="btn btn-secondary btn-sm" style="background:linear-gradient(135deg,#7C3AED,#4A94E0);border:none;color:#fff;" onclick="openAuditIACompta()">🤖 Audit IA</button>
           <button class="btn btn-secondary btn-sm" onclick="ouvrirVisaEcritures()" title="Circuit de validation : passer les écritures du brouillard au statut validé (intangible)">🖊️ Validation / Visa</button>
           <span class="tb-sep"></span>
+          <button class="btn btn-secondary" onclick="ecrCtlOuvrir()" title="Dates anormales, doublons, extournes de commissions, comptes de TVA par défaut">🔎 Contrôles</button>
           <button class="btn btn-primary" onclick="openEcritureModal()">+ Écriture</button>
         </div>
 
@@ -36185,6 +36186,7 @@ async function annulerCommission(id) {
     };
     DATA.ecritures.push(ext);
     await dbPut('ecritures', ext);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', ext);
     comm.ecriture_extourne_id  = ext.id;
     comm.ecriture_extourne_ref = ref;
     if (typeof filterEcritures === 'function') filterEcritures();
@@ -44959,6 +44961,15 @@ function _tvaMvt(mois, prefixe, sens) {
   });
   return tot;
 }
+/* Mouvement d'un compte exact (sans ses sous-comptes) : le regroupement 443 recouvre 4431… */
+function _tvaMvtExact(mois, compte, sens) {
+  var tot = 0;
+  (DATA.ecritures || []).forEach(function(e){
+    if (!e.date || e.date.slice(0, 7) !== mois || e.source === 'liquidation_tva') return;
+    ecrLignes(e).forEach(function(l){ if (String(l.compte || '') !== compte) return; var m = parseFloat(l.montant) || 0; tot += (l.sens === sens) ? m : -m; });
+  });
+  return tot;
+}
 function _tvaCreditAnterieur(mois) {
   var cfg = _tvaCfg();
   var prec = cfg.declarations.filter(function(d){ return d.mois < mois; })
@@ -44973,6 +44984,7 @@ function calculerTVA(mois) {
   /* Le préfixe 4431 englobe 44311-44313 : on retire le global s'il fait doublon */
   var aDetail = col.some(function(x){ return x.code.length > 4; });
   if (aDetail) col = col.filter(function(x){ return x.code !== '4431'; });
+  var m443 = _tvaMvtExact(mois, '443', 'C'); if (Math.round(m443)) col.push({ code: '443', label: 'TVA facturée (compte de regroupement 443)', mt: m443 });
   var ded = TVA_DEDUCTIBLE.map(function(x){ return { code: x[0], label: x[1], mt: _tvaMvt(mois, x[0], 'D') }; })
     .filter(function(x){ return Math.round(x.mt) !== 0; });
 
@@ -45331,6 +45343,194 @@ function tvaJExporter(quoi) {
   a.href = URL.createObjectURL(blob); a.download = 'justification_tva_' + (quoi || 'pieces') + '_' + today() + '.csv'; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 
+/* ══ Contrôles des écritures : dates, doublons, extournes de commissions, comptes de TVA par défaut ══
+   Lecture seule par défaut : chaque correction se fait ligne par ligne, avec confirmation, hors exercice clos et hors pièce visée. */
+var _ecrCtl = { onglet: 'dates', sel: {} };
+function ecrCtlOuvrir(onglet) { _ecrCtl.onglet = onglet || 'dates'; _ecrCtl.sel = {}; openModal('modal-ecr-ctl'); ecrCtlRender(); }
+function ecrCtlOnglet(o) { _ecrCtl.onglet = o; ecrCtlRender(); }
+function ecrDateNorm(d) { var m = String(d == null ? '' : d).trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; }
+function ecrDateProbleme(e) {
+  var raw = e && e.date;
+  if (raw == null || String(raw).trim() === '') return { code: 'absente', lib: 'Date absente', corrigeable: true };
+  var n = ecrDateNorm(raw); if (!n) return { code: 'format', lib: 'Format illisible : « ' + raw + ' »', corrigeable: true };
+  var y = +n.slice(0, 4), m = +n.slice(5, 7), d = +n.slice(8, 10);
+  if (m < 1 || m > 12 || d < 1 || d > new Date(y, m, 0).getDate()) return { code: 'invalide', lib: 'Date impossible : ' + n, corrigeable: true };
+  if (y < 2000 || y > new Date().getFullYear() + 1) return { code: 'hors_plage', lib: 'Année improbable : ' + y, corrigeable: true };
+  if (String(raw).length !== 10) return { code: 'horodatage', lib: 'Date avec heure (' + raw + ')', normalisable: n };
+  if (n > today()) {
+    if (/amort|dotation|provision|constat|cca/i.test((e.libelle || '') + ' ' + (e.id || ''))) return { code: 'prevue', lib: 'Datée du futur (dotation ou écriture prévue)', info: true };
+    return { code: 'future', lib: 'Datée du futur (' + n + ')', corrigeable: true };
+  }
+  return null;
+}
+function ecrCtlDates() { var L = []; (DATA.ecritures || []).forEach(function(e){ var p = ecrDateProbleme(e); if (p) L.push({ e: e, p: p }); }); return L.sort(function(a, b){ return String(a.e.date || '').localeCompare(String(b.e.date || '')); }); }
+function _ecrMontant(e) { return ecrLignes(e).filter(function(l){ return l.sens === 'D'; }).reduce(function(a, l){ return a + (parseFloat(l.montant) || 0); }, 0); }
+function _ecrModifiable(e, nouvelleDate) {
+  if (typeof exerciceEstClos === 'function' && ((ecrDateNorm(e.date) && exerciceEstClos(ecrDateNorm(e.date))) || (nouvelleDate && exerciceEstClos(nouvelleDate)))) { toast('🔒 Exercice clos : date de cette écriture non modifiable.', 'error'); return false; }
+  if (typeof ecrVerrouVisa === 'function' && ecrVerrouVisa(e, 'modification')) return false;
+  return true;
+}
+async function ecrDateCorriger(id) {
+  var e = (DATA.ecritures || []).filter(function(x){ return x.id === id; })[0], v = (document.getElementById('ecrctl-d-' + id) || {}).value || ''; if (!e) return;
+  if (!exigerDroit('Comptabilite', 'm', 'la correction d\'une date d\'écriture')) return;
+  var y = +v.slice(0, 4); if (!v || y < 2000 || y > new Date().getFullYear() + 1) { toast('Saisissez une date valide (année entre 2000 et ' + (new Date().getFullYear() + 1) + ').', 'error'); return; }
+  if (!_ecrModifiable(e, v)) return;
+  if (!confirm('Changer la date de l\'écriture « ' + (e.libelle || e.piece || id) + ' » de ' + (e.date || '—') + ' à ' + v + ' ?')) return;
+  e.date = v; e._modifie = new Date().toISOString(); await dbPut('ecritures', e); if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', e);
+  if (typeof buildBalance === 'function') buildBalance(); toast('Date corrigée.', 'success'); ecrCtlRender();
+}
+async function ecrDatesNormaliser() {
+  var L = ecrCtlDates().filter(function(x){ return x.p.code === 'horodatage'; }); if (!L.length) return;
+  if (!exigerDroit('Comptabilite', 'm', 'la normalisation des dates')) return;
+  if (!confirm('Normaliser ' + L.length + ' date(s) « avec heure » au format AAAA-MM-JJ (le jour est conservé) ?')) return;
+  var ok = 0, clos = 0;
+  for (var i = 0; i < L.length; i++) { var e = L[i].e; if (typeof exerciceEstClos === 'function' && exerciceEstClos(L[i].p.normalisable)) { clos++; continue; } e.date = L[i].p.normalisable; e._modifie = new Date().toISOString(); await dbPut('ecritures', e); if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', e); ok++; }
+  toast(ok + ' date(s) normalisée(s)' + (clos ? ' · ' + clos + ' ignorée(s) (exercice clos)' : '') + '.', clos ? 'warn' : 'success'); ecrCtlRender();
+}
+/* Contrôle à la saisie manuelle : retourne un message d'erreur bloquant, une confirmation à demander, ou ''. */
+function ecrDateSaisie(date) {
+  var p = ecrDateProbleme({ date: date, libelle: '' });
+  if (!p) return { erreur: '', confirmer: '' };
+  if (p.corrigeable && p.code !== 'future') return { erreur: p.lib + '. Saisissez une date valide.', confirmer: '' };
+  if (p.code === 'future') return { erreur: '', confirmer: 'La date ' + date + ' est dans le futur. Enregistrer quand même (écriture prévisionnelle) ?' };
+  return { erreur: '', confirmer: '' };
+}
+
+/* ── Doublons ── */
+function _ecrRefs() {
+  var s = {};
+  Object.keys(DATA).forEach(function(k){ var a = DATA[k]; if (Array.isArray(a) && k !== 'ecritures') a.forEach(function(x){ if (x && typeof x === 'object') { if (x.ecriture_id) s[x.ecriture_id] = (s[x.ecriture_id] || 0) + 1; if (x.ecriture_extourne_id) s[x.ecriture_extourne_id] = (s[x.ecriture_extourne_id] || 0) + 1; } }); });
+  return s;
+}
+function _ecrSignature(e) {
+  return JSON.stringify([ecrDateNorm(e.date), e.piece || e.ref || '', e.libelle || '', e.source || '', ecrLignes(e).map(function(l){ return [l.compte, l.sens, Math.round((parseFloat(l.montant) || 0) * 100) / 100, l.tiers_id || '']; }).sort()]);
+}
+/* Doublons réels : on écarte les extournes et les écritures de commissions annulées dont l'extourne existe (original + extourne = neutre). */
+function ecrCtlDoublons() {
+  var comms = {}; (DATA.commissions || []).forEach(function(c){ comms[c.id] = c; });
+  var refs = _ecrRefs(), G = {};
+  (DATA.ecritures || []).forEach(function(e){
+    if (e.source === 'extourne_commission' || e.source === 'liquidation_tva') return;
+    var c = e.commission_id ? comms[e.commission_id] : null; if (c && c.statut === 'annulee' && c.ecriture_extourne_id) return;
+    (G[_ecrSignature(e)] = G[_ecrSignature(e)] || []).push(e);
+  });
+  var out = [];
+  Object.keys(G).forEach(function(k){
+    var L = G[k]; if (L.length < 2) return;
+    var liees = L.filter(function(e){ return refs[e.id]; });
+    var gardee = liees.length === 1 ? liees[0] : (liees.length === 0 ? L.slice().sort(function(a, b){ return String(a.created_at || '').localeCompare(String(b.created_at || '')) || String(a.id).localeCompare(String(b.id)); })[0] : null);
+    var supp = gardee ? L.filter(function(e){ return e !== gardee && !refs[e.id] && !e.lettrage && !(typeof exerciceEstClos === 'function' && exerciceEstClos(ecrDateNorm(e.date))); }) : [];
+    out.push({ cle: k, L: L, gardee: gardee, supp: supp, montant: _ecrMontant(L[0]), note: !gardee ? 'Chaque écriture est rattachée à un enregistrement différent (bon de caisse, versement…) : à vérifier à la source, suppression non proposée.' : (supp.length < L.length - 1 ? 'Certaines écritures sont rattachées, lettrées ou en exercice clos : non supprimables ici.' : '') });
+  });
+  return out.sort(function(a, b){ return b.montant * (b.L.length - 1) - a.montant * (a.L.length - 1); });
+}
+function ecrCtlSel(k, on) { if (on) _ecrCtl.sel[k] = true; else delete _ecrCtl.sel[k]; ecrCtlRender(); }
+async function ecrDoublonsSupprimer() {
+  var G = ecrCtlDoublons().filter(function(g){ return _ecrCtl.sel[g.cle]; }), n = 0, m = 0; G.forEach(function(g){ n += g.supp.length; m += g.supp.length * g.montant; });
+  if (!n) { toast('Cochez au moins un groupe supprimable.', 'info'); return; }
+  if (!exigerDroit('Comptabilite', 's', 'la suppression d\'écritures en doublon')) return;
+  if (!confirm('Supprimer ' + n + ' écriture(s) en doublon pour ' + fmtF(m) + ' FCFA (la première de chaque groupe est conservée) ?\n\nOpération définitive.')) return;
+  for (var i = 0; i < G.length; i++) for (var j = 0; j < G[i].supp.length; j++) { var id = G[i].supp[j].id; await deleteRecord('ecritures', id); DATA.ecritures = (DATA.ecritures || []).filter(function(x){ return x.id !== id; }); }
+  _ecrCtl.sel = {}; if (typeof buildBalance === 'function') buildBalance(); toast(n + ' écriture(s) supprimée(s).', 'success'); ecrCtlRender();
+}
+
+/* ── Commissions annulées dont l'extourne manque (cloud ou local) ── */
+function _ecrExtourneLocale(c) { return (DATA.ecritures || []).filter(function(e){ return e.id === c.ecriture_extourne_id || (e.source === 'extourne_commission' && e.commission_id === c.id); })[0] || null; }
+function ecrCtlExtournes() { return (DATA.commissions || []).filter(function(c){ return c.statut === 'annulee' && c.ecriture_id; }); }
+async function ecrExtournesAnalyser() {
+  var C = ecrCtlExtournes(), res = { sansLocale: [], absentesCloud: [], ok: 0, cloud: null };
+  var locales = {}; C.forEach(function(c){ var x = _ecrExtourneLocale(c); if (x) locales[c.id] = x; else res.sansLocale.push(c); });
+  var ids = Object.keys(locales).map(function(k){ return locales[k].id; });
+  if (typeof sbFetch === 'function' && ids.length && navigator.onLine) {
+    try {
+      var presents = {}; for (var i = 0; i < ids.length; i += 40) { var rows = await sbFetch('pi_ecritures?select=id&id=in.(' + ids.slice(i, i + 40).map(encodeURIComponent).join(',') + ')', 'GET'); if (!Array.isArray(rows)) throw new Error('cloud'); rows.forEach(function(r){ presents[r.id] = true; }); }
+      res.cloud = true; C.forEach(function(c){ var x = locales[c.id]; if (x) { if (presents[x.id]) res.ok++; else res.absentesCloud.push(c); } });
+    } catch (e) { res.cloud = false; }
+  } else res.cloud = false;
+  return res;
+}
+function _ecrNouvelleExtourne(comm) {
+  var cC = getCompteCommission(comm.type_beneficiaire, 'charge'), cP = getCompteCommission(comm.type_beneficiaire, 'provision'), typeB = comm.type_beneficiaire === 'commercial' ? 'Commercial' : 'Apporteur', an = today().slice(0, 4);
+  var ref = 'EXT-COMM-' + an + '-' + prochainNumeroRef('ecritures', 'EXT-COMM', an, 4);
+  return { id: uid(), ref: ref, date: today(), piece: 'EXT-' + (comm.ecriture_ref || comm.id.slice(-6).toUpperCase()), type: 'charge', libelle: 'Extourne commission ' + typeB.toLowerCase() + ' — ' + (comm.beneficiaire || '') + ' (annule réf. ' + (comm.ecriture_ref || '') + ') — régularisation',
+    compte: cP, compte_debit: cP, compte_credit: cC, montant: comm.montant_comm, mode: 'commission', programme_id: '', division: _resolveDivisionEcriture('client', comm.client_id), notes: 'Contre-passation régularisée a posteriori (extourne d\'origine absente)', source: 'extourne_commission', commission_id: comm.id, created_at: today() };
+}
+async function ecrExtournesReparer() {
+  if (!exigerDroit('Comptabilite', 'c', 'la régularisation des extournes de commissions')) return;
+  var r = await ecrExtournesAnalyser(), n1 = r.absentesCloud.length, n2 = r.sansLocale.length;
+  if (!n1 && !n2) { toast('Aucune extourne à régulariser.', 'info'); return; }
+  if (!confirm((n1 ? n1 + ' extourne(s) présente(s) sur ce poste mais absente(s) du cloud : elles seront envoyées.\n' : '') + (n2 ? n2 + ' extourne(s) introuvable(s) : elles seront recréées (datées d\'aujourd\'hui, l\'annulation d\'origine n\'ayant pas de date).\n' : '') + '\nContinuer ?')) return;
+  r.absentesCloud.forEach(function(c){ var x = _ecrExtourneLocale(c); if (x && typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', x); });
+  for (var i = 0; i < r.sansLocale.length; i++) {
+    var c = r.sansLocale[i], ext; try { ext = _ecrNouvelleExtourne(c); } catch (e) { toast('Comptes de commission non paramétrés : arrêt.', 'error'); break; }
+    DATA.ecritures.push(ext); await dbPut('ecritures', ext); if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', ext);
+    c.ecriture_extourne_id = ext.id; c.ecriture_extourne_ref = ext.ref; await dbPut('commissions', c); if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', c);
+  }
+  if (typeof buildBalance === 'function') buildBalance(); toast('Extournes régularisées : ' + n1 + ' envoyée(s), ' + n2 + ' recréée(s).', 'success', 7000); ecrCtlRender();
+}
+
+/* ── Comptes de TVA par défaut ── */
+function tvaDefautsDiagnostic() {
+  var cd = (DATA.params || {}).comptes_defaut || {}, plan = (APP.planComptable || []), fam = { tva_collectee: TVA_COLLECTEE, tva_deductible: TVA_DEDUCTIBLE, tva_deductible_travaux: TVA_DEDUCTIBLE }, lib = { tva_collectee: 'TVA collectée', tva_deductible: 'TVA déductible', tva_deductible_travaux: 'TVA déductible — travaux' };
+  return Object.keys(fam).map(function(cle){
+    var val = String(cd[cle] || ''), lu = val && fam[cle].some(function(x){ return val.indexOf(x[0]) === 0; }), parent = val && typeof compteEstParent === 'function' && compteEstParent(val);
+    var pb = !val ? 'Non paramétré' : (parent ? 'Compte de regroupement : non imputable à la saisie' : (!lu ? 'Compte non repris par la déclaration de TVA' : ''));
+    var props = plan.filter(function(c){ return c && c.code && fam[cle].some(function(x){ return String(c.code).indexOf(x[0]) === 0; }) && !(typeof compteEstParent === 'function' && compteEstParent(c.code)); }).map(function(c){ return { code: c.code, label: c.label || '' }; }).slice(0, 25);
+    return { cle: cle, lib: lib[cle], val: val, probleme: pb, props: props };
+  });
+}
+async function tvaDefautAppliquer(cle) {
+  var code = (document.getElementById('ecrctl-tva-' + cle) || {}).value || ''; if (!code) return;
+  if (!exigerDroit('Comptabilite', 'm', 'les comptes par défaut')) return;
+  if (!confirm('Utiliser le compte ' + code + ' comme compte par défaut « ' + cle + ' » ?\n\nLes écritures déjà passées ne sont pas modifiées.')) return;
+  DATA.params = DATA.params || {}; DATA.params.comptes_defaut = DATA.params.comptes_defaut || {}; DATA.params.comptes_defaut[cle] = code;
+  await dbPut('params', DATA.params); if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params); toast('Compte par défaut mis à jour : ' + code, 'success'); ecrCtlRender();
+}
+
+/* ── Rendu ── */
+async function ecrCtlRender() {
+  var host = document.getElementById('ecrctl-corps'); if (!host) return;
+  var f = function(v){ return fmtF(Math.round(v || 0)); }, E = escHtml, o = _ecrCtl.onglet;
+  var nav = [['dates', '📅 Dates'], ['doublons', '👯 Doublons'], ['extournes', '↩️ Extournes de commissions'], ['tva', '🧾 Comptes de TVA']].map(function(t){ return '<button class="tab-btn' + (o === t[0] ? ' active' : '') + '" onclick="ecrCtlOnglet(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join('');
+  var h = '<div class="tab-nav" style="margin-bottom:10px;">' + nav + '</div>';
+  if (o === 'dates') {
+    var L = ecrCtlDates(), n = L.filter(function(x){ return x.p.code === 'horodatage'; }).length, aCorr = L.filter(function(x){ return x.p.corrigeable; }), info = L.filter(function(x){ return x.p.info; });
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">' + aCorr.length + ' date(s) à corriger · ' + n + ' avec heure (normalisables) · ' + info.length + ' prévue(s) (dotations).</div>'
+      + (n ? '<div style="margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="ecrDatesNormaliser()">Normaliser les ' + n + ' date(s) avec heure</button></div>' : '')
+      + '<div class="table-wrap" style="max-height:46vh;overflow:auto;"><table><thead><tr><th>Date</th><th>Pièce</th><th>Libellé</th><th style="text-align:right;">Montant</th><th>Problème</th><th>Correction</th></tr></thead><tbody>'
+      + (L.length ? L.map(function(x){ var e = x.e;
+          return '<tr><td style="white-space:nowrap;font-size:12px;">' + E(String(e.date || '—')) + '</td><td style="font-size:12px;">' + E(e.piece || e.ref || '') + '</td><td style="font-size:12px;">' + E(String(e.libelle || '').slice(0, 70)) + '</td><td style="text-align:right;">' + f(_ecrMontant(e)) + '</td>'
+            + '<td style="font-size:11px;color:' + (x.p.info ? 'var(--blanc-dim)' : 'var(--or)') + ';">' + E(x.p.lib) + '</td>'
+            + '<td style="white-space:nowrap;">' + (x.p.corrigeable ? '<input type="date" class="form-control" id="ecrctl-d-' + e.id + '" style="width:150px;display:inline-block;" value="' + (ecrDateNorm(e.date) && !x.p.code.match(/invalide|hors_plage|future/) ? ecrDateNorm(e.date) : '') + '"> <button class="btn btn-secondary btn-sm" onclick="ecrDateCorriger(\'' + e.id + '\')">Corriger</button>' : (x.p.normalisable ? '→ ' + x.p.normalisable : '—')) + '</td></tr>'; }).join('')
+        : '<tr><td colspan="6" style="text-align:center;color:var(--vert);padding:18px;">✅ Toutes les dates sont valides.</td></tr>') + '</tbody></table></div>';
+  } else if (o === 'doublons') {
+    var G = ecrCtlDoublons(), tn = 0, tm = 0; G.forEach(function(g){ if (_ecrCtl.sel[g.cle]) { tn += g.supp.length; tm += g.supp.length * g.montant; } });
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Écritures strictement identiques (date, pièce, libellé, comptes, montants). Les extournes et les commissions annulées déjà extournées sont écartées : elles ne sont pas des doublons. La première écriture de chaque groupe est conservée.</div>'
+      + '<div style="margin-bottom:8px;"><button class="btn btn-primary btn-sm" onclick="ecrDoublonsSupprimer()"' + (tn ? '' : ' disabled') + '>Supprimer la sélection (' + tn + ' écriture(s), ' + f(tm) + ' FCFA)</button></div>'
+      + '<div class="table-wrap" style="max-height:46vh;overflow:auto;"><table><thead><tr><th></th><th>Date</th><th>Pièce / libellé</th><th style="text-align:right;">Montant</th><th style="text-align:right;">Exemplaires</th><th>Remarque</th></tr></thead><tbody>'
+      + (G.length ? G.map(function(g){ var e = g.L[0];
+          return '<tr><td><input type="checkbox"' + (g.supp.length ? '' : ' disabled') + (_ecrCtl.sel[g.cle] ? ' checked' : '') + ' onchange="ecrCtlSel(this.getAttribute(\'data-k\'),this.checked)" data-k="' + E(g.cle) + '"></td><td style="font-size:12px;white-space:nowrap;">' + E(ecrDateNorm(e.date)) + '</td><td style="font-size:12px;">' + E(e.piece || e.ref || '') + '<br><span style="color:var(--blanc-dim);">' + E(String(e.libelle || '').slice(0, 70)) + '</span></td><td style="text-align:right;">' + f(g.montant) + '</td><td style="text-align:right;">' + g.L.length + ' (' + g.supp.length + ' supprimable(s))</td><td style="font-size:11px;color:var(--or);">' + E(g.note) + '</td></tr>'; }).join('')
+        : '<tr><td colspan="6" style="text-align:center;color:var(--vert);padding:18px;">✅ Aucun doublon.</td></tr>') + '</tbody></table></div>';
+  } else if (o === 'extournes') {
+    h += '<div id="ecrctl-ext">⏳ Analyse en cours…</div>'; host.innerHTML = h;
+    var r = await ecrExtournesAnalyser(), blocs = '';
+    var ligne = function(c, etat){ return '<tr><td style="font-size:12px;">' + E(c.beneficiaire || '') + '</td><td style="font-size:12px;">' + E(String(c.date_versement || '')) + '</td><td style="text-align:right;">' + f(c.montant_comm) + '</td><td style="font-size:11px;">' + etat + '</td></tr>'; };
+    blocs = '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Une commission annulée doit être extournée (contre-passation). Une extourne enregistrée sur un poste mais jamais envoyée au cloud laisse la charge en place pour les autres postes.</div>'
+      + '<div style="margin-bottom:8px;font-size:12px;">' + r.ok + ' extourne(s) en règle · <strong style="color:var(--or);">' + r.absentesCloud.length + ' absente(s) du cloud</strong> · <strong style="color:var(--rouge);">' + r.sansLocale.length + ' introuvable(s)</strong>' + (r.cloud === false ? ' · <em>cloud injoignable : vérification locale seulement</em>' : '') + '</div>'
+      + '<div style="margin-bottom:8px;"><button class="btn btn-primary btn-sm" onclick="ecrExtournesReparer()"' + (r.absentesCloud.length + r.sansLocale.length ? '' : ' disabled') + '>Régulariser (envoyer / recréer)</button></div>'
+      + '<div class="table-wrap" style="max-height:40vh;overflow:auto;"><table><thead><tr><th>Bénéficiaire</th><th>Date</th><th style="text-align:right;">Commission</th><th>État</th></tr></thead><tbody>'
+      + r.absentesCloud.map(function(c){ return ligne(c, 'Extourne présente ici, absente du cloud'); }).join('') + r.sansLocale.map(function(c){ return ligne(c, 'Aucune extourne : charge toujours en place'); }).join('')
+      + (r.absentesCloud.length + r.sansLocale.length ? '' : '<tr><td colspan="4" style="text-align:center;color:var(--vert);padding:18px;">✅ Toutes les commissions annulées sont extournées.</td></tr>') + '</tbody></table></div>';
+    var box = document.getElementById('ecrctl-ext'); if (box && _ecrCtl.onglet === 'extournes') box.innerHTML = blocs; return;
+  } else {
+    var D = tvaDefautsDiagnostic();
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">La déclaration de TVA lit les comptes 4431 (collectée) et 4451 à 4456 (déductible). Un compte par défaut sur un compte de regroupement (443, 445) ou hors de ces familles n\'est pas repris. Choisissez un compte de détail : les écritures déjà passées ne changent pas.</div>'
+      + D.map(function(d){ return '<div class="card" style="padding:8px 12px;margin-bottom:8px;"><strong>' + E(d.lib) + '</strong> — compte par défaut actuel : <code>' + E(d.val || '—') + '</code> '
+        + (d.probleme ? '<span style="color:var(--rouge);">⚠ ' + E(d.probleme) + '</span>' : '<span style="color:var(--vert);">✓ lu par la déclaration</span>')
+        + (d.probleme ? '<div style="margin-top:6px;display:flex;gap:8px;"><select class="form-control" id="ecrctl-tva-' + d.cle + '" style="max-width:360px;"><option value="">— Choisir un compte de détail —</option>' + d.props.map(function(p){ return '<option value="' + E(p.code) + '">' + E(p.code + ' — ' + p.label) + '</option>'; }).join('') + '</select><button class="btn btn-secondary btn-sm" onclick="tvaDefautAppliquer(\'' + d.cle + '\')">Appliquer</button></div>' : '') + '</div>'; }).join('');
+  }
+  host.innerHTML = h;
+}
 function ouvrirDeclarationTVA() {
   var d = new Date(); d.setMonth(d.getMonth() - 1);
   var moisDefaut = d.toISOString().slice(0, 7);
@@ -45672,6 +45872,9 @@ async function saveEcriture() {
   var libelle = document.getElementById('e-libelle').value.trim();
   var date = document.getElementById('e-date').value;
   if (!libelle || !date) { toast('Libellé et date sont obligatoires.', 'error'); return; }
+  var _ds = ecrDateSaisie(date);
+  if (_ds.erreur) { toast(_ds.erreur, 'error', 7000); return; }
+  if (_ds.confirmer && !confirm(_ds.confirmer)) return;
   var _exist = APP.editingId ? (DATA.ecritures || []).find(function(x){ return x.id === APP.editingId; }) : null;
   if (_exist && (_exist.lettrage || (Array.isArray(_exist.lignes) && _exist.lignes.some(function(x){ return x && x.lettrage; })))) {
     toast('🔒 Écriture lettrée : délettrez-la (Tiers › Délettrage) avant de la modifier, sinon le lettrage ne correspondrait plus aux montants.', 'error', 8000);
@@ -116555,6 +116758,7 @@ async function annulerCommissionSilencieux(comm) {
     };
     DATA.ecritures.push(ext);
     await dbPut('ecritures', ext);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', ext);
     comm.ecriture_extourne_id = ext.id;
     comm.ecriture_extourne_ref = ref;
   }
@@ -148924,6 +149128,14 @@ goTo = function(page) {
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-pa-rapport')">Fermer</button><button class="btn btn-secondary" onclick="paImprimerCourse(_paRapportId,'rapport')">🖨️ Aperçu / imprimer</button>
       <button class="btn btn-secondary" id="pra-btn-brouillon" onclick="paRapportEnregistrer(false)">💾 Brouillon</button><button class="btn btn-primary" id="pra-btn-transmettre" onclick="paRapportEnregistrer(true)">📤 Transmettre à la hiérarchie</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-ecr-ctl">
+  <div class="modal" style="max-width:1050px;width:96vw;">
+    <div class="modal-header"><h3>🔎 Contrôles des écritures comptables</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-ecr-ctl')">✕</button></div>
+    <div class="modal-body"><div id="ecrctl-corps"></div></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-ecr-ctl')">Fermer</button></div>
   </div>
 </div>
 
