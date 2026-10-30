@@ -27,7 +27,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.177 · 2026-10-30 — Correctif : références de versement Mobile Money (VRS) basées sur le plus grand numéro attribué, plus de doublon après suppression ; v14.176 · 2026-10-30 — Manuels & flux : portail des acteurs détaillé (12 espaces) + 3 diagrammes ; v14.175 · 2026-10-30 — Manuels & flux : réorganisation par phases dans le sens de la marche en avant (frise, numérotation, sections) ; v14.174 · 2026-10-30 — Manuels & flux : carte commerciale et portail des acteurs + 3 diagrammes ; v14.173 · 2026-10-30 — Manuels & flux : 5 manuels (FNE, calendrier, messagerie, cartographie SIG, pilotage) + 9 diagrammes ; v14.172 · 2026-10-30 — Manuels & flux : 11 manuels (programmes, conception, aménagement, budget, locatif, copropriété, parc auto, accueil, réunions, diaspora, administration) + 16 diagrammes ; v14.171 · 2026-10-30 — Manuels & flux : manuels Conventions, Suivi de chantier et DQE + 5 diagrammes ; v14.170 · 2026-10-30 — Manuels & flux : manuels Réception/Livraison, Stock et Trésorerie + 6 diagrammes ; v14.169 · 2026-10-30 — Manuels & flux : manuels CRM, LBC/FT et Juridique + 7 diagrammes ; v14.168 · 2026-10-30 — Manuels & flux : manuels Paie et RH + 6 diagrammes ; v14.167 · 2026-10-30 — Manuels & flux : manuels Achats et Fournisseurs + 3 diagrammes ; v14.166 · 2026-10-30 — Manuels & flux : manuels Paiements et Relances + 4 diagrammes ; v14.165 · 2026-10-30 — Manuels & flux : les diagrammes s\'affichent au clic sur un manuel ; v14.164 · 2026-10-30 — Manuels & flux : 12 diagrammes de flux supplémentaires (souscripteur, caisse, comptabilité, foncier, portefeuille) ; v14.163 · 2026-10-30 — Paramètres › « Manuels & flux » : catalogue des manuels de procédures (PDF) et diagrammes de flux imprimables ; v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\'engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\'un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.178 · 2026-10-30 — Correctif : références BIEN/CAND/KYC/DS/ART/OT/BAIL/MANDAT/QUIT/JUR/ANCR/DSP/rapports de chantier basées sur le plus grand numéro attribué (plus de doublon après suppression) ; v14.177 · 2026-10-30 — Correctif : références de versement Mobile Money (VRS) basées sur le plus grand numéro attribué, plus de doublon après suppression ; v14.176 · 2026-10-30 — Manuels & flux : portail des acteurs détaillé (12 espaces) + 3 diagrammes ; v14.175 · 2026-10-30 — Manuels & flux : réorganisation par phases dans le sens de la marche en avant (frise, numérotation, sections) ; v14.174 · 2026-10-30 — Manuels & flux : carte commerciale et portail des acteurs + 3 diagrammes ; v14.173 · 2026-10-30 — Manuels & flux : 5 manuels (FNE, calendrier, messagerie, cartographie SIG, pilotage) + 9 diagrammes ; v14.172 · 2026-10-30 — Manuels & flux : 11 manuels (programmes, conception, aménagement, budget, locatif, copropriété, parc auto, accueil, réunions, diaspora, administration) + 16 diagrammes ; v14.171 · 2026-10-30 — Manuels & flux : manuels Conventions, Suivi de chantier et DQE + 5 diagrammes ; v14.170 · 2026-10-30 — Manuels & flux : manuels Réception/Livraison, Stock et Trésorerie + 6 diagrammes ; v14.169 · 2026-10-30 — Manuels & flux : manuels CRM, LBC/FT et Juridique + 7 diagrammes ; v14.168 · 2026-10-30 — Manuels & flux : manuels Paie et RH + 6 diagrammes ; v14.167 · 2026-10-30 — Manuels & flux : manuels Achats et Fournisseurs + 3 diagrammes ; v14.166 · 2026-10-30 — Manuels & flux : manuels Paiements et Relances + 4 diagrammes ; v14.165 · 2026-10-30 — Manuels & flux : les diagrammes s\'affichent au clic sur un manuel ; v14.164 · 2026-10-30 — Manuels & flux : 12 diagrammes de flux supplémentaires (souscripteur, caisse, comptabilité, foncier, portefeuille) ; v14.163 · 2026-10-30 — Paramètres › « Manuels & flux » : catalogue des manuels de procédures (PDF) et diagrammes de flux imprimables ; v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\'engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\'un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -42700,6 +42700,18 @@ function _ecrEquilibre(ok, totD, totC) { return { ok:ok, totD:totD, totC:totC };
    collision entre deux postes hors-ligne créant simultanément une référence
    avant synchronisation — seul un identifiant serveur séquentiel le ferait ;
    l'id (uid()) reste la clé unique réelle, ref n'est qu'un repère lisible. */
+/* Même principe pour une liste quelconque : « length + 1 » réattribue un numéro déjà pris
+   dès qu'un enregistrement a été supprimé. Retourne la référence complète (préfixe + numéro). */
+function prochaineRefListe(liste, prefixe, largeur) {
+  var max = 0;
+  (liste || []).forEach(function(r){
+    if (r && r.ref && String(r.ref).indexOf(prefixe) === 0) {
+      var n = parseInt(String(r.ref).slice(prefixe.length), 10);
+      if (!isNaN(n) && n > max) max = n;
+    }
+  });
+  return prefixe + String(max + 1).padStart(largeur || 4, '0');
+}
 function prochainNumeroRef(store, prefixe, annee, largeur) {
   var pfx = prefixe + '-' + annee + '-';
   var max = 0;
@@ -66658,7 +66670,7 @@ async function blSave(){
   var loyer=parseFloat(g('bl-loyer'))||0;
   if(loyer<=0){ toast('Indiquez le loyer demandé.','error'); return; }
   var id=g('bl-id'), ex=id?_blL().find(function(x){return x.id===id;}):null;
-  var b=ex||{ id:uid(), ref:'BIEN-'+String(_blL().length+1).padStart(3,'0'), created_at:today() };
+  var b=ex||{ id:uid(), ref:prochaineRefListe(_blL(),'BIEN-',3), created_at:today() };
   b.designation=des; b.type=g('bl-type'); b.adresse=g('bl-adresse'); b.commune=g('bl-commune');
   b.pieces=g('bl-pieces'); b.surface=parseFloat(g('bl-surface'))||0;
   b.loyer=loyer; b.charges=parseFloat(g('bl-charges'))||0; b.depot=parseFloat(g('bl-depot'))||0;
@@ -67007,7 +67019,7 @@ async function candSave(){
   if(d.loyer_vise<=0){ toast('Précisez le loyer du bien visé.','error'); return; }
   var id=(document.getElementById('cd-id')||{}).value;
   var ex=id?_candL().find(function(x){return x.id===id;}):null;
-  var c=ex||{ id:uid(), ref:'CAND-'+new Date().getFullYear()+'-'+String(_candL().length+1).padStart(4,'0'), created_at:today() };
+  var c=ex||{ id:uid(), ref:prochaineRefListe(_candL(),'CAND-'+new Date().getFullYear()+'-',4), created_at:today() };
   Object.keys(d).forEach(function(k){ c[k]=d[k]; });
   if(c.client_id && !(c.nom||'').trim()){
     var cl=(DATA.clients||[]).find(function(x){return x.id===c.client_id;});
@@ -67307,7 +67319,7 @@ async function kycSave(){
   if(!cid){ toast('Sélectionnez le client.','error'); return; }
   if(!(g('kyc-piece-num')||'').trim()){ toast('Le numéro de pièce d\'identité est obligatoire : c\'est le socle de l\'obligation d\'identification.','error'); return; }
   var id=g('kyc-id'), ex=id?_kyc().find(function(x){return x.id===id;}):null;
-  var f=ex||{ id:uid(), ref:'KYC-'+String(_kyc().length+1).padStart(4,'0'), created_at:today() };
+  var f=ex||{ id:uid(), ref:prochaineRefListe(_kyc(),'KYC-',4), created_at:today() };
   f.client_id=cid; f.personne=g('kyc-personne');
   f.piece_type=g('kyc-piece-type'); f.piece_num=(g('kyc-piece-num')||'').trim();
   f.piece_expire=g('kyc-piece-expire'); f.naissance=g('kyc-naissance');
@@ -67441,7 +67453,7 @@ async function lbcSaveDeclaration(){
   if(!cid){ toast('Client non identifié.','error'); return; }
   if(faits.length<30){ toast('Décrivez précisément les faits : une déclaration non circonstanciée est irrecevable.','error'); return; }
   if(analyse.length<30){ toast('L\'analyse qui fonde le soupçon est obligatoire — sans elle la déclaration est irrecevable.','error'); return; }
-  var d={ id:uid(), ref:'DS-'+new Date().getFullYear()+'-'+String(_lbcD().length+1).padStart(4,'0'),
+  var d={ id:uid(), ref:prochaineRefListe(_lbcD(),'DS-'+new Date().getFullYear()+'-',4),
     client_id:cid, alerte_id:g('ds-alerte'), date:g('ds-date')||today(),
     montant:parseFloat(g('ds-montant'))||0, nature:g('ds-nature'), execution:g('ds-execution'),
     faits:faits, analyse:analyse, statut:g('ds-statut'),
@@ -68887,7 +68899,7 @@ async function otSaveArtisan(){
   if(!nom){ toast('Nom de l\'artisan requis.','error'); return; }
   if(!(g('oa-tel')||'').trim()){ toast('Un numéro de téléphone est indispensable pour le joindre.','error'); return; }
   var id=g('oa-id'), ex=id?_otA().find(function(x){return x.id===id;}):null;
-  var a=ex||{ id:uid(), ref:'ART-'+String(_otA().length+1).padStart(3,'0'), created_at:today() };
+  var a=ex||{ id:uid(), ref:prochaineRefListe(_otA(),'ART-',3), created_at:today() };
   a.nom=nom; a.metier=g('oa-metier'); a.tel=g('oa-tel'); a.email=g('oa-email');
   a.adresse=g('oa-adresse'); a.ncc=g('oa-ncc'); a.tarif_horaire=parseFloat(g('oa-tarif'))||0;
   a.note=parseInt(g('oa-note'),10)||5; a.statut=g('oa-statut'); a.notes=g('oa-notes');
@@ -68991,7 +69003,7 @@ async function otSave(){
     toast('Renseignez le coût réel avant de clore l\'intervention.','error'); return;
   }
   var id=g('ot-id'), ex=id?_otL().find(function(x){return x.id===id;}):null;
-  var o=ex||{ id:uid(), ref:'OT-'+new Date().getFullYear()+'-'+String(_otL().length+1).padStart(4,'0'),
+  var o=ex||{ id:uid(), ref:prochaineRefListe(_otL(),'OT-'+new Date().getFullYear()+'-',4),
               created_at:today(), comptabilise:false };
   var ancienStatut=ex?ex.statut:'';
   o.objet=objet; o.signalement_id=g('ot-sig'); o.bail_id=g('ot-bail'); o.artisan_id=g('ot-artisan');
@@ -79772,7 +79784,7 @@ async function locSaveBail(){
   if(!bien){ toast('Précisez le bien loué.','error'); return; }
   if(loyer<=0){ toast('Loyer invalide.','error'); return; }
   var exist=id?_locBaux().find(function(x){return x.id===id;}):null;
-  var b=exist||{ id:uid(), ref:'BAIL-'+new Date().getFullYear()+'-'+String(_locBaux().length+1).padStart(3,'0'), created_at:today() };
+  var b=exist||{ id:uid(), ref:prochaineRefListe(_locBaux(),'BAIL-'+new Date().getFullYear()+'-',3), created_at:today() };
   b.bien_id=(document.getElementById('lb-bien-id')||{}).value||'';
   b.locataire_id=loc; b.bien=bien; b.nature=g('lb-nature'); b.debut=g('lb-debut');
   b.proprietaire_id=g('lb-proprietaire')||''; b.meuble=g('lb-meuble')||'non_meuble';
@@ -79875,7 +79887,7 @@ async function locSaveProprietaire(){
   if(!nom){ toast('Précisez le nom / la raison sociale du propriétaire.','error'); return; }
   if(!dateConv){ toast('Précisez la date de signature de la convention.','error'); return; }
   var exist=id?_locProp(id):null;
-  var p=exist||{ id:uid(), ref:'MANDAT-'+new Date().getFullYear()+'-'+String(_locProps().length+1).padStart(3,'0'), created_at:today() };
+  var p=exist||{ id:uid(), ref:prochaineRefListe(_locProps(),'MANDAT-'+new Date().getFullYear()+'-',3), created_at:today() };
   p.type=g('pr-type'); p.nom=nom; p.tel=g('pr-tel'); p.email=g('pr-email'); p.adresse=g('pr-adresse');
   p.piece=g('pr-piece'); p.date_convention=dateConv; p.honoraires=Math.min(100,Math.max(0,parseFloat(g('pr-honoraires'))||0));
   p.statut=g('pr-statut'); p.notes=g('pr-notes');
@@ -79950,7 +79962,7 @@ async function locQuittancerMois(){
     var tva=(b.nature!=='habitation'&&b.tva_assujetti)?Math.round(loyer*0.18):0;
     var prop=_locProp(b.proprietaire_id), pct=prop?(parseFloat(prop.honoraires)||0):0;
     var commission=prop?Math.round(loyer*pct/100):0, partProprietaire=prop?(loyer-commission):0;
-    var q={ id:uid(), ref:'QUIT-'+mois.replace('-','')+'-'+String(_locQ().length+1).padStart(4,'0'),
+    var q={ id:uid(), ref:prochaineRefListe(_locQ(),'QUIT-'+mois.replace('-','')+'-',4),
       bail_id:b.id, locataire_id:b.locataire_id, periode:mois, date:mois+'-01',
       echeance:mois+'-'+String(b.jour||5).padStart(2,'0'), periodicite:b.periodicite||'mensuel',
       loyer:loyer, charges:ch, tva:tva, total:loyer+ch+tva, regle:0,
@@ -80266,7 +80278,7 @@ async function locLierDossierJuridique(b, q, priorite){
     if(d.statut==='clos_favorable'||d.statut==='clos_defavorable') d.statut='ouvert';
     d.notes=(d.notes||'')+'\n'+new Date().toLocaleDateString('fr-FR')+' — Relance '+_locPalier(q._j||_locRetard(q)).label+' (quittance '+q.ref+', '+fcfa(du)+').';
   } else {
-    d = { id:uid(), ref:'JUR-LOC-'+String(DATA.dossiersJuridiques.length+1).padStart(4,'0'),
+    d = { id:uid(), ref:prochaineRefListe(DATA.dossiersJuridiques,'JUR-LOC-',4),
       type:'contentieux', objet:'Recouvrement loyer impayé — bail '+(b.ref||''),
       interlocuteur:_locNom(b), avocat:'', date_ouv:today(), date_ech:dateEch.toISOString().slice(0,10),
       priorite:priorite||'haute', statut:'ouvert', montant:du,
@@ -80301,7 +80313,7 @@ async function clientLierDossierJuridique(c, note, montant, urgent, nomAffiche){
     if (urgent) d.priorite = 'urgente';
     if (d.statut==='clos_favorable' || d.statut==='clos_defavorable') d.statut = 'ouvert';
   } else {
-    d = { id:uid(), ref:'JUR-CV-'+String(DATA.dossiersJuridiques.length+1).padStart(4,'0'),
+    d = { id:uid(), ref:prochaineRefListe(DATA.dossiersJuridiques,'JUR-CV-',4),
       type:'contrat_vente', objet:'Contrat de vente — '+nom,
       interlocuteur:nom, avocat:'',
       date_ouv:today(), date_ech:'', priorite:urgent?'urgente':'normale', statut:'ouvert', montant:montant||0,
@@ -80724,7 +80736,7 @@ async function dspGenererAncrage(){
   if(!v.blocs){ toast('Aucune preuve à ancrer.','error'); return; }
   if(!v.ok){ toast('Chaîne altérée — corrigez avant d\'ancrer.','error'); return; }
   var a={ id:uid(), date:new Date().toISOString(), racine:v.racine, blocs:v.blocs,
-    ref:'ANCR-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+String(_dspA().length+1).padStart(3,'0'),
+    ref:prochaineRefListe(_dspA(),'ANCR-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-',3),
     depose:false, created_at:today() };
   await _dspSave('diaspo_ancrages',a,'pi_diaspo_ancrages');
   dspRenderAncrage();
@@ -80801,7 +80813,7 @@ async function dspSaveDossier(){
   if(!pays){ toast('Précisez le pays de résidence.','error'); return; }
   if(!bien){ toast('Précisez le bien concerné.','error'); return; }
   var ex=id?_dspD().find(function(x){return x.id===id;}):null;
-  var d=ex||{ id:uid(), ref:'DSP-'+new Date().getFullYear()+'-'+String(_dspD().length+1).padStart(3,'0'), sequestre:[], created_at:today() };
+  var d=ex||{ id:uid(), ref:prochaineRefListe(_dspD(),'DSP-'+new Date().getFullYear()+'-',3), sequestre:[], created_at:today() };
   d.client_id=cid; d.pays=pays; d.devise=g('dd-devise'); d.tz=g('dd-tz'); d.bien=bien;
   d.montant=parseFloat(g('dd-montant'))||0; d.mandataire=g('dd-mandataire'); d.tel=g('dd-tel');
   d.statut=g('dd-statut'); d.notes=g('dd-notes');
@@ -93343,7 +93355,7 @@ function rchReprendreContexte() {
   if (APP.editingId) return;
   var conv = (document.getElementById('rch-convention') || {}).value; if (!conv) return;
   var num = document.getElementById('rch-numero');   /* numéro proposé aussi quand la convention est présélectionnée à l'ouverture */
-  if (num && !num.value) num.value = 'R-' + today().slice(0, 4) + '-' + String((DATA.rapports_chantier || []).filter(function(r){ return r.convention_id === conv; }).length + 1).padStart(3, '0');
+  if (num && !num.value) num.value = prochaineRefListe((DATA.rapports_chantier || []).filter(function(r){ return r.convention_id === conv; }), 'R-' + today().slice(0, 4) + '-', 3);
   var prec = rchRapportPrecedent(conv, null); if (!prec) return;
   var ouv = document.getElementById('rch-ouvriers'); if (ouv && (!ouv.value || ouv.value === '0') && prec.nb_ouvriers) ouv.value = prec.nb_ouvriers;
   var ct = document.getElementById('rch-categorie'); if (ct && prec.categorie) ct.value = prec.categorie;
