@@ -1,6 +1,6 @@
 # Manuel de procédures — Parc auto
 
-**Réf.** PRO-PAU · **Version** 1.0 · **Date** Octobre 2026
+**Réf.** PRO-PAU · **Version** 2.0 · **Date** Octobre 2026
 **Objet** : fixer qui fait quoi pour gérer les véhicules de l'entreprise : fiche véhicule, affectations, carburant, entretien, courses.
 **Principe directeur** : un véhicule, une fiche, un affectataire ; chaque plein et chaque entretien génère son écriture ; aucun compte n'est deviné.
 
@@ -69,6 +69,28 @@ Enregistrer ; modifier une fiche exige le droit de modification.
 
 **Où** : Courses quotidiennes : suivre les courses des véhicules. Les ordres de mission peuvent désigner un véhicule de la société (PRO-CRM, CRM-04).
 
+### PAU-05b — Course : demande préalable, autorisation, rapport
+
+**Qui** : demandeur (agent ou chauffeur), hiérarchie, comptabilité pour le suivi. **Où** : **Parc Auto › Courses quotidiennes** et **Pilotage › Validations**.
+
+| Étape | Qui | Où | Résultat |
+|---|---|---|---|
+| 1. **Demande préalable** | Demandeur | Bouton **📝 Demande de course (préalable)** | Objectif, entreprise ou organisme visité, lieu, interlocuteurs attendus, participants, distance estimée, urgence |
+| 2. **Autorisation** | Hiérarchie | Validations › **Demande de course** (bouton 👁 Voir, ✅ Valider ou ⛔ Rejeter avec motif) | Course « Autorisée » ou « Refusée », autorisateur et date conservés |
+| 3. **Réalisation** | Chauffeur | Bouton **▶ Réaliser** sur la ligne autorisée, puis km départ, km retour et horaires | Course « réalisée » |
+| 4. **Rapport détaillé** | Demandeur | Bouton **📝** de la ligne | Objectif atteint, entreprise visitée, personnes rencontrées, résumé, résultats, suites à donner, documents, dépenses, incidents |
+| 5. **Transmission** | Demandeur | **📤 Transmettre à la hiérarchie** | Le rapport est figé et part en validation |
+| 6. **Validation** | Hiérarchie | Validations › **Rapport de course** | « Validé » ou « À compléter » avec commentaire ; le rédacteur corrige puis retransmet |
+
+Règles :
+
+1. **Une course se demande avant de partir** ; une course faite sans demande est marquée **Sans demande**.
+2. Le **rapport est obligatoire** pour toute course enregistrée : il se rédige dans les **2 jours** qui suivent le retour, sinon une alerte **Rapport à rédiger** apparaît dans le Parc Auto.
+3. La transmission exige : objectif atteint, entreprise visitée, personnes rencontrées et un **résumé détaillé** (au moins 30 caractères) ; la course doit être clôturée (km départ et retour).
+4. Un rapport **transmis ou validé ne se modifie plus** ; un rapport « à compléter » se rouvre.
+5. Le paramètre **Parc Auto › Demande préalable de course obligatoire** (Paramètres) refuse toute course sans autorisation. Il est désactivé par défaut : la course sans demande est alors simplement signalée.
+6. La demande et le rapport s'**impriment** (🖨️) avec la décision de la hiérarchie et le visa.
+
 ### PAU-06 — Suppression
 
 Un véhicule se supprime depuis la liste ; s'il a un historique, préférer un autre statut que « actif ».
@@ -117,3 +139,4 @@ Un véhicule se supprime depuis la liste ; s'il a un historique, préférer un a
 | Version | Date | Objet |
 |---|---|---|
 | 1.0 | Octobre 2026 | Création |
+| 2.0 | Octobre 2026 | Courses : demande préalable, autorisation, rapport détaillé transmis et validé par la hiérarchie |
