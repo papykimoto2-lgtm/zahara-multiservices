@@ -34387,7 +34387,7 @@ function clientFinancementBancaire(c) {
    projet n (mois entre la date de début du souscripteur et la livraison du programme). L'apport reste dû dès le départ et vaut avance :
        attendu(t) = min(V, max(apport, V × mois écoulés ÷ n))      mensualité théorique = V ÷ n
    Un souscripteur qui suit son échéancier contractuel n'est donc jamais en retard, et un gros apport met en avance.
-   Programme sans date de livraison : ancienne règle, marquée « estimé » : attendu = apport + mois écoulés × mensualité (durée de la fiche).
+   Programme sans date de livraison : même principe avec la durée saisie sur la fiche (échéancier « estimé », marqué « ≈ estimé »).
    Retard en mois = écart ÷ mensualité théorique, plafonné aux mois réellement écoulés (jamais « 40 mois » le premier mois, jamais infini). */
 function _dateLocale(s) { var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
 function _moisEntre(a, b) { return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()); }
@@ -34415,8 +34415,8 @@ function echeancierClient(c, now, verse) {
     attendu = Math.min(valeur, Math.max(apport, valeur * Math.min(1, moisEcoules / n)));
   } else {
     mode = 'estime'; n = parseInt(c.duree, 10) || 0; valeur = total;
-    mensualite = n > 0 ? Math.ceil((total - apport) / n) : 0;
-    attendu = Math.min(total, apport + moisEcoules * mensualite);
+    mensualite = n > 0 ? Math.ceil(total / n) : 0;
+    attendu = n > 0 ? Math.min(total, Math.max(apport, total * Math.min(1, moisEcoules / n))) : Math.min(total, apport);
   }
   var ecart = Math.max(0, attendu - verse);
   var exact = ecart <= 0.5 ? 0 : (mensualite > 0 ? Math.min(ecart / mensualite, moisEcoules) : moisEcoules);
@@ -50448,7 +50448,7 @@ function detectRelances() {
       + '<td><a href="#" style="color:inherit;" title="Ouvrir le dossier du souscripteur" onclick="openClientModal(\'' + r.id + '\');return false;"><strong>' + r.nom + ' ' + r.prenoms + '</strong></a><br><span style="font-size:11px;color:var(--blanc-dim);">' + r.tel + '</span>'
         + an.motifs.map(function(m){ return '<br><span style="font-size:11px;color:' + (m.prio === 1 ? 'var(--rouge)' : 'var(--or)') + ';font-weight:600;">' + m.label + '</span>'; }).join('') + '</td>'
       + '<td>' + (prog ? prog.nom : '—') + (lot ? ' / Lot ' + lot.numero : '') + '</td>'
-      + '<td style="color:var(--rouge);font-weight:bold;">' + r.moisRetard + ' mois' + (r.echeancier === 'estime' ? ' <span title="Programme sans date de livraison : retard estimé d\'après la durée saisie sur la fiche du souscripteur" style="font-size:10px;color:var(--or);font-weight:600;white-space:nowrap;">≈ estimé</span>' : '') + '</td>'
+      + '<td style="color:var(--rouge);font-weight:bold;">' + r.moisRetard + ' mois' + (r.echeancier === 'estime' ? ' <span title="Programme sans date de livraison : retard estimé d\'après la durée saisie sur la fiche du souscripteur (l\'apport compte comme avance)" style="font-size:10px;color:var(--or);font-weight:600;white-space:nowrap;">≈ estimé</span>' : '') + '</td>'
       + '<td style="color:var(--rouge);">' + fcfa(r.montantDu) + '</td>'
       + '<td><span class="badge ' + n.badge + '">' + n.icone + ' ' + n.label + '</span>' + promesseChipHtml(r, an) + (dosCtx ? '<br><a href="#" style="font-size:11px;color:var(--rouge);" title="Ouvrir le dossier contentieux" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\');return false;">⚖️ ' + escHtml(dosCtx.ref) + '</a>' : '') + '</td>'
       + '<td style="font-size:11px;">' + (lastRelance ? dateShort(lastRelance.date) : 'Jamais') + '</td>'
