@@ -12686,6 +12686,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
                 <button class="btn btn-primary btn-sm" onclick="comptabiliserToutesCommissions()">📒 Tout comptabiliser</button>
                 <button class="btn btn-secondary btn-sm" onclick="exportCommissionsCSV()">⬇ Export CSV</button>
                 <button class="btn btn-danger btn-sm" onclick="regenererToutesCommissions()">🔄 Régénérer tout</button>
+                <button class="btn btn-primary btn-sm" onclick="commCtlOuvrir()" title="Orphelines, doublons, bénéficiaire différent de la fiche, versements sans commission">🔎 Contrôles commissions</button>
                 <button class="btn btn-secondary btn-sm" onclick="verifierCommissionsVersementsUI()" title="Détecte les commissions orphelines (versement supprimé) et en double (souvent causées par un versement saisi deux fois)">🔍 Vérifier doublons/orphelines</button>
               </div>
             </div>
@@ -30693,6 +30694,210 @@ function cmzBuildTendance() {
     + (t3prec>0 ? ' · ' + (tendance>=0?'▲ +':'▼ ')+Math.abs(tendance)+'% vs trimestre préc.' : '');
 }
 
+/* ── Contrôles Commissions : orphelines, doublons, bénéficiaire ≠ fiche, versements sans commission ──
+   Aucune suppression : toute commission écartée est ANNULÉE (statut « annulee ») et, si sa charge
+   est comptabilisée, EXTOURNÉE. Les commissions payées ne sont jamais touchées. */
+var _cmCtl = { onglet: 'orphelines' };
+function _cmNomCle(s) { return sfcNormalise(String(s || '')).split(' ').filter(Boolean).sort().join(' '); }
+function _cmActive(c) { return c.statut !== 'annulee'; }
+function _cmActionnable(c) { return c.statut === 'a_payer'; }
+function _cmNomBenef(client, type) {
+  if (!client) return '';
+  if (type === 'commercial') {
+    var e = client.commercial_id ? (DATA.employes || []).find(function (x) { return x.id === client.commercial_id; }) : null;
+    return e ? (((e.prenoms || '') + ' ' + (e.nom || '')).trim()) : (client.commercial || '');
+  }
+  var a = client.apporteur_id ? (DATA.apporteurs || []).find(function (x) { return x.id === client.apporteur_id; }) : null;
+  return a ? (((a.prenoms ? a.prenoms + ' ' : '') + (a.nom || '')).trim()) : (client.apporteur || '');
+}
+function _cmCandidatVersement(c) {
+  var clients = DATA.clients || [], ids = [];
+  if (clients.some(function (x) { return x.id === c.client_id; })) ids = [c.client_id];
+  else { var cle = _cmNomCle(c.client_nom); if (cle) ids = clients.filter(function (x) { return _cmNomCle((x.prenoms || '') + ' ' + (x.nom || '')) === cle; }).map(function (x) { return x.id; }); }
+  if (!ids.length) return null;
+  var cands = (DATA.versements || []).filter(function (v) {
+    if (ids.indexOf(v.client_id) < 0) return false;
+    if ((v.date || '') !== (c.date_versement || '')) return false;
+    if (Math.abs((parseFloat(v.montant) || 0) - (parseFloat(c.montant_base) || 0)) > 0.5) return false;
+    return !(DATA.commissions || []).some(function (o) { return o.id !== c.id && _cmActive(o) && o.versement_id === v.id && o.type_beneficiaire === c.type_beneficiaire; });
+  });
+  return cands.length === 1 ? cands[0] : null;
+}
+function commCtlCalculer() {
+  var comms = DATA.commissions || [], clients = DATA.clients || [], vers = DATA.versements || [];
+  var parClient = {}; clients.forEach(function (x) { parClient[x.id] = x; });
+  var parVers = {}; vers.forEach(function (v) { parVers[v.id] = v; });
+  var r = { orphelines: [], doublons: [], benef: [], manquantes: { lignes: {}, nb: 0, base: 0 } };
+  comms.forEach(function (c) {
+    if (!_cmActive(c)) return;
+    if (!parVers[c.versement_id]) {
+      var cand = _cmActionnable(c) ? _cmCandidatVersement(c) : null;
+      r.orphelines.push({ c: c, clientOk: !!parClient[c.client_id], cand: cand });
+    }
+    var cl = parClient[c.client_id];
+    if (cl && _cmActionnable(c)) {
+      var fid = c.type_beneficiaire === 'commercial' ? (cl.commercial_id || '') : (cl.apporteur_id || '');
+      var cid = c.type_beneficiaire === 'commercial' ? (c.beneficiaire_id || '') : (c.apporteur_id || '');
+      if (fid !== cid) r.benef.push({ c: c, cl: cl, fid: fid, fiche: _cmNomBenef(cl, c.type_beneficiaire) });
+    }
+  });
+  var groupes = {};
+  comms.forEach(function (c) { if (_cmActive(c)) (groupes[c.versement_id + '|' + c.type_beneficiaire] = groupes[c.versement_id + '|' + c.type_beneficiaire] || []).push(c); });
+  Object.keys(groupes).forEach(function (k) {
+    if (groupes[k].length < 2) return;
+    var tri = groupes[k].slice().sort(function (a, b) { return String(a.created_at || a.date_generation || '').localeCompare(String(b.created_at || b.date_generation || '')) || String(a.id).localeCompare(String(b.id)); });
+    r.doublons.push({ garde: tri[0], extras: tri.slice(1) });
+  });
+  var modeBien = commissionMode() === 'bien', surFrais = !!(DATA.params && DATA.params.commission_sur_frais_souscription);
+  vers.forEach(function (v) {
+    var cl = parClient[v.client_id]; if (!cl) return;
+    if (v.type === 'frais_souscription' && !surFrais) return;
+    if (modeBien) { var p1 = _premierVersementPrix(cl.id); if (!p1 || p1.id !== v.id) return; }
+    var present = comms.filter(function (c) { return _cmActive(c) && (modeBien ? c.client_id === cl.id : c.versement_id === v.id); }).map(function (c) { return c.type_beneficiaire; });
+    var mc = !!(cl.commercial_id || cl.commercial) && present.indexOf('commercial') < 0;
+    var ma = !!(cl.apporteur_id || cl.apporteur) && present.indexOf('apporteur') < 0;
+    if (!mc && !ma) return;
+    var an = String(v.date || '').slice(0, 4) || '?';
+    var l = r.manquantes.lignes[an] = r.manquantes.lignes[an] || { an: an, nb: 0, base: 0, comm: 0, app: 0 };
+    l.nb++; l.base += parseFloat(v.montant) || 0; if (mc) l.comm++; if (ma) l.app++;
+    r.manquantes.nb++; r.manquantes.base += parseFloat(v.montant) || 0;
+  });
+  return r;
+}
+function commCtlTotal(r) { r = r || commCtlCalculer(); return r.orphelines.length + r.doublons.length + r.benef.length; }
+function commCtlOuvrir(onglet) { _cmCtl.onglet = onglet || _cmCtl.onglet || 'orphelines'; openModal('modal-comm-ctl'); commCtlRender(); }
+function commCtlOnglet(o) { _cmCtl.onglet = o; commCtlRender(); }
+function commCtlRender() {
+  var box = document.getElementById('commctl-corps'); if (!box) return;
+  var r = commCtlCalculer(), mgr = hasRole('manager'), CAP = 100;
+  var onglets = [['orphelines', 'Orphelines', r.orphelines.length], ['doublons', 'Doublons', r.doublons.length], ['benef', 'Bénéficiaire ≠ fiche', r.benef.length], ['manquantes', 'Versements sans commission', r.manquantes.nb]];
+  var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">' + onglets.map(function (o) {
+    return '<button class="btn btn-sm ' + (_cmCtl.onglet === o[0] ? 'btn-primary' : 'btn-secondary') + '" onclick="commCtlOnglet(\'' + o[0] + '\')">' + o[1] + ' <strong>' + o[2] + '</strong></button>';
+  }).join('') + '</div>';
+  var th = function (a) { return '<thead><tr>' + a.map(function (x) { return '<th>' + x + '</th>'; }).join('') + '</tr></thead>'; };
+  var vide = '<div style="color:#10B981;padding:12px 0;">✅ Aucune anomalie.</div>';
+  var suite = function (n) { return n > CAP ? '<div style="font-size:11px;color:var(--blanc-dim);margin-top:6px;">' + CAP + ' premières lignes sur ' + n + '.</div>' : ''; };
+  var tot = function (arr) { return arr.reduce(function (s, c) { return s + (parseFloat(c.montant_comm) || 0); }, 0); };
+  var o = _cmCtl.onglet;
+  if (o === 'orphelines') {
+    var act = r.orphelines.filter(function (x) { return _cmActionnable(x.c); }), ratt = act.filter(function (x) { return x.cand; }), reste = act.filter(function (x) { return !x.cand; });
+    var compta = reste.filter(function (x) { return x.c.ecriture_id && !x.c.ecriture_extourne_id; });
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Commissions dont le versement n\'existe plus. « Rattacher » n\'est proposé que si un seul versement du souscripteur a la même date et le même montant. Sinon la commission est <strong>annulée et extournée</strong> (jamais supprimée).</div>';
+    if (mgr && act.length) h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'
+      + (ratt.length ? '<button class="btn btn-primary btn-sm" onclick="commCtlRattacherToutes()">🔗 Rattacher les ' + ratt.length + ' avec correspondance sûre</button>' : '')
+      + (reste.length ? '<button class="btn btn-warning btn-sm" onclick="commCtlAnnulerOrphelines()">🚫 Annuler + extourner les ' + reste.length + ' autres (' + fmtF(tot(reste.map(function (x) { return x.c; }))) + ' F' + (compta.length ? ', dont ' + compta.length + ' comptabilisées' : '') + ')</button>' : '') + '</div>';
+    h += r.orphelines.length ? '<table class="data-table">' + th(['Souscripteur', 'Bénéficiaire', 'Type', 'Date vers.', 'Commission', 'Compta', '']) + '<tbody>' + r.orphelines.slice(0, CAP).map(function (x) {
+      var c = x.c;
+      return '<tr><td>' + escHtml(c.client_nom || '—') + (x.clientOk ? '' : ' <span style="color:#EF4444;font-size:10px;">(fiche absente)</span>') + '</td><td>' + escHtml(c.beneficiaire || '') + '</td><td>' + escHtml(c.type_beneficiaire || '') + '</td><td>' + escHtml(c.date_versement || '') + '</td><td>' + fmtF(c.montant_comm || 0) + ' F</td><td>' + (c.ecriture_id ? '✔' : '—') + '</td><td>'
+        + (!_cmActionnable(c) ? '<span style="font-size:11px;color:var(--blanc-dim);">' + escHtml(c.statut) + ' — non touchée</span>' : (mgr ? (x.cand ? '<button class="btn btn-secondary btn-sm" onclick="commCtlRattacher(\'' + c.id + '\')">🔗 Rattacher</button> ' : '') + '<button class="btn btn-warning btn-sm" onclick="commCtlAnnuler(\'' + c.id + '\')">🚫 Annuler</button>' : '')) + '</td></tr>';
+    }).join('') + '</tbody></table>' + suite(r.orphelines.length) : vide;
+  } else if (o === 'doublons') {
+    var extras = r.doublons.reduce(function (a, g) { return a.concat(g.extras); }, []);
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Plusieurs commissions actives du même type pour un même versement : la plus ancienne est conservée, les autres sont annulées et extournées.</div>';
+    if (mgr && extras.some(_cmActionnable)) h += '<div style="margin-bottom:8px;"><button class="btn btn-warning btn-sm" onclick="commCtlAnnulerDoublons()">🚫 Annuler + extourner les ' + extras.filter(_cmActionnable).length + ' doublon(s)</button></div>';
+    h += r.doublons.length ? '<table class="data-table">' + th(['Souscripteur', 'Type', 'Conservée', 'Doublon(s)']) + '<tbody>' + r.doublons.slice(0, CAP).map(function (g) {
+      return '<tr><td>' + escHtml(g.garde.client_nom || '—') + '</td><td>' + escHtml(g.garde.type_beneficiaire) + '</td><td>' + fmtF(g.garde.montant_comm || 0) + ' F (' + escHtml(g.garde.statut) + ')</td><td>' + g.extras.map(function (c) { return fmtF(c.montant_comm || 0) + ' F (' + escHtml(c.statut) + ')' + (mgr && _cmActionnable(c) ? ' <button class="btn btn-warning btn-sm" onclick="commCtlAnnuler(\'' + c.id + '\')">🚫</button>' : ''); }).join('<br>') + '</td></tr>';
+    }).join('') + '</tbody></table>' + suite(r.doublons.length) : vide;
+  } else if (o === 'benef') {
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Commissions à payer dont le bénéficiaire n\'est pas le commercial / l\'apporteur actuel de la fiche. Vérifiez qui l\'a réellement apporté : « Réaffecter » transfère la commission à la personne de la fiche (le montant ne change pas).</div>';
+    h += r.benef.length ? '<table class="data-table">' + th(['Souscripteur', 'Type', 'Bénéficiaire de la commission', 'Sur la fiche', 'Commission', '']) + '<tbody>' + r.benef.slice(0, CAP).map(function (x) {
+      var c = x.c;
+      return '<tr><td>' + escHtml(c.client_nom || '—') + '</td><td>' + escHtml(c.type_beneficiaire) + '</td><td>' + escHtml(c.beneficiaire || '—') + '</td><td>' + (x.fid ? escHtml(x.fiche) : '<em>aucun</em>') + '</td><td>' + fmtF(c.montant_comm || 0) + ' F</td><td>'
+        + (mgr && x.fid ? '<button class="btn btn-secondary btn-sm" onclick="commCtlReaffecter(\'' + c.id + '\')">↪ Réaffecter</button>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table>' + suite(r.benef.length) : vide;
+  } else {
+    var lignes = Object.keys(r.manquantes.lignes).sort().map(function (k) { return r.manquantes.lignes[k]; });
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Versements dont le souscripteur a un commercial ou un apporteur, mais sans commission générée. Constat seul : le droit à commission des périodes anciennes est une décision de gestion, rien n\'est généré ici.</div>';
+    h += lignes.length ? '<table class="data-table">' + th(['Année', 'Versements', 'Base versée', 'Commercial manquant', 'Apporteur manquant']) + '<tbody>' + lignes.map(function (l) {
+      return '<tr><td>' + escHtml(l.an) + '</td><td>' + l.nb + '</td><td>' + fmtF(l.base) + ' F</td><td>' + l.comm + '</td><td>' + l.app + '</td></tr>';
+    }).join('') + '<tr style="font-weight:700;"><td>Total</td><td>' + r.manquantes.nb + '</td><td>' + fmtF(r.manquantes.base) + ' F</td><td></td><td></td></tr></tbody></table>' : vide;
+  }
+  box.innerHTML = h;
+}
+function _cmRafraichir() {
+  if (typeof filterEcritures === 'function') filterEcritures();
+  if (typeof buildBalance === 'function') buildBalance();
+  if (typeof renderCommissions === 'function') renderCommissions();
+  if (typeof buildKPIsApporteurs === 'function') buildKPIsApporteurs();
+  commCtlRender();
+}
+async function _cmAnnulerEtExtourner(c, motif) {
+  if (!c || c.statut !== 'a_payer') return 'statut';
+  var avant = JSON.parse(JSON.stringify(c));
+  try { await annulerCommissionSilencieux(c, motif); } catch (e) { return (e && e.message) || 'erreur'; }
+  await logAudit('commissions', c.id, 'update', avant, c);
+  return '';
+}
+async function commCtlAnnuler(id) {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var c = (DATA.commissions || []).find(function (x) { return x.id === id; }); if (!c) return;
+  if (!confirm('Annuler cette commission de ' + fmtF(c.montant_comm || 0) + ' F (' + (c.beneficiaire || '') + ') ?' + (c.ecriture_id ? '\nSa charge comptabilisée sera extournée.' : ''))) return;
+  var e = await _cmAnnulerEtExtourner(c, 'contrôle commissions');
+  if (e) toast('❌ Annulation impossible : ' + e, 'error'); else toast('Commission annulée' + (c.ecriture_extourne_ref ? ' et extournée.' : '.'), 'success');
+  _cmRafraichir();
+}
+async function commCtlAnnulerOrphelines() {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var l = commCtlCalculer().orphelines.filter(function (x) { return _cmActionnable(x.c) && !x.cand; }).map(function (x) { return x.c; });
+  if (!l.length) return;
+  var nbCompta = l.filter(function (c) { return c.ecriture_id && !c.ecriture_extourne_id; }).length;
+  if (!confirm('Annuler ' + l.length + ' commission(s) orpheline(s) pour ' + fmtF(l.reduce(function (s, c) { return s + (parseFloat(c.montant_comm) || 0); }, 0)) + ' F ?\n' + nbCompta + ' charge(s) comptabilisée(s) seront extournées (écritures de contre-passation). Aucune suppression.')) return;
+  var ok = 0, ko = [];
+  for (var i = 0; i < l.length; i++) { var e = await _cmAnnulerEtExtourner(l[i], 'orpheline : versement inexistant'); if (e) ko.push(e); else ok++; }
+  toast(ok + ' annulée(s)' + (ko.length ? ', ' + ko.length + ' en échec (' + ko[0] + ')' : '') + '.', ko.length ? 'error' : 'success');
+  _cmRafraichir();
+}
+async function commCtlAnnulerDoublons() {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var l = commCtlCalculer().doublons.reduce(function (a, g) { return a.concat(g.extras); }, []).filter(_cmActionnable);
+  if (!l.length) return;
+  if (!confirm('Annuler ' + l.length + ' doublon(s) (la commission la plus ancienne est conservée) ? Les charges comptabilisées seront extournées.')) return;
+  var ok = 0, ko = [];
+  for (var i = 0; i < l.length; i++) { var e = await _cmAnnulerEtExtourner(l[i], 'doublon'); if (e) ko.push(e); else ok++; }
+  toast(ok + ' doublon(s) annulé(s)' + (ko.length ? ', ' + ko.length + ' en échec (' + ko[0] + ')' : '') + '.', ko.length ? 'error' : 'success');
+  _cmRafraichir();
+}
+async function _cmRattacher(c) {
+  var v = _cmCandidatVersement(c); if (!v) return false;
+  var avant = JSON.parse(JSON.stringify(c)), cl = (DATA.clients || []).find(function (x) { return x.id === v.client_id; });
+  c.versement_id = v.id; c.client_id = v.client_id;
+  if (cl) { c.client_nom = ((cl.prenoms || '') + ' ' + (cl.nom || '')).trim(); c.programme_id = cl.programme_id || c.programme_id || ''; }
+  c._modifie = new Date().toISOString();
+  await dbPut('commissions', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', c);
+  await logAudit('commissions', c.id, 'update', avant, c);
+  return true;
+}
+async function commCtlRattacher(id) {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var c = (DATA.commissions || []).find(function (x) { return x.id === id; }); if (!c) return;
+  toast(await _cmRattacher(c) ? 'Commission rattachée au versement.' : 'Aucune correspondance sûre.', 'success');
+  _cmRafraichir();
+}
+async function commCtlRattacherToutes() {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var l = commCtlCalculer().orphelines.filter(function (x) { return _cmActionnable(x.c) && x.cand; }).map(function (x) { return x.c; });
+  if (!l.length || !confirm('Rattacher ' + l.length + ' commission(s) au versement de même date et même montant ?')) return;
+  var n = 0; for (var i = 0; i < l.length; i++) { if (await _cmRattacher(l[i])) n++; }
+  toast(n + ' commission(s) rattachée(s).', 'success'); _cmRafraichir();
+}
+async function commCtlReaffecter(id) {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var c = (DATA.commissions || []).find(function (x) { return x.id === id; }); if (!c || c.statut !== 'a_payer') return;
+  var cl = (DATA.clients || []).find(function (x) { return x.id === c.client_id; }); if (!cl) return;
+  var nom = _cmNomBenef(cl, c.type_beneficiaire);
+  if (!confirm('Réaffecter cette commission de ' + fmtF(c.montant_comm || 0) + ' F de « ' + (c.beneficiaire || '—') + ' » à « ' + nom + ' » ?')) return;
+  var avant = JSON.parse(JSON.stringify(c));
+  c.beneficiaire = nom;
+  if (c.type_beneficiaire === 'commercial') c.beneficiaire_id = cl.commercial_id || '';
+  else { c.apporteur_id = cl.apporteur_id || ''; var ap = (DATA.apporteurs || []).find(function (a) { return a.id === cl.apporteur_id; }); if (ap && ap.tel) c.beneficiaire_tel = ap.tel; }
+  c._modifie = new Date().toISOString();
+  await dbPut('commissions', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', c);
+  await logAudit('commissions', c.id, 'update', avant, c);
+  toast('Commission réaffectée.', 'success'); _cmRafraichir();
+}
+
 /* ── Contrôles Ventes : cohérence souscripteurs ↔ lots, réservations, prix ──
    Lecture seule, sauf la libération (réservée aux managers) d'une réservation
    expirée SANS aucun versement : au-delà, le dossier passe par la relance ou
@@ -36384,7 +36589,7 @@ async function annulerCommission(id) {
 async function verifierCommissionsVersements(reparer) {
   var rapport = { total_versements: DATA.versements.length, sans_intervenant: 0,
                   manquantes_commercial: [], manquantes_apporteur: [],
-                  doublons: [], orphelines: [], creees: 0, doublons_supprimees: 0, orphelines_supprimees: 0 };
+                  doublons: [], orphelines: [], creees: 0, doublons_supprimees: 0, orphelines_supprimees: 0, annulees_extournees: 0 };
 
   // Doublons : >1 commission active de même type pour un versement — on garde
   // la plus ancienne (created_at), les suivantes sont les doublons à traiter.
@@ -36447,6 +36652,13 @@ async function verifierCommissionsVersements(reparer) {
       var com=(DATA.commissions||[]).find(function(x){return x.id===aSupprimer[j];});
       if (!com) continue;
       if (com.statut==='payee') continue; // jamais de suppression automatique d'une commission déjà payée
+      /* Charge déjà comptabilisée : supprimer la commission laisserait l'écriture sans contrepartie.
+         On l'ANNULE et on EXTOURNE sa charge (la commission reste visible, statut « annulée »). */
+      if (com.ecriture_id && !com.ecriture_extourne_id) {
+        try { await annulerCommissionSilencieux(com, rapport.doublons.indexOf(com.id)!==-1 ? 'doublon' : 'orpheline : versement inexistant'); rapport.annulees_extournees++; }
+        catch(e) { console.warn('Extourne impossible pour la commission', com.id, e); }
+        continue;
+      }
       await logAudit('commissions', com.id, 'delete', com, null);
       DATA.commissions = DATA.commissions.filter(function(x){ return x.id!==com.id; });
       try{ await deleteRecord('commissions', com.id); }catch(e){}
@@ -36474,13 +36686,13 @@ async function verifierCommissionsVersementsUI(reparer){
     var c=(DATA.clients||[]).find(function(x){return x.id===v.client_id;}); return c?((c.nom||'')+' '+(c.prenoms||'')).trim():'—'; };
   var ligneComm=function(id){ var c=(DATA.commissions||[]).find(function(x){return x.id===id;}); if(!c) return null;
     return '<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-top:1px solid var(--bord2,#E2E8F0);">'
-      +'<span>'+escHtml(nomClient(c.versement_id))+' · '+escHtml(c.type_beneficiaire)+' · '+fmtF(c.montant)+' F · '+(c.date_versement||'')+'</span>'
+      +'<span>'+escHtml(nomClient(c.versement_id))+' · '+escHtml(c.type_beneficiaire)+' · '+fmtF(c.montant_comm||0)+' F · '+(c.date_versement||'')+'</span>'
       +(c.statut==='payee'?'<span style="color:var(--or);">payée — non touchée</span>':'<span style="color:var(--rouge);">à traiter</span>')+'</div>';
   };
   var doublonsLignes = r.doublons.map(ligneComm).filter(Boolean);
   var orphelinesLignes = r.orphelines.map(ligneComm).filter(Boolean);
   var confirmation = reparer ? ('<div style="margin-top:6px;font-size:11.5px;color:var(--vert);">✅ '+r.creees+' commission(s) créée(s), '
-    +r.doublons_supprimees+' doublon(s) supprimé(s), '+r.orphelines_supprimees+' orpheline(s) supprimée(s).</div>') : '';
+    +r.doublons_supprimees+' doublon(s) supprimé(s), '+r.orphelines_supprimees+' orpheline(s) supprimée(s), '+r.annulees_extournees+' annulée(s) avec extourne de la charge comptabilisée.</div>') : '';
   var nbManq=r.manquantes_commercial.length+r.manquantes_apporteur.length;
   window._vcvDernierRapport = r;
   if (!nbManq && !r.doublons.length && !r.orphelines.length){
@@ -36498,7 +36710,7 @@ async function verifierCommissionsVersementsUI(reparer){
     +(doublonsLignes.length?('<div style="margin-top:8px;"><b style="font-size:12px;">Doublons (même versement, même type)</b>'+doublonsLignes.join('')+'</div>'):'')
     +(orphelinesLignes.length?('<div style="margin-top:8px;"><b style="font-size:12px;">Orphelines (versement déjà supprimé)</b>'+orphelinesLignes.join('')+'</div>'):'')
     +(nbManq?('<div style="margin-top:8px;font-size:11px;color:var(--blanc-dim);">'+nbManq+' versement(s) éligible(s) sans commission générée.</div>'):'')
-    +'<div style="margin-top:10px;"><button class="btn btn-danger btn-sm" onclick="verifierCommissionsVersementsUI(true)">🧹 Générer les manquantes et supprimer doublons/orphelines (hors commissions payées)</button></div>'
+    +'<div style="margin-top:10px;"><button class="btn btn-danger btn-sm" onclick="verifierCommissionsVersementsUI(true)">🧹 Générer les manquantes, supprimer les doublons/orphelines non comptabilisés et extourner les comptabilisés (hors commissions payées)</button></div>'
     +'</div>';
 }
 
@@ -36552,6 +36764,10 @@ async function regenererToutesCommissions() {
   var aConserver = (DATA.commissions||[]).filter(function(c){ return c.statut==='payee'; });
   var aSupprimer = (DATA.commissions||[]).filter(function(c){ return c.statut!=='payee'; });
   for (var i=0; i<aSupprimer.length; i++) {
+    /* Charge comptabilisée : extournée avant suppression, sinon la régénération la comptabilise une 2e fois. */
+    if (aSupprimer[i].ecriture_id && !aSupprimer[i].ecriture_extourne_id && aSupprimer[i].statut !== 'annulee') {
+      try { await annulerCommissionSilencieux(aSupprimer[i], 'régénération des commissions'); } catch(e) { console.warn('Extourne impossible', aSupprimer[i].id, e); }
+    }
     try { await deleteRecord('commissions', aSupprimer[i].id); } catch(e){}
   }
   DATA.commissions = aConserver;
@@ -117002,7 +117218,7 @@ async function cederLotsPartEntreprise(opId) {
 ══════════════════════════════════════════════════════════ */
 
 /* Annulation silencieuse d'une commission (avec extourne si comptabilisée) */
-async function annulerCommissionSilencieux(comm) {
+async function annulerCommissionSilencieux(comm, motif) {
   if (!comm || comm.statut === 'annulee' || comm.statut === 'payee') return;
   if (comm.ecriture_id && !comm.ecriture_extourne_id && typeof getCompteCommission === 'function') {
     var compteCharge    = getCompteCommission(comm.type_beneficiaire, 'charge');
@@ -117014,7 +117230,7 @@ async function annulerCommissionSilencieux(comm) {
       id: uid(), ref: ref, date: today(),
       piece: 'EXT-' + (comm.ecriture_ref || comm.id.slice(-6).toUpperCase()),
       type: 'charge',
-      libelle: 'Extourne commission ' + typeB.toLowerCase() + ' — ' + (comm.beneficiaire || '') + ' (modification versement)',
+      libelle: 'Extourne commission ' + typeB.toLowerCase() + ' — ' + (comm.beneficiaire || '') + ' (' + (motif || 'modification versement') + ')',
       compte: compteProvision, compte_debit: compteProvision, compte_credit: compteCharge,
       montant: comm.montant_comm, mode: 'commission', programme_id: '',
       division: _resolveDivisionEcriture('client', comm.client_id),
@@ -117028,6 +117244,7 @@ async function annulerCommissionSilencieux(comm) {
     comm.ecriture_extourne_ref = ref;
   }
   comm.statut = 'annulee';
+  if (motif) { comm.annule_motif = motif; comm.annule_le = new Date().toISOString(); }
   await dbPut('commissions', comm);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', comm);
 }
@@ -149394,6 +149611,14 @@ goTo = function(page) {
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-pa-rapport')">Fermer</button><button class="btn btn-secondary" onclick="paImprimerCourse(_paRapportId,'rapport')">🖨️ Aperçu / imprimer</button>
       <button class="btn btn-secondary" id="pra-btn-brouillon" onclick="paRapportEnregistrer(false)">💾 Brouillon</button><button class="btn btn-primary" id="pra-btn-transmettre" onclick="paRapportEnregistrer(true)">📤 Transmettre à la hiérarchie</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-comm-ctl">
+  <div class="modal" style="max-width:1100px;width:96vw;">
+    <div class="modal-header"><h3>🔎 Contrôles commissions</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-comm-ctl')">✕</button></div>
+    <div class="modal-body"><div id="commctl-corps"></div></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-comm-ctl')">Fermer</button></div>
   </div>
 </div>
 
