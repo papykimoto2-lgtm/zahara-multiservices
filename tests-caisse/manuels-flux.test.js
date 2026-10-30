@@ -17,15 +17,20 @@ test('chaque manuel du catalogue pointe vers un PDF existant et chaque diagramme
   });
 });
 
-test("l'onglet affiche manuels et diagrammes, et la recherche filtre", async () => {
+test("les diagrammes n'apparaissent qu'au clic sur un manuel", async () => {
   const app = await ouvrirApp();
   const r = await app.page.evaluate(function () {
     switchTab('params', 'manuels');
-    var n1 = document.querySelectorAll('#manuels-liste tbody tr').length, d1 = document.querySelectorAll('#manuels-flux .manuel-flux').length;
+    var avant = { carte: getComputedStyle(document.getElementById('manuels-flux-card')).display, flux: document.querySelectorAll('#manuels-flux .manuel-flux').length };
+    manuelsSelectionner('PRO-ATT');
+    var apres = { carte: getComputedStyle(document.getElementById('manuels-flux-card')).display, flux: document.querySelectorAll('#manuels-flux .manuel-flux').length, attendu: MANUELS_CATALOGUE.filter(function (m) { return m.ref === 'PRO-ATT'; })[0].flux.length };
+    manuelsSelectionner('PRO-ATT');
+    var ferme = getComputedStyle(document.getElementById('manuels-flux-card')).display;
     document.getElementById('manuels-recherche').value = 'caisse'; renderManuelsFlux();
-    var n2 = document.querySelectorAll('#manuels-liste tbody tr').length, d2 = document.querySelectorAll('#manuels-flux .manuel-flux').length;
-    return { n1: n1, d1: d1, n2: n2, d2: d2, nf: Object.keys(MANUELS_FLUX).length, sans: MANUELS_CATALOGUE.filter(function (m) { return !m.flux.length; }).length };
+    return { avant: avant, apres: apres, ferme: ferme, lignes: document.querySelectorAll('#manuels-liste tbody tr').length, nm: MANUELS_CATALOGUE.length };
   });
-  assert.equal(r.n1, 8); assert.equal(r.d1, r.nf); assert.equal(r.sans, 0);
-  assert.equal(r.n2, 1); assert.ok(r.d2 >= 1 && r.d2 < r.nf);
+  assert.equal(r.avant.carte, 'none'); assert.equal(r.avant.flux, 0);
+  assert.equal(r.apres.carte, 'block'); assert.equal(r.apres.flux, r.apres.attendu);
+  assert.equal(r.ferme, 'none');
+  assert.ok(r.lignes >= 1 && r.lignes < r.nm);
 });
