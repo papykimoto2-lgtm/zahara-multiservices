@@ -44995,7 +44995,7 @@ var TVA_FNE_DEBUT = '2025-12-01';
 var _tvaJ = { de: '', a: '', mois: '', onglet: 'justifier', filtre: 'a_traiter', piece: null };
 function _tvaJNomTiers(e) {
   var l = ecrLignes(e).filter(function(x){ return String(x.compte || '').indexOf('401') === 0 && x.sens === 'C'; })[0], id = l ? ecrTiersLigne(e, l) : '', nom = '';
-  if (e.tva_justif && e.tva_justif.fournisseur) nom = e.tva_justif.fournisseur;
+  var jj = e.tva_justif || daFneVersJustif(e); if (jj && jj.fournisseur) nom = jj.fournisseur;
   if (!nom && id) {
     var t = (DATA.fournisseurs || []).filter(function(x){ return x.id === id; })[0] || (DATA.constructeurs || []).filter(function(x){ return x.id === id; })[0] || (DATA.tiers_comptables || []).filter(function(x){ return x.id === id; })[0];
     nom = t ? (t.nom || t.raison_sociale || t.nom_organisation || '') : '';
@@ -45011,7 +45011,7 @@ function tvaJAnalyse(e) {
     if (l.sens === 'D' && TVA_DEDUCTIBLE.some(function(x){ return String(l.compte || '').indexOf(x[0]) === 0; })) tva += parseFloat(l.montant) || 0;
   });
   if (Math.round(tva) <= 0) return null;
-  var j = e.tva_justif || null, etat, raison = '';
+  var j = e.tva_justif || daFneVersJustif(e) || null, etat, raison = '';
   if (e.date < TVA_FNE_DEBUT) etat = 'avant_fne';
   else if (!j) { etat = 'a_justifier'; raison = 'Aucune FNE enregistrée'; }
   else if (j.statut === 'fne') {
@@ -45094,6 +45094,9 @@ function tvaRapprochement(mois) {
   if (ni.length) add('tiers', 'attention', ni.length + ' pièce(s) sans fournisseur identifié', 'Sans nom de fournisseur, le classement et le suivi des FNE manquantes sont faussés : renseignez-le dans « Justifier ».', { lib: 'Compléter', js: 'tvaJAller(\'justifier\',\'' + mois + '\')' });
   else add('tiers', 'ok', 'Fournisseur identifié sur toutes les pièces');
 
+  /* 5 bis. Demandes d'achat payées dans le mois sans FNE enregistrée */
+  var daSans = (DATA.fiches_engagement_depense || []).filter(function(d){ return d.statut === 'decaissee' && String(d.decaisse_le || '').slice(0, 7) === mois && daFneEtat(d).cle === 'retard'; });
+  if (daSans.length) add('da', 'attention', daSans.length + ' demande(s) d\'achat payée(s) sans FNE enregistrée depuis plus de ' + FNE_DELAI_HEURES + ' h', daSans.slice(0, 8).map(function(d){ return escHtml(d.numero_da || d.numero_fed || '') + ' (' + escHtml(d.beneficiaire || 'fournisseur') + ', ' + fmtF(d.montant) + ' F)'; }).join(' · ') + '. Réclamez la FNE à l\'acheteur ou enregistrez « sans FNE ».', { lib: 'Demandes d\'achat', js: 'closeModal(\'modal-tva-justif\');goTo(\'budget\');switchTab(\'budget\',\'da\')' });
   /* 6. Factures de vente (FNE émises) */
   var fv = (DATA.factures_client || []).filter(function(x){ return x.date && x.date.slice(0, 7) === mois && x.mode_facture !== 'simple'; });
   var enErr = fv.filter(function(x){ return x.statut_fne === 'erreur' || x.statut_fne === 'a_certifier'; }), cert = fv.filter(function(x){ return x.statut_fne === 'certifiee'; });
@@ -117097,7 +117100,7 @@ function budgetRenderDA() {
   if (badge) { badge.textContent = nbAImprimer; badge.style.display = nbAImprimer ? 'inline-block' : 'none'; }
   if (!liste.length) { box.innerHTML = '<div class="alert alert-info" style="text-align:center;padding:20px;">Aucune Demande d\'Achat pour l\'instant — une fiche apparaît ici dès qu\'elle est validée.</div>'; return; }
 
-  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N° DA</th><th>Objet</th><th>Ligne</th><th style="text-align:right;">Montant</th><th>Validée par</th><th>Statut</th><th></th></tr></thead><tbody>';
+  var html = '<div class="card"><div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>N° DA</th><th>Objet</th><th>Ligne</th><th style="text-align:right;">Montant</th><th>Validée par</th><th>Statut</th><th>FNE</th><th></th></tr></thead><tbody>';
   liste.forEach(function(d) {
     html += '<tr>'
       + '<td><b>' + escHtml(d.numero_da||'') + '</b><div style="font-size:10px;color:var(--blanc-dim);">ex-' + escHtml(d.numero_fed||'') + '</div></td>'
@@ -117108,11 +117111,91 @@ function budgetRenderDA() {
           ? '<span class="badge" style="background:rgba(16,163,74,0.15);color:var(--vert);">✅ Payée le ' + dateShort(d.decaisse_le) + '</span>'
           : '<span class="badge" style="background:rgba(184,115,51,0.15);color:var(--or);">🕓 À décaisser</span>')
       + '</td>'
-      + '<td><button class="btn btn-secondary btn-sm btn-icon" title="Imprimer la DA" onclick="imprimerDA(\'' + d.id + '\')">🖨️</button></td>'
+      + '<td>' + (function(){ var e = daFneEtat(d); return '<span class="badge ' + e.badge + '" style="font-size:10px;">' + escHtml(e.lib) + '</span>'; })() + '</td>'
+      + '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm btn-icon" title="Imprimer la DA" onclick="imprimerDA(\'' + d.id + '\')">🖨️</button> '
+      + '<button class="btn btn-secondary btn-sm btn-icon" title="Bon d\'achat à remettre à l\'acheteur (exige la FNE)" onclick="imprimerBonAchat(\'' + d.id + '\')">🧾</button> '
+      + '<button class="btn btn-secondary btn-sm btn-icon" title="Enregistrer la FNE reçue du fournisseur" onclick="daFneOuvrir(\'' + d.id + '\')">📥</button></td>'
       + '</tr>';
   });
   html += '</tbody></table></div></div>';
   box.innerHTML = html;
+}
+
+/* ══ Bon d'achat fournisseur et suivi de la FNE ══
+   Une Demande d'Achat validée donne lieu à un bon d'achat imprimable remis à l'acheteur : il rappelle ce qui est autorisé et exige la FNE au NCC de l'entreprise.
+   La FNE reçue est ensuite enregistrée sur la DA ; elle justifie automatiquement la TVA de l'écriture de la dépense (module « Justif. TVA »). */
+var BON_ACHAT_VALIDITE_JOURS = 7, FNE_DELAI_HEURES = 48;
+function daFneEtat(d) {
+  var s = d.fne_suivi || {};
+  if (s.statut === 'recue') return { cle: 'recue', lib: '✓ FNE reçue' + (s.numero ? ' ' + s.numero : ''), badge: 'badge-vert' };
+  if (s.statut === 'sans_fne') return { cle: 'sans_fne', lib: '✗ Sans FNE', badge: 'badge-rouge' };
+  if (d.statut === 'decaissee') {
+    var h = (Date.now() - new Date(d.decaisse_le || 0).getTime()) / 3600000;
+    if (h > FNE_DELAI_HEURES) return { cle: 'retard', lib: '⏰ FNE en retard (' + Math.max(1, Math.floor(h / 24)) + ' j)', badge: 'badge-rouge' };
+    return { cle: 'attendue', lib: '⏳ FNE attendue', badge: 'badge-or' };
+  }
+  return { cle: 'avant', lib: s.bon_imprime_le ? '🧾 Bon remis' : 'Bon à remettre', badge: 'badge-neutre' };
+}
+/* La FNE saisie sur la DA vaut justification de la TVA de l'écriture de caisse correspondante (id « ecr_cse_<mouvement> »). */
+function daFneVersJustif(e) {
+  if (!e || String(e.id || '').indexOf('ecr_cse_') !== 0) return null;
+  var mvt = String(e.id).slice(8), d = (DATA.fiches_engagement_depense || []).filter(function(x){ return x.mouvement_caisse_id === mvt; })[0], s = d && d.fne_suivi;
+  if (!s || (s.statut !== 'recue' && s.statut !== 'sans_fne')) return null;
+  return { statut: s.statut === 'recue' ? 'fne' : 'sans_fne', fne_numero: s.numero || '', fne_tva: s.tva == null ? '' : s.tva, ncc_ok: !!s.ncc_ok, fournisseur: d.beneficiaire || '', note: 'Demande d\'achat ' + (d.numero_da || ''), le: s.recue_le || '' };
+}
+async function imprimerBonAchat(id) {
+  var d = (DATA.fiches_engagement_depense || []).filter(function(x){ return x.id === id; })[0]; if (!d) return;
+  if (d.statut !== 'validee' && d.statut !== 'decaissee') { toast('🔒 Le bon d\'achat n\'existe que pour une Demande d\'Achat validée.', 'error'); return; }
+  var p = DATA.params || {}, E = escHtml, dup = d.statut === 'decaissee' || (d.fne_suivi && d.fne_suivi.bon_imprime_le);
+  var lim = new Date(); lim.setDate(lim.getDate() + BON_ACHAT_VALIDITE_JOURS);
+  var lignes = (d.lignes || []).map(function(l){ return '<tr><td>' + E(l.designation) + '</td><td class="num">' + (l.qte || 0) + '</td><td class="num">' + fmtF((l.qte || 0) * (l.pu || 0)) + ' F</td></tr>'; }).join('');
+  var div = d.division_id && typeof _nomDivision === 'function' ? _nomDivision(d.division_id) : '';
+  var ncc = p.dgi || '', soc = p.societe || 'ImmoSuite ERP';
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bon d\'achat ' + E(d.numero_da || '') + '</title><style>'
+    + 'body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:18px;max-width:700px;margin:0 auto;}h1{font-size:18px;margin:0;color:#B87333;}'
+    + 'table{width:100%;border-collapse:collapse;margin:8px 0;}td,th{border:1px solid #999;padding:5px 7px;text-align:left;}th{background:#efeae3;font-size:11px;}.num{text-align:right;}'
+    + '.fne{border:3px solid #1A6B3A;border-radius:8px;padding:10px 14px;background:#F0FBF4;margin:12px 0;}.fne h2{margin:0 0 6px;font-size:14px;color:#1A6B3A;}.fne li{margin:3px 0;}'
+    + '.coupon{border:2px dashed #555;border-radius:6px;padding:10px 14px;margin-top:18px;}.sig{display:flex;gap:30px;margin-top:26px;font-size:11px;}.sig div{flex:1;border-top:1px solid #333;padding-top:3px;}</style></head><body>'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #B87333;padding-bottom:10px;"><div><div style="font-size:15px;font-weight:800;">' + E(soc) + '</div><div style="font-size:11px;">' + E(p.adresse || '') + '<br>NCC : <strong>' + E(ncc || '—') + '</strong>' + (p.rccm ? ' · RCCM ' + E(p.rccm) : '') + (p.tel ? ' · ' + E(p.tel) : '') + '</div></div>'
+    + '<div style="text-align:right;"><h1>BON D\'ACHAT</h1><div style="font-weight:700;">' + E(d.numero_da || '') + (dup ? ' — DUPLICATA' : '') + '</div><div style="font-size:11px;">Valable jusqu\'au ' + lim.toLocaleDateString('fr-FR') + '</div></div></div>'
+    + '<table style="margin-top:10px;"><tbody><tr><th style="width:30%;">Acheteur autorisé</th><td>' + E(d.soumis_par || '—') + '</td></tr><tr><th>Fournisseur</th><td>' + E(d.beneficiaire || '—') + '</td></tr>'
+    + '<tr><th>Objet / destination</th><td>' + E(d.objet || '') + (div ? ' — ' + E(div) : '') + '</td></tr><tr><th>Montant maximum autorisé (TTC)</th><td><strong>' + fmtF(d.montant) + ' FCFA</strong></td></tr></tbody></table>'
+    + '<table><thead><tr><th>Désignation autorisée</th><th class="num">Qté</th><th class="num">Montant</th></tr></thead><tbody>' + lignes + '</tbody></table>'
+    + '<div class="fne"><h2>🧾 EXIGEZ LA FACTURE NORMALISÉE ÉLECTRONIQUE (FNE)</h2><div>Sans FNE à notre nom, la TVA payée n\'est <strong>pas récupérable</strong> : l\'entreprise perd 18 % de l\'achat.</div><ul>'
+    + '<li>Faire établir la FNE au nom de <strong>' + E(soc) + '</strong>, NCC <strong>' + E(ncc || '—') + '</strong> (à communiquer <u>avant</u> l\'établissement de la facture).</li>'
+    + '<li>Vérifier avant de payer : logo FNE, QR code, numéro de facture, NCC ci-dessus, TVA détaillée.</li>'
+    + '<li>Une facture manuscrite, un reçu ou un ticket de caisse ordinaire <strong>ne suffit pas</strong>.</li>'
+    + '<li>Rapporter la FNE à la comptabilité <strong>sous ' + FNE_DELAI_HEURES + ' h</strong> après l\'achat.</li></ul></div>'
+    + '<div class="sig"><div>Demandeur : ' + E(d.soumis_par || '') + '</div><div>Autorisé par : ' + E(d.valide_par || '') + (d.valide_le ? ' le ' + E(String(d.valide_le).slice(0, 10)) : '') + '</div><div>Acheteur (signature)</div></div>'
+    + '<div class="coupon"><strong>✂ Coupon de remise de la FNE</strong> — DA ' + E(d.numero_da || '') + '<table><tbody><tr><th>N° de la FNE</th><td>&nbsp;</td><th>Date</th><td>&nbsp;</td></tr><tr><th>Montant TTC</th><td>&nbsp;</td><th>dont TVA</th><td>&nbsp;</td></tr><tr><th>NCC de l\'entreprise présent</th><td>☐ oui &nbsp; ☐ non</td><th>Reçu par (compta)</th><td>&nbsp;</td></tr></tbody></table></div>'
+    + '</body></html>';
+  openPrintPreview(html, 'Bon d\'achat — ' + (d.numero_da || ''), false);
+  if (!d.fne_suivi || !d.fne_suivi.bon_imprime_le) {
+    d.fne_suivi = d.fne_suivi || {}; d.fne_suivi.bon_imprime_le = new Date().toISOString(); d._modifie = new Date().toISOString();
+    await dbPut('fiches_engagement_depense', d); if (typeof syncToSupabase === 'function') syncToSupabase('pi_fiches_engagement_depense', d);
+    if (typeof budgetRenderDA === 'function') budgetRenderDA();
+  }
+}
+var _daFneId = null;
+function daFneOuvrir(id) {
+  var d = (DATA.fiches_engagement_depense || []).filter(function(x){ return x.id === id; })[0]; if (!d) return;
+  _daFneId = id; var s = d.fne_suivi || {}, set = function(i, v){ var el = document.getElementById(i); if (el) { if (el.type === 'checkbox') el.checked = !!v; else el.value = v == null ? '' : v; } };
+  set('dafne-statut', s.statut === 'sans_fne' ? 'sans_fne' : 'recue'); set('dafne-numero', s.numero); set('dafne-ttc', s.ttc != null ? s.ttc : d.montant); set('dafne-tva', s.tva); set('dafne-ncc', s.ncc_ok); set('dafne-note', s.note);
+  document.getElementById('dafne-titre').textContent = (d.numero_da || d.numero_fed || '') + ' — ' + (d.beneficiaire || 'fournisseur') + ' — ' + fmtF(d.montant) + ' FCFA'; daFneStatut(); openModal('modal-da-fne');
+}
+function daFneStatut() { var r = document.getElementById('dafne-statut').value === 'recue'; var el = document.getElementById('dafne-bloc'); if (el) el.style.display = r ? '' : 'none'; }
+async function daFneEnregistrer() {
+  var d = (DATA.fiches_engagement_depense || []).filter(function(x){ return x.id === _daFneId; })[0]; if (!d) return;
+  if (!exigerDroit('Budget', 'm', 'l\'enregistrement de la FNE')) return;
+  var v = function(i){ return (document.getElementById(i) || {}).value || ''; }, st = v('dafne-statut');
+  if (st === 'recue' && !v('dafne-numero').trim()) { toast('Saisissez le numéro de la FNE.', 'error'); return; }
+  var prec = d.fne_suivi || {};
+  d.fne_suivi = { bon_imprime_le: prec.bon_imprime_le, statut: st, numero: st === 'recue' ? v('dafne-numero').trim() : '', ttc: parseFloat(v('dafne-ttc')) || 0, tva: v('dafne-tva') === '' ? null : (parseFloat(v('dafne-tva')) || 0),
+    ncc_ok: !!(document.getElementById('dafne-ncc') || {}).checked, note: v('dafne-note').trim(), recue_le: new Date().toISOString(), par: (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || '' };
+  d._modifie = new Date().toISOString();
+  await dbPut('fiches_engagement_depense', d); if (typeof syncToSupabase === 'function') syncToSupabase('pi_fiches_engagement_depense', d);
+  closeModal('modal-da-fne'); toast(st === 'recue' ? '✅ FNE enregistrée sur la demande d\'achat ' + (d.numero_da || '') + '.' : 'Achat enregistré « sans FNE » : la TVA ne sera pas récupérable.', st === 'recue' ? 'success' : 'warn');
+  if (typeof budgetRenderDA === 'function') budgetRenderDA();
 }
 
 function imprimerDA(id) {
@@ -148247,6 +148330,27 @@ goTo = function(page) {
       <button class="btn btn-secondary" onclick="closeModal('modal-prog-dates')">Fermer</button>
       <button class="btn btn-primary" id="pgd-enregistrer" onclick="progDatesEnregistrer()" disabled>💾 Enregistrer</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-da-fne">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header"><h3>🧾 FNE de l'achat</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-da-fne')">✕</button></div>
+    <div class="modal-body">
+      <div id="dafne-titre" style="font-weight:700;margin-bottom:10px;"></div>
+      <div class="form-group"><label>Pièce remise par le fournisseur</label><select class="form-control" id="dafne-statut" onchange="daFneStatut()"><option value="recue">FNE reçue (facture normalisée électronique)</option><option value="sans_fne">Aucune FNE délivrée</option></select></div>
+      <div id="dafne-bloc">
+        <div class="form-grid">
+          <div class="form-group"><label>N° de la FNE *</label><input class="form-control" id="dafne-numero"></div>
+          <div class="form-group"><label>Montant TTC (FCFA)</label><input type="number" class="form-control" id="dafne-ttc"></div>
+          <div class="form-group"><label>dont TVA (FCFA)</label><input type="number" class="form-control" id="dafne-tva"></div>
+        </div>
+        <div class="form-group"><label style="font-weight:normal;"><input type="checkbox" id="dafne-ncc"> Le NCC de l'entreprise figure sur la FNE</label></div>
+      </div>
+      <div class="form-group"><label>Note</label><input class="form-control" id="dafne-note"></div>
+      <div style="font-size:11px;color:var(--blanc-dim);">Cette FNE justifie automatiquement la TVA de l'écriture de la dépense dans « Justif. TVA ».</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-da-fne')">Annuler</button><button class="btn btn-primary" onclick="daFneEnregistrer()">💾 Enregistrer</button></div>
   </div>
 </div>
 
