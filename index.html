@@ -27,7 +27,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\'engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\'un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.163 · 2026-10-30 — Paramètres › « Manuels & flux » : catalogue des manuels de procédures (PDF) et diagrammes de flux imprimables ; v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\'engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\'un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\'agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\'un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\'envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\'application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\'entreprise sur l\'attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\'une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\'écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\'équilibre ; Sous-comptes de caisse : le compte d\'une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\'est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\'efface plus le cloud, et un ordre de remise à zéro diffusé n\'entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -6554,6 +6554,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div class="etape-btns">
               <button class="tab-btn" onclick="switchTab('params','import');renderImportPage()" title="Reprise de données depuis fichiers externes"><i>📥</i>Import de données</button>
               <button class="tab-btn" onclick="switchTab('params','backup');loadBackupParams()" title="Export, restauration et mise à zéro pour passage en production"><i>💾</i>Sauvegardes</button>
+              <button class="tab-btn" onclick="switchTab('params','manuels')" title="Tous les manuels de procédures (PDF) et diagrammes de flux"><i>📚</i>Manuels &amp; flux</button>
             </div>
           </div>
           <div class="etape">
@@ -7654,6 +7655,19 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
           <div class="card">
             <div id="conflits-sync-list"></div>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-params-manuels">
+          <div class="alert alert-info" style="margin-bottom:16px;">📚 Manuels de procédures (PDF) et diagrammes de flux. Un diagramme décrit qui fait quoi et les décisions ; le manuel détaille chaque étape.</div>
+          <div class="card">
+            <div class="card-title">📄 Manuels de procédures</div>
+            <input type="text" class="search-input" id="manuels-recherche" placeholder="🔍 Rechercher un manuel ou un diagramme…" oninput="renderManuelsFlux()" style="margin-bottom:10px;">
+            <div id="manuels-liste"></div>
+          </div>
+          <div class="card" style="margin-top:16px;">
+            <div class="card-title">🔀 Diagrammes de flux</div>
+            <div id="manuels-flux"></div>
           </div>
         </div>
 
@@ -30814,6 +30828,7 @@ function switchTab(context, tab) {
   // Hook : rafraîchir l'état de synchro à l'ouverture de l'onglet Cloud/Synchro
   if (context==='params' && tab==='cloud') { setTimeout(function(){ try { if (typeof renderSyncStatus==='function') renderSyncStatus(); } catch(e){} }, 250); }
   if (context==='params' && tab==='conflits' && typeof renderConflitsSync==='function') renderConflitsSync();
+  if (context==='params' && tab==='manuels' && typeof renderManuelsFlux==='function') renderManuelsFlux();
 
   // ── Traitement dédié : Rapports Commerciaux ─────────────────────────────
   // Implémentation ciblée pour éviter toute interférence avec les autres
@@ -41202,6 +41217,69 @@ function _conflitResume(store, e) {
     }
     default: return e.libelle || e.designation || e.numero || '';
   }
+}
+/* ── Manuels de procédures & diagrammes de flux (Paramètres › Manuels & flux) ──
+   Catalogue unique : ajouter un manuel = une ligne dans MANUELS_CATALOGUE (+ son PDF dans /docs) ; un diagramme = une entrée dans MANUELS_FLUX. */
+var MANUELS_CATALOGUE = [
+  { ref:'PRO-ATT-SUB', titre:"Soumission d'une attestation de solde pour validation hiérarchique", module:'Juridique / Validations', fichier:'MANUEL_SOUMISSION_ATTESTATION_SOLDE', flux:['att_soumission'] },
+  { ref:'PRO-ATT',     titre:"Attestation de solde (de la constatation du solde à la remise au notaire)", module:'Juridique / Documents', fichier:'MANUEL_ATTESTATION_SOLDE', flux:['att_soumission','att_cycle'] },
+  { ref:'PRO-SOUS',    titre:"Enregistrement d'un souscripteur", module:'Ventes & souscriptions', fichier:'MANUEL_ENREGISTREMENT_SOUSCRIPTEUR', flux:[] },
+  { ref:'PRO-CAI',     titre:"Caisse (ouverture, clôture, rapprochement)", module:'Caisse', fichier:'MANUEL_CAISSE', flux:[] },
+  { ref:'PRO-COMPTA',  titre:"Comptabilité (écriture, clôture, export)", module:'Comptabilité', fichier:'MANUEL_COMPTABILITE', flux:[] },
+  { ref:'PRO-FON',     titre:"Foncier : sécurisation du titre et coordination des démarches", module:'Foncier', fichier:'MANUEL_PROCEDURES_FONCIER', flux:[] },
+  { ref:'GUI-FON',     titre:"Foncier : manuel d'utilisation", module:'Foncier', fichier:'MANUEL_FONCIER', flux:[] },
+  { ref:'PRO-PTF',     titre:"Portefeuille foncier : acquisition, financement, mutation, cession", module:'Foncier', fichier:'MANUEL_PORTEFEUILLE_FONCIER', flux:[] }
+];
+/* Étape : {a: acteur, t: texte} ; décision : {a, t, d:[[libellé, suite], …]} */
+var MANUELS_FLUX = {
+  att_soumission: { titre:"Soumission d'une attestation de solde pour validation", ref:'PRO-ATT-SUB', etapes:[
+    { a:'Comptabilité / commercial', t:'Contrôler les prérequis : soldé, contrat non résilié, reçus, bons de caisse, références, écritures' },
+    { a:'Comptabilité / commercial', t:'Relire l’aperçu (œil) ; choisir le visa souscripteur' },
+    { a:'Comptabilité / commercial', t:'Cliquer « Soumettre au DG » → statut En attente', },
+    { a:'DG / gérant', t:'Menu Validations › 🔎 Pièces : examiner versements, reçus, bons de caisse, écritures' },
+    { a:'DG / gérant', t:'Décision ?', d:[['Validée','Texte figé → impression, portail, WhatsApp, notaire'],['Rejetée (motif)','Corriger la cause → re-soumettre'],['Plus soldé','Rejet automatique → rétablir le versement → re-soumettre']] },
+    { a:'Admin / gérant', t:'Validation erronée ? « Annuler la validation » (motif) → retour en brouillon' }
+  ]},
+  att_cycle: { titre:"Cycle complet de l'attestation de solde", ref:'PRO-ATT', etapes:[
+    { a:'Système', t:'Versement enregistré → solde recalculé → brouillon créé si soldé' },
+    { a:'Comptabilité / commercial', t:'Soumettre au DG' },
+    { a:'DG / gérant', t:'Valider ou rejeter', d:[['Validée','Suite du cycle'],['Rejetée','Retour au brouillon après correction']] },
+    { a:'Comptabilité / commercial', t:'Imprimer « Sans modif. » (version officielle)' },
+    { a:'Comptabilité / commercial', t:'Publier au portail → envoyer WhatsApp' },
+    { a:'Comptabilité / commercial', t:'Transmettre au notaire (balance)' }
+  ]}
+};
+function manuelsFluxHtml(f) {
+  var E = escHtml, coul = { 'Comptabilité / commercial':'#2563eb', 'DG / gérant':'#b45309', 'Admin / gérant':'#7c3aed', 'Système':'#475569' };
+  return '<div class="manuel-flux">' + f.etapes.map(function(e, i) {
+    var c = coul[e.a] || '#475569';
+    var box = '<div style="border:2px solid ' + c + ';border-radius:' + (e.d ? '18px' : '8px') + ';padding:8px 12px;background:rgba(127,127,127,.06);max-width:560px;margin:0 auto;">'
+      + '<div style="font-size:10px;font-weight:700;color:' + c + ';text-transform:uppercase;letter-spacing:.4px;">' + (i + 1) + ' · ' + E(e.a) + '</div>'
+      + '<div style="font-size:12px;margin-top:2px;">' + E(e.t) + '</div></div>';
+    var br = e.d ? '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:8px;">' + e.d.map(function(d) {
+      return '<div style="flex:1 1 150px;max-width:220px;border:1px dashed ' + c + ';border-radius:8px;padding:6px 8px;font-size:11px;"><b>' + E(d[0]) + '</b><br>' + E(d[1]) + '</div>'; }).join('') + '</div>' : '';
+    return box + br + (i < f.etapes.length - 1 ? '<div style="text-align:center;font-size:18px;line-height:20px;color:var(--dim);">↓</div>' : '');
+  }).join('') + '</div>';
+}
+function manuelsImprimerFlux(id) {
+  var f = MANUELS_FLUX[id]; if (!f) return;
+  var w = window.open('', '_blank', 'width=860,height=900'); if (!w) { toast('Fenêtre bloquée par le navigateur.', 'error'); return; }
+  w.document.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + escHtml(f.titre) + '</title></head><body style="font-family:Arial,sans-serif;margin:24px;color:#111;"><h2>' + escHtml(f.titre) + ' <small style="color:#666;">(' + escHtml(f.ref) + ')</small></h2>' + manuelsFluxHtml(f) + '<script>window.onload=function(){window.print();};<\/script></body></html>');
+  w.document.close();
+}
+function renderManuelsFlux() {
+  var lst = document.getElementById('manuels-liste'), fx = document.getElementById('manuels-flux'); if (!lst || !fx) return;
+  var E = escHtml, q = ((document.getElementById('manuels-recherche') || {}).value || '').toLowerCase().trim();
+  var ok = function(txt) { return !q || txt.toLowerCase().indexOf(q) !== -1; };
+  var ms = MANUELS_CATALOGUE.filter(function(m) { return ok(m.ref + ' ' + m.titre + ' ' + m.module); });
+  lst.innerHTML = ms.length ? '<div class="table-wrap"><table><thead><tr><th>Réf.</th><th>Manuel</th><th>Module</th><th>Diagrammes</th><th></th></tr></thead><tbody>' + ms.map(function(m) {
+    return '<tr><td>' + E(m.ref) + '</td><td>' + E(m.titre) + '</td><td>' + E(m.module) + '</td><td>' + (m.flux.length ? m.flux.map(function(id) { return '<a href="#" onclick="document.getElementById(\'manuel-flux-' + id + '\').scrollIntoView({behavior:\'smooth\'});return false;">' + E(MANUELS_FLUX[id].titre) + '</a>'; }).join('<br>') : '—') + '</td>'
+      + '<td style="white-space:nowrap;"><a class="btn btn-secondary btn-sm" href="docs/' + m.fichier + '.pdf" target="_blank" rel="noopener">📄 PDF</a></td></tr>';
+  }).join('') + '</tbody></table></div>' : '<div style="font-size:12px;color:var(--dim);">Aucun manuel trouvé.</div>';
+  var ids = Object.keys(MANUELS_FLUX).filter(function(id) { var f = MANUELS_FLUX[id]; return ok(f.titre + ' ' + f.ref); });
+  fx.innerHTML = ids.length ? ids.map(function(id) { var f = MANUELS_FLUX[id];
+    return '<div id="manuel-flux-' + id + '" style="margin-bottom:22px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><b>' + E(f.titre) + ' <span style="color:var(--dim);font-weight:400;">(' + E(f.ref) + ')</span></b><button class="btn btn-secondary btn-sm" onclick="manuelsImprimerFlux(\'' + id + '\')">🖨️ Imprimer</button></div>' + manuelsFluxHtml(f) + '</div>';
+  }).join('') : '<div style="font-size:12px;color:var(--dim);">Aucun diagramme trouvé.</div>';
 }
 function renderConflitsSync() {
   var el = document.getElementById('conflits-sync-list'); if (!el) return;
