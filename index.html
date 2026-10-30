@@ -31320,7 +31320,7 @@ function ventesGardeSouscription(s) {
   var nom = sfcNormalise((s.nom || '') + ' ' + (s.prenoms || ''));
   if (nom.length >= 3) {
     var memeNom = clients.filter(function (c) { return _cdNomComplet(c) === nom; });
-    if (memeNom.length) av.push('Un souscripteur de même nom existe déjà (dossier ' + (memeNom[0].dossier || '—') + ').');
+    if (memeNom.length) av.push('Un souscripteur de même nom existe déjà (dossier ' + (memeNom[0].dossier || '—') + ') : normal si c\'est le même client qui prend un autre appartement (une souscription par logement) ; sinon vérifiez qu\'il ne s\'agit pas d\'un doublon.');
   }
   if (!(s.lotIds || []).length) av.push('Aucun lot n\'est rattaché à cette souscription.');
   else if ((s.lotIds || []).some(function (id) { var l = (DATA.lots || []).find(function (x) { return x.id === id; }); return l && !(parseFloat(l.prix) > 0); })) av.push('Un des lots choisis n\'a pas de prix.');
