@@ -5412,19 +5412,21 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
 
         <div id="relances-tabs" class="tab-nav" style="margin-bottom:14px;"></div>
 
-        <div class="card">
+        <div class="card" id="relances-card-liste">
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>Client</th><th>Programme / Lot</th><th>Retard (mois)</th>
-                  <th>Montant Dû</th><th>Niveau</th><th>Dernière relance</th><th>Actions</th>
+                  <th>Montant Dû</th><th title="Part du prix du bien déjà versée (hors frais de souscription)">Taux de cotisation</th><th>Niveau</th><th>Dernière relance</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody id="tbody-relances"></tbody>
             </table>
           </div>
         </div>
+
+        <div class="card" id="relances-controle" style="display:none;"></div>
       </div>
 
       <!-- ── PARAMÈTRES ─────────────────────────────── -->
@@ -34434,7 +34436,7 @@ function getRetardataires() {
     if (clientFinancementBancaire(c)) return;    // financement bancaire : jamais en retard
     var e = echeancierClient(c, now, verse);     // null : aucune date de départ exploitable
     if (!e || e.ecart <= 0.5) return;
-    result.push({ id: c.id, nom: c.nom, prenoms: c.prenoms, tel: c.tel, dossier: c.dossier, moisRetard: e.moisRetard, montantDu: e.ecart, echeancier: e.mode, mensualite: e.mensualite });
+    result.push({ id: c.id, nom: c.nom, prenoms: c.prenoms, tel: c.tel, dossier: c.dossier, moisRetard: e.moisRetard, montantDu: e.ecart, echeancier: e.mode, mensualite: e.mensualite, verse: verse, total: parseFloat(c.montant_total) || 0, tauxCotisation: Math.min(100, verse / c.montant_total * 100) });
   });
   return result;
 }
@@ -50286,6 +50288,96 @@ function relanceEfficacite(retardataires) {
   (DATA.clients || []).forEach(function(c){ (c.promesses_paiement || []).forEach(function(p){ if (p.statut === 'annulee') return; var e = promesseEtat(c, p); if (e === 'tenue') tenues++; else if (e === 'non_tenue') nonTenues++; }); });
   return { relances: ids.length, regularises: regularises, taux: ids.length ? Math.round(regularises / ids.length * 100) : null, tenues: tenues, nonTenues: nonTenues };
 }
+/* ══ Contrôle des échéanciers des souscripteurs (lecture seule : rien n'est modifié) ══
+   Repère les fiches dont les données faussent ou empêchent le calcul du retard. Les anomalies « à corriger » (⛔) rendent le calcul impossible ou
+   inexact ; celles « à vérifier » (⚠️) sont des incohérences probables. Chaque ligne ouvre la fiche du souscripteur pour la corriger. */
+var ECH_ANOMALIES = {
+  sans_prix:    { grave: true, lib: 'Prix de vente non renseigné', aide: 'Ignoré du calcul du retard : renseignez le montant total.' },
+  sans_date:    { grave: true, lib: 'Aucune date de début ni de souscription', aide: 'Ignoré du calcul du retard : renseignez la date de début.' },
+  duree_absente: { grave: true, lib: 'Durée de l\'échéancier absente', aide: 'Programme sans date de livraison : la mensualité n\'est pas calculable, seul l\'apport est jugé dû. Renseignez la durée ou la livraison du programme.' },
+  apport_incoherent: { grave: true, lib: 'Apport négatif ou supérieur au prix', aide: 'Corrigez l\'apport dans la fiche.' },
+  date_debut_absente: { lib: 'Date de début absente', aide: 'La date de souscription est utilisée à la place.' },
+  debut_avant_souscription: { lib: 'Début antérieur de plus d\'un mois à la souscription', aide: 'Vérifiez la date de début de l\'échéancier.' },
+  debut_futur:  { lib: 'Date de début dans le futur', aide: 'Aucun retard n\'est compté avant cette date.' },
+  debut_avant_lancement: { lib: 'Début antérieur au lancement du programme', aide: 'Vérifiez la date de début ou celle du programme.' },
+  debut_apres_livraison: { lib: 'Début postérieur à la livraison du programme', aide: 'Tout le prix est considéré comme dû : vérifiez les dates.' },
+  duree_courte: { lib: 'Durée très courte (moins de 6 mois)', aide: 'Vérifiez qu\'il ne s\'agit pas d\'une saisie erronée (par exemple 1 au lieu de 60).' },
+  apport_sans_versement: { lib: 'Apport déclaré sans versement d\'apport enregistré', aide: 'Seul un versement encaissé compte : enregistrez-le ou corrigez l\'apport.' },
+  trop_percu:   { lib: 'Versements supérieurs au prix', aide: 'Vérifiez les versements ou le prix (modification, terrain supplémentaire…).' }
+};
+function echeancierAnomalies(c, ctx) {
+  var total = parseFloat(c.montant_total) || 0, apport = parseFloat(c.apport) || 0, v = ctx.verse, prog = ctx.prog, codes = [];
+  if (total <= 0) return { codes: ['sans_prix'], estime: false };
+  if (apport < 0 || apport > total) codes.push('apport_incoherent');
+  if (apport > 0 && v.apport + 0.5 < apport) codes.push('apport_sans_versement');
+  if (v.total > total + 0.5) codes.push('trop_percu');
+  var estime = false;
+  if (!(v.total >= total - 0.5) && !clientFinancementBancaire(c)) {
+    var debut = _dateLocale(c.date_debut), souscr = _dateLocale(c.date_souscription), ancre = debut || souscr;
+    if (!ancre) codes.push('sans_date');
+    else {
+      if (!debut) codes.push('date_debut_absente');
+      if (debut && souscr && (souscr - debut) / 86400000 > 31) codes.push('debut_avant_souscription');
+      if (ancre > ctx.now) codes.push('debut_futur');
+      var lanc = prog && _dateLocale(prog.date_lancement), livr = prog && _dateLocale(prog.date_livraison);
+      if (lanc && (lanc - ancre) / 86400000 > 31) codes.push('debut_avant_lancement');
+      if (livr && ancre > livr) codes.push('debut_apres_livraison');
+      if (!livr) { estime = true; var d = parseInt(c.duree, 10) || 0; if (d <= 0) codes.push('duree_absente'); else if (d < 6) codes.push('duree_courte'); }
+    }
+  }
+  return { codes: codes, estime: estime };
+}
+function echeancierControle(now) {
+  now = now || new Date();
+  var verses = {}, progs = {}, lignes = [], compteurs = {}, parProg = {}, nbEstimes = 0;
+  (DATA.versements || []).forEach(function(v){ if (v.statut === 'annule') return; var o = verses[v.client_id] || (verses[v.client_id] = { total: 0, apport: 0 }); if (_versementSurPrix(v)) o.total += parseFloat(v.montant) || 0; if (v.type === 'apport') o.apport += parseFloat(v.montant) || 0; });
+  (DATA.programmes || []).forEach(function(p){ progs[p.id] = p; });
+  (DATA.clients || []).forEach(function(c){
+    if (c.statut === 'resilie' || c.statut === 'inactif') return;
+    var prog = progs[c.programme_id] || null, an = echeancierAnomalies(c, { prog: prog, verse: verses[c.id] || { total: 0, apport: 0 }, now: now });
+    if (an.estime) { nbEstimes++; var nom = prog ? (prog.nom || '—') : '—'; parProg[nom] = (parProg[nom] || 0) + 1; }
+    if (!an.codes.length) return;
+    lignes.push({ c: c, prog: prog, codes: an.codes, grave: an.codes.some(function(k){ return ECH_ANOMALIES[k].grave; }) });
+    an.codes.forEach(function(k){ compteurs[k] = (compteurs[k] || 0) + 1; });
+  });
+  lignes.sort(function(a, b){ return (b.grave - a.grave) || String(a.c.nom || '').localeCompare(String(b.c.nom || '')); });
+  return { lignes: lignes, compteurs: compteurs, nbEstimes: nbEstimes, parProg: parProg };
+}
+var _ctrlFiltre = '';
+function relancesControleFiltrer(code) { _ctrlFiltre = (_ctrlFiltre === code) ? '' : code; relancesControleRender(); }
+function relancesControleCSVTexte() {
+  var r = echeancierControle(), q = function(x){ return '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"'; };
+  var rows = [['Dossier', 'Souscripteur', 'Programme', 'Niveau', 'Anomalies'].map(q).join(';')];
+  r.lignes.forEach(function(l){ rows.push([l.c.dossier || '', ((l.c.nom || '') + ' ' + (l.c.prenoms || '')).trim(), l.prog ? l.prog.nom : '', l.grave ? 'à corriger' : 'à vérifier', l.codes.map(function(k){ return ECH_ANOMALIES[k].lib; }).join(' | ')].map(q).join(';')); });
+  return '﻿' + rows.join('\n');
+}
+function relancesControleCSV() {
+  var blob = new Blob([relancesControleCSVTexte()], { type: 'text/csv;charset=utf-8' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'controle_echeanciers_' + today() + '.csv'; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function relancesControleRender() {
+  var host = document.getElementById('relances-controle'); if (!host) return;
+  var r = echeancierControle(), E = escHtml, A = ECH_ANOMALIES, LIM = 500;
+  var lignes = _ctrlFiltre ? r.lignes.filter(function(l){ return l.codes.indexOf(_ctrlFiltre) !== -1; }) : r.lignes;
+  var codes = Object.keys(A).filter(function(k){ return r.compteurs[k]; });
+  var chip = function(k){ return '<button type="button" class="btn btn-secondary btn-sm" style="margin:2px;' + (_ctrlFiltre === k ? 'border-color:var(--or);font-weight:700;' : '') + '" onclick="relancesControleFiltrer(\'' + k + '\')" title="' + E(A[k].aide) + '">' + (A[k].grave ? '⛔ ' : '⚠️ ') + E(A[k].lib) + ' <strong>' + r.compteurs[k] + '</strong></button>'; };
+  var estimes = Object.keys(r.parProg).sort(function(a, b){ return r.parProg[b] - r.parProg[a]; }).slice(0, 6).map(function(n){ return E(n) + ' (' + r.parProg[n] + ')'; }).join(' · ');
+  var h = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;"><div class="card-title" style="margin:0;flex:1;">🔎 Contrôle des échéanciers — ' + r.lignes.length + ' souscripteur(s) à vérifier sur ' + (DATA.clients || []).length + '</div>'
+    + '<button class="btn btn-secondary btn-sm" onclick="relancesControleCSV()">⬇ Exporter (CSV)</button></div>'
+    + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Lecture seule : rien n\'est modifié. ⛔ = à corriger (le calcul du retard est impossible ou inexact), ⚠️ = incohérence probable à vérifier. Cliquez sur une anomalie pour filtrer, sur un souscripteur pour ouvrir sa fiche.</div>'
+    + (r.nbEstimes ? '<div class="alert alert-warn" style="font-size:12px;margin-bottom:8px;">📐 <strong>' + r.nbEstimes + ' souscripteur(s)</strong> sont sur un échéancier <strong>estimé</strong> (programme sans date de livraison) : ' + estimes + '. Complétez les dates dans <a href="#" onclick="goTo(\'programmes\');return false;">Programmes</a>.</div>' : '')
+    + (codes.length ? '<div style="margin-bottom:8px;">' + codes.map(chip).join('') + (_ctrlFiltre ? ' <button type="button" class="btn btn-secondary btn-sm" onclick="relancesControleFiltrer(\'' + _ctrlFiltre + '\')">✕ Tout afficher</button>' : '') + '</div>' : '');
+  if (!lignes.length) { host.innerHTML = h + '<div style="padding:18px;color:var(--vert);text-align:center;">✅ Aucune anomalie détectée sur les fiches.</div>'; return; }
+  host.innerHTML = h + '<div class="table-wrap"><table><thead><tr><th>Souscripteur</th><th>Programme</th><th>Anomalies</th><th></th></tr></thead><tbody>'
+    + lignes.slice(0, LIM).map(function(l){
+        return '<tr><td><a href="#" style="color:inherit;" onclick="openClientModal(\'' + l.c.id + '\');return false;"><strong>' + E(((l.c.nom || '') + ' ' + (l.c.prenoms || '')).trim() || '—') + '</strong></a><br><span style="font-size:11px;color:var(--blanc-dim);">' + E(l.c.dossier || '') + '</span></td>'
+          + '<td style="font-size:12px;">' + E(l.prog ? l.prog.nom : '—') + '</td>'
+          + '<td>' + l.codes.map(function(k){ return '<span title="' + E(A[k].aide) + '" style="display:inline-block;margin:1px 3px 1px 0;font-size:11px;padding:1px 6px;border-radius:10px;background:' + (A[k].grave ? 'rgba(224,82,82,.14)' : 'rgba(184,115,51,.14)') + ';color:' + (A[k].grave ? 'var(--rouge)' : 'var(--or)') + ';">' + (A[k].grave ? '⛔ ' : '') + E(A[k].lib) + '</span>'; }).join('') + '</td>'
+          + '<td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="openClientModal(\'' + l.c.id + '\')">📁 Ouvrir</button></td></tr>';
+      }).join('')
+    + '</tbody></table></div>' + (lignes.length > LIM ? '<div style="font-size:11px;color:var(--blanc-dim);padding:6px;">Affichage limité aux ' + LIM + ' premiers : filtrez par anomalie ou exportez le CSV.</div>' : '');
+}
 /* Avertissement : souscripteurs jugés sur un échéancier estimé (programme sans date de livraison). */
 function relanceAvisEstime(retardataires) {
   var est = (retardataires || []).filter(function(r){ return r.echeancier === 'estime'; }); if (!est.length) return '';
@@ -50405,18 +50497,25 @@ function detectRelances() {
   retards.forEach(function(r){ var a = relanceAnalyse(r); analyses[r.id] = a; if (a.motifs.length) nbJour++; if (a.motifs.some(function(m){ return m.cle === 'promesse'; })) nbPromNonTenues++; });
   if (nbPromNonTenues && !APP._promAlerte) { APP._promAlerte = true; toast('⛔ ' + nbPromNonTenues + ' promesse(s) de paiement non tenue(s) : à relancer en priorité.', 'warn', 8000); }
 
+  var nbCtrl = echeancierControle().lignes.length;
   var tabs = document.getElementById('relances-tabs');
   if (tabs) {
     tabs.innerHTML = '<button type="button" class="tab-btn' + (_relancesNiveauActif==='jour'?' active':'') + '" onclick="setRelancesNiveau(\'jour\')" title="Promesses non tenues, nouveaux seuils, clients sans relance récente">📌 À traiter aujourd\'hui (' + nbJour + ')</button>'
       + '<button type="button" class="tab-btn' + (_relancesNiveauActif==='tous'?' active':'') + '" onclick="setRelancesNiveau(\'tous\')">📋 Tous (' + retards.length + ')</button>'
       + RELANCE_NIVEAUX.map(function(n){
           return '<button type="button" class="tab-btn' + (_relancesNiveauActif===n.cle?' active':'') + '" onclick="setRelancesNiveau(\'' + n.cle + '\')">' + n.icone + ' ' + n.label + ' (' + compteurs[n.cle] + ')</button>';
-        }).join('');
+        }).join('')
+      + '<button type="button" class="tab-btn' + (_relancesNiveauActif==='controle'?' active':'') + '" onclick="setRelancesNiveau(\'controle\')" title="Fiches dont les données faussent le calcul du retard (lecture seule)">🔎 Contrôle des échéanciers (' + nbCtrl + ')</button>';
   }
+
+  var modeCtrl = _relancesNiveauActif === 'controle', carteListe = document.getElementById('relances-card-liste'), carteCtrl = document.getElementById('relances-controle');
+  if (carteListe) carteListe.style.display = modeCtrl ? 'none' : '';
+  if (carteCtrl) carteCtrl.style.display = modeCtrl ? '' : 'none';
+  if (modeCtrl) { relancesControleRender(); return; }
 
   var tbody = document.getElementById('tbody-relances');
   if (!retards.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--vert);padding:24px;">✅ Aucun retard de paiement détecté</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--vert);padding:24px;">✅ Aucun retard de paiement détecté</td></tr>';
     return;
   }
 
@@ -50431,8 +50530,8 @@ function detectRelances() {
     return true;
   });
   if (!retardsAffiches.length) {
-    if (_relancesNiveauActif === 'jour' && !searchRel) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--vert);padding:24px;">✅ Rien à traiter aujourd\'hui : promesses en cours ou clients relancés récemment.</td></tr>'; return; }
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun souscripteur en retard ne correspond à ce filtre' + (searchRel ? ' « ' + escHtml(searchRel) + ' »' : '') + '.</td></tr>';
+    if (_relancesNiveauActif === 'jour' && !searchRel) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--vert);padding:24px;">✅ Rien à traiter aujourd\'hui : promesses en cours ou clients relancés récemment.</td></tr>'; return; }
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--blanc-dim);padding:24px;">Aucun souscripteur en retard ne correspond à ce filtre' + (searchRel ? ' « ' + escHtml(searchRel) + ' »' : '') + '.</td></tr>';
     return;
   }
 
@@ -50450,6 +50549,8 @@ function detectRelances() {
       + '<td>' + (prog ? prog.nom : '—') + (lot ? ' / Lot ' + lot.numero : '') + '</td>'
       + '<td style="color:var(--rouge);font-weight:bold;">' + r.moisRetard + ' mois' + (r.echeancier === 'estime' ? ' <span title="Programme sans date de livraison : retard estimé d\'après la durée saisie sur la fiche du souscripteur (l\'apport compte comme avance)" style="font-size:10px;color:var(--or);font-weight:600;white-space:nowrap;">≈ estimé</span>' : '') + '</td>'
       + '<td style="color:var(--rouge);">' + fcfa(r.montantDu) + '</td>'
+      + '<td title="' + fcfa(r.verse) + ' versés sur ' + fcfa(r.total) + '" style="white-space:nowrap;"><strong style="color:' + (r.tauxCotisation >= 70 ? 'var(--vert)' : r.tauxCotisation >= 30 ? 'var(--or)' : 'var(--rouge)') + ';">' + (Math.round(r.tauxCotisation * 10) / 10).toString().replace('.', ',') + ' %</strong>'
+        + '<div style="height:4px;background:rgba(128,128,128,.25);border-radius:2px;margin-top:3px;min-width:60px;"><div style="height:4px;width:' + Math.round(r.tauxCotisation) + '%;background:currentColor;opacity:.7;border-radius:2px;"></div></div></td>'
       + '<td><span class="badge ' + n.badge + '">' + n.icone + ' ' + n.label + '</span>' + promesseChipHtml(r, an) + (dosCtx ? '<br><a href="#" style="font-size:11px;color:var(--rouge);" title="Ouvrir le dossier contentieux" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\');return false;">⚖️ ' + escHtml(dosCtx.ref) + '</a>' : '') + '</td>'
       + '<td style="font-size:11px;">' + (lastRelance ? dateShort(lastRelance.date) : 'Jamais') + '</td>'
       + '<td style="white-space:nowrap;">'
@@ -62255,6 +62356,7 @@ function fcBadgeStatut(s) {
 function fcMsg(r, ok) { if (typeof toast === 'function') toast(r.ok ? (ok || 'Enregistré.') : r.erreur, r.ok ? 'success' : 'error'); return r.ok; }
 function fcRender() {
   var host = document.getElementById('fc-root'); if (!host) return;
+  try { fcAppliquerAjoutsRoles().catch(function(e){ console.warn('[Équipe interne] ajouts de rôles', e); }); } catch (e) {}
   var s = fcSynthese(), users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; });
   var kpi = function(t, v, c) { return '<div class="kpi-card" style="border-top-color:' + (c || 'var(--or)') + ';"><div class="kpi-label">' + t + '</div><div class="kpi-value" style="font-size:20px;">' + v + '</div></div>'; };
   var h = '<div class="card" style="border:1px solid var(--or);"><div class="card-title">📁 Dossiers fonciers — coordination des démarches</div>'
@@ -65800,6 +65902,33 @@ var FC_EQUIPE_ETAPES = {
   urb_livraison_financiers: ['commercial', '', ['juridique'], []], urb_maj_statut: ['foncier', '', [], []], urb_publication_souscripteur: ['commercial', 'foncier', [], []]
 };
 function fcEquipeEtape(code) { var q = FC_EQUIPE_ETAPES[code]; return q ? { exec: q[0], valide: q[1], appui: q[2], info: q[3] } : { exec: 'foncier', valide: '', appui: [], info: [] }; }
+/* Rattachement de rôles aux fonctions de l'équipe interne : ajouts appliqués UNE SEULE FOIS (décision du 30/10/2026).
+   Additif : on ajoute les rôles manquants, on ne retire jamais rien de ce qui est déjà configuré (Modèles de dossier › Équipe interne).
+   Foncier : seuls les rôles listés ici (le rôle d'Ingrid, « service Foncier (Copie) », n'en fait volontairement pas partie : il peut demander une validation, pas la rendre).
+   Exécuté par un administrateur, paramètres chargés, puis mémorisé dans les paramètres (fc_roles_ajouts_v1) : les autres postes le reçoivent par la synchronisation. */
+var FC_ROLES_AJOUTS = {
+  foncier: ['responsable_administratif'],
+  technique: ['responsable_technique'],
+  juridique: ['responsable_rh_et_juridique'],
+  commercial: ['responsable_commercial']
+};
+async function fcAppliquerAjoutsRoles() {
+  var P = DATA.params;
+  if (!P || P.id !== 'main' || P.fc_roles_ajouts_v1 || !APP.currentUser || !fcEstAdmin() || APP._fcAjoutsRolesEnCours) return false;
+  APP._fcAjoutsRolesEnCours = true;
+  try {
+    var map = Object.assign({}, P.fc_fonctions_roles || {}), change = false;
+    Object.keys(FC_ROLES_AJOUTS).forEach(function(f){
+      var actuel = fcRolesFonction(f).slice(), nouveau = actuel.slice();
+      FC_ROLES_AJOUTS[f].forEach(function(r){ if (nouveau.indexOf(r) === -1) nouveau.push(r); });
+      if (nouveau.length !== actuel.length) { map[f] = nouveau; change = true; }
+    });
+    if (change) P.fc_fonctions_roles = map;
+    P.fc_roles_ajouts_v1 = true;
+    await fcEnregistrerParams();
+    return change;
+  } finally { APP._fcAjoutsRolesEnCours = false; }
+}
 function fcRolesFonction(f) { var p = ((DATA.params || {}).fc_fonctions_roles || {})[f]; return Array.isArray(p) ? p : ((FC_FONCTIONS[f] || {}).roles || []); }
 function fcUsersFonction(f) { var roles = fcRolesFonction(f); return (DATA.users || []).filter(function(u){ return u && u.statut !== 'inactif' && roles.indexOf(u.role) !== -1; }); }
 /* Charge = étapes non terminées dont la personne est responsable, dans les dossiers actifs. */
