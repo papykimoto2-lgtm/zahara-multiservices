@@ -4041,6 +4041,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <div class="spacer"></div>
           <button class="btn btn-secondary btn-sm" onclick="openFlux('montage')">📊 Schéma des flux</button>
           <button class="btn btn-primary btn-sm" onclick="pgmRemplirSelect();pgmOuvrirPilotage()" title="Cycle de vie de l'opération et prochaine étape">🧭 Pilotage</button>
+          <button class="btn btn-secondary btn-sm" onclick="progDatesOuvrir()" title="Renseigner en masse les dates de lancement et de livraison : elles fixent le calcul du retard des souscripteurs">📅 Dates des programmes</button>
           <button class="btn btn-secondary btn-sm" onclick="exportProgrammesCSV()">⬇ Export</button>
           <button class="btn btn-primary" onclick="openProgrammeModal()">+ Nouveau Programme</button>
         </div>
@@ -4314,6 +4315,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
               <button class="tab-btn" onclick="switchTab('compta','periodique')" title="États sur période libre"><i>📅</i>État périodique</button>
               <button class="tab-btn" onclick="ouvrirCutoff()" title="Charges et produits constatés d'avance, factures non parvenues, factures à établir"><i>📆</i>Régularisations</button>
               <button class="tab-btn" onclick="ouvrirDeclarationTVA()" title="Déclaration mensuelle de TVA — collectée, déductible, prorata, liquidation"><i>🧾</i>TVA</button>
+              <button class="tab-btn" onclick="tvaJOuvrir()" title="TVA déductible : FNE des fournisseurs, fournisseurs conformes, manque à gagner"><i>🧾</i>Justif. TVA</button>
             </div>
           </div>
           <div class="etape">
@@ -44932,7 +44934,7 @@ var TVA_CPT_DUE = '4441', TVA_CPT_CREDIT = '4449';
 function _tvaCfg() {
   var c = (DATA.params && DATA.params.tva) || {};
   return { prorata: (c.prorata === undefined ? 100 : parseFloat(c.prorata)),
-    regime: c.regime || 'RNI', declarations: Array.isArray(c.declarations) ? c.declarations : [] };
+    regime: c.regime || 'RNI', declarations: Array.isArray(c.declarations) ? c.declarations : [], politique_fne: c.politique_fne === 'strict' ? 'strict' : 'signaler' };
 }
 async function _tvaSave(cfg) {
   DATA.params = DATA.params || {}; DATA.params.tva = cfg;
@@ -44973,13 +44975,174 @@ function calculerTVA(mois) {
   var totCol = col.reduce(function(a, x){ return a + x.mt; }, 0);
   var totDedBrut = ded.reduce(function(a, x){ return a + x.mt; }, 0);
   var pr = isNaN(cfg.prorata) ? 100 : cfg.prorata;
-  var totDed = totDedBrut * pr / 100;
+  /* TVA sans FNE valide : signalée (défaut) ou, en politique stricte, exclue de la déduction et passée en charge à la liquidation. */
+  var nj = tvaJNonJustifieeMois(mois), nonJustif = (cfg.politique_fne === 'strict') ? Math.max(0, Math.min(nj.montant, totDedBrut)) : 0;
+  var totDed = (totDedBrut - nonJustif) * pr / 100;
   var rejet = totDedBrut - totDed;
   var credAnt = _tvaCreditAnterieur(mois);
   var net = totCol - totDed - credAnt;
   return { mois: mois, col: col, ded: ded, totCol: totCol, totDedBrut: totDedBrut, prorata: pr,
-    totDed: totDed, rejet: rejet, credAnt: credAnt,
+    totDed: totDed, rejet: rejet, nonJustif: nonJustif, nonJustifSignale: nj.montant, nbNonJustif: nj.nb, strict: cfg.politique_fne === 'strict', credAnt: credAnt,
     aPayer: net > 0 ? net : 0, credit: net < 0 ? -net : 0, net: net };
+}
+
+/* ══ Justification de la TVA déductible : la FNE du fournisseur ══
+   Depuis le 1er décembre 2025, la TVA d'un achat n'est récupérable que sur une facture normalisée (FNE) portant le NCC de l'entreprise. Ce module ne touche à aucune
+   écriture comptable : il ajoute à chaque pièce comportant de la TVA déductible (comptes 445x) une justification (e.tva_justif) et en tire un état de conformité,
+   un classement des fournisseurs et le manque à gagner. Politique « signaler » (défaut) : la déclaration de TVA ne change pas ; politique « stricte » : seule la TVA
+   justifiée par une FNE conforme est déduite, le reste va en charge (6461) lors de la liquidation. */
+var TVA_FNE_DEBUT = '2025-12-01';
+var _tvaJ = { de: '', a: '', onglet: 'justifier', filtre: 'a_traiter', piece: null };
+function _tvaJNomTiers(e) {
+  var l = ecrLignes(e).filter(function(x){ return String(x.compte || '').indexOf('401') === 0 && x.sens === 'C'; })[0], id = l ? ecrTiersLigne(e, l) : '', nom = '';
+  if (e.tva_justif && e.tva_justif.fournisseur) nom = e.tva_justif.fournisseur;
+  if (!nom && id) {
+    var t = (DATA.fournisseurs || []).filter(function(x){ return x.id === id; })[0] || (DATA.constructeurs || []).filter(function(x){ return x.id === id; })[0] || (DATA.tiers_comptables || []).filter(function(x){ return x.id === id; })[0];
+    nom = t ? (t.nom || t.raison_sociale || t.nom_organisation || '') : '';
+  }
+  if (!nom) nom = e.fournisseur_nom || e.fournisseur || e.beneficiaire || e.tiers_nom || '';
+  return String(nom || '').trim() || 'Fournisseur non identifié';
+}
+/* Analyse d'une écriture : null si elle ne porte pas de TVA déductible. */
+function tvaJAnalyse(e) {
+  if (!e || e.source === 'liquidation_tva' || !e.date) return null;
+  var tva = 0;
+  ecrLignes(e).forEach(function(l){
+    if (l.sens === 'D' && TVA_DEDUCTIBLE.some(function(x){ return String(l.compte || '').indexOf(x[0]) === 0; })) tva += parseFloat(l.montant) || 0;
+  });
+  if (Math.round(tva) <= 0) return null;
+  var j = e.tva_justif || null, etat, raison = '';
+  if (e.date < TVA_FNE_DEBUT) etat = 'avant_fne';
+  else if (!j) { etat = 'a_justifier'; raison = 'Aucune FNE enregistrée'; }
+  else if (j.statut === 'fne') {
+    if (!String(j.fne_numero || '').trim()) { etat = 'a_justifier'; raison = 'N° de FNE manquant'; }
+    else if (!j.ncc_ok) { etat = 'non_conforme'; raison = 'NCC de l\'entreprise absent de la FNE'; }
+    else if (j.fne_tva !== undefined && j.fne_tva !== null && j.fne_tva !== '' && Math.abs((parseFloat(j.fne_tva) || 0) - tva) > 1) { etat = 'non_conforme'; raison = 'TVA de la FNE (' + fmtF(Math.round(parseFloat(j.fne_tva) || 0)) + ') différente de la TVA comptabilisée (' + fmtF(Math.round(tva)) + ')'; }
+    else etat = 'conforme';
+  } else if (j.statut === 'sans_fne') { etat = 'non_conforme'; raison = 'Fournisseur sans FNE'; }
+  else { etat = 'non_conforme'; raison = 'Fournisseur non assujetti : pas de TVA déductible'; }
+  var prog = e.programme_id ? (DATA.programmes || []).filter(function(p){ return p.id === e.programme_id; })[0] : null;
+  return { e: e, tva: tva, tiers: _tvaJNomTiers(e), etat: etat, raison: raison, mois: e.date.slice(0, 7), prog: prog ? prog.nom : (e.programme_id ? '—' : 'Hors programme'),
+           acheteur: e.created_by || e.auteur || e.saisi_par || e.user || '' };
+}
+function tvaJListe(de, a) {
+  var out = [];
+  (DATA.ecritures || []).forEach(function(e){
+    if (!e || !e.date) return; var m = e.date.slice(0, 7);
+    if ((de && m < de) || (a && m > a)) return;
+    var x = tvaJAnalyse(e); if (x) out.push(x);
+  });
+  return out;
+}
+/* Synthèse d'une liste : récupérée / perdue / à justifier, puis ventilations. */
+function tvaJSynthese(L) {
+  var S = { tot: 0, ok: 0, perdue: 0, ajust: 0, parMois: {}, parTiers: {}, parProg: {}, parAch: {} };
+  var cle = { conforme: 'ok', non_conforme: 'perdue', a_justifier: 'ajust' };
+  L.forEach(function(x){
+    if (x.etat === 'avant_fne') return; var k = cle[x.etat]; if (!k) return;
+    S.tot += x.tva; S[k] += x.tva;
+    [['parMois', x.mois], ['parTiers', x.tiers], ['parProg', x.prog], ['parAch', x.acheteur || '—']].forEach(function(g){
+      var o = S[g[0]][g[1]] = S[g[0]][g[1]] || { tot: 0, ok: 0, perdue: 0, ajust: 0, nb: 0, dernier: '' };
+      o.tot += x.tva; o[k] += x.tva; o.nb++; if (x.e.date > o.dernier) o.dernier = x.e.date;
+    });
+  });
+  return S;
+}
+/* TVA des pièces non justifiées du mois (déclaration de TVA). */
+function tvaJNonJustifieeMois(mois) {
+  var s = 0, n = 0;
+  tvaJListe(mois, mois).forEach(function(x){ if (x.etat === 'a_justifier' || x.etat === 'non_conforme') { s += x.tva; n++; } });
+  return { montant: s, nb: n };
+}
+function tvaJOuvrir() {
+  var d = new Date(); _tvaJ.a = d.toISOString().slice(0, 7); _tvaJ.de = TVA_FNE_DEBUT.slice(0, 7); _tvaJ.onglet = 'justifier'; _tvaJ.filtre = 'a_traiter';
+  openModal('modal-tva-justif'); tvaJRender();
+}
+function tvaJChange(ch, v) { _tvaJ[ch] = v; tvaJRender(); }
+function tvaJPolitique(v) { var cfg = _tvaCfg(); cfg.politique_fne = (v === 'strict') ? 'strict' : 'signaler'; _tvaSave(cfg); toast(cfg.politique_fne === 'strict' ? 'Politique stricte : seule la TVA justifiée par une FNE conforme sera déduite à la prochaine liquidation.' : 'Politique « signaler » : la déclaration de TVA n\'est pas modifiée.', 'info', 7000); tvaJRender(); }
+function _tvaJBadge(x) {
+  var m = { conforme: ['badge-vert', '✓ Conforme'], a_justifier: ['badge-or', '⏳ À justifier'], non_conforme: ['badge-rouge', '✗ Non déductible'], avant_fne: ['badge-neutre', 'Avant FNE'] }[x.etat];
+  return '<span class="badge ' + m[0] + '">' + m[1] + '</span>' + (x.raison ? '<div style="font-size:11px;color:var(--blanc-dim);">' + escHtml(x.raison) + '</div>' : '');
+}
+function _tvaJBarre(v, t, coul) { var p = t > 0 ? Math.round(v / t * 100) : 0; return '<div style="background:rgba(128,128,128,.2);border-radius:3px;height:6px;min-width:80px;"><div style="width:' + p + '%;height:6px;border-radius:3px;background:' + coul + ';"></div></div>'; }
+function tvaJRender() {
+  var host = document.getElementById('tvaj-corps'); if (!host) return;
+  var L = tvaJListe(_tvaJ.de, _tvaJ.a).filter(function(x){ return x.etat !== 'avant_fne'; }), S = tvaJSynthese(L), f = function(v){ return fmtF(Math.round(v || 0)); };
+  var cfg = _tvaCfg(), tx = S.tot > 0 ? Math.round(S.ok / S.tot * 1000) / 10 : 0;
+  var tab = function(k, lib){ return '<button class="tab-btn' + (_tvaJ.onglet === k ? ' active' : '') + '" onclick="tvaJChange(\'onglet\',\'' + k + '\')">' + lib + '</button>'; };
+  var h = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;">'
+    + '<div class="form-group" style="margin:0;"><label style="font-size:11px;">Du mois</label><input type="month" class="form-control" value="' + _tvaJ.de + '" min="' + TVA_FNE_DEBUT.slice(0, 7) + '" onchange="tvaJChange(\'de\',this.value||\'' + TVA_FNE_DEBUT.slice(0, 7) + '\')"></div>'
+    + '<div class="form-group" style="margin:0;"><label style="font-size:11px;">Au mois</label><input type="month" class="form-control" value="' + _tvaJ.a + '" onchange="tvaJChange(\'a\',this.value)"></div>'
+    + '<div class="form-group" style="margin:0;flex:1;min-width:240px;"><label style="font-size:11px;">Politique de déduction</label><select class="form-control" onchange="tvaJPolitique(this.value)"><option value="signaler"' + (cfg.politique_fne === 'strict' ? '' : ' selected') + '>Signaler seulement (déclaration inchangée)</option><option value="strict"' + (cfg.politique_fne === 'strict' ? ' selected' : '') + '>Stricte : déduire uniquement la TVA justifiée par une FNE</option></select></div></div>'
+    + '<div class="tab-nav" style="margin-bottom:10px;">' + tab('justifier', '🧾 Pièces à justifier') + tab('fournisseurs', '🏪 Fournisseurs') + tab('manque', '📉 Manque à gagner') + '</div>';
+  if (_tvaJ.onglet === 'justifier') {
+    var flt = { a_traiter: ['a_justifier', 'non_conforme'], conforme: ['conforme'], toutes: ['a_justifier', 'non_conforme', 'conforme'] }[_tvaJ.filtre];
+    var V = L.filter(function(x){ return flt.indexOf(x.etat) !== -1; }).sort(function(a, b){ return b.e.date.localeCompare(a.e.date); });
+    h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;"><select class="filter-select" onchange="tvaJChange(\'filtre\',this.value)"><option value="a_traiter"' + (_tvaJ.filtre === 'a_traiter' ? ' selected' : '') + '>À traiter (à justifier + non déductibles)</option><option value="conforme"' + (_tvaJ.filtre === 'conforme' ? ' selected' : '') + '>Conformes</option><option value="toutes"' + (_tvaJ.filtre === 'toutes' ? ' selected' : '') + '>Toutes</option></select>'
+      + '<span style="font-size:12px;color:var(--blanc-dim);flex:1;">' + V.length + ' pièce(s) · TVA ' + f(V.reduce(function(a, x){ return a + x.tva; }, 0)) + ' FCFA</span><button class="btn btn-secondary btn-sm" onclick="tvaJExporter()">⬇ Export CSV</button></div>'
+      + '<div class="table-wrap" style="max-height:46vh;overflow:auto;"><table><thead><tr><th>Date</th><th>Pièce</th><th>Fournisseur</th><th style="text-align:right;">TVA</th><th>État</th><th></th></tr></thead><tbody>'
+      + (V.length ? V.slice(0, 300).map(function(x){
+          return '<tr><td style="white-space:nowrap;font-size:12px;">' + escHtml(x.e.date) + '</td><td style="font-size:12px;">' + escHtml(x.e.piece || x.e.libelle || '') + '</td><td style="font-size:12px;">' + escHtml(x.tiers) + '</td><td style="text-align:right;">' + f(x.tva) + '</td><td>' + _tvaJBadge(x) + '</td>'
+            + '<td><button class="btn btn-secondary btn-sm" onclick="tvaJPiece(\'' + x.e.id + '\')">' + (x.e.tva_justif ? '✏️ Modifier' : '🧾 Justifier') + '</button></td></tr>'; }).join('') + (V.length > 300 ? '<tr><td colspan="6" style="text-align:center;color:var(--blanc-dim);">… ' + (V.length - 300) + ' autres : réduisez la période.</td></tr>' : '')
+        : '<tr><td colspan="6" style="text-align:center;color:var(--vert);padding:18px;">✅ Rien à traiter sur la période.</td></tr>')
+      + '</tbody></table></div>';
+  } else if (_tvaJ.onglet === 'fournisseurs') {
+    var maintenant = _tvaJ.a, m3 = function(m, n){ var d = new Date(m + '-01'); d.setMonth(d.getMonth() - n); return d.toISOString().slice(0, 7); };
+    var taux = function(arr){ var t = 0, o = 0; arr.forEach(function(x){ t += x.tva; if (x.etat === 'conforme') o += x.tva; }); return t > 0 ? o / t * 100 : null; };
+    var rows = Object.keys(S.parTiers).map(function(n){
+      var o = S.parTiers[n], mine = L.filter(function(x){ return x.tiers === n; });
+      var rec = taux(mine.filter(function(x){ return x.mois > m3(maintenant, 3); })), anc = taux(mine.filter(function(x){ return x.mois <= m3(maintenant, 3) && x.mois > m3(maintenant, 6); }));
+      return { n: n, o: o, t: o.tot > 0 ? o.ok / o.tot * 100 : 0, rec: rec, anc: anc };
+    }).sort(function(a, b){ return b.o.perdue + b.o.ajust - a.o.perdue - a.o.ajust; });
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">Classement par TVA non récupérée. Un fournisseur à 0 % ne délivre pas de FNE : à remplacer ou à exiger. La tendance compare les 3 derniers mois aux 3 précédents.</div>'
+      + '<div style="text-align:right;margin-bottom:6px;"><button class="btn btn-secondary btn-sm" onclick="tvaJExporter(\'fournisseurs\')">⬇ Export CSV</button></div>'
+      + '<div class="table-wrap" style="max-height:46vh;overflow:auto;"><table><thead><tr><th>Fournisseur</th><th style="text-align:right;">Pièces</th><th style="text-align:right;">TVA</th><th style="text-align:right;">Récupérable</th><th style="text-align:right;">Perdue</th><th style="text-align:right;">À justifier</th><th>Conformité</th><th>Tendance</th></tr></thead><tbody>'
+      + (rows.length ? rows.map(function(r){
+          var tend = (r.rec == null || r.anc == null) ? '—' : (r.rec > r.anc + 5 ? '<span style="color:var(--vert);">↗ en progrès</span>' : (r.rec < r.anc - 5 ? '<span style="color:var(--rouge);">↘ se dégrade</span>' : '→ stable'));
+          var st = r.t >= 95 ? '<span class="badge badge-vert">✓ FNE délivrée</span>' : (r.o.ok === 0 && r.o.ajust === 0 ? '<span class="badge badge-rouge">✗ Sans FNE</span>' : '<span class="badge badge-or">⚠ Partielle</span>');
+          return '<tr><td>' + escHtml(r.n) + '</td><td style="text-align:right;">' + r.o.nb + '</td><td style="text-align:right;">' + f(r.o.tot) + '</td><td style="text-align:right;color:var(--vert);">' + f(r.o.ok) + '</td><td style="text-align:right;color:var(--rouge);">' + f(r.o.perdue) + '</td><td style="text-align:right;color:var(--or);">' + f(r.o.ajust) + '</td><td>' + st + ' <span style="font-size:11px;">' + Math.round(r.t) + ' %</span></td><td style="font-size:12px;">' + tend + '</td></tr>'; }).join('')
+        : '<tr><td colspan="8" style="text-align:center;color:var(--blanc-dim);padding:18px;">Aucune pièce sur la période.</td></tr>')
+      + '</tbody></table></div>';
+  } else {
+    var bloc = function(titre, obj, tri){
+      var ks = Object.keys(obj).sort(function(a, b){ return tri ? tri(a, b) : (obj[b].perdue + obj[b].ajust) - (obj[a].perdue + obj[a].ajust); }).slice(0, 12);
+      return '<div class="card" style="margin-bottom:10px;"><div class="card-title" style="font-size:13px;">' + titre + '</div><table style="width:100%;font-size:12px;"><tbody>'
+        + (ks.length ? ks.map(function(k){ var o = obj[k]; return '<tr><td style="width:36%;">' + escHtml(k) + '</td><td style="width:26%;">' + _tvaJBarre(o.ok, o.tot, 'var(--vert)') + '</td><td style="text-align:right;color:var(--rouge);">−' + f(o.perdue) + '</td><td style="text-align:right;color:var(--or);">⏳ ' + f(o.ajust) + '</td></tr>'; }).join('') : '<tr><td style="color:var(--blanc-dim);">Aucune donnée.</td></tr>') + '</tbody></table></div>';
+    };
+    var kp = function(lib, v, c){ return '<div class="kpi-card"><div class="kpi-label">' + lib + '</div><div class="kpi-value" style="color:' + c + ';font-size:18px;">' + f(v) + ' F</div></div>'; };
+    h += '<div class="kpi-grid" style="margin-bottom:10px;">' + kp('TVA sur achats (période)', S.tot, 'var(--blanc)') + kp('Récupérable (FNE conforme)', S.ok, 'var(--vert)') + kp('Perdue (sans FNE valide)', S.perdue, 'var(--rouge)') + kp('À justifier', S.ajust, 'var(--or)') + '</div>'
+      + '<div style="font-size:12px;margin-bottom:8px;">Taux de récupération : <strong>' + String(tx).replace('.', ',') + ' %</strong>. <span style="color:var(--blanc-dim);">Barre verte = part récupérable ; − = perdue ; ⏳ = encore à justifier.</span></div>'
+      + bloc('Par fournisseur', S.parTiers) + bloc('Par mois', S.parMois, function(a, b){ return b.localeCompare(a); }) + bloc('Par programme', S.parProg)
+      + (Object.keys(S.parAch).some(function(k){ return k !== '—'; }) ? bloc('Par acheteur (saisie)', S.parAch) : '');
+  }
+  host.innerHTML = h;
+}
+function tvaJPiece(id) {
+  var e = (DATA.ecritures || []).filter(function(x){ return x.id === id; })[0]; if (!e) return;
+  var a = tvaJAnalyse(e), j = e.tva_justif || {}; _tvaJ.piece = id;
+  var set = function(i, v){ var el = document.getElementById(i); if (el) { if (el.type === 'checkbox') el.checked = !!v; else el.value = v == null ? '' : v; } };
+  set('tvajp-statut', j.statut || 'fne'); set('tvajp-numero', j.fne_numero); set('tvajp-tva', j.fne_tva != null ? j.fne_tva : Math.round(a.tva)); set('tvajp-ncc', j.ncc_ok); set('tvajp-fourn', j.fournisseur || (a.tiers === 'Fournisseur non identifié' ? '' : a.tiers)); set('tvajp-note', j.note);
+  document.getElementById('tvajp-titre').textContent = (e.piece || e.libelle || '') + ' — TVA ' + fmtF(Math.round(a.tva)) + ' FCFA (' + e.date + ')';
+  tvaJPieceStatut(); openModal('modal-tva-justif-piece');
+}
+function tvaJPieceStatut() { var fne = document.getElementById('tvajp-statut').value === 'fne'; ['tvajp-bloc-fne'].forEach(function(i){ var el = document.getElementById(i); if (el) el.style.display = fne ? '' : 'none'; }); }
+async function tvaJEnregistrerPiece() {
+  if (!exigerDroit('Comptabilite', 'm', 'la justification de TVA')) return;
+  var e = (DATA.ecritures || []).filter(function(x){ return x.id === _tvaJ.piece; })[0]; if (!e) return;
+  var v = function(i){ return (document.getElementById(i) || {}).value || ''; }, statut = v('tvajp-statut');
+  if (statut === 'fne' && !v('tvajp-numero').trim()) { toast('Saisissez le numéro de la FNE.', 'error'); return; }
+  e.tva_justif = { statut: statut, fne_numero: v('tvajp-numero').trim(), fne_tva: v('tvajp-tva') === '' ? '' : (parseFloat(v('tvajp-tva')) || 0), ncc_ok: !!(document.getElementById('tvajp-ncc') || {}).checked,
+    fournisseur: v('tvajp-fourn').trim(), note: v('tvajp-note').trim(), le: new Date().toISOString() };
+  await dbPut('ecritures', e); if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', e);
+  closeModal('modal-tva-justif-piece'); toast('Justification enregistrée.', 'success'); tvaJRender();
+  if (document.getElementById('tva-box') && typeof renderDeclarationTVA === 'function') renderDeclarationTVA();
+}
+function tvaJExporter(quoi) {
+  var q = function(x){ return '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"'; }, L = tvaJListe(_tvaJ.de, _tvaJ.a).filter(function(x){ return x.etat !== 'avant_fne'; }), rows;
+  if (quoi === 'fournisseurs') { var S = tvaJSynthese(L); rows = [['Fournisseur', 'Pièces', 'TVA', 'Récupérable', 'Perdue', 'À justifier'].map(q).join(';')].concat(Object.keys(S.parTiers).map(function(n){ var o = S.parTiers[n]; return [n, o.nb, Math.round(o.tot), Math.round(o.ok), Math.round(o.perdue), Math.round(o.ajust)].map(q).join(';'); })); }
+  else rows = [['Date', 'Pièce', 'Fournisseur', 'TVA', 'État', 'Motif', 'N° FNE'].map(q).join(';')].concat(L.map(function(x){ return [x.e.date, x.e.piece || x.e.libelle || '', x.tiers, Math.round(x.tva), x.etat, x.raison, (x.e.tva_justif || {}).fne_numero || ''].map(q).join(';'); }));
+  var blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'justification_tva_' + (quoi || 'pieces') + '_' + today() + '.csv'; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 
 function ouvrirDeclarationTVA() {
@@ -44995,6 +45158,7 @@ function ouvrirDeclarationTVA() {
     + '<input type="month" class="form-control" id="tva-mois" value="' + moisDefaut + '" onchange="renderDeclarationTVA()"></div>'
     + '<div class="form-group" style="margin:0;"><label style="font-size:11px;">Prorata de déduction (%)</label>'
     + '<input type="number" class="form-control" id="tva-prorata" value="' + _tvaCfg().prorata + '" min="0" max="100" step="0.01" style="width:110px;" oninput="renderDeclarationTVA()"></div>'
+    + '<button class="btn btn-secondary btn-sm" onclick="tvaJOuvrir()" title="Justifier la TVA déductible par les FNE des fournisseurs">🧾 Justification FNE</button>'
     + '<button class="btn btn-secondary btn-sm" onclick="imprimerDeclarationTVA()">🖨️ Imprimer</button>'
     + '</div><div id="tva-box"></div></div>'
     + '<div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById(\'modal-tva\').classList.remove(\'open\')">Fermer</button>'
@@ -45032,11 +45196,14 @@ function renderDeclarationTVA() {
     + '<div class="table-wrap"><table><thead><tr><th>Compte</th><th>Nature</th><th style="text-align:right;">Montant</th></tr></thead><tbody>'
     + rows(T.ded, 'Aucune TVA déductible sur la période.')
     + '<tr style="font-weight:700;"><td colspan="2">TVA déductible brute</td><td style="text-align:right;">' + f(T.totDedBrut) + '</td></tr>'
+    + (T.nonJustif ? '<tr><td colspan="2">TVA sans FNE valide — non déduite (politique stricte)</td><td style="text-align:right;color:var(--rouge);">−' + f(T.nonJustif) + '</td></tr>' : '')
     + (T.prorata !== 100
-        ? '<tr><td colspan="2">Prorata de déduction appliqué (' + T.prorata + ' %) — quote-part non déductible</td><td style="text-align:right;color:var(--rouge);">−' + f(T.rejet) + '</td></tr>'
+        ? '<tr><td colspan="2">Prorata de déduction appliqué (' + T.prorata + ' %) — quote-part non déductible</td><td style="text-align:right;color:var(--rouge);">−' + f(T.rejet - T.nonJustif) + '</td></tr>'
         : '')
     + '<tr class="tot" style="font-weight:700;"><td colspan="2">TOTAL TVA DÉDUCTIBLE</td><td style="text-align:right;color:var(--rouge);">' + f(T.totDed) + '</td></tr>'
     + '</tbody></table></div>'
+    + (T.nbNonJustif ? '<div class="alert alert-warn" style="font-size:12px;margin-top:8px;">🧾 <strong>' + T.nbNonJustif + ' pièce(s)</strong> portent <strong>' + f(T.nonJustifSignale) + ' FCFA</strong> de TVA sans FNE valide enregistrée. '
+        + (T.strict ? 'Politique stricte : cette TVA est exclue de la déduction.' : 'Politique « signaler » : cette TVA reste déduite, au risque d\'un redressement.') + ' <a href="#" onclick="tvaJOuvrir();return false;">Justifier maintenant</a></div>' : '')
     + '<div style="margin-top:12px;padding:12px 14px;background:var(--card2);border-left:3px solid var(--or);border-radius:5px;">'
     + '<table style="width:100%;font-size:12.5px;"><tbody>'
     + '<tr><td>TVA collectée</td><td style="text-align:right;font-weight:600;">' + f(T.totCol) + '</td></tr>'
@@ -45070,12 +45237,12 @@ async function passerEcritureTVA() {
   var lignes = [];
   T.col.forEach(function(x){ if (Math.round(x.mt)) lignes.push({ compte: x.code, sens: 'D', montant: Math.round(x.mt), libelle: 'Solde ' + x.label }); });
   T.ded.forEach(function(x){
-    var m = Math.round(x.mt * T.prorata / 100);
+    var m = T.totDedBrut ? Math.round(x.mt * T.totDed / T.totDedBrut) : 0;
     if (m) lignes.push({ compte: x.code, sens: 'C', montant: m, libelle: 'Solde ' + x.label });
   });
   /* Quote-part non déductible : charge définitive, pas un actif */
   if (Math.round(T.rejet)) {
-    lignes.push({ compte: TVA_CPT_DUE === '4441' ? '6461' : '6461', sens: 'D', montant: Math.round(T.rejet), libelle: 'TVA non déductible — prorata ' + T.prorata + ' %' });
+    lignes.push({ compte: TVA_CPT_DUE === '4441' ? '6461' : '6461', sens: 'D', montant: Math.round(T.rejet), libelle: 'TVA non déductible — prorata ' + T.prorata + ' %' + (T.nonJustif ? ' — dont ' + Math.round(T.nonJustif) + ' sans FNE valide' : '') });
     lignes.push({ compte: '4452', sens: 'C', montant: Math.round(T.rejet), libelle: 'Quote-part non récupérable' });
   }
   if (Math.round(T.credAnt)) lignes.push({ compte: TVA_CPT_CREDIT, sens: 'C', montant: Math.round(T.credAnt), libelle: 'Imputation du crédit reporté' });
@@ -45133,7 +45300,8 @@ function imprimerDeclarationTVA() {
     + tb(T.col) + '<tr class="tot"><td colspan="2">TOTAL COLLECTÉE</td><td class="num">' + f(T.totCol) + '</td></tr></tbody></table>'
     + '<h2>B — TVA DÉDUCTIBLE</h2><table><thead><tr><th>Compte</th><th>Nature</th><th class="num">Montant</th></tr></thead><tbody>'
     + tb(T.ded) + '<tr><td colspan="2">Déductible brute</td><td class="num">' + f(T.totDedBrut) + '</td></tr>'
-    + (T.prorata !== 100 ? '<tr><td colspan="2">Prorata ' + T.prorata + ' % — non déductible</td><td class="num">−' + f(T.rejet) + '</td></tr>' : '')
+    + (T.nonJustif ? '<tr><td colspan="2">Sans FNE valide — non déduite</td><td class="num">−' + f(T.nonJustif) + '</td></tr>' : '')
+    + (T.prorata !== 100 ? '<tr><td colspan="2">Prorata ' + T.prorata + ' % — non déductible</td><td class="num">−' + f(T.rejet - T.nonJustif) + '</td></tr>' : '')
     + '<tr class="tot"><td colspan="2">TOTAL DÉDUCTIBLE</td><td class="num">' + f(T.totDed) + '</td></tr></tbody></table>'
     + '<div class="res"><table><tbody>'
     + '<tr><td>TVA collectée</td><td class="num">' + f(T.totCol) + '</td></tr>'
@@ -50368,7 +50536,7 @@ function relancesControleRender() {
   var chip = function(k){ return '<button type="button" class="btn btn-secondary btn-sm" style="margin:2px;' + (_ctrlFiltre === k ? 'border-color:var(--or);font-weight:700;' : '') + '" onclick="relancesControleFiltrer(\'' + k + '\')" title="' + E(A[k].aide) + '">' + (A[k].grave ? '⛔ ' : '⚠️ ') + E(A[k].lib) + ' <strong>' + r.compteurs[k] + '</strong></button>'; };
   var estimes = Object.keys(r.parProg).sort(function(a, b){ return r.parProg[b] - r.parProg[a]; }).slice(0, 6).map(function(n){ return E(n) + ' (' + r.parProg[n] + ')'; }).join(' · ');
   var h = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;"><div class="card-title" style="margin:0;flex:1;">🔎 Contrôle des échéanciers — ' + r.lignes.length + ' souscripteur(s) à vérifier sur ' + (DATA.clients || []).length + '</div>'
-    + '<button class="btn btn-secondary btn-sm" onclick="relancesControleCSV()">⬇ Exporter (CSV)</button></div>'
+    + '<button class="btn btn-secondary btn-sm" onclick="progDatesOuvrir()" title="Renseigner les dates de lancement et de livraison des programmes">📅 Dates des programmes</button> <button class="btn btn-secondary btn-sm" onclick="relancesControleCSV()">⬇ Exporter (CSV)</button></div>'
     + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Lecture seule : rien n\'est modifié. ⛔ = à corriger (le calcul du retard est impossible ou inexact), ⚠️ = incohérence probable à vérifier. Cliquez sur une anomalie pour filtrer, sur un souscripteur pour ouvrir sa fiche.</div>'
     + (r.nbEstimes ? '<div class="alert alert-warn" style="font-size:12px;margin-bottom:8px;">📐 <strong>' + r.nbEstimes + ' souscripteur(s)</strong> sont sur un échéancier <strong>estimé</strong> (programme sans date de livraison) : ' + estimes + '. Complétez les dates dans <a href="#" onclick="goTo(\'programmes\');return false;">Programmes</a>.</div>' : '')
     + (codes.length ? '<div style="margin-bottom:8px;">' + codes.map(chip).join('') + (_ctrlFiltre ? ' <button type="button" class="btn btn-secondary btn-sm" onclick="relancesControleFiltrer(\'' + _ctrlFiltre + '\')">✕ Tout afficher</button>' : '') + '</div>' : '');
@@ -137239,6 +137407,83 @@ function coordImporter(input) {
   var rd = new FileReader(); rd.onload = function(e){ coordTraiterTexte(e.target.result); input.value = ''; }; rd.readAsText(f, 'utf-8');
 }
 
+/* ══ Dates des programmes en masse (lancement / livraison) ══
+   La date de livraison d'un programme décide du calcul du retard de ses souscripteurs : renseignée, l'échéancier suit la durée réelle du projet ;
+   absente, le retard n'est qu'« estimé » d'après la durée saisie sur chaque fiche. Un seul tableau pour tous les programmes, avec l'effet immédiat sur les fiches. */
+var _progDates = {};
+function progDatesOuvrir() { _progDates = {}; openModal('modal-prog-dates'); progDatesRender(); }
+function _progDateOk(s) { return !s || (/^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime()) && +s.slice(0, 4) >= 2000 && +s.slice(0, 4) <= 2100); }
+function _progDateVal(p, ch) { var b = _progDates[p.id]; return b && b[ch] !== undefined ? b[ch] : (p[ch] || ''); }
+function progDatesSaisie(id, ch, v) {
+  var p = (DATA.programmes || []).find(function(x){ return x.id === id; }); if (!p) return;
+  var b = _progDates[id] = _progDates[id] || {};
+  if (String(v) === String(p[ch] || '')) delete b[ch]; else b[ch] = v;
+  if (!Object.keys(b).length) delete _progDates[id];
+  progDatesLigne(id); progDatesCompteur();
+}
+/* Contrôle + effet sur les souscripteurs actifs non soldés (ceux dont le retard est calculé). */
+function progDatesAnalyse(p) {
+  var lanc = _progDateVal(p, 'date_lancement'), livr = _progDateVal(p, 'date_livraison'), err = [], warn = [];
+  if (!_progDateOk(lanc)) err.push('Date de lancement invalide'); if (!_progDateOk(livr)) err.push('Date de livraison invalide');
+  if (!err.length && lanc && livr && livr <= lanc) err.push('La livraison doit suivre le lancement');
+  var cl = (DATA.clients || []).filter(function(c){ return c.programme_id === p.id && c.statut !== 'resilie' && !clientFinancementBancaire(c) && !fneSoldeClient(c).solde; });
+  var proj = 0, sansDate = 0, apres = 0;
+  cl.forEach(function(c){
+    var anc = c.date_debut || c.date_souscription; if (!_dateLocale(anc)) { sansDate++; return; }
+    if (!livr || !_progDateOk(livr)) return;
+    var d = dureeProjetDepuis({ date_livraison: livr }, anc), debut = _dateLocale(anc), fin = _dateLocale(livr);
+    if (d && fin && _moisEntre(debut, fin) < 1) apres++; else proj++;
+  });
+  if (livr && !err.length && livr < today() && cl.length) warn.push('Livraison déjà passée : les souscripteurs non soldés sont en retard sur la totalité de leur solde restant (à confirmer)');
+  return { err: err, warn: warn, nb: cl.length, proj: proj, sansDate: sansDate, apres: apres, livr: livr };
+}
+function progDatesLigne(id) {
+  var p = (DATA.programmes || []).find(function(x){ return x.id === id; }), cell = document.getElementById('pgd-info-' + id); if (!p || !cell) return;
+  var a = progDatesAnalyse(p), h = [];
+  a.err.forEach(function(m){ h.push('<span style="color:var(--rouge);">⛔ ' + escHtml(m) + '</span>'); });
+  if (a.livr && !a.err.length) h.push('<span style="color:var(--vert);">✓ ' + a.proj + ' / ' + a.nb + ' calculé(s) sur la durée du projet</span>');
+  else if (!a.livr && a.nb) h.push('<span style="color:var(--or);">≈ ' + a.nb + ' souscripteur(s) en échéancier estimé</span>');
+  if (a.sansDate) h.push('<span style="color:var(--or);">⚠️ ' + a.sansDate + ' sans date de départ</span>');
+  if (a.apres) h.push('<span style="color:var(--or);">⚠️ ' + a.apres + ' démarrent à moins d\'un mois (ou après) la livraison</span>');
+  a.warn.forEach(function(m){ h.push('<span style="color:var(--or);">⚠️ ' + escHtml(m) + '</span>'); });
+  cell.innerHTML = h.join('<br>');
+}
+function progDatesCompteur() {
+  var ids = Object.keys(_progDates), nbErr = ids.filter(function(id){ var p = (DATA.programmes || []).find(function(x){ return x.id === id; }); return p && progDatesAnalyse(p).err.length; }).length;
+  var el = document.getElementById('pgd-compteur'); if (el) el.textContent = ids.length + ' programme(s) modifié(s)' + (nbErr ? ' dont ' + nbErr + ' en erreur' : '');
+  var bt = document.getElementById('pgd-enregistrer'); if (bt) bt.disabled = !ids.length || nbErr > 0;
+}
+function progDatesRender() {
+  var host = document.getElementById('pgd-corps'); if (!host) return;
+  var filtre = (document.getElementById('pgd-filtre') || {}).value || 'manquantes';
+  var nbCl = function(p){ return (DATA.clients || []).filter(function(c){ return c.programme_id === p.id && c.statut !== 'resilie'; }).length; };
+  var L = (DATA.programmes || []).map(function(p){ return { p: p, n: nbCl(p) }; }).filter(function(x){
+    if (filtre === 'tous') return true; if (_progDates[x.p.id]) return true;
+    return !x.p.date_livraison || !x.p.date_lancement; }).sort(function(a, b){ return b.n - a.n || String(a.p.nom).localeCompare(String(b.p.nom), 'fr'); });
+  host.innerHTML = '<div class="table-wrap" style="max-height:55vh;overflow:auto;"><table><thead><tr><th>Programme</th><th style="text-align:right;">Souscripteurs</th><th>Lancement</th><th>Livraison</th><th>Effet sur les retards</th></tr></thead><tbody>'
+    + (L.length ? L.map(function(x){ var p = x.p;
+        return '<tr><td><strong>' + escHtml(p.nom || '—') + '</strong><div style="font-size:11px;color:var(--blanc-dim);">' + escHtml(p.localisation || '') + '</div></td><td style="text-align:right;">' + x.n + '</td>'
+          + '<td><input type="date" class="form-control" value="' + escHtml(_progDateVal(p, 'date_lancement')) + '" onchange="progDatesSaisie(\'' + p.id + '\',\'date_lancement\',this.value)"></td>'
+          + '<td><input type="date" class="form-control" value="' + escHtml(_progDateVal(p, 'date_livraison')) + '" onchange="progDatesSaisie(\'' + p.id + '\',\'date_livraison\',this.value)"></td>'
+          + '<td id="pgd-info-' + p.id + '" style="font-size:11px;"></td></tr>'; }).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:var(--vert);padding:18px;">✅ Tous les programmes ont leurs dates.</td></tr>')
+    + '</tbody></table></div>';
+  L.forEach(function(x){ progDatesLigne(x.p.id); }); progDatesCompteur();
+}
+async function progDatesEnregistrer() {
+  var ids = Object.keys(_progDates), n = 0;
+  for (var i = 0; i < ids.length; i++) {
+    var p = (DATA.programmes || []).find(function(x){ return x.id === ids[i]; }), b = _progDates[ids[i]]; if (!p || progDatesAnalyse(p).err.length) continue;
+    if (b.date_lancement !== undefined) { p.date_lancement = b.date_lancement; p.date_debut = b.date_lancement; }
+    if (b.date_livraison !== undefined) p.date_livraison = b.date_livraison;
+    await dbPut('programmes', p); if (typeof syncToSupabase === 'function') syncToSupabase('pi_programmes', p);
+    delete _progDates[ids[i]]; n++;
+  }
+  toast('✅ Dates enregistrées pour ' + n + ' programme(s). Les retards des souscripteurs concernés sont recalculés.', 'success');
+  try { if (typeof renderProgrammes === 'function') renderProgrammes(); if (typeof detectRelances === 'function' && document.getElementById('tbody-relances')) detectRelances(); } catch (e) { /* page non affichée */ }
+  progDatesRender();
+}
+
 function facturerCession(cesId) {
   var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === cesId; });
   if (!c) { toast('Cession introuvable.', 'error'); return; }
@@ -147839,6 +148084,59 @@ goTo = function(page) {
 </div>
 
 <!-- Modal Facturation FNE -->
+<div class="modal-overlay" id="modal-tva-justif">
+  <div class="modal" style="max-width:1050px;width:96vw;">
+    <div class="modal-header">
+      <h3>🧾 Justification de la TVA déductible (FNE fournisseurs)</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-tva-justif')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">La TVA d'un achat n'est récupérable que sur une facture normalisée électronique (FNE) du fournisseur portant le NCC de l'entreprise (obligatoire depuis le 01/12/2025). Enregistrez la FNE reçue pour chaque pièce : sans elle, la TVA est signalée comme non justifiée.</div>
+      <div id="tvaj-corps"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-tva-justif')">Fermer</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-tva-justif-piece">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header"><h3>🧾 Justifier la TVA</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-tva-justif-piece')">✕</button></div>
+    <div class="modal-body">
+      <div id="tvajp-titre" style="font-weight:700;margin-bottom:10px;"></div>
+      <div class="form-group"><label>Pièce reçue du fournisseur</label>
+        <select class="form-control" id="tvajp-statut" onchange="tvaJPieceStatut()"><option value="fne">FNE reçue (facture normalisée électronique)</option><option value="sans_fne">Le fournisseur n'a pas délivré de FNE</option><option value="non_assujetti">Fournisseur non assujetti à la TVA</option></select></div>
+      <div id="tvajp-bloc-fne">
+        <div class="form-grid">
+          <div class="form-group"><label>N° de la FNE *</label><input class="form-control" id="tvajp-numero"></div>
+          <div class="form-group"><label>TVA indiquée sur la FNE (FCFA)</label><input type="number" class="form-control" id="tvajp-tva"></div>
+        </div>
+        <div class="form-group"><label style="font-weight:normal;"><input type="checkbox" id="tvajp-ncc"> Le NCC de l'entreprise figure bien sur la FNE (condition de déduction)</label></div>
+      </div>
+      <div class="form-group"><label>Fournisseur (si non identifié ou à corriger)</label><input class="form-control" id="tvajp-fourn" placeholder="ex : Quincaillerie Le Bâtisseur"></div>
+      <div class="form-group"><label>Note</label><input class="form-control" id="tvajp-note"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-tva-justif-piece')">Annuler</button><button class="btn btn-primary" onclick="tvaJEnregistrerPiece()">💾 Enregistrer</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-prog-dates">
+  <div class="modal" style="max-width:1000px;width:96vw;">
+    <div class="modal-header">
+      <h3>📅 Dates des programmes — lancement et livraison</h3>
+      <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-prog-dates')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">La date de livraison fixe l'échéancier théorique des souscripteurs du programme : sans elle, le retard n'est qu'« estimé » d'après la durée saisie sur chaque fiche. Renseignez les dates, contrôlez l'effet à droite, puis enregistrez.</div>
+      <div style="margin-bottom:10px;"><select class="filter-select" id="pgd-filtre" onchange="progDatesRender()"><option value="manquantes">Programmes avec date manquante</option><option value="tous">Tous les programmes</option></select></div>
+      <div id="pgd-corps"></div>
+    </div>
+    <div class="modal-footer">
+      <span id="pgd-compteur" style="margin-right:auto;font-size:12px;color:var(--blanc-dim);"></span>
+      <button class="btn btn-secondary" onclick="closeModal('modal-prog-dates')">Fermer</button>
+      <button class="btn btn-primary" id="pgd-enregistrer" onclick="progDatesEnregistrer()" disabled>💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-coordonnees">
   <div class="modal" style="max-width:1000px;width:96vw;">
     <div class="modal-header">
