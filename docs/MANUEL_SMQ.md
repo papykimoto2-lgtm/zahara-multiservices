@@ -1,6 +1,6 @@
 # Manuel de procédures — Système de management de la qualité (SMQ)
 
-**Réf.** PRO-SMQ · **Version** 1.4 · **Date** Octobre 2026
+**Réf.** PRO-SMQ · **Version** 1.5 · **Date** Octobre 2026
 **Objet** : fixer comment l'entreprise tient son système qualité dans l'ERP : cartographie et fiches de processus, maîtrise des documents, audits internes, revue de direction, non-conformités et actions correctives, réclamations, satisfaction des clients.
 **Principe directeur** : tout écart est **enregistré, analysé, corrigé, puis vérifié** ; aucune clôture sans preuve d'efficacité.
 
@@ -114,6 +114,17 @@
 6. Seuls les indicateurs **validés** sont calculés. Un indicateur sans donnée sur la période reste sans relevé.
 7. À la revue de direction, les indicateurs automatiques sont recalculés sur **la période de la revue** et marqués « calculé ».
 
+### SMQ-12 — Tenir la matrice des compétences
+
+**Où** : Paramètres › SMQ › 🎓 Compétences. Écriture réservée à la hiérarchie.
+
+1. **Définir le référentiel** : « + Compétence » (nom, processus, niveau requis de 1 à 4) ou « 💡 Proposer les compétences » pour partir d'une base par processus, à ajuster.
+2. **Évaluer** : cliquer une case (employé × compétence). Choisir le niveau (0 non maîtrisé, 1 notions, 2 sous supervision, 3 autonome, 4 référent), la date et la **preuve** (diplôme, attestation, observation). Les évaluations antérieures sont conservées.
+3. **Lire la matrice** : vert = niveau requis atteint, orange = écart de 1, rouge = écart de 2 ou plus, ⚠️ = évaluation de plus de 12 mois à refaire. Seuls les employés actifs figurent.
+4. **Combler les écarts** : le plan de formation regroupe les écarts par compétence ; « 📅 Planifier » crée la formation (RH › Formations) avec les employés concernés. Après la formation, **réévaluer** les participants : c'est la preuve d'efficacité.
+5. **Traiter les dépendances** : une compétence détenue au niveau requis par moins de 2 personnes est signalée (risque de continuité) ; former un suppléant ou l'inscrire au registre des risques.
+6. L'indicateur « Compétences requises atteintes » se calcule automatiquement (SMQ-11).
+
 ### SMQ-03 — Traiter une non-conformité
 
 **Où** : Qualité (SMQ) › **Non-conformités** › **+ Non-conformité**.
@@ -160,6 +171,7 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 | SMQ-09 | A | R | R | I |
 | SMQ-10 | A | R | R | C |
 | SMQ-11 | I | R/A | C | I |
+| SMQ-12 | A | R | R | C |
 | SMQ-04 | A | R | R | C |
 | SMQ-05 | I | R | I | R |
 
@@ -194,3 +206,4 @@ Chaque enregistrement porte sa référence (NC, RCL), son créateur et sa date ;
 | 1.2 | Octobre 2026 | Revue de direction (SMQ-07) |
 | 1.3 | Octobre 2026 | Politique, objectifs, risques et opportunités (SMQ-08 à SMQ-10) |
 | 1.4 | Octobre 2026 | Calcul automatique des indicateurs (SMQ-11) |
+| 1.5 | Octobre 2026 | Matrice des compétences (SMQ-12) |

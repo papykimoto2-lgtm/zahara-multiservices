@@ -15,7 +15,7 @@ async function preparer(page) {
     DATA.programmes = [{ id: 'g1', nom: 'Prog' }]; DATA.parcelles = [{ id: 'p1', ref: 'P1', programme_id: 'g1' }]; DATA.lots = []; DATA.clients = [];
     DATA.users = users; window.userPeutSurStore = () => true; APP.currentUser = { id: 'dir', nom: 'Directeur', role: 'admin' };
     ['dossiers_fonciers', 'evenements_fonciers', 'notifications_foncieres', 'pieces_foncieres', 'publications_foncieres', 'demandes_fonciers', 'missions_foncieres', 'intervenants_fonciers', 'validations'].forEach(s => { DATA[s] = []; });
-    window.syncToSupabase = () => {};
+    window.syncToSupabase = () => {}; window.confirm = () => true;
   }, USERS);
 }
 
@@ -82,4 +82,46 @@ test('rattrapage : une demande antérieure sans ligne centrale y est ajoutée', 
     return { a, b: DATA.validations.length, type: DATA.validations[0].type };
   });
   assert.equal(r.a, 1); assert.equal(r.b, 1); assert.equal(r.type, 'etape_fonciere');
+});
+
+test('aperçu du dossier depuis Validations : contenu, validation sans consultation demandée, ouverture directe sur l\'étape', async () => {
+  const app = await ouvrirApp(); await preparer(app.page);
+  const r = await app.page.evaluate(async () => {
+    const d = (await fcOuvrirDossier({ parcelle_id: 'p1', type: 'acd', responsable_id: 's1' })).dossier, o = {};
+    const V = () => DATA.validations.filter(v => v.type === 'etape_fonciere');
+    APP.currentUser = { id: 's1', nom: 'Foncier 1', role: 'service_foncier' };
+    await fcChangerStatutEtape(d.id, 'creation_dossier', 'termine', {}); await fcChangerStatutEtape(d.id, 'completude_documents', 'termine', {});
+    await fcChangerStatutEtape(d.id, 'identification_procedure', 'en_cours', {});
+    await fcDemanderValidationEtape(d.id, 'identification_procedure');
+    APP.currentUser = { id: 'dir', nom: 'Directeur', role: 'admin' };
+    window.confirm = () => false; await valDecide(V()[0].id, 'valide', ''); o.sansConsulter = V()[0].statut;
+    renderValidations(); o.boutons = (document.getElementById('tbody-validations') || {}).innerHTML.indexOf('valApercuEtapeFonciere') !== -1;
+    valApercuEtapeFonciere(V()[0].id);
+    const m = document.getElementById('val-apercu-fc'); o.modal = !!m; const t = m ? m.textContent : '';
+    o.contenu = [t.indexOf(fcDossier(d.id).reference) !== -1, t.indexOf('Pièces de l’étape') !== -1, t.indexOf('Direction') !== -1, t.indexOf('Avancement') !== -1];
+    o.btns = m ? [m.innerHTML.indexOf('valApercuDecider') !== -1, m.innerHTML.indexOf('valOuvrirDossierFoncier') !== -1] : [];
+    o.vu = !!APP._valApercuVus[V()[0].id];
+    valApercuFermer(); o.ferme = !document.getElementById('val-apercu-fc');
+    APP._valApercuVus = {}; valApercuEtapeFonciere(V()[0].id); await valApercuDecider(V()[0].id, true); o.apresApercu = V()[0].statut; o.modalFerme = !document.getElementById('val-apercu-fc');
+    return o;
+  });
+  assert.equal(r.sansConsulter, 'en_attente'); assert.ok(r.boutons); assert.ok(r.modal);
+  assert.deepEqual(r.contenu, [true, true, true, true]); assert.deepEqual(r.btns, [true, true]); assert.ok(r.vu); assert.ok(r.ferme);
+  assert.equal(r.apresApercu, 'valide'); assert.ok(r.modalFerme);
+});
+
+test('ouvrir le dossier : onglet Étapes, étape visible et mise en évidence', async () => {
+  const app = await ouvrirApp(); await preparer(app.page);
+  const r = await app.page.evaluate(async () => {
+    const d = (await fcOuvrirDossier({ parcelle_id: 'p1', type: 'acd', responsable_id: 's1' })).dossier, o = {};
+    APP._fcPh = {}; APP._fcPh[d.id] = { [fcEtape(fcDossier(d.id), 'identification_procedure').phase]: true };
+    o.ok = fcAllerEtape(d.id, 'identification_procedure');
+    await new Promise(r => setTimeout(r, 400));
+    const tr = document.querySelector('#fc-detail tr[data-fcet="identification_procedure"]');
+    o.ligne = !!tr; o.visible = !!tr && tr.style.display !== 'none'; o.flash = !!tr && tr.classList.contains('fc-flash');
+    o.onglet = (document.querySelector('#fc-detail [data-fcpane="etapes"]') || {}).className || '';
+    o.inconnu = fcAllerEtape('zz', 'x');
+    return o;
+  });
+  assert.ok(r.ok); assert.ok(r.ligne); assert.ok(r.visible); assert.ok(r.flash); assert.match(r.onglet, /on/); assert.equal(r.inconnu, false);
 });

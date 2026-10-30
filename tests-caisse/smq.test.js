@@ -272,10 +272,38 @@ test('indicateurs automatiques : formules calculées sur les données, relevés,
     o.resume = smqResumeHtml('pilotage').indexOf('hors cible') !== -1;
     return o;
   });
-  assert.equal(r.nb, 21);
+  assert.equal(r.nb, 22);
   assert.equal(r.val, '3|1|50'); assert.equal(r.nc, '1|1|4'); assert.equal(r.sat, '3.67|66.7'); assert.equal(r.rcl, '2|50');
   assert.equal(r.doc, r.docAttendu); assert.equal(r.rsq, 1); assert.equal(r.fne, 1); assert.equal(r.vis, 66.7); assert.equal(r.bc, 6); assert.equal(r.inc, 50);
   assert.equal(r.vide, '|'); assert.equal(r.etats, 'ok|ko||ok');
   assert.equal(r.sensSuggere, 'max'); assert.equal(r.valeur, '1'); assert.equal(r.releves, 1); assert.equal(r.etat, 'ko'); assert.equal(r.relevesJour, 1);
   assert.equal(r.nonValide, ''); assert.equal(r.sauve, '1'); assert.equal(r.global, '2'); assert.equal(r.revue, '2|true|ko'); assert.ok(r.resume);
+});
+
+test('matrice des compétences : référentiel, évaluation, écarts, périmées, dépendances, plan de formation, indicateur', async () => {
+  const app = await ouvrir(true);
+  const r = await app.page.evaluate(async function () {
+    var o = {}, an = new Date().getFullYear();
+    DATA.employes = [{ id: 'e1', nom: 'Kone', prenoms: 'Awa', statut: 'actif', poste: 'Caissière' }, { id: 'e2', nom: 'Diallo', prenoms: 'Ali', statut: 'actif', poste: 'Comptable' }, { id: 'e3', nom: 'Sorti', prenoms: 'X', statut: 'actif', date_depart: '2000-01-01' }];
+    DATA.params = DATA.params || {}; DATA.params.smq_competences = []; DATA.smq_evaluations = []; DATA.formations_rh = [];
+    await smqCmpSuggerer(); o.sug = smqCmpRef().length; await smqCmpSuggerer(); o.sug2 = smqCmpRef().length;
+    var c = smqCmpRef()[0]; c.requis = 3;
+    o.vide = smqCmpBilan().couverture;
+    o.futur = (await smqCmpNoter('e1', c.id, 2, '2999-01-01', '')).ok; o.hors = (await smqCmpNoter('e1', c.id, 9, '', '')).ok; o.inconnu = (await smqCmpNoter('zz', c.id, 3, '', '')).ok;
+    await smqCmpNoter('e1', c.id, 2, '', 'Observation'); await smqCmpNoter('e2', c.id, 4, '2000-01-01', 'Diplôme'); await smqCmpNoter('e3', c.id, 0, '', '');
+    var b = smqCmpBilan(); o.evalues = b.evalues; o.ecarts = b.ecarts.length; o.ecartEmp = b.ecarts[0].emp.id; o.perimees = b.perimees; o.couv = b.couverture; o.dep = b.dependances.some(function (d) { return d.c.id === c.id && d.nb === 1; });
+    await smqCmpNoter('e1', c.id, 3, '', 'Formation'); o.histo = _smqCmpEval('e1', c.id).historique.length; o.apres = smqCmpBilan().ecarts.length; o.couvApres = smqCmpBilan().couverture;
+    await smqCmpNoter('e1', c.id, 1, '', ''); var p = await smqCmpPlanifierFormation(c.id); o.frm = DATA.formations_rh.length + ':' + DATA.formations_rh[0].participants.join(); var p2 = await smqCmpPlanifierFormation(c.id); o.doublon = DATA.formations_rh.length + ':' + !!p2.existe;
+    o.calc = smqCalculer('comp_couverture', '2000-01-01', '2999-12-31').v;
+    smqOnglet('cmp'); o.html = document.getElementById('smq-contenu').innerHTML.indexOf('Plan de formation') !== -1; smqCmpNoterOuvrir('e1', c.id); o.form = document.getElementById('smqe-niveau') ? 1 : 0;
+    window.smqPeutEditer = function () { return false; }; o.ro = (await smqCmpNoter('e1', c.id, 4, '', '')).ok;
+    return o;
+  });
+  assert.ok(r.sug >= 10); assert.equal(r.sug2, r.sug); assert.equal(r.vide, null);
+  assert.equal(r.futur, false); assert.equal(r.hors, false); assert.equal(r.inconnu, false);
+  assert.equal(r.evalues, 2); assert.equal(r.ecarts, 1); assert.equal(r.ecartEmp, 'e1');
+  assert.equal(r.perimees, 1); assert.equal(r.couv, 50); assert.ok(r.dep);
+  assert.equal(r.histo, 1); assert.equal(r.apres, 0); assert.equal(r.couvApres, 100);
+  assert.equal(r.frm, '1:e1'); assert.equal(r.doublon, '1:true'); assert.equal(r.calc, 50);
+  assert.ok(r.html); assert.equal(r.form, 1); assert.equal(r.ro, false);
 });
