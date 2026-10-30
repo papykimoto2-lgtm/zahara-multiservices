@@ -24,8 +24,8 @@ test("l'onglet affiche manuels et diagrammes, et la recherche filtre", async () 
     var n1 = document.querySelectorAll('#manuels-liste tbody tr').length, d1 = document.querySelectorAll('#manuels-flux .manuel-flux').length;
     document.getElementById('manuels-recherche').value = 'caisse'; renderManuelsFlux();
     var n2 = document.querySelectorAll('#manuels-liste tbody tr').length, d2 = document.querySelectorAll('#manuels-flux .manuel-flux').length;
-    return { n1: n1, d1: d1, n2: n2, d2: d2 };
+    return { n1: n1, d1: d1, n2: n2, d2: d2, nf: Object.keys(MANUELS_FLUX).length, sans: MANUELS_CATALOGUE.filter(function (m) { return !m.flux.length; }).length };
   });
-  assert.equal(r.n1, 8); assert.equal(r.d1, 2);
-  assert.equal(r.n2, 1); assert.equal(r.d2, 0);
+  assert.equal(r.n1, 8); assert.equal(r.d1, r.nf); assert.equal(r.sans, 0);
+  assert.equal(r.n2, 1); assert.ok(r.d2 >= 1 && r.d2 < r.nf);
 });
