@@ -30762,7 +30762,7 @@ function goTo(page) {
   if (page === 'debourse') { edsRender(); }
   if (page === 'stock') { renderStock(); renderMargeChantiers(); }
   if (page === 'achats') { renderAchats(); }
-  if (page === 'validations') { renderValidations(); }
+  if (page === 'validations') { renderValidations(); if (typeof valActualiserDepuisCloud === 'function') valActualiserDepuisCloud(); }
   if (page === 'recliv') { renderRecliv(); }
   if (page === 'foncierops') { afRender(); }
   if (page === 'locatif') { locEnter(); if(typeof sigBadge==='function') sigBadge(); }
@@ -61600,10 +61600,23 @@ function tfwLienDossier(parcelleId){
   return d ? '<button class="btn btn-secondary btn-sm" onclick="fcAllerDossier(\''+d.id+'\')" title="Étapes détaillées, contrôles, justificatifs">📁 '+escHtml(d.reference)+'</button>' : '<span style="font-size:10px;color:var(--dim);">aucun dossier</span>';
 }
 /* Ouvre le dossier sur l'onglet Étapes, phase dépliée, et met l'étape en évidence (depuis la page Validations). */
+/* Depuis une autre page (Validations, tableau de bord…), il faut d'abord ouvrir la page Foncier : sinon le dossier s'affiche dans une page masquée. */
+function fcOuvrirPageFoncier() { if (typeof goTo === 'function' && (APP.currentPage || '') !== 'foncier') goTo('foncier'); }
+/* Dossier absent de la copie locale (créé ou modifié depuis la connexion) : on le récupère du cloud puis on réessaie une fois. */
+function fcDossierOuRecuperer(dossierId, suite) {
+  if (fcDossier(dossierId)) return true;
+  if (typeof syncPullStore === 'function' && navigator.onLine !== false) {
+    Promise.resolve(syncPullStore('dossiers_fonciers')).then(function(){ if (fcDossier(dossierId)) suite(); else toast('Dossier introuvable.', 'error'); }).catch(function(){ toast('Dossier introuvable.', 'error'); });
+    return false;
+  }
+  toast('Dossier introuvable.', 'error'); return false;
+}
 function fcAllerEtape(dossierId, code) {
-  var d = fcDossier(dossierId); if (!d) { toast('Dossier introuvable.', 'error'); return false; }
+  if (!fcDossierOuRecuperer(dossierId, function(){ fcAllerEtape(dossierId, code); })) return false;
+  var d = fcDossier(dossierId);
   var e = fcEtape(d, code); APP._fcOnglet = 'etapes';
   if (e && APP._fcPh && APP._fcPh[dossierId]) APP._fcPh[dossierId][e.phase] = false;
+  fcOuvrirPageFoncier();
   if (typeof switchTab === 'function') switchTab('foncier', 'dossiers');
   setTimeout(function() {
     fcOuvrirDetail(dossierId); fcOnglet('etapes');
@@ -61612,7 +61625,7 @@ function fcAllerEtape(dossierId, code) {
   }, 80);
   return true;
 }
-function fcAllerDossier(id){ if(typeof switchTab==='function') switchTab('foncier','dossiers'); setTimeout(function(){ if(typeof fcOuvrirDetail==='function') fcOuvrirDetail(id); },50); }
+function fcAllerDossier(id){ if(!fcDossierOuRecuperer(id, function(){ fcAllerDossier(id); })) return; fcOuvrirPageFoncier(); if(typeof switchTab==='function') switchTab('foncier','dossiers'); setTimeout(function(){ if(typeof fcOuvrirDetail==='function') fcOuvrirDetail(id); },50); }
 function fcAllerJalons(parcelleId){ if(typeof switchTab==='function') switchTab('foncier','workflow'); setTimeout(function(){ if(typeof tfwOpen==='function') tfwOpen(parcelleId); },50); }
 function tfwOpen(id){ var sel=document.getElementById('tfw-parc'); if(sel){ sel.value=id; tfwSelect(); } }
 
@@ -61898,6 +61911,7 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
     if (!motif) return { ok: false, erreur: 'Une dérogation exige un motif.' };
     derogation = true;
   }
+  if (statut === 'termine') fcRattraperValidationEtape(d, e);
   var valF = (statut === 'termine') ? fcValidationRequise(d, e) : '';
   if (valF && !(e.validation && e.validation.statut === 'validee')) {
     if (!fcPeutValiderEtape(valF)) return { ok: false, validation_requise: true, fonction: valF, erreur: 'Cette étape doit être validée par la fonction « ' + fcLibFonction(valF) + ' » avant d\'être terminée.' };
@@ -62306,10 +62320,9 @@ function fcRenderDetail(id) {
 }
 /* Dérogations cumulées : chaque refus successif ajoute sa dérogation aux précédentes (avant, chaque nouvel essai
    repartait d'options vides et perdait la dérogation déjà accordée — un dossier pouvait ne jamais se clôturer). */
-async function fcStatutUI(id, code, sel) {
-  var statut = sel.value, motif = '';
-  if (['rejete', 'annule', 'bloque'].indexOf(statut) !== -1) { motif = prompt('Motif obligatoire pour « ' + FC_STATUTS[statut] + ' » :') || ''; }
-  var opts = { motif: motif }, motifs = motif ? [motif] : [];
+/* Change le statut d'une étape en proposant, à chaque blocage, la dérogation motivée correspondante (ordre, phase, clôture, justificatif). */
+async function fcStatutAvecDerogations(id, code, statut, motif) {
+  var opts = { motif: motif || '' }, motifs = motif ? [motif] : [];
   var essai = async function(cle, question, invite){
     if (!confirm(question)) return false;
     var mo = prompt(invite) || ''; if (mo) motifs.push(mo);
@@ -62326,8 +62339,21 @@ async function fcStatutUI(id, code, sel) {
     else if ((r.justificatif_manquant || r.controles_restants || r.etapes_restantes) && !opts.derogation) fait = await essai('derogation', r.erreur + '\n\nTerminer quand même par dérogation (motif obligatoire, journalisée) ?', 'Motif de la dérogation :');
     if (!fait) break;
   }
+  return r;
+}
+async function fcStatutUI(id, code, sel) {
+  var statut = sel.value, motif = '';
+  if (['rejete', 'annule', 'bloque'].indexOf(statut) !== -1) { motif = prompt('Motif obligatoire pour « ' + FC_STATUTS[statut] + ' » :') || ''; }
+  var r = await fcStatutAvecDerogations(id, code, statut, motif);
   if (!r.ok && r.validation_requise && confirm(r.erreur + '\n\nDemander la validation maintenant ?')) { r = await fcDemanderValidationEtape(id, code); if (r.ok) { toast('Validation demandée.', 'success'); fcRender(); return; } }
   fcMsg(r, 'Étape mise à jour.'); fcRender();
+}
+/* Validation accordée mais étape non terminée (blocage) : on termine ici, avec les mêmes dérogations que le bouton « Terminer ». */
+async function fcTerminerApresValidation(id, code, avertissement) {
+  toast('Validation enregistrée, mais l\'étape n\'est pas terminée : ' + avertissement, 'warning', 9000);
+  var r = await fcStatutAvecDerogations(id, code, 'termine', '');
+  fcMsg(r, 'Étape terminée.');
+  return r;
 }
 async function fcJustifUI(id, code) {
   var ref = prompt('Référence ou description du justificatif :'); if (ref === null) return;
@@ -65689,20 +65715,41 @@ async function fcAjouterCatalogueUI(id) {
    Ne s'applique que si au moins une personne porte un rôle de cette fonction (sinon rien ne bloquerait jamais). Réglage : DATA.params.fc_validation_fonctions (actif par défaut). */
 function fcValidationFonctionsActive() { return ((DATA.params || {}).fc_validation_fonctions) !== false; }
 function fcRoleActeur() { return (APP.currentUser && APP.currentUser.role) || ''; }
+/* La ligne centrale du module Validations et l'état de l'étape peuvent diverger (synchronisation, ancienne donnée) : si la dernière ligne de cette étape est « validée », l'étape l'est aussi. */
+function fcRattraperValidationEtape(d, e) {
+  if (!d || !e || (e.validation && e.validation.statut === 'validee')) return;
+  var ref = d.id + '|' + e.code, lignes = (DATA.validations || []).filter(function(x){ return x.type === 'etape_fonciere' && x.ref_id === ref; }), v = lignes[lignes.length - 1];
+  if (v && v.statut === 'valide') e.validation = Object.assign({}, e.validation || {}, { statut: 'validee', fonction: (v.meta || {}).fonction || (e.validation || {}).fonction || '', par: v.valideur || '—', le: v.date_decision || new Date().toISOString(), motif: '' });
+}
 function fcValidationRequise(d, e) {
   if (!fcValidationFonctionsActive() || !e || FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return '';
   var f = fcEquipeEtape(e.code).valide; if (!f) return '';
   return fcUsersFonction(f).length ? f : '';
 }
 function fcPeutValiderEtape(f) { return fcEstAdmin() || fcRolesFonction(f).indexOf(fcRoleActeur()) !== -1; }
+/* Une validation n'a de sens que lorsque l'étape peut être terminée : on ne la demande pas tant que ses étapes préalables (ou, pour la clôture, toutes les autres étapes) ne sont pas terminées. */
+function fcObstacleValidation(d, e) {
+  if (!e) return '';
+  if (e.code === 'cloture') {
+    var restantes = (d.etapes || []).filter(function(x){ return x.code !== 'cloture' && FC_STATUTS_FINAUX.indexOf(x.statut) === -1; });
+    return restantes.length ? restantes.length + ' autre(s) étape(s) du dossier ne sont pas terminées' : '';
+  }
+  if (!fcDependancesActives()) return '';
+  var m = fcPrerequisManquants(d, e.code);
+  return m.length ? 'étape(s) préalable(s) non terminée(s) : ' + m.slice(0, 2).map(function(x){ return x.libelle; }).join(' ; ') + (m.length > 2 ? ' (+' + (m.length - 2) + ')' : '') : '';
+}
 async function fcDemanderValidationEtape(dossierId, code) {
   var d = fcDossier(dossierId), e = d && fcEtape(d, code);
   if (!d || !e) return { ok: false, erreur: 'Dossier ou étape introuvable.' };
   if (['cloture', 'annule'].indexOf(d.statut) !== -1) return { ok: false, erreur: 'Dossier ' + d.statut + '.' };
+  fcRattraperValidationEtape(d, e);
   var f = fcValidationRequise(d, e); if (!f) return { ok: false, erreur: 'Cette étape ne nécessite pas de validation.' };
   if (e.validation && e.validation.statut === 'demandee') return { ok: false, erreur: 'Une validation est déjà demandée.' };
+  var obst = (e.validation && e.validation.statut === 'validee') ? '' : fcObstacleValidation(d, e);
+  if (obst) return { ok: false, erreur: 'Validation impossible pour le moment : ' + obst + '. Terminez d\'abord les étapes qui précèdent.' };
+  if (e.validation && e.validation.statut === 'validee') return { ok: false, erreur: 'Cette étape est déjà validée : il reste à la terminer.' };
   var a = fcActeur();
-  if (!fcPeutGererDossier(d) && fcResponsableEtape(d, e) !== a.id) return { ok: false, erreur: "Seul le responsable de l'étape ou du dossier demande la validation." };
+  if (!fcPeutGererDossier(d) && fcResponsableEtape(d, e) !== a.id && !fcDroitEcriture()) return { ok: false, erreur: "Vous n'avez pas le droit de modifier les dossiers fonciers : demandez au responsable de l'étape ou du dossier de lancer la demande de validation." };
   e.validation = { statut: 'demandee', fonction: f, demande_par: a.nom, demande_par_id: a.id, demande_le: new Date().toISOString() };
   await fcSauver(d);
   await valSyncEtapeFonciere(d, e, 'en_attente');
@@ -65735,18 +65782,23 @@ async function fcDecisionValidationEtape(dossierId, code, decision, motif) {
 }
 fcProtegerMutations(['fcDemanderValidationEtape', 'fcDecisionValidationEtape']);
 function fcValidationHtml(d, e) {
+  fcRattraperValidationEtape(d, e);
   var f = fcValidationRequise(d, e), v = e.validation || {};
   if (!f) return v.statut === 'validee' ? '<br><span style="font-size:11px;color:#2e7d4f;" title="Validation par fonction">🔏 Validée par ' + escHtml(v.par || '') + ' (' + escHtml(fcLibFonction(v.fonction)) + ')</span>' : '';
   var q = "'" + d.id + "','" + e.code + "'", lib = escHtml(fcLibFonction(f)), actif = FC_STATUTS_ACTIFS.indexOf(e.statut) !== -1, peut = fcPeutValiderEtape(f);
   if (v.statut === 'demandee') return '<br><span style="font-size:11px;color:#8a5a00;">⏳ Validation en attente — ' + lib + (peut ? ' <button class="btn btn-primary btn-sm" onclick="fcValiderEtapeUI(' + q + ',true)">✅ Valider</button> <button class="btn btn-secondary btn-sm" onclick="fcValiderEtapeUI(' + q + ',false)">⛔ Refuser</button>' : '') + '</span>';
+  if (v.statut === 'validee') return '<br><span style="font-size:11px;color:#2e7d4f;">🔏 Validée par ' + escHtml(v.par || '') + ' (' + lib + ') — reste à terminer l\'étape' + (actif ? '' : ' (démarrez-la)') + ' <button class="btn btn-primary btn-sm" onclick="fcActionEtapeUI(' + q + ',\'termine\')">✅ Terminer cette étape</button></span>';
   if (v.statut === 'refusee') return '<br><span style="font-size:11px;color:#c0392b;">⛔ Validation refusée par ' + escHtml(v.decide_par || '') + ' : ' + escHtml(v.motif || '') + (actif ? ' <button class="btn btn-secondary btn-sm" onclick="fcDemanderValidationUI(' + q + ')">Redemander</button>' : '') + '</span>';
+  var obst = fcObstacleValidation(d, e);
+  if (obst) return '<br><span style="font-size:11px;color:#6a5acd;">🔏 À valider par ' + lib + ' — validation possible une fois les étapes qui précèdent terminées</span>';
   return '<br><span style="font-size:11px;color:#5b6b7a;">🔏 À valider par ' + lib + ' avant d\'être terminée' + (actif ? ' <button class="btn btn-secondary btn-sm" onclick="fcDemanderValidationUI(' + q + ')">Demander la validation</button>' : '') + '</span>';
 }
 async function fcDemanderValidationUI(id, code) { if (fcMsg(await fcDemanderValidationEtape(id, code), 'Validation demandée.')) { fcRender(); fcRenderDetail(id); } }
 async function fcValiderEtapeUI(id, code, ok) {
   var motif = ok ? '' : (prompt('Motif du refus (obligatoire) :') || '');
   var r = await fcDecisionValidationEtape(id, code, ok ? 'validee' : 'refusee', motif);
-  if (fcMsg(r, ok ? 'Validée : étape terminée.' : 'Validation refusée.')) { if (r.avertissement) toast('Validation enregistrée, mais l\'étape n\'est pas terminée : ' + r.avertissement, 'warning'); fcRender(); fcRenderDetail(id); }
+  if (r && r.ok && r.validee && !r.terminee) { await fcTerminerApresValidation(id, code, r.avertissement); fcRender(); fcRenderDetail(id); return; }
+  if (fcMsg(r, ok ? 'Validée : étape terminée.' : 'Validation refusée.')) { fcRender(); fcRenderDetail(id); }
 }
 
 /* ── Prochaine action : une seule carte « quoi faire maintenant, par qui, avec quoi » ── */
@@ -118196,11 +118248,12 @@ async function valDecideEtapeFonciere(v,decision,motif){
   if(decision==='valide' && !(APP._valApercuVus||{})[v.id] && !confirm('Vous n’avez pas consulté ce dossier (boutons « 👁 Aperçu » ou « 📁 Dossier »).\n\nValider quand même ?')) return;
   var r=await fcDecisionValidationEtape(m.dossier_id,m.code,decision==='valide'?'validee':'refusee',motif||'');
   if(!r||!r.ok){ toast((r&&r.erreur)||'Décision impossible.','error'); return; }
-  if(r.avertissement) toast('Validation enregistrée, mais l\'étape n\'est pas terminée : '+r.avertissement,'warning');
+  if(r.validee && !r.terminee && typeof fcTerminerApresValidation==='function') r=Object.assign({},r,{terminee:((await fcTerminerApresValidation(m.dossier_id,m.code,r.avertissement))||{}).ok===true});
   renderValidations();
   if(typeof fcRender==='function'){ try{ fcRender(); if(APP._fcSel===m.dossier_id) fcRenderDetail(m.dossier_id); }catch(e){} }
   etudesLiveRefresh('validations');
-  toast(decision==='valide'?'✅ Validé : étape terminée.':'⛔ Rejeté.',decision==='valide'?'success':'info');
+  if(decision!=='valide') toast('⛔ Rejeté.','info');
+  else if(r.terminee!==false) toast('✅ Validé : étape terminée.','success');
 }
 /* Crée, clôt ou rattrape la ligne centrale d'une validation d'étape. decision : 'en_attente' (création) | 'valide' | 'rejete'. */
 async function valSyncEtapeFonciere(d,e,decision,par,motif){
@@ -118349,6 +118402,26 @@ function valSearchChange(txt){
   valSearch=String(txt||''); valPgEtat('circuit').page=1;
   clearTimeout(_valSearchTimer);
   _valSearchTimer=setTimeout(function(){ if(typeof renderValidations==='function') renderValidations(); }, 150);
+}
+/* À l'ouverture du module, on ne se contente pas de la copie locale : les demandes faites par d'autres personnes depuis la connexion
+   (temps réel coupé, session ancienne) n'y figurent pas. Récupération silencieuse (sans message), au plus une fois toutes les 15 s. */
+async function valActualiserDepuisCloud(){
+  if(APP._valPullEnCours || !navigator.onLine || typeof sbFetch!=='function' || typeof _supaUnwrap!=='function') return;
+  if(Date.now()-(APP._valPullLe||0)<15000) return;
+  APP._valPullEnCours=true; APP._valPullLe=Date.now();
+  try{
+    var rows=await sbFetch('pi_validations?select=*','GET'); if(!Array.isArray(rows)) return;
+    DATA.validations=DATA.validations||[];
+    var byId={}; DATA.validations.forEach(function(x){ byId[x.id]=x; }); var n=0;
+    for(var i=0;i<rows.length;i++){
+      var r=_supaUnwrap('pi_validations',rows[i]); if(!r||!r.id) continue;
+      if(typeof tombHas==='function' && tombHas('validations',r.id)) continue;
+      if(typeof _remoteWins==='function' && _remoteWins(r,byId[r.id])){ byId[r.id]=r; try{ await dbPut('validations',r); }catch(_){} n++; }
+    }
+    DATA.validations=Object.keys(byId).map(function(k){ return byId[k]; });
+    if(n && typeof renderValidations==='function') renderValidations();
+  }catch(e){ console.warn('[Validations] actualisation cloud',e); }
+  finally{ APP._valPullEnCours=false; }
 }
 function renderValidations(){
   var all=(DATA.validations||[]);
@@ -122312,7 +122385,7 @@ function etudesLiveRefresh(store) {
     if (typeof renderGantt === 'function') renderGantt();
     if (typeof renderRapports === 'function') renderRapports();
     if (typeof buildCoutRevient === 'function') buildCoutRevient();
-  } else if (page === 'validations' && typeof renderValidations === 'function') renderValidations();
+  } else if (page === 'validations' && typeof renderValidations === 'function') { renderValidations(); if (typeof valActualiserDepuisCloud === 'function') valActualiserDepuisCloud(); }
   else if (page === 'recliv' && typeof renderRecliv === 'function') renderRecliv();
 }
 
