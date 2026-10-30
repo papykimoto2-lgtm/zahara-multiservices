@@ -50336,7 +50336,7 @@ function detectRelances() {
     var lastRelance = DATA.relances.filter(function(rel) { return rel.client_id === r.id; }).sort(function(a, b) { return new Date(b.date) - new Date(a.date); })[0];
     var dosCtx = (typeof ctxDossierDuClient === 'function') ? ctxDossierDuClient(r.id) : null;
     return '<tr>'
-      + '<td><strong>' + r.nom + ' ' + r.prenoms + '</strong><br><span style="font-size:11px;color:var(--blanc-dim);">' + r.tel + '</span>'
+      + '<td><a href="#" style="color:inherit;" title="Ouvrir le dossier du souscripteur" onclick="openClientModal(\'' + r.id + '\');return false;"><strong>' + r.nom + ' ' + r.prenoms + '</strong></a><br><span style="font-size:11px;color:var(--blanc-dim);">' + r.tel + '</span>'
         + an.motifs.map(function(m){ return '<br><span style="font-size:11px;color:' + (m.prio === 1 ? 'var(--rouge)' : 'var(--or)') + ';font-weight:600;">' + m.label + '</span>'; }).join('') + '</td>'
       + '<td>' + (prog ? prog.nom : '—') + (lot ? ' / Lot ' + lot.numero : '') + '</td>'
       + '<td style="color:var(--rouge);font-weight:bold;">' + r.moisRetard + ' mois</td>'
@@ -50346,6 +50346,7 @@ function detectRelances() {
       + '<td style="white-space:nowrap;">'
       + '<button class="btn btn-primary btn-sm" onclick="openRelanceModal(\'' + r.id + '\')">📨 Relancer</button> '
       + '<button class="btn btn-secondary btn-sm" onclick="etatRelance(\'' + r.id + '\')">📄 Lettre PDF</button> '
+      + '<button class="btn btn-secondary btn-sm" title="Ouvrir le dossier du souscripteur (fiche, documents, échéancier)" onclick="openClientModal(\'' + r.id + '\')">📁 Dossier</button> '
       + '<button class="btn btn-secondary btn-sm" title="Enregistrer une promesse de paiement" onclick="promesseNouvelle(\'' + r.id + '\')">🤝 Promesse</button>'
       + (dosCtx ? ' <button class="btn btn-secondary btn-sm" onclick="ctxOuvrirDossier(\'' + dosCtx.id + '\')">⚖️ Voir le contentieux</button>'
                 : (r.moisRetard >= 3 ? ' <button class="btn btn-danger btn-sm" title="Ouvrir un dossier contentieux dans le module Juridique" onclick="ctxEscalader(\'' + r.id + '\')">⚖️ Contentieux</button>' : ''))
@@ -50379,6 +50380,7 @@ function openRelanceModal(clientId) {
     + '<div style="display:flex;gap:10px;margin-top:12px;">'
     + '<a class="btn btn-secondary btn-sm" href="sms:' + client.tel + '" target="_blank">📱 Ouvrir SMS</a>'
     + '<a class="btn btn-secondary btn-sm" href="https://wa.me/' + telWhatsApp(client.tel) + '?text=' + encodeURIComponent(msgSMS) + '" target="_blank">💬 WhatsApp</a>'
+    + '<button class="btn btn-secondary btn-sm" title="Ouvrir le dossier du souscripteur" onclick="closeModal(\'modal-relance\');openClientModal(\'' + client.id + '\')">📁 Dossier</button>'
     + '</div>';
 
   document.getElementById('relance-body').innerHTML = body;
