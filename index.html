@@ -4346,6 +4346,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
                   <input type="date" class="form-control" id="compta-vers-date-fin" onchange="renderComptaVersements()" style="padding:6px 8px;">
                 </label>
                 <button class="btn btn-secondary btn-sm" onclick="document.getElementById('compta-vers-date-debut').value='';document.getElementById('compta-vers-date-fin').value='';renderComptaVersements()" title="Réinitialiser la période">✕ Période</button>
+                <button class="btn btn-primary btn-sm" onclick="pmCtlOuvrir()" title="Rapprochement versements / écritures : versements sans écriture, écritures sans versement, écarts, charges de commission orphelines">🔎 Contrôles Paiements</button>
                 <button class="btn btn-secondary btn-sm" onclick="detecterVersementsDoublons()" title="Repère les versements probablement saisis deux fois (import historique + ressaisie manuelle)">🔍 Détecter les doublons</button>
               </div>
             </div>
@@ -30899,6 +30900,178 @@ async function commCtlReaffecter(id) {
   toast('Commission réaffectée.', 'success'); _cmRafraichir();
 }
 
+/* ── Contrôles Paiements : rapprochement versements ↔ écritures comptables ──
+   Les écritures de versement ont l'identifiant « ecr_vrs_<id du versement> ». Rien n'est supprimé :
+   une écriture orpheline est CONTRE-PASSÉE (pièce inverse), jamais effacée. */
+var _pmCtl = { onglet: 'synthese' };
+function _pmNomClient(id) { var c = (DATA.clients || []).find(function (x) { return x.id === id; }); return c ? (((c.prenoms || '') + ' ' + (c.nom || '')).trim() || c.dossier || '—') : '(fiche absente)'; }
+function _pmAn(d) { return String(d || '').slice(0, 4) || '?'; }
+function pmCtlCalculer() {
+  var vers = DATA.versements || [], ecrs = DATA.ecritures || [];
+  var parEcr = {}; ecrs.forEach(function (e) { parEcr[e.id] = e; });
+  var parVers = {}; vers.forEach(function (v) { parVers[v.id] = v; });
+  var r = { manquantes: [], orphelines: [], ecarts: [], commOrph: [], synth: {} };
+  var syn = function (an) { return r.synth[an] = r.synth[an] || { an: an, nv: 0, mv: 0, ne: 0, me: 0, nm: 0, mm: 0, no: 0, mo: 0 }; };
+  vers.forEach(function (v) {
+    var m = parseFloat(v.montant) || 0, s = syn(_pmAn(v.date)); s.nv++; s.mv += m;
+    var e = parEcr['ecr_vrs_' + v.id];
+    if (!e) {
+      var jumelle = ecrs.find(function (x) { return x.id !== 'ecr_vrs_' + v.id && v.ref && (x.ref === v.ref || x.piece === v.ref); });
+      r.manquantes.push({ v: v, jumelle: jumelle || null, clos: typeof exerciceEstClos === 'function' && !!exerciceEstClos(v.date) });
+      s.nm++; s.mm += m;
+    } else {
+      s.ne++; s.me += parseFloat(e.montant) || 0;
+      var dm = Math.abs((parseFloat(e.montant) || 0) - m) > 0.5, dd = String(e.date || '') !== String(v.date || '');
+      if (dm || dd) r.ecarts.push({ v: v, e: e, dm: dm, dd: dd });
+    }
+  });
+  ecrs.forEach(function (e) {
+    if (String(e.id).indexOf('ecr_vrs_') !== 0 || parVers[String(e.id).slice(8)]) return;
+    var m = parseFloat(e.montant) || 0, s = syn(_pmAn(e.date));
+    if (!e.contrepassee_par) { s.no++; s.mo += m; }
+    r.orphelines.push({ e: e, deja: !!e.contrepassee_par, clos: typeof exerciceEstClos === 'function' && !!exerciceEstClos(e.date) });
+  });
+  var comms = {}; (DATA.commissions || []).forEach(function (c) { comms[c.id] = 1; });
+  var ext = {}; ecrs.forEach(function (x) { if (x.source === 'extourne_commission' && x.commission_id) ext[x.commission_id] = 1; });
+  ecrs.forEach(function (e) { if (e.source === 'commission' && e.commission_id && !comms[e.commission_id] && !ext[e.commission_id]) r.commOrph.push(e); });
+  return r;
+}
+function pmCtlTotal(r) { r = r || pmCtlCalculer(); return r.manquantes.length + r.orphelines.filter(function (x) { return !x.deja; }).length + r.ecarts.length + r.commOrph.length; }
+function pmCtlOuvrir(onglet) { _pmCtl.onglet = onglet || _pmCtl.onglet || 'synthese'; openModal('modal-pm-ctl'); pmCtlRender(); }
+function pmCtlOnglet(o) { _pmCtl.onglet = o; pmCtlRender(); }
+function pmCtlRender() {
+  var box = document.getElementById('pmctl-corps'); if (!box) return;
+  var r = pmCtlCalculer(), mgr = hasRole('manager'), CAP = 100, F = function (v) { return fmtF(Math.round(v || 0)); };
+  var orphA = r.orphelines.filter(function (x) { return !x.deja; });
+  var onglets = [['synthese', 'Synthèse', ''], ['manquantes', 'Versements sans écriture', r.manquantes.length], ['orphelines', 'Écritures sans versement', orphA.length], ['ecarts', 'Écarts montant / date', r.ecarts.length], ['comm', 'Charges de commission sans commission', r.commOrph.length]];
+  var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">' + onglets.map(function (o) { return '<button class="btn btn-sm ' + (_pmCtl.onglet === o[0] ? 'btn-primary' : 'btn-secondary') + '" onclick="pmCtlOnglet(\'' + o[0] + '\')">' + o[1] + (o[2] !== '' ? ' <strong>' + o[2] + '</strong>' : '') + '</button>'; }).join('') + '</div>';
+  var th = function (a) { return '<thead><tr>' + a.map(function (x) { return '<th>' + x + '</th>'; }).join('') + '</tr></thead>'; };
+  var vide = '<div style="color:#10B981;padding:12px 0;">✅ Aucune anomalie.</div>';
+  var suite = function (n) { return n > CAP ? '<div style="font-size:11px;color:var(--blanc-dim);margin-top:6px;">' + CAP + ' premières lignes sur ' + n + '.</div>' : ''; };
+  var o = _pmCtl.onglet;
+  if (o === 'synthese') {
+    var an = Object.keys(r.synth).sort(), T = { nv: 0, mv: 0, me: 0, mm: 0, mo: 0 };
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Rapprochement par année de la date du versement. <strong>Écart comptable</strong> = versements − écritures de versement = (versements sans écriture) − (écritures sans versement) ± écarts de montant.</div>'
+      + '<table class="data-table">' + th(['Année', 'Versements', 'Montant', 'Sans écriture', 'Écritures sans versement', 'Écart comptable']) + '<tbody>' + an.map(function (k) {
+        var s = r.synth[k], ec = s.mv - (s.me + s.mo); T.nv += s.nv; T.mv += s.mv; T.me += s.me; T.mm += s.mm; T.mo += s.mo;
+        return '<tr><td>' + escHtml(k) + '</td><td>' + s.nv + '</td><td>' + F(s.mv) + ' F</td><td>' + (s.nm ? s.nm + ' (' + F(s.mm) + ' F)' : '0') + '</td><td>' + (s.no ? s.no + ' (' + F(s.mo) + ' F)' : '0') + '</td><td style="font-weight:700;color:' + (Math.abs(ec) > 0.5 ? '#EF4444' : '#10B981') + ';">' + F(ec) + ' F</td></tr>';
+      }).join('') + '<tr style="font-weight:700;"><td>Total</td><td>' + T.nv + '</td><td>' + F(T.mv) + ' F</td><td>' + F(T.mm) + ' F</td><td>' + F(T.mo) + ' F</td><td>' + F(T.mv - T.me - T.mo) + ' F</td></tr></tbody></table>';
+  } else if (o === 'manquantes') {
+    var gen = r.manquantes.filter(function (x) { return !x.jumelle && !x.clos; });
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Versements enregistrés mais absents de la comptabilité. « Générer » crée l\'écriture (Débit trésorerie / Crédit client). Écartés : les versements d\'un exercice clos, et ceux dont une écriture de même référence existe déjà sous un autre identifiant (à examiner à la main, pour ne pas comptabiliser deux fois).</div>';
+    if (mgr && gen.length) h += '<div style="margin-bottom:8px;"><button class="btn btn-primary btn-sm" onclick="pmCtlGenererToutes()">📒 Générer les ' + gen.length + ' écriture(s) (' + F(gen.reduce(function (s, x) { return s + (parseFloat(x.v.montant) || 0); }, 0)) + ' F)</button></div>';
+    h += r.manquantes.length ? '<table class="data-table">' + th(['Date', 'Réf.', 'Souscripteur', 'Mode', 'Montant', 'Remarque', '']) + '<tbody>' + r.manquantes.slice(0, CAP).map(function (x) {
+      var v = x.v;
+      return '<tr><td>' + escHtml(v.date || '') + '</td><td>' + escHtml(v.ref || '') + '</td><td>' + escHtml(_pmNomClient(v.client_id)) + '</td><td>' + escHtml(v.mode || '') + '</td><td>' + F(v.montant) + ' F</td><td style="font-size:11px;">' + (x.jumelle ? 'Écriture de même référence : ' + escHtml(x.jumelle.ref || x.jumelle.id) : (x.clos ? 'Exercice clos' : '')) + '</td><td>' + (mgr && !x.jumelle && !x.clos ? '<button class="btn btn-secondary btn-sm" onclick="pmCtlGenerer(\'' + v.id + '\')">📒 Générer</button>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table>' + suite(r.manquantes.length) : vide;
+  } else if (o === 'orphelines') {
+    var aCp = orphA.filter(function (x) { return !x.clos; });
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Écritures de versement dont le versement n\'existe plus : elles gonflent les encaissements. <strong>Vérifiez d\'abord</strong> que le versement a bien été supprimé et non perdu par une synchronisation. Une écriture n\'est jamais effacée : elle est <strong>contre-passée</strong> (pièce inverse, motif tracé). Les écritures d\'un exercice clos sont écartées.</div>';
+    if (mgr && aCp.length) h += '<div style="margin-bottom:8px;"><button class="btn btn-warning btn-sm" onclick="pmCtlContrePasserToutes()">↩️ Contre-passer les ' + aCp.length + ' écriture(s) (' + F(aCp.reduce(function (s, x) { return s + (parseFloat(x.e.montant) || 0); }, 0)) + ' F)</button></div>';
+    h += orphA.length ? '<table class="data-table">' + th(['Date', 'Pièce', 'Libellé', 'Montant', 'Remarque', '']) + '<tbody>' + orphA.slice(0, CAP).map(function (x) {
+      var e = x.e;
+      return '<tr><td>' + escHtml(e.date || '') + '</td><td>' + escHtml(e.piece || e.ref || '') + '</td><td>' + escHtml(e.libelle || '') + '</td><td>' + F(e.montant) + ' F</td><td style="font-size:11px;">' + (x.clos ? 'Exercice clos' : '') + '</td><td>' + (mgr && !x.clos ? '<button class="btn btn-warning btn-sm" onclick="pmCtlContrePasser(\'' + String(e.id).replace(/'/g, '') + '\')">↩️ Contre-passer</button>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table>' + suite(orphA.length) : vide;
+  } else if (o === 'ecarts') {
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Écriture dont le montant ou la date diffère du versement. « Régénérer » réécrit l\'écriture d\'après le versement, sauf pièce visée ou exercice clos (contre-passation à la main).</div>';
+    h += r.ecarts.length ? '<table class="data-table">' + th(['Souscripteur', 'Versement', 'Écriture', 'Écart', '']) + '<tbody>' + r.ecarts.map(function (x) {
+      var blq = typeof vrsEcritureVerrouillee === 'function' ? vrsEcritureVerrouillee(x.v.id) : '';
+      return '<tr><td>' + escHtml(_pmNomClient(x.v.client_id)) + '</td><td>' + escHtml(x.v.date || '') + ' · ' + F(x.v.montant) + ' F</td><td>' + escHtml(x.e.date || '') + ' · ' + F(x.e.montant) + ' F</td><td>' + (x.dm ? 'montant ' : '') + (x.dd ? 'date' : '') + '</td><td>' + (mgr && !blq ? '<button class="btn btn-secondary btn-sm" onclick="pmCtlRegenerer(\'' + x.v.id + '\')">🔄 Régénérer</button>' : '<span style="font-size:11px;">' + escHtml(blq || '') + '</span>') + '</td></tr>';
+    }).join('') + '</tbody></table>' : vide;
+  } else {
+    h += '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">Charges de commission comptabilisées dont la commission a été supprimée (avec son versement) sans extourne : la charge reste au compte de résultat sans dette réelle. « Extourner » passe l\'écriture inverse.</div>';
+    if (mgr && r.commOrph.length) h += '<div style="margin-bottom:8px;"><button class="btn btn-warning btn-sm" onclick="pmCtlExtournerToutes()">↩️ Extourner les ' + r.commOrph.length + ' charge(s) (' + F(r.commOrph.reduce(function (s, e) { return s + (parseFloat(e.montant) || 0); }, 0)) + ' F)</button></div>';
+    h += r.commOrph.length ? '<table class="data-table">' + th(['Date', 'Réf.', 'Libellé', 'Montant']) + '<tbody>' + r.commOrph.slice(0, CAP).map(function (e) {
+      return '<tr><td>' + escHtml(e.date || '') + '</td><td>' + escHtml(e.ref || '') + '</td><td>' + escHtml(e.libelle || '') + '</td><td>' + F(e.montant) + ' F</td></tr>';
+    }).join('') + '</tbody></table>' + suite(r.commOrph.length) : vide;
+  }
+  box.innerHTML = h;
+}
+function _pmRafraichir() {
+  if (typeof filterEcritures === 'function') filterEcritures();
+  if (typeof buildBalance === 'function') buildBalance();
+  if (typeof renderVersements === 'function') renderVersements();
+  pmCtlRender();
+}
+async function _pmGenerer(v) { try { await genererEcritureVersement(v); return ''; } catch (e) { return (e && e.message) || 'erreur'; } }
+async function pmCtlGenerer(id) {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var v = (DATA.versements || []).find(function (x) { return x.id === id; }); if (!v) return;
+  var e = await _pmGenerer(v); toast(e ? '❌ ' + e : 'Écriture générée.', e ? 'error' : 'success'); _pmRafraichir();
+}
+async function pmCtlGenererToutes() {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var l = pmCtlCalculer().manquantes.filter(function (x) { return !x.jumelle && !x.clos; }).map(function (x) { return x.v; });
+  if (!l.length || !confirm('Générer ' + l.length + ' écriture(s) de versement (Débit trésorerie / Crédit client) ?')) return;
+  var ok = 0, ko = ''; for (var i = 0; i < l.length; i++) { var e = await _pmGenerer(l[i]); if (e) ko = e; else ok++; }
+  toast(ok + ' écriture(s) générée(s)' + (ko ? ' — échec : ' + ko : '') + '.', ko ? 'error' : 'success'); _pmRafraichir();
+}
+async function pmCtlRegenerer(id) {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var v = (DATA.versements || []).find(function (x) { return x.id === id; }); if (!v) return;
+  if (typeof vrsEcritureVerrouillee === 'function' && vrsEcritureVerrouillee(v.id)) { toast('🔒 Pièce visée ou exercice clos.', 'error'); return; }
+  var e = await _pmGenerer(v); toast(e ? '❌ ' + e : 'Écriture régénérée.', e ? 'error' : 'success'); _pmRafraichir();
+}
+async function _pmContrePasser(src, date, motif) {
+  if (!src || src.contrepassee_par) return 'déjà contre-passée';
+  if (typeof exerciceEstClos === 'function' && exerciceEstClos(date)) return 'exercice clos à la date de contre-passation';
+  var lignes = ecrLignes(src); if (!lignes.length) return 'aucune ligne';
+  var inv = {
+    id: uid(), date: date, journal: src.journal || 'OD', type: src.type || 'od',
+    piece: 'CP-' + (src.piece || src.ref || String(src.id).slice(-6)),
+    libelle: 'Contre-passation — ' + (src.libelle || '') + ' — ' + motif,
+    division: src.division, entite: src.entite, programme_id: src.programme_id, client_id: (typeof ecrClientIdDe === 'function' ? ecrClientIdDe(src) : src.client_id) || undefined,
+    lignes: lignes.map(function (l) { return { compte: l.compte, sens: (l.sens === 'D' ? 'C' : 'D'), montant: parseFloat(l.montant) || 0, tiers_id: l.tiers_id || (typeof ecrTiersLigne === 'function' ? ecrTiersLigne(src, l) : undefined) || undefined, libelle: 'CP — ' + (l.libelle || src.libelle || '') }; }),
+    contrepassation_de: src.id, source: 'contrepassation', created_at: today()
+  };
+  inv.montant = inv.lignes.filter(function (l) { return l.sens === 'D'; }).reduce(function (a, l) { return a + l.montant; }, 0);
+  inv.compte_debit = (inv.lignes.find(function (l) { return l.sens === 'D'; }) || {}).compte;
+  inv.compte_credit = (inv.lignes.find(function (l) { return l.sens === 'C'; }) || {}).compte;
+  DATA.ecritures.push(inv); await dbPut('ecritures', inv);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', inv);
+  src.contrepassee_par = inv.piece; src.contrepassee_le = new Date().toISOString(); src._modifie = src.contrepassee_le;
+  await dbPut('ecritures', src, { forceCloture: true });
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', src, { forceCloture: true });
+  return '';
+}
+async function pmCtlContrePasser(id) {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var e = (DATA.ecritures || []).find(function (x) { return x.id === id; }); if (!e) return;
+  var d = prompt('Date de la contre-passation :', today()); if (!d) return;
+  var motif = prompt('Motif :', 'Versement supprimé — écriture sans versement'); if (!motif) return;
+  var err = await _pmContrePasser(e, d, motif); toast(err ? '❌ ' + err : 'Contre-passation générée.', err ? 'error' : 'success'); _pmRafraichir();
+}
+async function pmCtlContrePasserToutes() {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var l = pmCtlCalculer().orphelines.filter(function (x) { return !x.deja && !x.clos; }).map(function (x) { return x.e; });
+  if (!l.length) return;
+  var d = prompt('Date de contre-passation pour ' + l.length + ' écriture(s) (exercice ouvert) :', today()); if (!d) return;
+  var motif = prompt('Motif :', 'Versement supprimé — écriture sans versement'); if (!motif) return;
+  if (!confirm('Contre-passer ' + l.length + ' écriture(s) au ' + d + ' ? Une pièce inverse est créée pour chacune ; rien n\'est effacé.')) return;
+  var ok = 0, ko = ''; for (var i = 0; i < l.length; i++) { var err = await _pmContrePasser(l[i], d, motif); if (err) ko = err; else ok++; }
+  toast(ok + ' contre-passation(s) générée(s)' + (ko ? ' — dernier échec : ' + ko : '') + '.', ko ? 'error' : 'success'); _pmRafraichir();
+}
+async function _pmExtournerCommission(e) {
+  var ext = {
+    id: uid(), ref: 'EXT-COMM-' + today().slice(0, 4) + '-' + prochainNumeroRef('ecritures', 'EXT-COMM', today().slice(0, 4), 4), date: today(),
+    piece: 'EXT-' + (e.ref || String(e.id).slice(-6).toUpperCase()), type: 'charge',
+    libelle: 'Extourne — ' + (e.libelle || '') + ' (commission supprimée avec son versement)',
+    compte: e.compte_credit, compte_debit: e.compte_credit, compte_credit: e.compte_debit, montant: parseFloat(e.montant) || 0, mode: 'commission',
+    programme_id: e.programme_id || '', division: e.division || '', notes: 'Extourne de régularisation — charge sans commission', source: 'extourne_commission', commission_id: e.commission_id, created_at: today()
+  };
+  if (typeof exerciceEstClos === 'function' && exerciceEstClos(ext.date)) return 'exercice clos';
+  DATA.ecritures.push(ext); await dbPut('ecritures', ext);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', ext);
+  return '';
+}
+async function pmCtlExtournerToutes() {
+  if (!hasRole('manager')) { toast('⛔ Réservé aux managers.', 'error'); return; }
+  var l = pmCtlCalculer().commOrph; if (!l.length) return;
+  if (!confirm('Extourner ' + l.length + ' charge(s) de commission sans commission (écritures inverses datées du jour) ?')) return;
+  var ok = 0, ko = ''; for (var i = 0; i < l.length; i++) { var err = await _pmExtournerCommission(l[i]); if (err) ko = err; else ok++; }
+  toast(ok + ' extourne(s)' + (ko ? ' — échec : ' + ko : '') + '.', ko ? 'error' : 'success'); _pmRafraichir();
+}
+
 /* ── États de paiement des commissions (bordereau par bénéficiaire) ──
    Ne retient que les commissions saines : versement et souscripteur existants, pas de doublon, souscripteur non
    résilié. Le bordereau est soumis au circuit de validation ; le règlement n'est possible qu'après validation. */
@@ -38296,12 +38469,23 @@ async function deleteVersement(id, skipConfirm) {
      (auquel cas elle doit être traitée manuellement, pas effacée en silence). */
   var commsLiees = (DATA.commissions||[]).filter(function(c){ return c.versement_id === id; });
   var commsPayees = commsLiees.filter(function(c){ return c.statut === 'payee'; });
+  var commsGardees = {};
   for (var i=0; i<commsLiees.length; i++) {
     var c = commsLiees[i]; if (c.statut === 'payee') continue;
+    /* Charge déjà comptabilisée : supprimer la commission laisserait son écriture sans contrepartie
+       (charge au compte de résultat, dette fictive). On l'ANNULE et on EXTOURNE la charge ; la commission
+       reste visible (statut « annulée »). Si l'extourne échoue (compte par défaut manquant), la commission
+       est conservée et l'utilisateur prévenu, jamais supprimée en silence. */
+    if (c.ecriture_id && !c.ecriture_extourne_id && c.statut !== 'annulee') {
+      try { await annulerCommissionSilencieux(c, 'versement supprimé'); }
+      catch(e) { toast('⚠️ Commission ' + (c.beneficiaire||'') + ' conservée : extourne impossible (' + ((e && e.message) || 'erreur') + '). Annulez-la depuis Commissions.', 'error', 9000); }
+      commsGardees[c.id] = true; continue;
+    }
+    if (c.statut === 'annulee' && c.ecriture_extourne_id) { commsGardees[c.id] = true; continue; }
     await logAudit('commissions', c.id, 'delete', c, null);
     try{ await deleteRecord('commissions', c.id); }catch(e){}
   }
-  DATA.commissions = (DATA.commissions||[]).filter(function(c){ return c.versement_id !== id || c.statut === 'payee'; });
+  DATA.commissions = (DATA.commissions||[]).filter(function(c){ return c.versement_id !== id || c.statut === 'payee' || commsGardees[c.id]; });
   /* [FIX cascade] Deux liens supplémentaires laissés orphelins jusqu'ici :
      1) l'écriture de frais de passerelle (mobile money) générée par
         payOnlineReconcilier() — id déterministe 'ecr_frais_<transaction_id>' ;
@@ -149735,6 +149919,14 @@ goTo = function(page) {
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-pa-rapport')">Fermer</button><button class="btn btn-secondary" onclick="paImprimerCourse(_paRapportId,'rapport')">🖨️ Aperçu / imprimer</button>
       <button class="btn btn-secondary" id="pra-btn-brouillon" onclick="paRapportEnregistrer(false)">💾 Brouillon</button><button class="btn btn-primary" id="pra-btn-transmettre" onclick="paRapportEnregistrer(true)">📤 Transmettre à la hiérarchie</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-pm-ctl">
+  <div class="modal" style="max-width:1100px;width:96vw;">
+    <div class="modal-header"><h3>🔎 Contrôles Paiements — versements et comptabilité</h3><button class="btn btn-secondary btn-icon" onclick="closeModal('modal-pm-ctl')">✕</button></div>
+    <div class="modal-body"><div id="pmctl-corps"></div></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-pm-ctl')">Fermer</button></div>
   </div>
 </div>
 
