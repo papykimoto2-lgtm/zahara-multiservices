@@ -179,7 +179,7 @@ Recommandation : rester en **signaler** tant que l'arriéré n'est pas résorbé
 La DGI ne publie pas d'interface permettant de vérifier une FNE automatiquement. La vérification reste donc **faite par une personne**, sur le site officiel, et le logiciel en garde la trace.
 
 1. Coller le **lien du QR code** de la FNE (adresse de vérification de la DGI).
-2. Cliquer **🔎 Vérifier sur le site de la DGI** : la page officielle s'ouvre. Seules les adresses du domaine de la DGI sont ouvertes.
+2. Cliquer **🔎 Vérifier sur le site de la DGI** : la page officielle s'ouvre. Seules les adresses du domaine de la DGI (`dgi.gouv.ci`, en HTTPS) sont ouvertes, ainsi que la plateforme de test publiée par la DGI, signalée comme telle : une FNE de production n'y figure pas.
 3. Comparer à l'écran : **fournisseur**, **NCC de l'entreprise** et **montant TTC** avec la FNE papier.
 4. Cocher **« Vérifiée sur le site de la DGI »** : le logiciel enregistre qui et quand.
 5. Une FNE dont le lien n'ouvre pas une page valide, ou dont les données diffèrent, est **refusée** : enregistrer « sans FNE » et alerter le responsable.
