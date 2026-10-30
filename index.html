@@ -41896,6 +41896,7 @@ var MANUELS_CATALOGUE = [
   { ref:'PRO-REU',     titre:"Réunions de direction (convocation, PV, actions)", module:'Réunions', fichier:'MANUEL_REUNIONS', flux:['reu_cycle'] },
   { ref:'PRO-DIA',     titre:"Investisseurs diaspora (séquestre par jalons, chaîne de preuve)", module:'Diaspora', fichier:'MANUEL_DIASPORA', flux:['dia_sequestre'] },
   { ref:'PRO-ADM',     titre:"Administration (utilisateurs, sécurité, sauvegardes, audit, incidents, portails)", module:'Paramètres', fichier:'MANUEL_ADMINISTRATION', flux:['adm_incident','adm_audit','adm_portail'] },
+  { ref:'PRO-TVA',     titre:"TVA déductible et FNE des fournisseurs (bon d'achat, justification, rapprochement mensuel)", module:'Comptabilité › TVA', fichier:'MANUEL_TVA_DEDUCTIBLE', flux:['tva_deductible'] },
   { ref:'PRO-FNE',     titre:"Facturation normalisée FNE (émission, certification, avoir)", module:'Facturation', fichier:'MANUEL_FNE', flux:['fne_cycle','fne_avoir'] },
   { ref:'PRO-CAL',     titre:"Calendrier partagé (événements, vues, export iCal)", module:'Calendrier', fichier:'MANUEL_CALENDRIER', flux:['cal_evenement'] },
   { ref:'PRO-MSG',     titre:"Messagerie interne (messages directs, groupes, pièces jointes)", module:'Messagerie', fichier:'MANUEL_MESSAGERIE', flux:['msg_echange'] },
@@ -41952,7 +41953,7 @@ var MANUELS_FLUX = {
   ]},
   rel_cycle: { titre:"Relance d'un souscripteur en retard", ref:'PRO-REL', etapes:[
     { a:'Système', t:'Retard = (attendu − versé) ÷ mensualité ; exclut soldés et financements bancaires' },
-    { a:'Comptabilité / commercial', t:'REL-01 · Consulter la liste ; vérifier que les versements sont à jour' },
+    { a:'Comptabilité / commercial', t:'REL-01 · Consulter la liste (taux de cotisation, tri par retard, montant dû ou programme) ; imprimer l’état ; vérifier que les versements sont à jour' },
     { a:'Commercial', t:'Niveau selon le retard', d:[['< 2 mois','Rappel simple (SMS / appel)'],['2 mois','Lettre de relance'],['3 mois','Mise en demeure'],['6 mois et plus','Résiliation (décision direction)']] },
     { a:'Commercial', t:'REL-02 · Relancer : message adapté, envoi SMS ou WhatsApp, relance enregistrée' },
     { a:'Direction', t:'REL-03 · Lettre PDF signée et remise (niveaux 2 et plus)' },
@@ -42038,6 +42039,8 @@ var MANUELS_FLUX = {
   crm_commission: { titre:"Commission d'un commercial ou d'un apporteur", ref:'PRO-CRM', etapes:[
     { a:'Direction', t:'CRM-05 · Contrat de l’apporteur signé ; taux fixés (fiche ou paramètres : 10 % puis 5 % par défaut)' },
     { a:'Système', t:'À chaque versement : commission du commercial et de l’apporteur, une fois par bénéficiaire', d:[['Frais de souscription','Aucune commission par défaut'],['Autre versement','Commission « à payer »']] },
+    { a:'Comptabilité', t:'CRM-06 bis · Contrôles commissions : orphelines, doublons, bénéficiaire ≠ fiche (annuler = extourner, jamais supprimer)' },
+    { a:'Comptabilité', t:'CRM-06 ter · États de paiement : bordereau par bénéficiaire → validation → règlement groupé' },
     { a:'Comptabilité', t:'CRM-06 · Payer : mode, date, référence' },
     { a:'Système', t:'Écriture de règlement (caisse 571 ou banque 521) ; commission « payée »' },
     { a:'Comptabilité', t:'Versement supprimé : commissions non payées retirées ; les payées sont traitées à la main' }
@@ -42096,7 +42099,8 @@ var MANUELS_FLUX = {
   ]},
   tre_suivi: { titre:"Suivi mensuel de la trésorerie", ref:'PRO-TRE', etapes:[
     { a:'Trésorier', t:'TRE-01 · Lire encaissements, décaissements, solde du mois et cumulé (année choisie)' },
-    { a:'Trésorier', t:'TRE-02 · Contrôler : sorties de caisse ventilées, soldes rapprochés des relevés et comptages' },
+    { a:'Trésorier', t:'TRE-01 · Lire la position par compte (caisses, banques, virements non soldés) et les alertes (plafonds, solde bas, rapprochement)' },
+    { a:'Trésorier', t:'TRE-02 · Contrôler : mouvements de caisse à ventiler (plus anciens d’abord), soldes rapprochés des relevés et comptages' },
     { a:'Trésorier', t:'Solde cumulé négatif ?', d:[['Oui','Alerter la direction : financement ou décalage de dépenses'],['Non','Poursuivre le suivi']] },
     { a:'Direction', t:'Arbitrer les décaissements et les financements' }
   ]},
@@ -42155,6 +42159,7 @@ var MANUELS_FLUX = {
   prg_lot: { titre:"Création et vente d'un lot", ref:'PRO-PRG', etapes:[
     { a:'Service commercial', t:'PRG-03 · Créer le lot : numéro obligatoire, programme, parcelle, nature, surface, prix', d:[['Somme des surfaces > parcelle','Avertissement de sur-allocation']] },
     { a:'Service commercial', t:'Statut : disponible → réservé → vendu' },
+    { a:'Responsable commercial', t:'PRG-04 · Contrôles Ventes : lots sans souscripteur ou partagés, réservations expirées (libérées si aucun versement), prix manquants' },
     { a:'Système', t:'Lot vendu avec prix : vente comptabilisée (terrain ou logement)', d:[['Compte de vente manquant','Lot enregistré, vente non comptabilisée (message)'],['Lot qui quitte « vendu »','Vente révoquée']] }
   ]},
   con_permis: { titre:"Conception et permis de construire", ref:'PRO-CON', etapes:[
@@ -42413,7 +42418,7 @@ var MANUELS_FLUX = {
     { a:'Commercial', t:'SOU-01 · Ouvrir la fiche ; choisir programme et lot (lot déjà rattaché refusé ; logement = un seul lot)' },
     { a:'Commercial', t:'SOU-02/03 · Identité ; cas famille, groupe ou mineur (tuteur)' },
     { a:'Commercial', t:'SOU-04/05 · Conditions : montant, apport, durée, dates ; rattacher commercial ou apporteur' },
-    { a:'Commercial', t:'SOU-07/08 · Consentement données personnelles → Enregistrer (code dossier SSnnn, lot réservé, audit)' },
+    { a:'Commercial', t:'SOU-07/08 · Consentement données personnelles → Enregistrer (avertissements si doublon téléphone/nom, lot manquant ou sans prix, montant nul ; code dossier SSnnn, lot réservé, audit)' },
     { a:'Commercial', t:'SOU-09 · Imprimer fiche de souscription + engagement → faire signer' },
     { a:'Comptabilité / caisse', t:'SOU-10 · Premier versement (espèces : caisse obligatoire) → écriture + reçu', d:[['Souscripteur gelé','Versement interdit'],['Versement similaire','Confirmer qu’il s’agit d’un autre paiement']] },
     { a:'Commercial', t:'SOU-11 · Remettre l’accès portail (identifiant + code à 6 chiffres, affiché une seule fois)' },
@@ -42441,11 +42446,21 @@ var MANUELS_FLUX = {
     { a:'Autre personne', t:'Confirmer la réception avec la référence de la preuve (jamais la personne qui a saisi)' },
     { a:'Système', t:'Bannière « Remises à confirmer » tant que la réception manque' }
   ]},
+  tva_deductible: { titre:"TVA déductible : du bon d'achat à la déclaration", ref:'PRO-TVA', etapes:[
+    { a:'Administrateur / comptabilité', t:'TVA-01 · Préparer l’entreprise : NCC, RCCM et adresse dans Paramètres › Société ; régime et prorata ; informer les fournisseurs ; désigner le validateur du rapprochement' },
+    { a:'Demandeur', t:'Demande d’achat validée (Budget › Demandes d’Achat) → engagement budgétaire' },
+    { a:'Comptabilité', t:'TVA-02 · Émettre le bon d’achat 🧾 : instructions et NCC de l’entreprise remis à l’acheteur' },
+    { a:'Acheteur', t:'TVA-03 · Acheter chez le fournisseur en exigeant la FNE à notre NCC ; règlement en caisse' },
+    { a:'Comptabilité', t:'TVA-04 · Enregistrer la FNE reçue 📥 ; TVA-09 vérification assistée', d:[['FNE conforme','TVA de la dépense justifiée automatiquement'],['Pièce hors demande d’achat','TVA-05 · Justifier : FNE reçue, fournisseur sans FNE ou non assujetti']] },
+    { a:'Comptabilité', t:'TVA-06/07 · Qualifier les fournisseurs ; appliquer la politique d’achat par seuil ; TVA-10 suivre le manque à gagner' },
+    { a:'Comptabilité / DAF', t:'TVA-08 · Rapprochement du mois avant la liquidation (échéance le 15 du mois suivant)', d:[['Point bloquant','Corriger avant de liquider'],['Prêt à déclarer','Liquidation avec la TVA justifiée']] },
+    { a:'Direction', t:'Déclarer la TVA (Comptabilité › TVA)' }
+  ]},
   compta_cycle: { titre:"Cycle comptable : du quotidien à la clôture", ref:'PRO-COMPTA', etapes:[
     { a:'Comptabilité', t:'Chaque jour · Ventiler la caisse ; COM-02 contrôler les écritures automatiques' },
     { a:'Comptabilité', t:'COM-03 · Écriture manuelle au brouillard (équilibrée, exercice ouvert, comptes du plan)' },
     { a:'Comptabilité', t:'Chaque semaine · Rapprochement bancaire, lettrage des tiers' },
-    { a:'Comptabilité', t:'COM-07 · Contrôles mensuels : balance, grand livre, brouillards, trésorerie, tiers' },
+    { a:'Comptabilité', t:'COM-07 · Contrôles mensuels : balance, grand livre, brouillards, trésorerie, tiers ; 🔎 Contrôles des écritures (dates, doublons, extournes de commissions, comptes de TVA)' },
     { a:'Valideur', t:'COM-08 · Viser les écritures du périmètre', d:[['Pièce bloquante','Corriger dans l’onglet Anomalies puis relancer'],['Visa accordé','Pièces définitives']] },
     { a:'Responsable', t:'COM-10 · États financiers et liasse (pièces visées, amortissements passés)' },
     { a:'Administrateur', t:'COM-11 · Clôturer l’exercice : écriture de clôture, à-nouveaux, verrouillage' },
@@ -42518,7 +42533,7 @@ var MANUELS_PHASES = [
   { nom:'Contrats & encaissements', but:'Facturer, encaisser, relancer et tenir la trésorerie', refs:['PRO-ATT','PRO-ATT-SUB','PRO-PAI','PRO-REL','PRO-FNE','PRO-CAI','PRO-REA','PRO-TRE'] },
   { nom:'Réalisation', but:'Contractualiser, acheter, réceptionner et suivre le chantier', refs:['PRO-CNV','PRO-CHA','PRO-ACH','PRO-FOU','PRO-REC','PRO-STK'] },
   { nom:'Livraison & gestion du patrimoine', but:'Exploiter les biens livrés', refs:['PRO-LOC','PRO-COP','PRO-PAU'] },
-  { nom:'Comptabilité & pilotage', but:'Enregistrer, contrôler et décider', refs:['PRO-COMPTA','PRO-VAL','PRO-SMQ','PRO-PIL','PRO-JUR'] },
+  { nom:'Comptabilité & pilotage', but:'Enregistrer, contrôler et décider', refs:['PRO-COMPTA','PRO-TVA','PRO-VAL','PRO-SMQ','PRO-PIL','PRO-JUR'] },
   { nom:'Équipes & support', but:'Personnel, coordination, portails et administration', refs:['PRO-RH','PRO-PAIE','PRO-ACC','PRO-REU','PRO-CAL','PRO-MSG','PRO-POR','PRO-ADM'] }
 ];
 /* Cartographie des processus : chaque manuel appartient à un seul processus (management, réalisation ou support). */
@@ -42532,7 +42547,7 @@ var MANUELS_PROCESSUS = [
   { fam:'realisation', id:'construction', nom:'Construction et livraison', but:'Contractualiser, suivre le chantier et réceptionner', refs:['PRO-CNV','PRO-CHA','PRO-REC'] },
   { fam:'realisation', id:'locatif', nom:'Gestion locative et copropriété', but:'Exploiter les biens livrés', refs:['PRO-LOC','PRO-COP'] },
   { fam:'support', id:'achats', nom:'Achats, fournisseurs et stock', but:'Approvisionner les chantiers et gérer les stocks', refs:['PRO-ACH','PRO-FOU','PRO-STK'] },
-  { fam:'support', id:'compta', nom:'Comptabilité', but:'Enregistrer, contrôler et clôturer', refs:['PRO-COMPTA'] },
+  { fam:'support', id:'compta', nom:'Comptabilité', but:'Enregistrer, contrôler et clôturer', refs:['PRO-COMPTA','PRO-TVA'] },
   { fam:'support', id:'rh', nom:'Ressources humaines et paie', but:'Gérer le personnel et la paie', refs:['PRO-RH','PRO-PAIE'] },
   { fam:'support', id:'moyens', nom:'Moyens généraux', but:'Parc auto et accueil des visiteurs', refs:['PRO-PAU','PRO-ACC'] },
   { fam:'support', id:'systemes', nom:'Communication et systèmes', but:'Calendrier, messagerie, portails et administration', refs:['PRO-CAL','PRO-MSG','PRO-POR','PRO-ADM'] }

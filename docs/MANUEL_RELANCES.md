@@ -1,6 +1,6 @@
 # Manuel de procédures — Relances clients
 
-**Réf.** PRO-REL · **Version** 1.0 · **Date** Octobre 2026
+**Réf.** PRO-REL · **Version** 1.1 · **Date** Octobre 2026
 **Objet** : fixer qui fait quoi, dans quel ordre et avec quelle preuve pour relancer les souscripteurs en retard, de l'alerte à la mise en demeure et à la résiliation.
 **Principe directeur** : la relance est graduée selon le retard réel, tracée et escaladée au juridique dès la mise en demeure.
 
@@ -47,6 +47,9 @@
 2. Lire les 4 compteurs par niveau ; cliquer pour filtrer, ou utiliser les onglets.
 3. Rechercher par nom, téléphone ou dossier.
 4. Lire pour chaque ligne : programme et lot, retard, montant dû, niveau, **dernière relance**.
+5. Lire le **taux de cotisation** : part du prix du bien déjà versée (hors frais de souscription). Il situe l'effort du souscripteur à côté de son retard.
+6. **Trier** la liste par programme et lot, par nombre de mois de retard, par montant dû ou par taux de cotisation (cliquer sur l'en-tête de colonne ou le tri proposé).
+7. **🖨 Imprimer l'état** : imprime la liste telle qu'affichée (onglet, recherche et tri en cours) pour une réunion de recouvrement.
 
 ### REL-02 — Relancer un souscripteur
 
@@ -88,6 +91,7 @@
 | Souscripteur soldé ou financement bancaire | Jamais en retard |
 | Relance à 3 mois et plus | Dossier juridique créé ou mis à jour |
 | Dernière relance | Affichée pour éviter les doublons de contact |
+| Taux de cotisation | Affiché et triable, hors frais de souscription |
 
 ## 6. Traçabilité
 
@@ -130,3 +134,4 @@
 | Version | Date | Objet |
 |---|---|---|
 | 1.0 | Octobre 2026 | Création |
+| 1.1 | Octobre 2026 | Taux de cotisation, tris (programme, mois de retard, montant dû, taux), impression de l'état |

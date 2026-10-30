@@ -1,6 +1,6 @@
 # Manuel de procédures — Trésorerie et prévisionnel
 
-**Réf.** PRO-TRE · **Version** 1.0 · **Date** Octobre 2026
+**Réf.** PRO-TRE · **Version** 1.1 · **Date** Octobre 2026
 **Objet** : fixer qui fait quoi pour suivre la trésorerie de l'entreprise (encaissements, décaissements, solde cumulé) et construire le prévisionnel / business plan destiné à la direction et aux banques.
 **Principe directeur** : la trésorerie se lit sur les mouvements réels (versements, caisse, écritures) ; le prévisionnel est un scénario daté, comparable au réel, figé quand il est envoyé à une banque.
 
@@ -32,6 +32,8 @@
 1. Pour chaque mois : **encaissements** (versements des souscripteurs, paiements de cessions, entrées de caisse non rattachées à un versement), **décaissements** (charges comptabilisées de classe 6, sorties de caisse non encore comptées), **solde du mois** et **solde cumulé**.
 2. Le filtre de division de la comptabilité s'applique : lire la trésorerie par entité.
 3. Expliquer chaque écart important avec la comptabilité.
+4. Lire le panneau **🏦 Position de trésorerie** : soldes d'après la comptabilité des **caisses et mobile money**, des **banques** et des **virements de fonds non soldés**, avec, pour chaque compte, le solde, le dernier mouvement et le contrôle appliqué.
+5. Un virement de fonds non soldé (compte de passage) doit revenir à zéro : s'il ne l'est pas, une des deux jambes du virement manque.
 
 ### TRE-02 — Contrôles mensuels de trésorerie
 
@@ -39,6 +41,8 @@
 2. Vérifier que les sorties de caisse sont ventilées (voir manuel Caisse, CAI-07).
 3. Suivre les échéances fournisseurs et clients à venir (Comptabilité › Comptes tiers › Échéances).
 4. Alerter la direction si le solde cumulé devient négatif.
+5. Traiter les **alertes de trésorerie** affichées par compte : plafond de caisse dépassé (2 000 000 F par défaut), plafond d'espèces (5 000 000 F), solde bancaire bas (500 000 F), rapprochement bancaire trop ancien. Les seuils sont des paramètres de l'entreprise : le panneau rappelle ceux qui s'appliquent.
+6. Ouvrir **🧾 Mouvements de caisse à ventiler** : tant qu'un mouvement n'est pas ventilé, il manque au compte de résultat et fausse les soldes par compte. Ventiler d'abord les plus anciens (plus de 30 jours) ; la liste donne, par caisse, les entrées, les sorties et l'ancienneté.
 
 ### TRE-03 — Construire un scénario de prévisionnel
 
@@ -83,6 +87,9 @@ Alertes : plafond de lots atteint ; trésorerie négative au plus bas ; échéan
 | Version figée | Non modifiable |
 | Modifications non enregistrées | Marque visible avant de quitter |
 | Plafond de lots atteint | Ventes arrêtées avant la fin de l'horizon |
+| Caisse au-dessus du plafond, solde bancaire sous le seuil, rapprochement trop ancien | Alerte affichée sur le compte |
+| Virement de fonds non soldé | Écart signalé dans la position |
+| Mouvement de caisse non ventilé | Listé avec son ancienneté ; absent du compte de résultat tant qu'il n'est pas ventilé |
 
 ## 5. Traçabilité
 
@@ -123,3 +130,4 @@ Alertes : plafond de lots atteint ; trésorerie négative au plus bas ; échéan
 | Version | Date | Objet |
 |---|---|---|
 | 1.0 | Octobre 2026 | Création |
+| 1.1 | Octobre 2026 | Position de trésorerie par compte d'après la comptabilité, alertes paramétrées (plafonds, solde bas, rapprochement), arriéré des mouvements de caisse non ventilés |

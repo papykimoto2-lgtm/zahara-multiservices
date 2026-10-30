@@ -182,6 +182,19 @@ L'ERP attribue une **référence** : JL-année-numéro de 5 chiffres. L'écritur
 | **Comptes hors plan** | Balance ou alertes | Aucun compte inconnu du plan |
 | **Audit** | Audit IA | Anomalies relevées à examiner (aide à la revue, non décisionnelle) |
 
+#### Contrôles des écritures (bouton 🔎 Contrôles)
+
+**Où** : Comptabilité › Écritures › **🔎 Contrôles**. À lancer avant le visa du mois. Quatre onglets :
+
+| Onglet | Ce qu'il repère | Action |
+|---|---|---|
+| **Dates** | Date absente, illisible, impossible, année improbable, datée du futur, ou avec une heure | Corriger ou normaliser la date ; les dotations et écritures prévues datées du futur sont signalées à part |
+| **Doublons** | Plusieurs écritures de même date, compte, montant et libellé | Annuler le doublon par contre-passation (COM-09) |
+| **Extournes de commissions** | Extournes non synchronisées avec le cloud | Régulariser (synchronisation) ; l'extourne n'est pas à recréer |
+| **Comptes de TVA** | Comptes de TVA par défaut manquants ou ambigus (le plan interne appelle 443 la TVA facturée, 444 la TVA récupérable, 445 la TVA à décaisser) | Choisir le bon compte dans les paramètres : l'ERP ne convertit rien automatiquement |
+
+Aucune correction n'est automatique : chaque ligne se traite après vérification, et une pièce visée se corrige par contre-passation.
+
 ### COM-08 — Viser les écritures
 
 **Qui** : valideur (droit de validation du module Comptabilité, plafond couvrant la plus forte pièce du périmètre). **Où** : **Visa des écritures**.
@@ -341,3 +354,4 @@ L'ERP attribue une **référence** : JL-année-numéro de 5 chiffres. L'écritur
 | Version | Date | Auteur | Objet |
 |---|---|---|---|
 | 1.0 | Octobre 2026 | | Création |
+| 1.1 | Octobre 2026 | | Contrôles des écritures (dates, doublons, extournes de commissions, comptes de TVA par défaut) |
