@@ -5404,6 +5404,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <div class="spacer"></div>
           <input type="text" class="form-control" id="search-relances" placeholder="🔍 Rechercher un souscripteur (nom, tél, dossier)" style="max-width:280px;" oninput="detectRelances()">
           <button class="btn btn-secondary btn-sm" onclick="relancesActualiser()">🔄 Actualiser la liste</button>
+          <button class="btn btn-secondary btn-sm" onclick="imprimerEtatRelances()" title="Imprimer l'état tel qu'affiché (onglet, recherche et tri en cours)">🖨️ Imprimer l'état</button>
         </div>
 
         <div id="relances-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;"></div>
@@ -50478,6 +50479,7 @@ async function promesseAnnuler(clientId, promesseId) {
 var _relancesNiveauActif = 'tous';
 /* Tri du tableau : clic sur l'en-tête (retard, montant dû, taux de cotisation, programme) ; un 2e clic inverse. Sans choix : ordre par défaut (priorité du jour / retard décroissant). */
 var _relancesTri = null;
+var _relancesVue = []; /* lignes affichées (filtrées + triées), reprises telles quelles par l'impression */
 function setRelancesTri(cle) {
   var defDir = (cle === 'programme') ? 1 : -1;
   _relancesTri = (_relancesTri && _relancesTri.cle === cle) ? { cle: cle, dir: -_relancesTri.dir } : { cle: cle, dir: defDir };
@@ -50494,6 +50496,7 @@ function setRelancesNiveau(cle) {
 
 function detectRelances() {
   var retards = getRetardataires();
+  _relancesVue = [];
   var stats = document.getElementById('relances-stats');
   var compteurs = {};
   RELANCE_NIVEAUX.forEach(function(n){ compteurs[n.cle] = 0; });
@@ -50546,6 +50549,7 @@ function detectRelances() {
     return;
   }
 
+  _relancesVue = retardsAffiches; /* trié sur place ci-dessous */
   var nomProg = function(r) { var c = DATA.clients.find(function(x){ return x.id === r.id; }), pg = c ? DATA.programmes.find(function(x){ return x.id === c.programme_id; }) : null; return pg ? String(pg.nom || '') : '\uffff'; };
   [['programme','Programme / Lot','Trier par programme'],['mois','Retard (mois)','Trier par nombre de mois de retard'],['montant','Montant Dû','Trier par montant dû'],['taux','Taux de cotisation','Trier par taux de cotisation']].forEach(function(t) {
     var th = document.getElementById('th-rel-' + t[0]);
@@ -100276,6 +100280,49 @@ function _cdcParamsLire() {
 }
 
 /* Lettre de relance graduée selon le retard */
+/* État imprimable de la liste affichée : mêmes filtres (onglet, recherche) et même tri que l'écran. */
+function imprimerEtatRelances() {
+  var L = _relancesVue || [];
+  if (!L.length) { toast('Aucune ligne à imprimer : ajustez le filtre ou la recherche.', 'info'); return; }
+  var E = escHtml, soc = (typeof _identiteSociete === 'function') ? _identiteSociete() : { nom: (DATA.params && DATA.params.societe) || '' };
+  var onglets = { jour: "À traiter aujourd'hui", tous: 'Tous les niveaux' };
+  RELANCE_NIVEAUX.forEach(function(n){ onglets[n.cle] = n.label; });
+  var search = ((document.getElementById('search-relances') || {}).value || '').trim();
+  var triLib = { programme: 'programme', mois: 'mois de retard', montant: 'montant dû', taux: 'taux de cotisation' };
+  var filtre = 'Niveau : ' + (onglets[_relancesNiveauActif] || _relancesNiveauActif) + (search ? ' · Recherche : « ' + search + ' »' : '')
+    + ' · Tri : ' + (_relancesTri ? triLib[_relancesTri.cle] + (_relancesTri.dir > 0 ? ' (croissant)' : ' (décroissant)') : 'par défaut');
+  var totDu = 0, totVerse = 0, totPrix = 0;
+  var lignes = L.map(function(r) {
+    var c = DATA.clients.find(function(x){ return x.id === r.id; }) || {};
+    var prog = DATA.programmes.find(function(x){ return x.id === c.programme_id; }), lot = DATA.lots.find(function(x){ return x.id === c.lot_id; });
+    var n = _relanceNiveauDe(r.moisRetard);
+    var last = (DATA.relances || []).filter(function(x){ return x.client_id === r.id; }).sort(function(a, b){ return new Date(b.date) - new Date(a.date); })[0];
+    totDu += r.montantDu; totVerse += r.verse; totPrix += r.total;
+    return '<tr><td>' + E(((r.nom || '') + ' ' + (r.prenoms || '')).trim()) + '<br><span class="sm">' + E(r.dossier || '') + (r.tel ? ' · ' + E(r.tel) : '') + '</span></td>'
+      + '<td>' + E(prog ? prog.nom : '—') + (lot ? ' / Lot ' + E(lot.numero) : '') + '</td>'
+      + '<td class="num">' + r.moisRetard + (r.echeancier === 'estime' ? ' *' : '') + '</td>'
+      + '<td class="num al">' + fcfa(r.montantDu) + '</td><td class="num">' + fcfa(r.verse) + '</td>'
+      + '<td class="num">' + (Math.round(r.tauxCotisation * 10) / 10).toString().replace('.', ',') + ' %</td>'
+      + '<td>' + E(n.label) + '</td><td>' + (last ? dateShort(last.date) : 'Jamais') + '</td></tr>';
+  }).join('');
+  var taux = totPrix > 0 ? Math.round(totVerse / totPrix * 1000) / 10 : 0;
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>État des relances</title><style>'
+    + 'body{font-family:Arial;font-size:10px;padding:16px;color:#111;} h1{font-size:14px;text-align:center;margin:4px 0;}'
+    + 'table{width:100%;border-collapse:collapse;margin-top:8px;} th,td{border:1px solid #999;padding:3px 5px;vertical-align:top;}'
+    + 'th{background:#efeae3;font-size:9px;} .num{text-align:right;white-space:nowrap;} .al{color:#b91c1c;font-weight:700;} .sm{font-size:8.5px;color:#555;}'
+    + 'tr.tot td{background:#f6f2ec;font-weight:700;} tr{page-break-inside:avoid;} thead{display:table-header-group;}</style></head><body>'
+    + '<div style="text-align:right;font-size:9.5px;">' + E(soc.nom || '') + ' · ' + new Date().toLocaleDateString('fr-FR') + '</div>'
+    + '<h1>ÉTAT DES RELANCES — SOUSCRIPTEURS EN RETARD DE PAIEMENT</h1>'
+    + '<div style="text-align:center;font-size:9.5px;color:#444;">' + E(filtre) + '</div>'
+    + '<table><thead><tr><th>Souscripteur</th><th>Programme / Lot</th><th class="num">Retard (mois)</th><th class="num">Montant dû</th><th class="num">Versé</th><th class="num">Taux de cotisation</th><th>Niveau</th><th>Dernière relance</th></tr></thead><tbody>'
+    + lignes
+    + '<tr class="tot"><td colspan="3">TOTAL — ' + L.length + ' souscripteur(s)</td><td class="num al">' + fcfa(totDu) + '</td><td class="num">' + fcfa(totVerse) + '</td><td class="num">' + String(taux).replace('.', ',') + ' %</td><td colspan="2"></td></tr>'
+    + '</tbody></table>'
+    + (L.some(function(r){ return r.echeancier === 'estime'; }) ? '<p class="sm">* Retard estimé : le programme n\'a pas de date de livraison, le calcul s\'appuie sur la durée saisie sur la fiche.</p>' : '')
+    + '</body></html>';
+  openPrintPreview(html, 'État des relances', true);
+}
+
 function etatRelance(clientId) {
   var c = DATA.clients.find(function(x){ return x.id === clientId; });
   if (!c) { toast('Souscripteur introuvable.', 'error'); return; }
