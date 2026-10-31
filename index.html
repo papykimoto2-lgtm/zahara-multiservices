@@ -8740,6 +8740,8 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
               <div class="form-group"><label>Anticipation alerte vidange (km avant échéance)</label><input type="number" id="param-parcauto-seuil-entretien-km" class="form-control" value="500" min="0" step="100"></div>
               <div class="form-group"><label>Plafond carburant mensuel (FCFA / véhicule)</label><input type="number" id="param-parcauto-plafond-carburant" class="form-control" value="150000" min="0" step="10000"></div>
               <div class="form-group"><label>Alerte consommation (% au-dessus de la moyenne du véhicule)</label><input type="number" id="param-parcauto-seuil-conso" class="form-control" value="30" min="5" step="5"></div>
+              <div class="form-group"><label>Validateur des demandes de courses</label><select id="param-parcauto-validateur" class="form-control"></select></div>
+              <div class="form-group"><label>Suppléant du validateur</label><select id="param-parcauto-suppleant" class="form-control"></select></div>
               <div class="form-group"><label>Demande préalable de course obligatoire</label><select id="param-parcauto-demande-obligatoire" class="form-control"><option value="non">Non (course sans demande signalée)</option><option value="oui">Oui (course refusée sans autorisation)</option></select></div>
             </div>
           </div>
@@ -16912,6 +16914,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <input type="month" class="form-control" id="pco-filter-mois" onchange="paRenderCourses()" style="max-width:160px;">
           </div>
           <div id="pco-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0;"></div>
+          <div id="pa-courses-aautoriser"></div>
           <div class="table-wrap"><div id="pa-courses-table"></div></div>
         </div>
 
@@ -53143,6 +53146,8 @@ async function saveModulesAvancesParams() {
     parcauto_plafond_carburant:      gvn0('param-parcauto-plafond-carburant', 150000),
     parcauto_seuil_conso_pct:        gvn0('param-parcauto-seuil-conso', 30),
     parcauto_demande_obligatoire:    ((document.getElementById('param-parcauto-demande-obligatoire')||{}).value) || 'non',
+    parcauto_validateur_id:          ((document.getElementById('param-parcauto-validateur')||{}).value) || '',
+    parcauto_suppleant_id:           (function(){ var a=((document.getElementById('param-parcauto-validateur')||{}).value)||'', b=((document.getElementById('param-parcauto-suppleant')||{}).value)||''; return (a && a===b) ? '' : b; })(),
 
     crm_delai_relance_prospect: gvn0('param-crm-delai-relance-prospect', 3),
     crm_score_min_qualif:       gvn0('param-crm-score-min-qualif', 50),
@@ -53798,6 +53803,8 @@ function loadParamFields() {
   sv('param-parcauto-plafond-carburant',p.parcauto_plafond_carburant||150000);
   sv('param-parcauto-seuil-conso',p.parcauto_seuil_conso_pct||30);
   sv('param-parcauto-demande-obligatoire',p.parcauto_demande_obligatoire||'non');
+  ['param-parcauto-validateur','param-parcauto-suppleant'].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML='<option value="">'+(id.indexOf('suppleant')>0?'— Aucun —':'— Hiérarchie : admin et managers (défaut) —')+'</option>'+(DATA.users||[]).filter(function(u){ return u && u.statut!=='inactif'; }).map(function(u){ return '<option value="'+u.id+'">'+escHtml((u.nom||u.login||'')+' ('+(u.role||'')+')')+'</option>'; }).join(''); });
+  sv('param-parcauto-validateur',p.parcauto_validateur_id||''); sv('param-parcauto-suppleant',p.parcauto_suppleant_id||'');
   sv('param-crm-delai-relance-prospect',p.crm_delai_relance_prospect||3);
   sv('param-crm-score-min-qualif',p.crm_score_min_qualif||50);
   sv('param-crm-source-defaut',p.crm_source_defaut||'site_web');
@@ -84452,6 +84459,56 @@ function paAllerCoursesRapports(vid) { window._paCoursesRapportVid = vid; window
 function _paSetVal(id, v) { var el = document.getElementById(id); if (el) { if (el.type === 'checkbox') el.checked = !!v; else el.value = v == null ? '' : v; } }
 function _paGetVal(id) { return String((document.getElementById(id) || {}).value || '').trim(); }
 
+/* ── Autorisation des demandes de courses : validateur désigné et file « À autoriser » dans le Parc Auto ──
+   Sans validateur désigné (Paramètres › Parc auto), l'autorisation reste celle de la hiérarchie (admin, managers).
+   Avec un validateur et un suppléant désignés, eux seuls (et l'administrateur) décident. On ne valide pas sa propre demande. */
+function paValidateursCourses() { var p = DATA.params || {}; return { principal: p.parcauto_validateur_id || '', suppleant: p.parcauto_suppleant_id || '' }; }
+function paNomUtilisateur(id) { var u = (DATA.users || []).filter(function(x){ return x.id === id; })[0]; return u ? (u.nom || u.login || id) : ''; }
+function paPeutAutoriser() {
+  var u = APP.currentUser; if (!u) return false;
+  if (typeof hasRole === 'function' && hasRole('admin')) return true;
+  var V = paValidateursCourses();
+  if (!V.principal && !V.suppleant) return typeof hasRole === 'function' && hasRole('manager');
+  return u.id === V.principal || u.id === V.suppleant;
+}
+function paEstDemandeur(v) { return !!(APP.currentUser && v && v.demandeur && v.demandeur === ((APP.currentUser.nom) || '—')); }
+function paValidationsCourses() {
+  return (DATA.validations || []).filter(function(v){ return (v.type === 'demande_course' || v.type === 'rapport_course') && v.statut === 'en_attente'; });
+}
+function paRenderAAutoriser() {
+  var box = document.getElementById('pa-courses-aautoriser'); if (!box) return;
+  var liste = paValidationsCourses(), V = paValidateursCourses(), peut = paPeutAutoriser();
+  var desig = V.principal ? ('Validateur : <strong>' + escHtml(paNomUtilisateur(V.principal) || '—') + '</strong>' + (V.suppleant ? ' · suppléant : <strong>' + escHtml(paNomUtilisateur(V.suppleant) || '—') + '</strong>' : '')) : 'Validateur : la hiérarchie (administrateurs et managers) — désignable dans Paramètres › Parc auto';
+  if (!liste.length) { box.innerHTML = '<div style="font-size:11px;color:var(--blanc-dim);margin-bottom:10px;">✅ Aucune demande de course ni aucun rapport en attente d\'autorisation. ' + desig + '.</div>'; return; }
+  var jours = function(v){ var d = new Date(((v.date_demande || today())) + 'T12:00:00'), n = Math.floor((new Date(today() + 'T12:00:00') - d) / 86400000); return isNaN(n) ? 0 : Math.max(0, n); };
+  var urg = function(v){ return !!((v.meta || {}).urgence === 'urgente'); };
+  liste.sort(function(a, b){ return (urg(b) - urg(a)) || (jours(b) - jours(a)); });
+  box.innerHTML = '<div class="card" style="border:1px solid var(--or);margin-bottom:14px;"><div class="form-section-title">⏳ À autoriser (' + liste.length + ')</div><div style="font-size:11px;color:var(--blanc-dim);margin:2px 0 8px;">' + desig + '.</div>'
+    + '<div class="table-wrap"><table><thead><tr><th>Type</th><th>Objet</th><th>Demandeur</th><th>Urgence</th><th>Depuis</th><th></th></tr></thead><tbody>' + liste.map(function(v){
+      var propre = paEstDemandeur(v), agir = peut && (!propre || hasRole('admin')), j = jours(v);
+      return '<tr><td>' + escHtml(valTypeLabel(v.type)) + '</td><td style="font-size:12px;">' + (v.libelle || '') + '</td><td>' + escHtml(v.demandeur || '—') + '</td><td>' + (urg(v) ? '<span class="badge badge-rouge">Urgente</span>' : 'Normale') + '</td><td>' + (j ? j + ' j' : 'aujourd\'hui') + '</td><td style="white-space:nowrap;">'
+        + '<button class="btn btn-secondary btn-sm" onclick="paCourseApercu(\'' + v.ref_id + '\',\'' + (v.type === 'rapport_course' ? 'rapport' : 'demande') + '\')">👁 Voir</button> '
+        + (agir ? '<button class="btn btn-primary btn-sm" onclick="paDecisionCourse(\'' + v.id + '\',\'valide\')">✅ ' + (v.type === 'rapport_course' ? 'Valider' : 'Autoriser') + '</button> <button class="btn btn-danger btn-sm" onclick="paDecisionCourse(\'' + v.id + '\',\'rejete\')">⛔ ' + (v.type === 'rapport_course' ? 'À compléter' : 'Refuser') + '</button>'
+          : '<span style="font-size:11px;color:var(--blanc-dim);">' + (propre ? 'votre demande : à faire autoriser par un autre validateur' : 'réservé au validateur') + '</span>') + '</td></tr>';
+    }).join('') + '</tbody></table></div></div>';
+}
+async function paDecisionCourse(valId, decision) {
+  var v = (DATA.validations || []).filter(function(x){ return x.id === valId; })[0];
+  if (!v || v.statut !== 'en_attente') { toast('Cette demande a déjà été traitée.', 'info'); paRenderCourses(); return; }
+  if (!paPeutAutoriser()) { toast('⛔ Autorisation réservée au validateur désigné.', 'error'); return; }
+  if (paEstDemandeur(v)) {
+    if (!hasRole('admin')) { toast('⛔ Vous ne pouvez pas valider votre propre demande.', 'error'); return; }
+    if (!confirm('Vous êtes à l\'origine de cette demande. L\'autoriser vous-même ?')) return;
+  }
+  if (decision === 'valide') { await valDecide(valId, 'valide', ''); }
+  else {
+    var m = prompt(v.type === 'rapport_course' ? 'Compléments demandés au rédacteur :' : 'Motif du refus :', ''); if (m === null) return;
+    if (!String(m).trim()) { toast('Le motif est obligatoire.', 'error'); return; }
+    await valDecide(valId, 'rejete', String(m).trim());
+  }
+  paRenderCourses(); paActualiserBadges();
+}
+
 /* ── Demande préalable ── */
 function paDemandeOuvrir() {
   var sv = document.getElementById('pdm-vehicule'), sc = document.getElementById('pdm-chauffeur');
@@ -84950,6 +85007,7 @@ function pcoEditCourse(id){
 }
 
 function paRenderCourses(){
+  if (typeof paRenderAAutoriser === 'function') paRenderAAutoriser();
   var box = document.getElementById('pa-courses-table');
   if (!box) return;
   var fV = (document.getElementById('pco-filter-vehicule')||{}).value||'';
@@ -120931,7 +120989,11 @@ async function valCreate(type,refId,libelle,montant,meta){
 async function valDecide(id,decision,motif){
   var v=(DATA.validations||[]).find(function(x){return x.id===id;}); if(!v)return;
   if(v.type==='etape_fonciere') return valDecideEtapeFonciere(v,decision,motif);
-  if(decision==='valide' && typeof hasRole==='function' && !hasRole('admin') && !hasRole('manager')){ toast('Validation réservée à la hiérarchie.','error'); return; }
+  if(v.type==='demande_course'||v.type==='rapport_course'){
+    if(typeof paPeutAutoriser==='function' && !paPeutAutoriser()){ toast('⛔ Autorisation réservée au validateur désigné (Paramètres › Parc auto).','error'); return; }
+    if(paEstDemandeur(v) && !hasRole('admin')){ toast('⛔ Vous ne pouvez pas valider votre propre demande.','error'); return; }
+  }
+  else if(decision==='valide' && typeof hasRole==='function' && !hasRole('admin') && !hasRole('manager')){ toast('Validation réservée à la hiérarchie.','error'); return; }
   /* Attestation de solde : le DG doit pouvoir examiner les pièces avant de valider ; s'il ne les a pas ouvertes, on le lui demande. */
   if(decision==='valide' && (v.type==='attestation_solde' || v.type==='attestation_solde_finale') && !(APP._attPiecesVues||{})[v.ref_id+'|'+attKindDeType(v.type)]
      && !confirm('Vous n\'avez pas consulté les pièces justificatives de cette attestation (bouton « 🔎 Pièces »).\n\nValider quand même ?')) return;
@@ -121007,6 +121069,7 @@ async function valApply(type,refId,decision){
 }
 /* ── Étapes de dossier foncier : la demande de validation par fonction (Foncier Connect) apparaît ici ; la décision reste portée par fcDecisionValidationEtape. ── */
 function valPeutDecider(v){
+  if(v.type==='demande_course'||v.type==='rapport_course') return typeof paPeutAutoriser==='function' && paPeutAutoriser() && (!paEstDemandeur(v) || hasRole('admin'));
   if(v.type==='etape_fonciere') return typeof fcPeutValiderEtape==='function' && fcPeutValiderEtape((v.meta||{}).fonction);
   return (typeof hasRole!=='function')||hasRole('admin')||hasRole('manager');
 }
