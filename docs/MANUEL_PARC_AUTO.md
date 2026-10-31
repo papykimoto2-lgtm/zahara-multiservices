@@ -1,6 +1,6 @@
 # Manuel de procédures — Parc auto
 
-**Réf.** PRO-PAU · **Version** 2.0 · **Date** Octobre 2026
+**Réf.** PRO-PAU · **Version** 2.1 · **Date** Octobre 2026
 **Objet** : fixer qui fait quoi pour gérer les véhicules de l'entreprise : fiche véhicule, affectations, carburant, entretien, courses.
 **Principe directeur** : un véhicule, une fiche, un affectataire ; chaque plein et chaque entretien génère son écriture ; aucun compte n'est deviné.
 
@@ -76,11 +76,11 @@ Enregistrer ; modifier une fiche exige le droit de modification.
 | Étape | Qui | Où | Résultat |
 |---|---|---|---|
 | 1. **Demande préalable** | Demandeur | Bouton **📝 Demande de course (préalable)** | Objectif, entreprise ou organisme visité, lieu, interlocuteurs attendus, participants, distance estimée, urgence |
-| 2. **Autorisation** | Hiérarchie | Validations › **Demande de course** (bouton 👁 Voir, ✅ Valider ou ⛔ Rejeter avec motif) | Course « Autorisée » ou « Refusée », autorisateur et date conservés |
+| 2. **Autorisation** | Validateur désigné (ou hiérarchie) | Parc Auto › Courses quotidiennes › **⏳ À autoriser** (👁 Voir, ✅ Autoriser, ⛔ Refuser avec motif), ou Validations › **Demande de course** | Course « Autorisée » ou « Refusée », autorisateur et date conservés |
 | 3. **Réalisation** | Chauffeur | Bouton **▶ Réaliser** sur la ligne autorisée, puis km départ, km retour et horaires | Course « réalisée » |
 | 4. **Rapport détaillé** | Demandeur | Bouton **📝** de la ligne | Objectif atteint, entreprise visitée, personnes rencontrées, résumé, résultats, suites à donner, documents, dépenses, incidents |
 | 5. **Transmission** | Demandeur | **📤 Transmettre à la hiérarchie** | Le rapport est figé et part en validation |
-| 6. **Validation** | Hiérarchie | Validations › **Rapport de course** | « Validé » ou « À compléter » avec commentaire ; le rédacteur corrige puis retransmet |
+| 6. **Validation** | Validateur désigné (ou hiérarchie) | **⏳ À autoriser** ou Validations › **Rapport de course** (✅ Valider, ⛔ À compléter) | « Validé » ou « À compléter » avec commentaire ; le rédacteur corrige puis retransmet |
 
 Règles :
 
@@ -89,7 +89,10 @@ Règles :
 3. La transmission exige : objectif atteint, entreprise visitée, personnes rencontrées et un **résumé détaillé** (au moins 30 caractères) ; la course doit être clôturée (km départ et retour).
 4. Un rapport **transmis ou validé ne se modifie plus** ; un rapport « à compléter » se rouvre.
 5. Le paramètre **Parc Auto › Demande préalable de course obligatoire** (Paramètres) refuse toute course sans autorisation. Il est désactivé par défaut : la course sans demande est alors simplement signalée.
-6. La demande et le rapport s'**impriment** (🖨️) avec la décision de la hiérarchie et le visa.
+6. **Validateur désigné** : dans **Paramètres › Parc auto**, l'administrateur désigne le **validateur des demandes de courses** et son **suppléant**. Tant qu'aucun n'est désigné, les administrateurs et les managers autorisent. Une fois désigné, seuls le validateur, son suppléant et l'administrateur décident (demandes et rapports).
+7. **On ne valide pas sa propre demande** : le demandeur voit sa demande « à faire autoriser par un autre validateur » ; seul l'administrateur peut s'autoriser lui-même, après confirmation.
+8. La file **⏳ À autoriser** (haut de l'onglet Courses quotidiennes) classe les demandes **urgentes d'abord**, puis les plus anciennes, avec l'ancienneté en jours. Un **refus exige un motif**, conservé avec le nom du décideur et la date.
+9. La demande et le rapport s'**impriment** (🖨️) avec la décision de la hiérarchie et le visa.
 
 ### PAU-06 — Suppression
 
@@ -140,3 +143,4 @@ Un véhicule se supprime depuis la liste ; s'il a un historique, préférer un a
 |---|---|---|
 | 1.0 | Octobre 2026 | Création |
 | 2.0 | Octobre 2026 | Courses : demande préalable, autorisation, rapport détaillé transmis et validé par la hiérarchie |
+| 2.1 | Octobre 2026 | Validateur et suppléant désignés, file « À autoriser » dans le Parc Auto, interdiction de valider sa propre demande, motif de refus obligatoire |
