@@ -1,6 +1,6 @@
 # Manuel de procédures — Administration du système
 
-**Réf.** PRO-ADM · **Version** 1.0 · **Date** Octobre 2026
+**Réf.** PRO-ADM · **Version** 1.1 · **Date** Octobre 2026
 **Objet** : fixer qui fait quoi pour administrer l'ERP : paramètres, utilisateurs et rôles, sécurité, sauvegardes, contrôle d'intégrité, incidents, archivage numérique (GED) et accès aux portails.
 **Principe directeur** : moindre privilège ; rien ne se supprime en masse sans sauvegarde préalable ; toute anomalie est tracée et traitée.
 
@@ -72,6 +72,7 @@ Enregistrer avec **💾 Tout enregistrer**.
 2. **⬆ Importer JSON** : restaurer une sauvegarde.
 3. **🗑 Réinitialiser BDD** (administrateur) : l'assistant liste, **par catégorie, ce qui part et ce qui reste**, et exige au moins un sous-module sélectionné.
 4. **Import de données** : reprise depuis des fichiers externes ; contrôler les doublons après import (PRO-PAI, PAI-08).
+5. **🔒 Verrou de mise en production** (administrateur, en tête de la carte « Mise à zéro ») : à activer dès la mise en production réelle. Production verrouillée : la remise à zéro est **limitée au poste** (« Effacer aussi sur Supabase » et « Propager à tous les postes » sont désactivés), la **sauvegarde est obligatoire**, et un ordre de remise à zéro venu d'un autre poste est **ignoré**. Pour déverrouiller, l'administrateur tape la phrase **DEVERROUILLER LA PRODUCTION** ; verrouillage et déverrouillage sont journalisés avec leur auteur. Production non verrouillée : une remise à zéro avec effacement du cloud supprime définitivement les données de **tous** les postes (exemple : médias, lots, employés et pointages effacés ensemble les 14 et 16 octobre 2026).
 
 ### ADM-05 — Cloud et synchronisation
 
@@ -116,6 +117,15 @@ Enregistrer avec **💾 Tout enregistrer**.
 4. Filtrer par type et par statut ; actualiser.
 5. Les **statistiques du portail** mesurent la fréquentation sans donnée personnelle.
 
+#### Médias du portail et état du portail
+
+**Où** : Médias portail. Le panneau **🌐 État du portail** résume ce qui est publié : photos et vidéos visibles, documents, médias masqués ou sans source, programmes et lots publiés, dernier prospect reçu du portail.
+
+1. **🔍 Vérifier ce que voit le portail** interroge le cloud **comme un visiteur anonyme** (médias, programmes, lots), compare les médias de ce poste à ceux du cloud (médias pas encore envoyés) et liste le stockage.
+2. Une **alerte rouge** s'affiche quand aucun média n'est visible : le portail n'affiche alors aucune photo.
+3. **Supprimer un média** (🗑) supprime sa ligne **et son fichier** du stockage public, après confirmation (irréversible). Si le fichier ne peut pas être supprimé (session expirée, réseau), le média est conservé et l'utilisateur est prévenu. Un fichier partagé par plusieurs médias n'est supprimé qu'avec le dernier.
+4. **Fichiers orphelins** : fichiers du stockage sans média publié (hors diaporama et vidéo d'accueil). Un fichier orphelin reste accessible par son adresse publique. Deux actions (administrateur ou manager) : **♻️ Republier** (recrée un média par fichier, sans titre ni rattachement, à compléter) ou **🗑 Supprimer** (irréversible, nombre de fichiers à retaper pour confirmer).
+
 ### ADM-10 — Manuels et diagrammes
 
 **Où** : Paramètres › Manuels & flux. Choisir un manuel pour afficher ses diagrammes ; ouvrir le PDF.
@@ -126,6 +136,9 @@ Enregistrer avec **💾 Tout enregistrer**.
 |---|---|
 | Action réservée sans rôle administrateur | Refusée |
 | Remise à zéro sans sous-module | Refusée |
+| Production verrouillée : effacement du cloud, propagation, ordre venu d'un autre poste | Refusés ; sauvegarde obligatoire |
+| Suppression d'un média : fichier non supprimé du stockage | Média conservé, message d'erreur |
+| Suppression de fichiers orphelins | Nombre à retaper ; irréversible |
 | URL ou clé cloud absente | Enregistrement refusé |
 | Incident sans nom ou description | Refusé |
 | Compte par défaut manquant | Écriture refusée, paramètre nommé |
@@ -162,13 +175,16 @@ Enregistrer avec **💾 Tout enregistrer**.
 ## 8. Liste de contrôle mensuelle
 
 1. ☐ Sauvegarde complète exportée
+1. ☐ Production verrouillée (après la mise en production réelle)
 2. ☐ Audit d'intégrité sans anomalie critique
 3. ☐ Incidents du mois traités
 4. ☐ Accès portail : codes émis, jamais connectés relancés
 5. ☐ Journal de connexion relu
+6. ☐ État du portail vérifié : médias visibles, aucun fichier orphelin
 
 ## 9. Révisions
 
 | Version | Date | Objet |
 |---|---|---|
 | 1.0 | Octobre 2026 | Création |
+| 1.1 | Novembre 2026 | Verrou de mise en production, suppression du fichier avec le média, état du portail, fichiers orphelins du stockage |
