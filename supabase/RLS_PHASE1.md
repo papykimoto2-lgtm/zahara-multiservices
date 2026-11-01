@@ -141,3 +141,16 @@ du claim exigé, toute politique écrite le serait à l'aveugle.
 
 `rls_01_inspection.sql` est en lecture seule et peut être lancé dès
 maintenant, en production, sans risque.
+
+## Mise à jour du 31/10/2026 — état mesuré et script de fermeture préparé
+
+- **Les deux instances sont encore entièrement ouvertes.** MENCO : 167 tables avec une politique ouverte (`*_open_rollback`, `*_all`,
+  plus `agro_state` et `menko_hub_users`). **Zahara : 152 tables, sous les noms `anon_all` et `auth_all`** : la mention
+  « Zahara fermée » du 13/10 était fausse (elle ne comptait que `*_open_rollback`). Les politiques ouvertes visent aussi le rôle
+  `authenticated` : un souscripteur connecté au portail a un accès total.
+- **Point 3 levé** : `staff-login` est prouvé en production sur MENCO (888 connexions serveur journalisées, `src = srv`) comme sur Zahara (700).
+- Préparés, **non appliqués** : `rls_03_fermeture.sql` (vagues A/B/C, simulation par défaut, sauvegarde et restauration des politiques),
+  `tools/rls_sonde_anon.js` (sonde de la clé publique) et `RLS_RECETTE_FERMETURE.md` (préalables, recette, critères d'arrêt).
+- Découverte : quatre vues publiques sont en `security_invoker` et deviendraient vides après fermeture de leurs tables de base ;
+  le script prévoit de les repasser en droits du propriétaire avant la vague B.
+
