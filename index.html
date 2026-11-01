@@ -34240,6 +34240,46 @@ function auditHistorique(entite, entiteId) {
     .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
 }
 
+/* ── Changement de commercial ou d'apporteur : proposer de réaffecter les commissions non payées ──
+   Les commissions déjà payées ou annulées ne sont jamais touchées. L'utilisateur choisit : l'ancien bénéficiaire
+   peut avoir réellement apporté la vente, auquel cas on garde ses commissions. */
+async function commProposerReaffectation(avant, c) {
+  if (!avant || !c) return 0;
+  var chg = [];
+  if ((avant.commercial_id || '') !== (c.commercial_id || '') && c.commercial_id) chg.push('commercial');
+  if ((avant.apporteur_id || '') !== (c.apporteur_id || '') && c.apporteur_id) chg.push('apporteur');
+  if (!chg.length) return 0;
+  var cibles = (DATA.commissions || []).filter(function(x){
+    if (x.client_id !== c.id || x.statut !== 'a_payer' || chg.indexOf(x.type_beneficiaire) < 0) return false;
+    return x.type_beneficiaire === 'commercial' ? (x.beneficiaire_id || '') !== c.commercial_id : (x.apporteur_id || '') !== c.apporteur_id;
+  });
+  if (!cibles.length) return 0;
+  var total = cibles.reduce(function(s, x){ return s + (parseFloat(x.montant_comm) || 0); }, 0);
+  var noms = chg.map(function(t){ return t === 'commercial' ? 'le commercial' : 'l\'apporteur'; }).join(' et ');
+  if (!confirm('Vous avez changé ' + noms + ' de ce souscripteur.\n\n' + cibles.length + ' commission(s) non payée(s) (' + fmtF(Math.round(total)) + ' F) sont encore au nom de l\'ancien bénéficiaire.\n\nOK : les réaffecter au nouveau bénéficiaire.\nAnnuler : les laisser à l\'ancien (par exemple s\'il a réellement apporté la vente).')) return 0;
+  var n = 0, now = new Date().toISOString();
+  for (var i = 0; i < cibles.length; i++) {
+    var k = cibles[i], av = JSON.parse(JSON.stringify(k));
+    if (k.type_beneficiaire === 'commercial') {
+      k.beneficiaire_id = c.commercial_id || '';
+      var emp = (DATA.employes || []).filter(function(e){ return e.id === c.commercial_id; })[0];
+      k.beneficiaire = emp ? ((emp.prenoms || '') + ' ' + (emp.nom || '')).trim() : (c.commercial || k.beneficiaire);
+    } else {
+      k.apporteur_id = c.apporteur_id || '';
+      var ap = (DATA.apporteurs || []).filter(function(a){ return a.id === c.apporteur_id; })[0];
+      k.beneficiaire = ap ? ((ap.prenoms ? ap.prenoms + ' ' : '') + (ap.nom || '')).trim() : (c.apporteur || k.beneficiaire);
+      if (ap && ap.tel) k.beneficiaire_tel = ap.tel;
+    }
+    k._modifie = now;
+    await dbPut('commissions', k); if (typeof syncToSupabase === 'function') syncToSupabase('pi_commissions', k);
+    await logAudit('commissions', k.id, 'update', av, k);
+    n++;
+  }
+  toast(n + ' commission(s) réaffectée(s).', 'success');
+  if (typeof renderCommissions === 'function') renderCommissions();
+  return n;
+}
+
 async function saveClient() {
   if (APP._savingClient) return; /* anti double-clic / double-tap mobile */
   var nom = document.getElementById('c-nom').value.trim();
@@ -34442,6 +34482,7 @@ async function saveClient() {
     await majStatutLotClient(id);
     syncToSupabase('pi_clients', client);
     await logAudit('clients', client.id, _clientAvant ? 'update' : 'create', _clientAvant, client);
+    try { await commProposerReaffectation(_clientAvant, client); } catch (eRc) { console.warn('Réaffectation des commissions', eRc); }
     closeModal('modal-client');
     toast('Souscripteur enregistré.', 'success');
     renderClients();
