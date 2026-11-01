@@ -189,6 +189,7 @@ Le souscripteur y suit ses paiements, ses documents et ses échéances.
 4. Un souscripteur **résilié** reste résilié, même si on modifie un champ.
 5. Si la fiche a été modifiée ailleurs entre-temps, un message de conflit l'indique : recharger avant de modifier.
 6. Retirer un lot de la liste le **libère** (retour à « disponible »).
+7. **Changer le commercial ou l'apporteur** : à l'enregistrement, l'ERP propose de **réaffecter** au nouveau bénéficiaire les commissions **non payées** encore au nom de l'ancien (nombre et total affichés). **OK** réaffecte ; **Annuler** les laisse à l'ancien, à choisir quand il a réellement apporté la vente. Les commissions payées ou annulées ne sont jamais touchées.
 
 Chaque modification est journalisée avec l'avant et l'après.
 
@@ -291,3 +292,4 @@ R = réalise, A = approuve, C = consulté, I = informé.
 |---|---|---|---|
 | 1.0 | Octobre 2026 | | Création |
 | 1.1 | Octobre 2026 | | Avertissements à la création (doublon téléphone/nom, lot manquant ou sans prix, montant nul) |
+| 1.2 | Novembre 2026 | | Réaffectation proposée des commissions non payées au changement de commercial ou d'apporteur |
