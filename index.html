@@ -5553,6 +5553,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
               <option value="">Tous rattachements</option>
             </select>
           </div>
+          <div id="pm-etat-portail"></div>
           <div id="pm-liste"></div>
         </div>
 
@@ -7886,6 +7887,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
                 <span>☢️ Mise à zéro — Passage en production</span>
                 <span style="font-size:10px;background:rgba(220,38,38,0.15);color:var(--rouge);padding:3px 8px;border-radius:6px;font-weight:600;">SUPER ADMIN</span>
               </div>
+              <div id="reset-prod-etat"></div>
               <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:14px;line-height:1.7;">
                 ⚠️ Supprime les données de test avant la mise en production réelle.<br>
                 Choisissez les catégories <strong>et le détail des sous-modules</strong> à effacer ou conserver.<br>
@@ -28775,7 +28777,7 @@ var PARAMS_PARTAGES = [
   'societe','raison_sociale','nom_societe','sigle','forme_juridique','activite',
   'rccm','ncc','cc','cnps','capital','regime_fiscal','centre_impots',
   'adresse','ville','tel','email','logo',
-  'synthese_auto','synthese_heure'
+  'synthese_auto','synthese_heure','mise_en_production'
 ];
 /* [FIX réglages non conservés] Seule la liste blanche ci-dessus était reprise
    du cloud : commissions, taux, banque, pénalités, seuils, conditions de
@@ -53805,6 +53807,7 @@ function loadParamFields() {
   sv('param-parcauto-demande-obligatoire',p.parcauto_demande_obligatoire||'non');
   ['param-parcauto-validateur','param-parcauto-suppleant'].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML='<option value="">'+(id.indexOf('suppleant')>0?'— Aucun —':'— Hiérarchie : admin et managers (défaut) —')+'</option>'+(DATA.users||[]).filter(function(u){ return u && u.statut!=='inactif'; }).map(function(u){ return '<option value="'+u.id+'">'+escHtml((u.nom||u.login||'')+' ('+(u.role||'')+')')+'</option>'; }).join(''); });
   sv('param-parcauto-validateur',p.parcauto_validateur_id||''); sv('param-parcauto-suppleant',p.parcauto_suppleant_id||'');
+  if (typeof prodRenderEtat === 'function') prodRenderEtat();
   sv('param-crm-delai-relance-prospect',p.crm_delai_relance_prospect||3);
   sv('param-crm-score-min-qualif',p.crm_score_min_qualif||50);
   sv('param-crm-source-defaut',p.crm_source_defaut||'site_web');
@@ -54171,6 +54174,7 @@ function renderResetCategories() {
 /* ─── Ouvrir le wizard ─────────────────────────────────────── */
 function ouvrirWizardReset() {
   if (!hasRole('admin')) { toast('Réservé à l\'administrateur.', 'error'); return; }
+  prodAppliquerOptionsReset();
   /* Récupérer les catégories sélectionnées */
   var stores = _getSelectedStores();
   if (!stores.length) { toast('Sélectionnez au moins un sous-module.', 'error'); return; }
@@ -54205,6 +54209,7 @@ function ouvrirWizardReset() {
     optEl.innerHTML =
       (keepParams ? '✅ Paramètres conservés<br>' : '⚠️ Paramètres <strong>effacés</strong><br>')
       +(keepUsers  ? '✅ Utilisateurs conservés<br>' : '⚠️ Utilisateurs <strong>effacés</strong><br>')
+      +(prodVerrouillee() ? '🔒 Production verrouillée : remise à zéro locale uniquement, sauvegarde obligatoire<br>' : '')
       +(withCloud  ? '☁️ Nettoyage Supabase <strong>activé</strong><br>' : '💾 Nettoyage local uniquement (Supabase conservé)');
   }
   /* Reset et afficher étape 1 */
@@ -54307,6 +54312,8 @@ async function _appliquerResetBroadcast() {
      tombstones qu'elle posait faisaient effacer le cloud au pull suivant.
      On l'ignore (marqué comme lu pour ne pas le réévaluer). */
   if (!b.cloud) { _resetBroadcastMarquer(b.id); return 0; }
+  /* Production verrouillée : un ordre de remise à zéro venu d'un autre poste est ignoré. */
+  if (typeof prodVerrouillee === 'function' && prodVerrouillee()) { _resetBroadcastMarquer(b.id); return 0; }
 
   var limite = b.date || '';
   var total = 0, detail = [];
@@ -54380,7 +54387,7 @@ async function executerReset() {
   var progressLbl  = document.getElementById('reset-progress-label');
   if (progressBar) progressBar.style.display='block';
 
-  var withCloud   = document.getElementById('reset-supabase') && document.getElementById('reset-supabase').checked;
+  var withCloud   = document.getElementById('reset-supabase') && document.getElementById('reset-supabase').checked && !prodVerrouillee();
   var keepParams  = document.getElementById('reset-keep-params') && document.getElementById('reset-keep-params').checked;
   var keepUsers   = document.getElementById('reset-keep-users') && document.getElementById('reset-keep-users').checked;
 
@@ -54442,7 +54449,7 @@ async function executerReset() {
   /* Ordre diffusé : purge les mêmes modules sur TOUS les autres postes à leur
      prochaine synchronisation, avant tout envoi de leur part. Sans cela, un
      collègue conservait ses copies locales et les repoussait au cloud. */
-  var _propager = document.getElementById('reset-propager');
+  var _propager = prodVerrouillee() ? { checked: false } : document.getElementById('reset-propager');
   if ((!_propager || _propager.checked) && !withCloud) {
     /* Le cloud garde les données : chaque poste les re-téléchargera au pull,
        alors que l'ordre ne s'applique qu'une fois. La propagation serait donc
@@ -88798,6 +88805,7 @@ async function pmEditerCommentaire(id){
 }
 
 function pmRender(){
+  if (typeof pmRenderEtatPortail === 'function') pmRenderEtatPortail();
   var el=document.getElementById('pm-liste'); if(!el) return;
   pmRemplirRefSelects();
   var fcat=(document.getElementById('pm-filter-cat')||{}).value||'';
@@ -88872,16 +88880,166 @@ async function pmToggleVisible(id){
   pmRender();
 }
 
-async function pmDelete(id){
-  if(!confirm('Supprimer ce média du portail ?')) return;
-  DATA.portail_medias = (DATA.portail_medias||[]).filter(function(x){return x.id!==id;});
+/* ══ Verrou de mise en production ══
+   Une fois la production verrouillée (Paramètres › Remise à zéro), la remise à zéro ne peut plus effacer le cloud ni
+   se propager aux autres postes ; elle reste possible en local seulement (les données reviennent au prochain pull),
+   avec sauvegarde obligatoire. Les ordres de remise à zéro reçus d'un autre poste sont ignorés. */
+function prodVerrouillee() { var m = (DATA.params || {}).mise_en_production; return !!(m && m.actif); }
+function prodAppliquerOptionsReset() {
+  var lock = prodVerrouillee();
+  ['reset-supabase', 'reset-propager'].forEach(function(id){ var e = document.getElementById(id); if (!e) return; if (lock) { e.checked = false; e.disabled = true; } else { e.disabled = false; } });
+  var ex = document.getElementById('reset-export-first'); if (ex) { if (lock) { ex.checked = true; ex.disabled = true; } else { ex.disabled = false; } }
+}
+function prodRenderEtat() {
+  var el = document.getElementById('reset-prod-etat'); if (!el) return;
+  var m = (DATA.params || {}).mise_en_production || {};
+  el.innerHTML = m.actif
+    ? '<div style="padding:10px 12px;border-left:4px solid #10B981;background:rgba(16,185,129,.08);font-size:12px;margin-bottom:12px;line-height:1.6;">🔒 <strong>Production verrouillée</strong> le ' + escHtml(String(m.date || '').slice(0, 10)) + ' par ' + escHtml(m.par || '—') + '. La remise à zéro est limitée à ce poste : effacement du cloud et propagation aux autres postes interdits, sauvegarde obligatoire. <button class="btn btn-secondary btn-sm" onclick="prodDeverrouiller()">🔓 Déverrouiller</button></div>'
+    : '<div style="padding:10px 12px;border-left:4px solid #F59E0B;background:rgba(245,158,11,.10);font-size:12px;margin-bottom:12px;line-height:1.6;">🔓 <strong>Production non verrouillée</strong> : une remise à zéro avec « Effacer aussi sur Supabase » supprime définitivement les données de <strong>tous les postes</strong>. Verrouillez dès la mise en production réelle. <button class="btn btn-primary btn-sm" onclick="prodVerrouiller()">🔒 Verrouiller la production</button></div>';
+  prodAppliquerOptionsReset();
+}
+async function _prodSauver(m) {
+  DATA.params = DATA.params || {}; DATA.params.mise_en_production = m; _paramsToucher();
+  await dbPut('params', DATA.params); if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
+  try { await logAudit('params', 'mise_en_production', 'update', null, m); } catch(e) {}
+  prodRenderEtat();
+}
+async function prodVerrouiller() {
+  if (!hasRole('admin')) { toast('Réservé à l\'administrateur.', 'error'); return; }
+  if (!confirm('Verrouiller la production ?\n\nLa remise à zéro ne pourra plus effacer le cloud ni se propager aux autres postes.')) return;
+  await _prodSauver({ actif: true, date: new Date().toISOString(), par: (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || '—' });
+  toast('🔒 Production verrouillée.', 'success');
+}
+async function prodDeverrouiller() {
+  if (!hasRole('admin')) { toast('Réservé à l\'administrateur.', 'error'); return; }
+  var p = prompt('Déverrouiller la production permet à nouveau d\'effacer les données de tous les postes.\n\nTapez exactement : DEVERROUILLER LA PRODUCTION', '');
+  if (p === null) return;
+  if (String(p).trim() !== 'DEVERROUILLER LA PRODUCTION') { toast('Phrase incorrecte : production toujours verrouillée.', 'error'); return; }
+  await _prodSauver({ actif: false, date_deverrouillage: new Date().toISOString(), deverrouille_par: (APP.currentUser && (APP.currentUser.nom || APP.currentUser.login)) || '—' });
+  toast('🔓 Production déverrouillée.', 'info');
+}
+
+/* ══ Médias du portail : suppression du fichier du stockage, état du portail, fichiers orphelins ══ */
+var _pmEtat = null;
+function _pmAdminOuManager() { return hasRole('admin') || hasRole('manager'); }
+async function pmSupprimerFichiers(chemins) {
+  if (!chemins || !chemins.length) return 0;
+  if (!SB.url || !SB.key) throw new Error('cloud non configuré');
+  if (typeof staffActif === 'function' && !staffActif()) throw new Error('session expirée — reconnectez-vous');
+  var n = 0;
+  for (var i = 0; i < chemins.length; i += 100) {
+    var lot = chemins.slice(i, i + 100);
+    var r = await fetch(SB.url + '/storage/v1/object/' + PM_BUCKET, { method: 'DELETE', headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + sbAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: lot }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    n += lot.length;
+  }
+  return n;
+}
+async function pmDelete(id) {
+  var m = (DATA.portail_medias || []).filter(function(x){ return x.id === id; })[0];
+  var chemin = (m && m.path && (m.bucket || PM_BUCKET) === PM_BUCKET) ? m.path : '';
+  var partage = !!chemin && (DATA.portail_medias || []).some(function(x){ return x.id !== id && x.path === chemin; });
+  if (!confirm('Supprimer ce média du portail ?' + (chemin && !partage ? '\n\nLe fichier sera aussi effacé du stockage public (irréversible).' : ''))) return;
+  if (chemin && !partage) {
+    try { await pmSupprimerFichiers([chemin]); }
+    catch (e) { toast('❌ Fichier non supprimé du stockage (' + ((e && e.message) || 'erreur') + ') : média conservé. Reconnectez-vous puis réessayez.', 'error'); return; }
+  }
+  DATA.portail_medias = (DATA.portail_medias || []).filter(function(x){ return x.id !== id; });
   if (typeof deleteRecord === 'function') await deleteRecord('portail_medias', id);
   else {
     await dbDelete('portail_medias', id);
-    if(typeof deleteFromSupabase==='function') deleteFromSupabase('pi_portail_medias', id);
+    if (typeof deleteFromSupabase === 'function') deleteFromSupabase('pi_portail_medias', id);
   }
   pmRender();
 }
+async function _pmAnonCount(chemin) {
+  try {
+    var r = await fetch(SB.url + '/rest/v1/' + chemin, { headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + SB.key, 'Prefer': 'count=exact' } });
+    if (!r.ok) return -1;
+    var n = parseInt(String(r.headers.get('content-range') || '').split('/')[1]); return isNaN(n) ? -1 : n;
+  } catch (e) { return -1; }
+}
+async function _pmListerStockage() {
+  var fichiers = [], dossiers = [''], vus = {};
+  while (dossiers.length) {
+    var prefixe = dossiers.shift(); if (vus[prefixe]) continue; vus[prefixe] = true;
+    for (var off = 0; ; off += 1000) {
+      var r = await fetch(SB.url + '/storage/v1/object/list/' + PM_BUCKET, { method: 'POST', headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + sbAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefix: prefixe, limit: 1000, offset: off, sortBy: { column: 'name', order: 'asc' } }) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var rows = await r.json();
+      rows.forEach(function(o){ var nom = (prefixe ? prefixe + '/' : '') + o.name; if (o.id === null || o.metadata == null) dossiers.push(nom); else fichiers.push({ name: nom, taille: (o.metadata || {}).size || 0, mime: (o.metadata || {}).mimetype || '' }); });
+      if (rows.length < 1000) break;
+    }
+  }
+  return fichiers;
+}
+function _pmEstReserve(nom) { return /^hero(_slides)?\//.test(nom); }
+async function pmVerifierPortail() {
+  var bt = document.getElementById('pm-etat-btn'); if (bt) { bt.disabled = true; bt.textContent = '⏳ Vérification…'; }
+  var e = { date: new Date().toISOString() };
+  e.anonMedias = await _pmAnonCount('pi_portail_medias?select=id&limit=1');
+  e.anonProg = await _pmAnonCount('pi_programmes_public?select=id&limit=1');
+  e.anonLots = await _pmAnonCount('pi_lots_public?select=id&limit=1');
+  try {
+    var cl = await sbFetch('pi_portail_medias?select=id,p:data->>path', 'GET');
+    if (Array.isArray(cl)) { var loc = {}; (DATA.portail_medias || []).forEach(function(m){ loc[m.id] = 1; }); var cid = {}; cl.forEach(function(x){ cid[x.id] = 1; });
+      e.enAttente = (DATA.portail_medias || []).filter(function(m){ return !cid[m.id]; }).length; e.cloudSeul = cl.filter(function(x){ return !loc[x.id]; }).length; }
+  } catch (x) {}
+  try {
+    var f = await _pmListerStockage(), chemins = {}; (DATA.portail_medias || []).forEach(function(m){ if (m.path) chemins[m.path] = 1; });
+    e.fichiers = f.length; e.orphelins = f.filter(function(o){ return !chemins[o.name] && !_pmEstReserve(o.name); });
+    e.orphelinsMo = Math.round(e.orphelins.reduce(function(s, o){ return s + (o.taille || 0); }, 0) / 1048576);
+  } catch (x) { e.stockageErreur = (x && x.message) || 'erreur'; }
+  _pmEtat = e; pmRenderEtatPortail();
+}
+function pmRenderEtatPortail() {
+  var el = document.getElementById('pm-etat-portail'); if (!el) return;
+  var med = DATA.portail_medias || [], vis = med.filter(function(m){ return m.visible !== false; });
+  var nb = function(t){ return vis.filter(function(m){ return m.type === t; }).length; };
+  var sansSource = med.filter(function(m){ return m.type !== 'video' && !m.url && !m.data && !m.path; }).length;
+  var progs = (DATA.programmes || []).filter(function(p){ return p.statut !== 'archive'; }).length;
+  var lots = (DATA.lots || []).filter(function(l){ return ['disponible', 'reserve', 'vendu'].indexOf(l.statut) !== -1; }).length;
+  var leads = (DATA.leads || []).filter(function(l){ return /portail|site_web/i.test(l.source || ''); }).sort(function(a, b){ return String(b.created_at || b.date_contact || '').localeCompare(String(a.created_at || a.date_contact || '')); });
+  var msgs = (DATA.portail_messages || []).length;
+  var E = _pmEtat, mgr = _pmAdminOuManager();
+  var alerte = !vis.length ? '<div style="margin:8px 0;padding:8px 10px;border-left:4px solid #EF4444;background:rgba(239,68,68,.08);font-size:12px;">⛔ <strong>Aucun média visible : le portail n\'affiche aucune photo.</strong> Publiez des médias ci-dessous' + ((E && E.orphelins && E.orphelins.length) ? ', ou republiez les ' + E.orphelins.length + ' fichiers encore présents dans le stockage' : '') + '.</div>' : '';
+  var h = '<div class="card" style="margin-bottom:14px;"><div class="form-section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><span>🌐 État du portail</span><button class="btn btn-secondary btn-sm" id="pm-etat-btn" onclick="pmVerifierPortail()">🔍 Vérifier ce que voit le portail</button></div>' + alerte
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:8px 0;">'
+    + [['Photos visibles', nb('photo')], ['Vidéos visibles', nb('video')], ['Documents', nb('document')], ['Médias masqués', med.length - vis.length], ['Sans source', sansSource], ['Programmes', progs], ['Lots publiés', lots], ['Messages portail', msgs]].map(function(k){ return '<div class="kpi-card"><div class="kpi-label">' + k[0] + '</div><div class="kpi-value" style="font-size:16px;">' + k[1] + '</div></div>'; }).join('') + '</div>'
+    + '<div style="font-size:12px;color:var(--blanc-dim);">Dernier prospect venu du portail : ' + (leads.length ? escHtml(dateShort(leads[0].created_at || leads[0].date_contact || '')) + ' · ' + leads.length + ' au total' : 'aucun') + '.</div>';
+  if (E) {
+    var ok = function(v){ return v > 0 ? '<span style="color:#10B981;">✓ ' + v + '</span>' : (v === 0 ? '<span style="color:#EF4444;">⛔ 0</span>' : '<span style="color:#EF4444;">⛔ inaccessible</span>'); };
+    h += '<div style="margin-top:10px;font-size:12px;line-height:1.8;border-top:1px solid var(--bord);padding-top:8px;"><strong>Vu par un visiteur anonyme</strong> (' + escHtml(String(E.date).slice(0, 16).replace('T', ' ')) + ') : médias ' + ok(E.anonMedias) + ' · programmes ' + ok(E.anonProg) + ' · lots ' + ok(E.anonLots)
+      + (E.enAttente != null ? '<br>Synchronisation : ' + (E.enAttente ? '<span style="color:#F59E0B;">' + E.enAttente + ' média(s) local(aux) pas encore au cloud</span>' : '✓ tout est au cloud') + (E.cloudSeul ? ' · ' + E.cloudSeul + ' au cloud absent(s) de ce poste' : '') : '')
+      + (E.stockageErreur ? '<br><span style="color:#F59E0B;">Stockage non listé (' + escHtml(E.stockageErreur) + ').</span>' : '<br>Stockage : ' + E.fichiers + ' fichier(s), dont ' + (E.orphelins.length ? '<strong style="color:#F59E0B;">' + E.orphelins.length + ' orphelin(s) (' + E.orphelinsMo + ' Mo)</strong> sans média publié' : '0 orphelin') + '.')
+      + '</div>';
+    if (E.orphelins && E.orphelins.length && mgr) h += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="pmOrphelinsRepublier()">♻️ Republier ces ' + E.orphelins.length + ' fichiers au portail</button><button class="btn btn-danger btn-sm" onclick="pmOrphelinsSupprimer()">🗑 Supprimer ces fichiers du stockage</button></div><div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">Republier recrée un média par fichier (sans titre ni rattachement, à compléter ensuite). Supprimer est irréversible : le fichier reste sinon accessible par son adresse publique, même sans média publié.</div>';
+  }
+  el.innerHTML = h + '</div>';
+}
+async function pmOrphelinsRepublier() {
+  var E = _pmEtat; if (!E || !E.orphelins || !E.orphelins.length || !_pmAdminOuManager()) return;
+  if (!confirm('Recréer ' + E.orphelins.length + ' média(s) du portail à partir des fichiers orphelins ?\n\nTitres et rattachements sont à compléter ensuite.')) return;
+  var n = 0, now = new Date().toISOString();
+  for (var i = 0; i < E.orphelins.length; i++) {
+    var o = E.orphelins[i], cat = o.name.split('/')[0] || 'eden', estVideo = /^video\//.test(o.mime || '');
+    var media = { id: uid(), type: estVideo ? 'video' : 'photo', categorie: cat, titre: '', commentaire: '', path: o.name, bucket: PM_BUCKET, url: _pmPublicUrl(o.name), mime: o.mime || (estVideo ? 'video/mp4' : 'image/jpeg'), taille: o.taille || 0, visible: true, date: now };
+    if (estVideo) { media.provider = 'upload'; media.video_id = ''; }
+    DATA.portail_medias.push(media); await dbPut('portail_medias', media);
+    if (typeof syncToSupabase === 'function') { try { await syncToSupabase('pi_portail_medias', media); } catch (e) {} }
+    n++;
+  }
+  toast(n + ' média(s) republié(s).', 'success'); _pmEtat = null; pmRender(); pmVerifierPortail();
+}
+async function pmOrphelinsSupprimer() {
+  var E = _pmEtat; if (!E || !E.orphelins || !E.orphelins.length || !_pmAdminOuManager()) return;
+  var p = prompt('Supprimer définitivement ' + E.orphelins.length + ' fichier(s) (' + E.orphelinsMo + ' Mo) du stockage ?\n\nIls ne sont rattachés à aucun média publié. Cette action est irréversible.\n\nTapez le nombre de fichiers pour confirmer :', '');
+  if (p === null) return; if (parseInt(p) !== E.orphelins.length) { toast('Nombre incorrect : rien supprimé.', 'error'); return; }
+  try { var n = await pmSupprimerFichiers(E.orphelins.map(function(o){ return o.name; })); toast(n + ' fichier(s) supprimé(s) du stockage.', 'success'); }
+  catch (e) { toast('❌ Suppression impossible (' + ((e && e.message) || 'erreur') + ').', 'error'); }
+  _pmEtat = null; pmVerifierPortail();
+}
+
 
 /* ═══ Médias portail → Supabase Storage (bucket PUBLIC) ═══
    Objectif : ne plus stocker le base64 dans pi_portail_medias.data (lignes
