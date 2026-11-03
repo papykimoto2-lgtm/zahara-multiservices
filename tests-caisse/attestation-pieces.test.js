@@ -44,6 +44,7 @@ test('pièces : validation sans consultation → confirmation demandée ; refus 
   const app = await ouvrirApp();
   try {
     await amorcer(app.page);
+    await app.page.evaluate(function () { APP.currentUser = { id: 'dg2', nom: 'DG2', role: 'admin' }; });
     app.etat.confirm = false;
     const refus = await app.page.evaluate(async function () { var v = DATA.validations[0]; await valDecide(v.id, 'valide'); return [v.statut, DATA.clients[0].attestation_solde.statut]; });
     assert.deepEqual(refus, ['en_attente', 'en_attente']);
@@ -58,6 +59,7 @@ test('pièces : validation sans consultation → confirmation demandée ; refus 
     assert.ok(!app.etat.dialogues.some(function (d) { return /pièces justificatives/.test(d); }), 'pas de demande après consultation');
   } finally { await app.fermer(); }
 });
+
 
 test('souscripteur supprimé mais attestation encore en attente : message explicite, jamais un bouton muet', async () => {
   const app = await ouvrirApp(); const page = app.page;
