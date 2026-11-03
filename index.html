@@ -141673,7 +141673,18 @@ async function caisseEnter() {
    Le verrou d'exercice clos (deleteRecord/ecritures) bloque toute suppression
    d'un mouvement ventilé sur un exercice comptable clôturé. */
 
+/* La suppression est réservée à admin et manager (règle de userPeut). Contrôle placé AVANT tout effet de bord
+   (écriture, demande d'achat) : deleteRecord refuse sinon la suppression du bon mais après ces modifications. */
+function _caisseSuppressionPermise() {
+  if (typeof userPeutSupprimer !== 'function' || userPeutSupprimer()) return true;
+  try { toast('🔒 Suppression réservée à l\'administrateur et au manager.', 'error'); } catch (e) {}
+  return false;
+}
 async function _caisseDelMvt(mvt, opts) {
+  if (typeof userPeutSurStore === 'function' && !userPeutSurStore('caisse_mouvements', 's')) {
+    try { toast('🔒 Votre profil ne permet pas de supprimer des données. Passez une opération inverse ou sollicitez un administrateur.', 'error'); } catch (e) {}
+    return false;
+  }
   /* [Versement ↔ caisse] Le bon rattaché à un versement partage l'écriture
      du versement (ecr_vrs_<id>) : il ne se supprime qu'avec le versement,
      et on ne supprime jamais cette écriture d'ici. */
@@ -141683,7 +141694,7 @@ async function _caisseDelMvt(mvt, opts) {
       toast('🔗 Le bon ' + (mvt.numero||'') + ' est rattaché à un versement souscripteur : supprimez ou modifiez le versement (Paiements), pas le bon.', 'error', 8000);
       return false;
     }
-    await deleteRecord('caisse_mouvements', mvt.id);
+    if (await deleteRecord('caisse_mouvements', mvt.id) === false) return false;
     DATA.caisse_mouvements = (DATA.caisse_mouvements || []).filter(function(x){ return x.id !== mvt.id; });
     return true;
   }
@@ -141716,7 +141727,7 @@ async function _caisseDelMvt(mvt, opts) {
     if (typeof syncToSupabase === 'function') syncToSupabase('pi_fiches_engagement_depense', daLiee);
     if (typeof budgetRenderFed === 'function') budgetRenderFed();
   }
-  await deleteRecord('caisse_mouvements', mvt.id);
+  if (await deleteRecord('caisse_mouvements', mvt.id) === false) return false;
   return true;
 }
 
@@ -141724,15 +141735,15 @@ async function _caisseDelMvt(mvt, opts) {
 async function caisseSupprimerMouvement(mvtId) {
   var m = (DATA.caisse_mouvements||[]).find(function(x){ return x.id===mvtId; });
   if (!m) return;
-  if (!caisseRoleAdminLike()) { toast('Droit refusé.','error'); return; }
+  if (!caisseRoleAdminLike() || !_caisseSuppressionPermise()) { return; }
   if (m.versement_id && (DATA.versements||[]).some(function(v){ return v.id === m.versement_id; })) { _caisseDelMvt(m); return; }
   if (m.visa_dg || m.bordereau_id) { toast('🔒 Le bon ' + (m.numero||'') + ' est ' + (m.visa_dg ? 'visé par le Gérant Holding' : 'dans le bordereau ' + (m.bordereau_numero||'')) + ' : suppression impossible. Régularisez par un mouvement inverse.', 'error', 8000); return; }
   var jumeau = _caisseMvtJumeau(m);
   if (!confirm('Supprimer le mouvement ' + (m.numero||'') + ' (' + fmtF(m.montant) + ' FCFA) ?'
     + (m.ecriture_id ? '\nL\'écriture comptable liée sera aussi supprimée.' : '')
     + (jumeau ? '\n\n🔄 Transfert entre caisses : le bon lié ' + (jumeau.numero||'') + ' (' + _caisseNomCaisse(jumeau.caisse_id) + ') sera supprimé aussi, pour ne pas laisser un seul côté du transfert.' : ''))) return;
-  if (await _caisseDelMvt(m) === false) { toast('🔒 Exercice clôturé — suppression bloquée.','error'); return; }
-  if (jumeau && await _caisseDelMvt(jumeau) === false) { toast('⚠️ ' + (m.numero||'') + ' supprimé, mais le bon lié ' + (jumeau.numero||'') + ' n\'a pas pu l\'être (exercice clôturé) — à régulariser.','error', 9000); return; }
+  if (await _caisseDelMvt(m) === false) { toast('🔒 Suppression bloquée : ' + (m.numero||'ce bon') + ' est conservé (droit, exercice clôturé ou pièce liée).','error'); return; }
+  if (jumeau && await _caisseDelMvt(jumeau) === false) { toast('⚠️ ' + (m.numero||'') + ' supprimé, mais le bon lié ' + (jumeau.numero||'') + ' n\'a pas pu l\'être (droit, exercice clôturé ou pièce liée) — à régulariser.','error', 9000); return; }
   toast(jumeau ? 'Mouvement et bon lié supprimés.' : 'Mouvement supprimé.','info');
   caisseRenderListe();
   if (typeof caisseRenderDashboard==='function') caisseRenderDashboard();
@@ -141741,7 +141752,7 @@ async function caisseSupprimerMouvement(mvtId) {
 
 /* 2) Vider une caisse : purge sessions + mouvements + écritures (garde la config) */
 async function caisseViderCaisse(caisseId) {
-  if (!caisseRoleAdminLike()) { toast('Droit refusé.','error'); return false; }
+  if (!caisseRoleAdminLike() || !_caisseSuppressionPermise()) return false;
   if (caisseGetSessionOuverte(caisseId)) { toast('🔒 Clôturez la session ouverte d\'abord.','error'); return false; }
   var mvts = (DATA.caisse_mouvements||[]).filter(function(m){ return m.caisse_id===caisseId; });
   var sess = (DATA.caisse_sessions||[]).filter(function(s){ return s.caisse_id===caisseId; });
@@ -141752,30 +141763,31 @@ async function caisseViderCaisse(caisseId) {
   for (var i=0;i<mvts.length;i++){ if (await _caisseDelMvt(mvts[i]) === false) ko++; }
   /* Une session qui porte encore un bon conservé (exercice clos, versement) n'est pas supprimée :
      sinon le bon et son écriture 571 resteraient rattachés à une session inexistante. */
-  var gardees = 0;
+  var gardees = 0, sessKo = 0;
   for (var j=0;j<sess.length;j++){
     var _sid = sess[j].id;
     if ((DATA.caisse_mouvements||[]).some(function(m){ return m.session_id === _sid; })) { gardees++; continue; }
-    await deleteRecord('caisse_sessions', _sid);
+    if (await deleteRecord('caisse_sessions', _sid) === false) sessKo++;
   }
-  toast('Caisse vidée' + (ko ? ' (' + ko + ' bon(s) conservé(s) — exercice clos ou rattaché(s) à un versement ; ' + gardees + ' session(s) conservée(s))' : '') + '.','info');
+  if (ko || sessKo) toast('Caisse partiellement vidée : ' + ko + ' bon(s) et ' + sessKo + ' session(s) conservé(s) (droit, exercice clos ou rattaché(s) à un versement ; ' + gardees + ' session(s) gardée(s) avec leurs bons).','error',8000);
+  else toast('Caisse vidée.','info');
   caisseRenderListe();
   if (typeof caisseRenderDashboard==='function') caisseRenderDashboard();
   if (CAISSE_UI.brouillardCaisseId===caisseId) caisseAfficherBrouillard(caisseId);
-  return ko === 0;
+  return ko === 0 && sessKo === 0;
 }
 
 /* 3) Supprimer une caisse complète : config + cascade enfants */
 async function caisseSupprimerCaisse(caisseId) {
   var c = (DATA.caisses||[]).find(function(x){ return x.id===caisseId; });
   if (!c) return;
-  if (!caisseRoleAdminLike()) { toast('Droit refusé.','error'); return; }
+  if (!caisseRoleAdminLike() || !_caisseSuppressionPermise()) return;
   if (caisseGetSessionOuverte(caisseId)) { toast('🔒 Session ouverte — clôturez avant suppression.','error'); return; }
   if (!confirm('Supprimer définitivement la caisse « ' + (c.nom||'') + ' » et tout son historique ?')) return;
   var okPurge = await caisseViderCaisse(caisseId);
   if (okPurge === null) return;
   if (okPurge === false) { toast('Suppression annulée — historique partiellement bloqué (exercice clos ou bons liés à des versements).','error'); return; }
-  await deleteRecord('caisses', caisseId);
+  if (await deleteRecord('caisses', caisseId) === false) { toast('🔒 La caisse « ' + (c.nom||'') + ' » n\'a pas été supprimée.','error'); caisseRenderListe(); return; }
   toast('Caisse « ' + (c.nom||'') + ' » supprimée.','info');
   caisseRenderListe();
 }
@@ -141817,8 +141829,8 @@ function caisseRenderListe() {
     if (caisseRoleAdminLike()) {
       actions += '<button class="btn btn-secondary btn-sm btn-icon" title="Configurer" onclick="caisseConfigModal(\'' + c.id + '\')">⚙️</button>';
       if (!ouverte) actions += '<button class="btn btn-secondary btn-sm btn-icon" title="Historique" onclick="caisseAfficherBrouillard(\'' + c.id + '\')">🗂️</button>'
-        + '<button class="btn btn-danger btn-sm btn-icon" title="Vider l\'historique (sessions + mouvements)" onclick="caisseViderCaisse(\'' + c.id + '\')">🧹</button>'
-        + '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer la caisse" onclick="caisseSupprimerCaisse(\'' + c.id + '\')">🗑️</button>';
+        + (userPeutSupprimer() ? '<button class="btn btn-danger btn-sm btn-icon" title="Vider l\'historique (sessions + mouvements)" onclick="caisseViderCaisse(\'' + c.id + '\')">🧹</button>'
+        + '<button class="btn btn-danger btn-sm btn-icon" title="Supprimer la caisse" onclick="caisseSupprimerCaisse(\'' + c.id + '\')">🗑️</button>' : '');
     }
     return '<div class="card" style="padding:16px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">'
@@ -143981,7 +143993,7 @@ function caisseAuditDoublonsToggleBtn() {
   document.getElementById('cad-btn-supprimer').disabled = !n;
 }
 async function caisseAuditDoublonsSupprimer() {
-  if (!caisseRoleAdminLike()) { toast('Droit refusé.','error'); return; }
+  if (!caisseRoleAdminLike() || !_caisseSuppressionPermise()) return;
   var cases = document.querySelectorAll('#cad-table input[type="checkbox"][data-mvt-id]:checked');
   if (!cases.length) return;
   if (!confirm('Supprimer définitivement ' + cases.length + ' mouvement(s) en double ? Les écritures comptables déjà générées pour ces bons seront supprimées avec eux.')) return;
@@ -144689,7 +144701,7 @@ function caisseRenderBrouillardSession(sessionId) {
       + (caisseCanEditBon(m) ? '<button class="btn btn-secondary btn-sm btn-icon" title="Modifier le bon" onclick="caisseEditBonModal(\'' + m.id + '\')">✏️</button> ' : '')
       + '<button class="btn btn-secondary btn-sm btn-icon" title="Imprimer le bon" onclick="caisseImprimerBon(\'' + m.id + '\')">🖨️</button>'
       + (caisseDocCount(m.id) ? ' <button class="btn btn-primary btn-sm" title="Pièces justificatives" onclick="caisseViewDocs(\'' + m.id + '\')">📎 ' + caisseDocCount(m.id) + '</button>' : '')
-      + (caisseRoleAdminLike() ? ' <button class="btn btn-danger btn-sm btn-icon" title="Supprimer le mouvement" onclick="caisseSupprimerMouvement(\'' + m.id + '\')">🗑️</button>' : '')
+      + (caisseRoleAdminLike() && userPeutSupprimer() ? ' <button class="btn btn-danger btn-sm btn-icon" title="Supprimer le mouvement" onclick="caisseSupprimerMouvement(\'' + m.id + '\')">🗑️</button>' : '')
       + (m.statut === 'ventile' ? '<span title="Ventilé" style="margin-left:4px;color:var(--vert);">✓</span>' : '<span title="En attente de ventilation" style="margin-left:4px;color:var(--dim);">⏳</span>')
       + (m.requiert_validation && !m.valide && !m.rejete ? '<span title="En attente de validation — n\'impacte pas encore le solde" style="margin-left:4px;color:var(--or);">🔐</span>' : '')
       + (m.rejete ? '<span title="Mouvement rejeté — jamais compté dans le solde" style="margin-left:4px;color:var(--rouge);">✖</span>' : '')
