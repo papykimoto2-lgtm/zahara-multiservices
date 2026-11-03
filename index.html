@@ -44934,10 +44934,14 @@ function prochainNumeroRef(store, prefixe, annee, largeur) {
     var cle = prefixe + '-' + annee;
     if ((seq[cle] || 0) > max) max = seq[cle];
     seq[cle] = max + 1;
-    try {
-      _paramsToucher();
-      Promise.resolve(dbPut('params', DATA.params)).then(function(){ if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params); }).catch(function(){});
-    } catch (e) {}
+    /* Persistance différée et groupée : un traitement en lot qui attribue des dizaines de numéros ne produit qu'UNE écriture de params. */
+    clearTimeout(window._seqEcrTimer);
+    window._seqEcrTimer = setTimeout(function(){
+      try {
+        _paramsToucher();
+        Promise.resolve(dbPut('params', DATA.params)).then(function(){ if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params); }).catch(function(){});
+      } catch (e) {}
+    }, 1500);
   }
   return String(max + 1).padStart(largeur || 4, '0');
 }

@@ -10,7 +10,7 @@
 //
 // Sécurité :
 //   - même origine uniquement, en-tête Origin obligatoire en POST (un autre site ou un script ne peut pas l'utiliser) ;
-//   - 20 requêtes POST / minute / IP ; clé API FNE obligatoire ; production en HTTPS uniquement ;
+//   - 120 requêtes POST / minute / IP ; clé API FNE obligatoire ; production en HTTPS uniquement ;
 //   - seuls les chemins FNE connus sont relayés (émission et avoir), sans « .. » ni caractère inattendu ;
 //   - la clé API (en-tête Authorization) est transmise telle quelle à la DGI : elle n'est ni stockée ni journalisée ;
 //   - délai maximal de 25 s vers la DGI (réponse 504 au-delà).
@@ -37,7 +37,7 @@ function memeOrigine(req) {
 }
 
 // Limitation de débit par IP (fenêtre glissante 60 s, en mémoire de l'instance — complète, ne remplace pas, une règle WAF Vercel).
-const LIMITE = 20, FENETRE_MS = 60000, compteurs = new Map();
+const LIMITE = 120, FENETRE_MS = 60000, compteurs = new Map();
 function trop(req) {
   const ip = String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || '?').split(',')[0].trim();
   const now = Date.now();
