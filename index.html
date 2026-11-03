@@ -63757,6 +63757,9 @@ function fcDroitEcriture() {
   } catch (e) { return true; }
 }
 async function fcDb(store, obj, opts) {
+  /* « Le plus récent gagne » (_remoteWins) ne lit que _modifie : sans lui, un changement de statut d'une pièce, d'une demande… faits
+     sur un poste n'écrasaient jamais la copie des autres postes. Dossiers et missions posent déjà le leur (fcSauver, fcSauverMission). */
+  if (obj && typeof obj === 'object' && store !== 'dossiers_fonciers' && store !== 'missions_foncieres') obj._modifie = new Date().toISOString();
   var r = await dbPut(store, obj, opts);
   if (r === false) throw new Error('écriture locale refusée ou stockage indisponible (' + store + ')');
   return r;
@@ -64081,6 +64084,30 @@ async function fcOuvrirUI() {
   var r = await fcOuvrirDossier(args());
   if (!r.ok && r.doublon && confirm(r.erreur + '\n\nOuvrir quand même un second dossier ?')) r = await fcOuvrirDossier(args({ forcer: true }));
   if (fcMsg(r, 'Dossier ouvert.')) { APP._fcSel = r.dossier.id; fcRender(); (r.avertissements || []).forEach(function(a){ toast(a, 'warning'); }); }
+}
+/* ── Temps réel ──
+   Les données foncières reçues d'un autre poste étaient fusionnées en mémoire (_rtApply) mais AUCUN rafraîchissement d'écran n'était
+   déclaré pour ces stores (RT_STORE_PAGE) : le collègue ne voyait rien avant de recharger. Rafraîchissement différé et groupé ;
+   reporté tant que l'utilisateur saisit dans un champ de l'écran (sa saisie n'est jamais écrasée). */
+var FC_RT_STORES = ['dossiers_fonciers', 'evenements_fonciers', 'intervenants_fonciers', 'missions_foncieres', 'publications_foncieres', 'demandes_fonciers', 'notifications_foncieres', 'pieces_foncieres', 'groupes_fonciers'];
+var _fcRtTimer = null, _fcRtEssais = 0;
+function fcRafraichirTempsReel() {
+  clearTimeout(_fcRtTimer);
+  _fcRtTimer = setTimeout(function essai() {
+    var root = document.getElementById('fc-root'), docs = document.getElementById('fd-root');
+    var visible = function(el){ return !!el && el.getClientRects().length > 0; };
+    if (!visible(root) && !visible(docs)) { _fcRtEssais = 0; return; }
+    var a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && ((root && root.contains(a)) || (docs && docs.contains(a)))) {
+      if (_fcRtEssais < 8) { _fcRtEssais++; _fcRtTimer = setTimeout(essai, 1500); return; }
+      _fcRtEssais = 0;
+      if (typeof toast === 'function') toast('Un collègue a modifié ces données : quittez le champ en cours pour actualiser l\'écran.', 'info');
+      return;
+    }
+    _fcRtEssais = 0;
+    try { if (visible(root)) fcRender(); } catch (e) { console.warn('[Foncier] rafraîchissement temps réel', e); }
+    try { if (visible(docs) && typeof fcRenderDocuments === 'function') fcRenderDocuments(); } catch (e) {}
+  }, 600);
 }
 function fcOuvrirDetail(id) { APP._fcSel = id; fcRenderDetail(id); var el = document.getElementById('fc-detail'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth' }); }
 /* Étapes en arborescence : une branche par phase, repliable ; l'état est mémorisé par dossier (conservé après chaque changement de statut). */
@@ -94431,6 +94458,7 @@ function _rtRefreshCaisseValidations() {
   }
 }
 function _rtRefreshPage(store){
+  if (typeof FC_RT_STORES !== 'undefined' && FC_RT_STORES.indexOf(store) !== -1 && typeof fcRafraichirTempsReel === 'function') fcRafraichirTempsReel();
   /* Toute donnée reçue peut alimenter une liste déroulante ouverte ailleurs. */
   try { if (typeof repeuplerListes === 'function') repeuplerListes(); } catch(e){}
   if (RT_CAISSE_STORES.indexOf(store) !== -1) _rtRefreshCaisseValidations();
