@@ -64396,7 +64396,8 @@ async function fcJustifUI(id, code) {
   var cles = Object.keys(FC_SOURCES), txt = cles.map(function(k, i){ return (i + 1) + '. ' + FC_SOURCES[k]; }).join('\n');
   var c = parseInt(prompt('Source du justificatif :\n' + txt + '\n\nNuméro :'), 10);
   if (!c || !cles[c - 1]) { toast('Source obligatoire.', 'error'); return; }
-  fcMsg(await fcAjouterJustificatif(id, code, { reference: ref, source: cles[c - 1] }), 'Justificatif ajouté.'); fcRender();
+  var okJ = fcMsg(await fcAjouterJustificatif(id, code, { reference: ref, source: cles[c - 1] }), 'Justificatif ajouté.'); fcRender();
+  if (okJ && confirm('Joindre aussi le fichier du justificatif (PDF ou photo) ?')) fcPiecesUI(id, code);
 }
 function fcDateSaisie(v) {
   v = String(v || '').trim(); if (!v) return '';
@@ -65881,16 +65882,42 @@ var FC_PIECES_MAX_PAR_ETAPE = 20;
 var FC_PIECES_TYPES = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 var FC_STATUTS_PIECE = { a_verifier: 'À vérifier', acceptee: 'Acceptée', refusee: 'Refusée', jointe: 'Jointe' };
 
-function fcLireFichier(file) {
+/* Type réel du fichier : certains téléphones/navigateurs fournissent un type vide → déduit de l'extension. */
+function fcTypeFichier(file) {
+  if (file.type) return file.type;
+  var m = String(file.name || '').toLowerCase().match(/\.(pdf|jpe?g|png|webp|heic|heif)$/);
+  return m ? { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif' }[m[1]] : '';
+}
+/* Photo de téléphone (souvent 3 à 10 Mo) : réduite en JPEG (2200 px max, qualité décroissante) pour passer sous la limite. */
+async function fcReduireImage(blob, nom) {
+  var bmp = await createImageBitmap(blob);
+  var essais = [[2200, 0.82], [1600, 0.7], [1200, 0.6]], out = null;
+  for (var i = 0; i < essais.length; i++) {
+    var k = Math.min(1, essais[i][0] / Math.max(bmp.width, bmp.height)), c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(bmp.width * k)); c.height = Math.max(1, Math.round(bmp.height * k));
+    var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(bmp, 0, 0, c.width, c.height);
+    out = await new Promise(function(res){ c.toBlob(res, 'image/jpeg', essais[i][1]); });
+    if (out && out.size <= FC_PIECES_MAX_OCTETS) break;
+  }
+  try { bmp.close(); } catch (e) {}
+  return { blob: out, nom: String(nom || 'photo').replace(/\.[^.]+$/, '') + '.jpg' };
+}
+async function fcLireFichier(file) {
+  var type = fcTypeFichier(file), nom = file.name, blob = file;
+  if (type && type !== file.type) blob = new Blob([file], { type: type });
+  if (/^image\/(jpeg|png|webp)$/.test(type) && file.size > FC_PIECES_MAX_OCTETS) {
+    try { var red = await fcReduireImage(blob, nom); if (red.blob) { blob = red.blob; nom = red.nom; type = 'image/jpeg'; } } catch (e) {}
+  }
   return new Promise(function(resolve, reject){
     var r = new FileReader();
-    r.onload = function(){ resolve({ nom: file.name, type: file.type, taille: file.size, contenu: r.result }); };
+    r.onload = function(){ resolve({ nom: nom, type: type, taille: blob.size, contenu: r.result }); };
     r.onerror = function(){ reject(new Error('Lecture du fichier impossible.')); };
-    r.readAsDataURL(file);
+    r.readAsDataURL(blob);
   });
 }
 function fcValiderFichier(f) {
   if (!f || !f.contenu || !f.nom) return 'Aucun fichier fourni.';
+  if (/^image\/hei[cf]$/.test(f.type)) return 'Format HEIC/HEIF non pris en charge : réglez l\'appareil photo en JPEG (ou partagez la photo en JPG).';
   if (!FC_PIECES_TYPES[f.type]) return 'Format non accepté (PDF, JPG, PNG ou WebP uniquement).';
   if (String(f.contenu).indexOf('data:' + f.type) !== 0) return 'Le contenu du fichier ne correspond pas à son format.';
   if (typeof fcSignatureFichierOk === 'function' && !fcSignatureFichierOk(f.type, f.contenu)) return 'Le fichier ne correspond pas au format annoncé (signature invalide).';
@@ -65989,6 +66016,8 @@ async function fcAjouterPiece(dossierId, code, f, o) {
   if (visibilite === 'souscripteur' && e.visibilite !== 'souscripteur') return { ok: false, erreur: "Cette étape n'est pas publiée au souscripteur : publiez-la d'abord, ou gardez la pièce interne." };
   if (o.source && !FC_SOURCES[o.source]) return { ok: false, erreur: 'Source inconnue.' };
   if (fcPiecesEtape(d.id, code).length >= FC_PIECES_MAX_PAR_ETAPE) return { ok: false, erreur: 'Nombre maximal de pièces atteint pour cette étape.' };
+  /* Étape exigeant un justificatif et sans justificatif : le fichier joint en tient lieu (source « promoteur », la plus faible — jamais une confirmation administrative). */
+  if (!o.source && e.justificatif_requis && !(e.justificatifs || []).length) o.source = 'promoteur';
   var a = fcActeur(), m = fcMetaPiece(f);
   var p = { id: uid(), dossier_id: d.id, etape_code: code, nom: m.nom, type: m.type, taille: m.taille, contenu: m.contenu, note: String(o.note || '').trim(),
             depose_par: { role: 'promoteur', id: a.id, nom: a.nom }, client_id: '', visibilite: visibilite, source: o.source || '', statut: 'jointe',
@@ -66113,7 +66142,8 @@ function fcPanneauPieces(d) {
          : (p.statut === 'a_verifier' ? ' <button class="btn btn-secondary btn-sm" onclick="fcDecisionPieceUI(\'' + p.id + '\',\'acceptee\')">Accepter</button> <button class="btn btn-secondary btn-sm" onclick="fcDecisionPieceUI(\'' + p.id + '\',\'refusee\')">Refuser</button>' : '')
            + ' <button class="btn btn-secondary btn-sm" onclick="fcRetirerPieceUI(\'' + p.id + '\')">Retirer</button>') + '</div>';
   }).join('') : '<div style="color:var(--dim);font-size:12px;">Aucune pièce sur cette étape.</div>';
-  h += '<div class="filters-bar" style="align-items:end;margin-top:10px;"><div class="form-group"><label>Fichier (PDF, JPG, PNG — 5 Mo max)</label><input type="file" id="fc-piece-fichier" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"></div>'
+  if (e.justificatif_requis && !(e.justificatifs || []).length) h += '<div style="margin-top:8px;padding:6px 8px;background:rgba(201,168,76,.12);border-radius:6px;font-size:12px;">ℹ️ Cette étape exige un justificatif : le fichier que vous joignez ici sera enregistré comme justificatif.</div>';
+  h += '<div class="filters-bar" style="align-items:end;margin-top:10px;"><div class="form-group"><label>Fichier (PDF, JPG, PNG — les grosses photos sont réduites automatiquement)</label><input type="file" id="fc-piece-fichier" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"></div>'
     + '<div class="form-group"><label>Visibilité</label><select class="filter-select" id="fc-piece-visi"><option value="interne">Interne</option>' + (e.visibilite === 'souscripteur' ? '<option value="souscripteur">Visible du souscripteur</option>' : '') + '</select></div>'
     + '<div class="form-group"><label>Catégorie</label><select class="filter-select" id="fc-piece-cat">' + fcOptions(FC_CATEGORIES_DOC, 'autre') + '</select></div>'
     + '<div class="form-group"><label>Confidentialité</label><select class="filter-select" id="fc-piece-conf">' + fcOptions(FC_CONFIDENTIALITES, 'normale') + '</select></div>'
