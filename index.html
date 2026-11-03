@@ -37311,6 +37311,19 @@ function _compteTresoVersement(mode) {
   var cd = (DATA.params && DATA.params.comptes_defaut) || {};
   return mode === 'especes' ? (_compteCaisseSouscripteurs()) : (mode === 'mobile_money' ? (requireCompteDefaut('treso_mobile')) : (requireCompteDefaut('treso_banque')));
 }
+/* Division d'un versement : lot principal, puis programme du souscripteur, puis lots supplémentaires.
+   Avant : seul client.lot_id comptait ; un souscripteur sans lot principal (multi-lots, programme seul)
+   produisait des versements SANS division, exclus des divisions et regroupés sous « Non affecté ». */
+function _divisionClientVersement(client) {
+  if (!client) return '';
+  var ids = [client.lot_id].concat(client.lot_ids || []).filter(Boolean);
+  for (var i = 0; i < ids.length; i++) {
+    var l = (DATA.lots || []).find(function(x){ return x.id === ids[i]; });
+    var d = l ? _progDivId(l.programme_id) : '';
+    if (d) return d;
+  }
+  return _progDivId(client.programme_id) || '';
+}
 async function genererEcritureVersement(versement) {
   var client = DATA.clients.find(function(c){ return c.id === versement.client_id; }) || {};
   var nomClient = (client.nom || '') + ' ' + (client.prenoms || '');
@@ -37319,8 +37332,7 @@ async function genererEcritureVersement(versement) {
   var cd = (DATA.params && DATA.params.comptes_defaut) || {};
   var compteCredit = estFrais ? requireParamCompte('compte_frais_souscription', 'Compte produit des frais de souscription') : (requireCompteDefaut('client_lots'));
   var typeLabels = { apport: 'Apport initial', mensualite: 'Mensualité', regularisation: 'Régularisation', frais_souscription: 'Frais de souscription', autre: 'Versement' };
-  var lotClient = client.lot_id ? (DATA.lots || []).find(function(l){ return l.id === client.lot_id; }) : null;
-  var progClient = lotClient ? (DATA.programmes || []).find(function(p){ return p.id === lotClient.programme_id; }) : null;
+  var divVersement = _divisionClientVersement(client);
   var ecr = {
     id: 'ecr_vrs_' + versement.id,
     ref: versement.ref || ('VRS-' + versement.id),
@@ -37337,7 +37349,7 @@ async function genererEcritureVersement(versement) {
       { compte: compteTreso, sens: 'D', montant: parseFloat(versement.montant) || 0 },
       { compte: compteCredit, sens: 'C', montant: parseFloat(versement.montant) || 0, tiers_id: estFrais ? undefined : versement.client_id }
     ],
-    division: (progClient && progClient.division_id) || '',
+    division: divVersement,
     montant: parseFloat(versement.montant) || 0,
     type: 'actif',
     mode: versement.mode,
@@ -47547,12 +47559,20 @@ function _lfSoldes(annee, divF) {
   var s = {};
   var _depuis = ecrFiltreDepuisOuverture(parseInt(annee, 10), divF);
   (DATA.ecritures || []).forEach(function(e){
-    if (divF && e.division !== divF) return;
+    if (divF === DIV_SANS) { if (e.division) return; }
+    else if (divF && e.division !== divF) return;
     if (!e.date || e.date >= (parseInt(annee, 10) + 1) + '-01-01') return;
     if (!_depuis(e)) return;
     ecrLignes(e).forEach(function(l){
       var c = String(l.compte || ''); if (!c) return;
-      s[c] = (s[c] || 0) + (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant) || 0);
+      var cle = c;
+      /* Clients (41) et fournisseurs (40) : un solde par TIERS (clé « compte§tiers »). Le préfixe du compte est
+         conservé, donc les totaux par préfixe restent identiques ; mais le classement compte par compte peut
+         séparer les tiers débiteurs (actif) des tiers créditeurs (passif), comme la page Bilan. */
+      if ((c.indexOf('40') === 0 || c.indexOf('41') === 0) && typeof _lettRacine === 'function' && _lettRacine(c)) {
+        var tid = ecrTiersLigne(e, l); if (tid) cle = c + '§' + tid;
+      }
+      s[cle] = (s[cle] || 0) + (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant) || 0);
     });
   });
   return s;
@@ -47571,6 +47591,31 @@ function _lfS(soldes, prefixes, sauf) {
 }
 var _lfD = function(s, p, x){ return _lfS(s, p, x); };                 /* nature débitrice */
 var _lfC = function(s, p, x){ return -_lfS(s, p, x); };                /* nature créditrice */
+/* Classement PAR COMPTE et non par classe : un compte à solde débiteur va à l'actif, un compte à solde créditeur
+   va au passif, et chaque compte n'est repris qu'UNE fois. Sans cela, les comptes 42 à 47 (tiers à nature mixte)
+   figuraient à l'actif (solde net) ET au passif (solde net inversé) : le bilan était déséquilibré du solde net
+   de ces comptes. */
+function _lfParCompte(soldes, prefixes, sauf, signe) {
+  var tot = 0;
+  Object.keys(soldes).forEach(function(c){
+    if (!prefixes.some(function(p){ return c.indexOf(p) === 0; })) return;
+    if (sauf && sauf.some(function(p){ return c.indexOf(p) === 0; })) return;
+    var v = soldes[c];
+    if (signe > 0 ? v > 0 : v < 0) tot += Math.abs(v);
+  });
+  return tot;
+}
+var _lfSoldeDeb = function(s, p, x){ return _lfParCompte(s, p, x, 1); };   /* somme des comptes débiteurs */
+var _lfSoldeCre = function(s, p, x){ return _lfParCompte(s, p, x, -1); };  /* somme des comptes créditeurs */
+
+/* Banques et établissements financiers (52 à 56, hors 565) : classement COMPTE PAR COMPTE.
+   Un compte débiteur va à l'actif (Trésorerie-Actif), un compte créditeur au passif (DR, concours bancaires).
+   Avant : le solde NET de 52 à 58 allait à l'actif ET le solde créditeur net au passif — un découvert était
+   déduit de l'actif et ajouté au passif (bilan déséquilibré de son montant), et deux comptes bancaires
+   (l'un à découvert) se compensaient sans que le découvert n'apparaisse. 57 et 58 (caisses, régies) restent nets. */
+var _LF_BANQUES = ['52','53','54','55','56'];
+function _lfTresoActif(s) { return _lfSoldeDeb(s, _LF_BANQUES, ['565']) + _lfD(s, ['57','58']); }
+function _lfTresoDecouvert(s) { return _lfSoldeCre(s, _LF_BANQUES, ['565']); }
 
 function _lfCalc(annee, divF) {
   var s = _lfSoldes(annee, divF);
@@ -47598,15 +47643,15 @@ function _lfCalc(annee, divF) {
 
   B.BA = _lfD(s, ['485','488']);
   B.BB = _lfD(s, ['31','32','33','34','35','36','37','38']) + _lfC(s, ['39']);
-  B.BH = _lfD(s, ['409']);
-  B.BI = _lfD(s, ['41'], ['419']) + _lfC(s, ['491']);
-  B.BJ = _lfD(s, ['42','43','44','45','46','47'], ['485','488']) + _lfC(s, ['492','493','494','495','496','497','498']);
+  B.BH = _lfD(s, ['409']) + _lfSoldeDeb(s, ['40'], ['409']);          /* avances versées + fournisseurs débiteurs (par tiers) */
+  B.BI = _lfSoldeDeb(s, ['41'], ['419']) + _lfC(s, ['491']);         /* clients débiteurs (par tiers) */
+  B.BJ = _lfSoldeDeb(s, ['42','43','44','45','46','47'], ['485','488','478','479']) + _lfC(s, ['492','493','494','495','496','497','498']);
   B.BG = B.BH + B.BI + B.BJ;
   B.BK = B.BA + B.BB + B.BG;
 
   B.BQ = _lfD(s, ['50']) + _lfC(s, ['590']);
   B.BR = _lfD(s, ['51']) + _lfC(s, ['591']);
-  B.BS = _lfD(s, ['52','53','54','55','57','58']) + _lfC(s, ['592','593','594']);
+  B.BS = _lfTresoActif(s) + _lfC(s, ['592','593','594']);
   B.BT = B.BQ + B.BR + B.BS;
   B.BU = _lfD(s, ['478']);
   B.BZ = B.AZ + B.BK + B.BT + B.BU;
@@ -47675,15 +47720,14 @@ function _lfCalc(annee, divF) {
   B.DD = B.DA + B.DB + B.DC;
   B.DF = B.CP + B.DD;
   B.DH = _lfC(s, ['481','482','484']);
-  B.DI = _lfC(s, ['419']);
-  B.DJ = _lfC(s, ['40'], ['409']);
-  B.DK = _lfC(s, ['42','43','44'], ['409']);
-  B.DM = _lfC(s, ['45','46','47'], ['478','481','482','484']);
+  B.DI = _lfC(s, ['419']) + _lfSoldeCre(s, ['41'], ['419']);           /* avances reçues + clients créditeurs (par tiers) */
+  B.DJ = _lfSoldeCre(s, ['40'], ['409']);                              /* fournisseurs créditeurs (par tiers) */
+  B.DK = _lfSoldeCre(s, ['42','43','44'], ['409']);
+  B.DM = _lfSoldeCre(s, ['45','46','47'], ['478','479','481','482','484']);
   B.DN = _lfC(s, ['499','599']);
   B.DP = B.DH + B.DI + B.DJ + B.DK + B.DM + B.DN;
   B.DQ = _lfC(s, ['565']);
-  B.DR = _lfC(s, ['52','56'], ['565']);
-  B.DR = B.DR > 0 ? B.DR : 0;
+  B.DR = _lfTresoDecouvert(s);
   B.DT = B.DQ + B.DR;
   B.DV = _lfC(s, ['479']);
   B.DZ = B.DF + B.DP + B.DT + B.DV;
@@ -47721,14 +47765,16 @@ function _lfCalc2(annee, divF) {
 
   act('BA', ['485','488'], null);
   act('BB', ['31','32','33','34','35','36','37','38'], ['39']);
-  act('BH', ['409'], null);
-  act('BI', ['41'], ['491'], ['419']);
-  act('BJ', ['42','43','44','45','46','47'], ['492','493','494','495','496','497','498'], ['485','488','478']);
+  A.BH = { b: _lfD(s, ['409']) + _lfSoldeDeb(s, ['40'], ['409']), a: 0 }; A.BH.n = A.BH.b;
+  A.BI = { b: _lfSoldeDeb(s, ['41'], ['419']), a: _lfAmo(s, ['491']) }; A.BI.n = A.BI.b - A.BI.a;
+  /* BJ : comptes 42 à 47 À SOLDE DÉBITEUR seulement (les soldes créditeurs sont au passif, DK / DM) ; 478 (BU) et 479 (DV) ont leur propre ligne. */
+  A.BJ = { b: _lfSoldeDeb(s, ['42','43','44','45','46','47'], ['485','488','478','479']), a: _lfAmo(s, ['492','493','494','495','496','497','498']) };
+  A.BJ.n = A.BJ.b - A.BJ.a;
   A.BG = { b: A.BH.b + A.BI.b + A.BJ.b, a: A.BH.a + A.BI.a + A.BJ.a }; A.BG.n = A.BG.b - A.BG.a;
   A.BK = { b: A.BA.b + A.BB.b + A.BG.b, a: A.BA.a + A.BB.a + A.BG.a }; A.BK.n = A.BK.b - A.BK.a;
   act('BQ', ['50'], ['590']);
   act('BR', ['51'], ['591']);
-  act('BS', ['52','53','54','55','57','58'], ['592','593','594']);
+  A.BS = { b: _lfTresoActif(s), a: _lfAmo(s, ['592','593','594']) }; A.BS.n = A.BS.b - A.BS.a;
   A.BT = { b: A.BQ.b + A.BR.b + A.BS.b, a: A.BQ.a + A.BR.a + A.BS.a }; A.BT.n = A.BT.b - A.BT.a;
   act('BU', ['478'], null);
   A.BZ = { b: A.AZ.b + A.BK.b + A.BT.b + A.BU.b, a: A.AZ.a + A.BK.a + A.BT.a + A.BU.a }; A.BZ.n = A.BZ.b - A.BZ.a;
@@ -47829,6 +47875,24 @@ function consoCalcul(annee) {
     lignes.push(row);
   });
 
+  /* Écritures SANS division : elles n'appartenaient à aucune entité et sortaient donc de la consolidation sans
+     avertissement (chiffre d'affaires et charges manquants). Elles sont regroupées sur une ligne « Non affecté »,
+     intégrée à 100 %, ajoutée EN DERNIER (la société mère reste une vraie entité). */
+  var nonAffecte = null;
+  (function(){
+    var dep = ecrFiltreDepuisOuverture(annee, DIV_SANS), nb = 0;
+    (DATA.ecritures || []).forEach(function(e){
+      if (e.division || !e.date || e.date >= (parseInt(annee, 10) + 1) + '-01-01' || !dep(e)) return;
+      nb++;
+    });
+    if (!nb) return;
+    var calc = _lfCalc2(annee, DIV_SANS);
+    if (!Object.keys(calc.s).some(function(c){ return Math.abs(calc.s[c]) >= 1; })) return;
+    nonAffecte = { nb: nb };
+    lignes.push({ id: DIV_SANS, nom: 'Non affecté (sans division)', methode: 'IG', pct: 100, quote: 1,
+      B: calc.B, A: calc.A, R: calc.R, s: calc.s, agrege: true, nonAffecte: true });
+  })();
+
   function cum(k, src) {
     return lignes.reduce(function(a, r){
       if (!r.agrege) return a;
@@ -47856,7 +47920,7 @@ function consoCalcul(annee) {
   var goodwill = 0, minoritaires = 0;
   if (mere) {
     lignes.forEach(function(r){
-      if (!r.agrege || r.id === mere.id) return;
+      if (!r.agrege || r.id === mere.id || r.nonAffecte) return;   /* « Non affecté » n'est pas une filiale */
       var q = (parseFloat(r.pct) || 100) / 100;
       var cpFille = r.B.CP || 0;
       var quotePart = cpFille * q;
@@ -47885,7 +47949,7 @@ function consoCalcul(annee) {
   conso.CP_groupe = (totalAgrege.CP || 0) - minoritaires - (mere ? _consoSolde(mere.s, ['26']) : 0) + goodwill;
 
   return { annee: annee, cfg: cfg, lignes: lignes, agrege: totalAgrege, elim: elim,
-    elimRec: elimRecMontant, conso: conso, mere: mere };
+    elimRec: elimRecMontant, conso: conso, mere: mere, nonAffecte: nonAffecte };
 }
 
 /* ── Paramétrage du périmètre ── */
@@ -48029,6 +48093,7 @@ function genererConsolidation() {
     + '<div style="text-align:center;"><h1>COMPTES CONSOLIDÉS DU GROUPE</h1>'
     + '<div>SYSCOHADA révisé · Exercice clos le 31/12/' + annee + ' · Montants en FCFA</div></div>'
     + '<div style="text-align:right;font-size:8.5px;">Société mère :<br>' + escHtml(K.mere ? K.mere.nom : '—') + '</div></div>'
+    + (K.nonAffecte ? '<div class="ctrl ko">⚠ ' + K.nonAffecte.nb + ' écriture(s) sans division sont regroupées dans la colonne « Non affecté (sans division) ». Affectez-leur une division pour une consolidation par entité exacte.</div>' : '')
     + bilan + resultat + notes
     + '<div style="margin-top:10px;font-size:8.5px;color:#555;">Consolidation établie par agrégation des comptes sociaux de chaque entité, '
     + 'élimination des soldes portés sur les comptes de liaison intra-groupe et des titres de participation détenus au sein du périmètre. '
@@ -49249,6 +49314,8 @@ function genererLiasseFiscale() {
    division, on part de son dernier à-nouveau ; en vue consolidée, du dernier à-nouveau
    consolidé ou de celui de la division de l'écriture. Sans à-nouveau (jamais clôturé,
    ou reprise par bilan d'ouverture), tout l'historique est cumulé comme avant. */
+/* Pseudo-division : écritures SANS division (voir consoCalcul, ligne « Non affecté »). */
+var DIV_SANS = '__sans_division__';
 function ecrFiltreDepuisOuverture(an, divF) {
   var kCons = 0, kDiv = {};
   (DATA.ecritures || []).forEach(function(e){
@@ -49258,8 +49325,12 @@ function ecrFiltreDepuisOuverture(an, divF) {
     var d = e.division || '';
     if (d) kDiv[d] = Math.max(kDiv[d] || 0, k); else kCons = Math.max(kCons, k);
   });
+  /* Écritures sans division : leur historique est repris par le dernier à-nouveau du groupe (quelle que soit
+     la division qui le porte), sinon on le compterait deux fois avec le bilan d'ouverture. */
+  var kTous = Object.keys(kDiv).reduce(function(m, k){ return Math.max(m, kDiv[k]); }, kCons);
   return function(e) {
     var y = parseInt(String(e.date).slice(0, 4), 10);
+    if (divF === DIV_SANS) return y >= kTous;
     var d = e.division || '';
     var depuis = Math.max(divF ? 0 : kCons, d ? (kDiv[d] || 0) : 0);
     return y >= depuis;
