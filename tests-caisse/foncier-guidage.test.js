@@ -23,6 +23,8 @@ test('validation par fonction : refus sans validation, demande, notification, va
   const r = await app.page.evaluate(async () => {
     const d = (await fcOuvrirDossier({ parcelle_id: 'p1', type: 'acd', responsable_id: 's1' })).dossier;
     const E = c => fcEtape(fcDossier(d.id), c), o = {};
+    window.confirm = () => true;
+    const pend = () => (DATA.validations || []).filter(v => v.type === 'etape_fonciere' && v.statut === 'en_attente').pop();   /* la HIÉRARCHIE décide UNIQUEMENT dans le module Validations */
     APP.currentUser = { id: 's1', nom: 'Foncier 1', role: 'service_foncier' };
     await fcChangerStatutEtape(d.id, 'creation_dossier', 'termine', {}); await fcChangerStatutEtape(d.id, 'completude_documents', 'termine', {});
     await fcChangerStatutEtape(d.id, 'identification_procedure', 'en_cours', {});
@@ -33,33 +35,34 @@ test('validation par fonction : refus sans validation, demande, notification, va
     o.notifs = DATA.notifications_foncieres.filter(n => n.template_code === 'validation_etape' && n.destinataire_id === 'dir').length;
     o.peutNon = (await fcDecisionValidationEtape(d.id, 'identification_procedure', 'validee')).ok;
     APP.currentUser = { id: 'dir', nom: 'Directeur', role: 'admin' };
-    o.refusSansMotif = (await fcDecisionValidationEtape(d.id, 'identification_procedure', 'refusee', '')).ok;
-    const ref = await fcDecisionValidationEtape(d.id, 'identification_procedure', 'refusee', 'Pièce manquante'); o.refusee = ref.ok && E('identification_procedure').validation.statut;
+    o.directInterdit = (await fcDecisionValidationEtape(d.id, 'identification_procedure', 'validee')).ok;   /* même l'administrateur : pas de décision hors du module Validations */
+    await valDecide(pend().id, 'rejete', ''); o.refusSansMotif = E('identification_procedure').validation.statut === 'demandee';
+    await valDecide(pend().id, 'rejete', 'Pièce manquante'); o.refusee = E('identification_procedure').validation.statut;
     APP.currentUser = { id: 's1', nom: 'Foncier 1', role: 'service_foncier' }; o.redemande = (await fcDemanderValidationEtape(d.id, 'identification_procedure')).ok;
     APP.currentUser = { id: 'dir', nom: 'Directeur', role: 'admin' };
-    const ok = await fcDecisionValidationEtape(d.id, 'identification_procedure', 'validee'); o.validee = [ok.ok, ok.terminee, E('identification_procedure').statut, E('identification_procedure').validation.par];
+    await valDecide(pend().id, 'valide', ''); o.validee = [true, true, E('identification_procedure').statut, E('identification_procedure').validation.par]; o.encoreEnAttente = (DATA.validations || []).filter(v => v.type === 'etape_fonciere' && v.statut === 'en_attente').length;
     o.evt = ['validation_demandee', 'validation_refusee', 'validation_accordee'].map(t => DATA.evenements_fonciers.filter(e => e.type === t).length);
     return o;
   });
   assert.deepEqual(r.refus, [false, true, 'direction']); assert.equal(r.statutApresRefus, 'en_cours'); assert.equal(r.demande, 'demandee'); assert.equal(r.doublon, false); assert.ok(r.notifs >= 1);
-  assert.equal(r.peutNon, false); assert.equal(r.refusSansMotif, false); assert.equal(r.refusee, 'refusee'); assert.equal(r.redemande, true);
+  assert.equal(r.peutNon, false); assert.equal(r.directInterdit, false); assert.equal(r.refusSansMotif, true); assert.equal(r.refusee, 'refusee'); assert.equal(r.redemande, true); assert.equal(r.encoreEnAttente, 0);
   assert.deepEqual(r.validee, [true, true, 'termine', 'Directeur']); assert.deepEqual(r.evt, [2, 1, 1]);
 });
 
-test('validation : l\'administrateur termine directement (et la validation est enregistrée) ; fonction sans personne = pas de blocage ; réglage désactivable', async () => {
+test('validation : même l\'administrateur ne peut pas terminer sans passer par Validations ; fonction sans personne = pas de blocage ; réglage désactivable', async () => {
   const app = await ouvrirApp(); await preparer(app.page, USERS, true);
   const r = await app.page.evaluate(async () => {
     const d = (await fcOuvrirDossier({ parcelle_id: 'p1', type: 'acd', responsable_id: 'dir' })).dossier, o = {};
     await fcChangerStatutEtape(d.id, 'creation_dossier', 'termine', {}); await fcChangerStatutEtape(d.id, 'completude_documents', 'termine', {});
     await fcChangerStatutEtape(d.id, 'identification_procedure', 'en_cours', {});
-    const t = await fcChangerStatutEtape(d.id, 'identification_procedure', 'termine', {}); o.admin = [t.ok, fcEtape(fcDossier(d.id), 'identification_procedure').validation.statut];
+    const t = await fcChangerStatutEtape(d.id, 'identification_procedure', 'termine', {}); o.admin = [t.ok, t.validation_requise, (fcEtape(fcDossier(d.id), 'identification_procedure').validation || {}).statut || 'aucune'];
     // fonction « technique » : validation_technique est validée par la direction (présente) ; ind_identification_lot exécutée par technique, sans validation
     o.requisDirection = fcValidationRequise(fcDossier(d.id), { code: 'validation_technique', statut: 'a_venir' });
     DATA.users = DATA.users.filter(u => u.role !== 'admin'); o.sansPersonne = fcValidationRequise(fcDossier(d.id), { code: 'validation_technique', statut: 'a_venir' });
     DATA.users.push({ id: 'dir', nom: 'Directeur', login: 'dir', role: 'admin' }); DATA.params.fc_validation_fonctions = false; o.desactive = fcValidationRequise(fcDossier(d.id), { code: 'validation_technique', statut: 'a_venir' });
     return o;
   });
-  assert.deepEqual(r.admin, [true, 'validee']); assert.equal(r.requisDirection, 'direction'); assert.equal(r.sansPersonne, ''); assert.equal(r.desactive, '');
+  assert.deepEqual(r.admin, [false, true, 'aucune']); assert.equal(r.requisDirection, 'direction'); assert.equal(r.sansPersonne, ''); assert.equal(r.desactive, '');
 });
 
 test('prochaine action : étape prête, personne, bouton adapté (démarrer / demander la validation / terminer), blocage, dossier clôturé', async () => {
@@ -75,14 +78,14 @@ test('prochaine action : étape prête, personne, bouton adapté (démarrer / de
     fcRenderDetail(d.id); h = document.getElementById('fc-detail').innerHTML; o.demande = /Demander la validation \(Direction\)/.test(h);
     await fcActionEtapeUI(d.id, 'identification_procedure', 'termine');   // confirm() accepté par le harnais : validation demandée
     a = fcProchaineAction(fcDossier(d.id)); o.attente = a.validation;
-    APP.currentUser = { id: 'dir', nom: 'Directeur', role: 'admin' }; fcRenderDetail(d.id); h = document.getElementById('fc-detail').innerHTML; o.valider = /Valider et terminer/.test(h);
+    APP.currentUser = { id: 'dir', nom: 'Directeur', role: 'admin' }; fcRenderDetail(d.id); h = document.getElementById('fc-detail').innerHTML; o.valider = /Valider et terminer/.test(h); o.versValidations = /Ouvrir Validations/.test(h);
     // blocage : toutes les étapes ouvertes dépendent d'une étape non terminée
     const d2 = fcDossier(d.id); d2.etapes.forEach(e => { if (e.statut !== 'termine') e.statut = 'a_venir'; });
     d2.statut = 'cloture'; o.cloture = fcProchaineAction(d2);
     return o;
   });
   assert.equal(r.premiere, 'creation_dossier'); assert.equal(r.carte, true); assert.equal(r.demarrer, true);
-  assert.deepEqual(r.suivante, ['identification_procedure', 'direction', true, 'foncier']); assert.equal(r.demande, true); assert.equal(r.attente, 'demandee'); assert.equal(r.valider, true); assert.equal(r.cloture, null);
+  assert.deepEqual(r.suivante, ['identification_procedure', 'direction', true, 'foncier']); assert.equal(r.demande, true); assert.equal(r.attente, 'demandee'); assert.equal(r.valider, false); assert.equal(r.versValidations, true); assert.equal(r.cloture, null);
   assert.deepEqual(app.etat.erreursPage, []);
 });
 
