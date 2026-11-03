@@ -25450,8 +25450,14 @@ function _ecrSigContenu(e) {
   var L = (typeof ecrLignes === 'function') ? ecrLignes(e) : (e.lignes || []);
   return String(e.date || '').slice(0, 10) + '|' + L.map(function(l){ return (l.compte || '') + ':' + (l.sens || '') + ':' + Math.round(parseFloat(l.montant) || 0); }).join(';');
 }
+/* Types de fichiers « actifs » : jamais téléversés dans les documents (XSS stockée via aperçu). */
+function docTypeInterdit(o) {
+  var t = String((o && (o.type || o.mime)) || '').toLowerCase(), n = String((o && (o.name || o.nom)) || '').toLowerCase();
+  return /^(text\/html|application\/xhtml|image\/svg|text\/xml|application\/xml|text\/javascript|application\/javascript|application\/x-javascript)/.test(t) || /\.(html?|xhtml|svg|xml|js|mjs)$/.test(n);
+}
 function dbPut(store, obj, opts) {
   opts = opts || {};
+  if (store === 'documents' && obj && !_pulling && docTypeInterdit(obj)) { try { toast('⛔ Type de fichier non autorisé (HTML, SVG, script) : ' + (obj.name || ''), 'error'); } catch (e) {} return Promise.resolve(false); }
   if (store !== 'ecritures' || !obj || obj.id === undefined || _pulling || obj._forceCloture
       || !db || !db.objectStoreNames.contains('ecritures')) return _dbPutBrut(store, obj, opts);
   return _ecrAncienIDB(obj.id).then(function(old) {
@@ -27202,6 +27208,7 @@ async function syncToSupabase(table, obj, opts) {
          on conserve SES valeurs pour les clés que ce poste n'a pas touchées.
          Sinon un poste au réglage périmé écrasait le paramétrage du groupe
          en enregistrant n'importe quel autre champ. */
+      _fusionnerClotures(obj, _remoteParams); _fusionnerSeqEcr(obj, _remoteParams);   /* clôtures et numérotation : jamais effacées par un poste en retard */
       var _rM = _remoteParams && _remoteParams.params_maj || '';
       var _lM = obj.params_maj || '';
       if (_rM && _rM > _lM && typeof PARAMS_PARTAGES !== 'undefined') {
@@ -27345,7 +27352,7 @@ function _filtrerFantomes(table, store, ids) {
   ids.forEach(function(id){
     if (tombHas(store, id)) {
       fantomes.push(id);
-      try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, id); } catch(e){}
+      try { if (typeof deleteFromSupabase === 'function' && tombPartage(store, id)) deleteFromSupabase(table, id); } catch(e){}
     } else vivants.push(id);
   });
   return { vivants: vivants, fantomes: fantomes };
@@ -27811,7 +27818,7 @@ async function syncPullStore(store){
        cloud. On ignore la ligne et on relance sa purge cloud à la place. */
     if (typeof tombHas === 'function' && tombHas(store, r.id)) {
       fantomes++;
-      try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, r.id); } catch(_){}
+      try { if (typeof deleteFromSupabase === 'function' && tombPartage(store, r.id)) deleteFromSupabase(table, r.id); } catch(_){}
       continue;
     }
     var ex = byId[r.id];
@@ -27875,7 +27882,7 @@ async function analyserDivergence(){
            qui la ressusciterait. On la purge côté cloud à la place. */
         if (typeof tombHas === 'function' && tombHas(store, id)) {
           fantomes++;
-          try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, id); } catch(e){}
+          try { if (typeof deleteFromSupabase === 'function' && tombPartage(store, id)) deleteFromSupabase(table, id); } catch(e){}
           return;
         }
         pullN++;
@@ -28733,7 +28740,7 @@ async function syncFromSupabase() {
            ligne et on renvoie une suppression au cloud pour purger la
            ligne fantôme au lieu de la laisser revenir en boucle. ── */
         if (typeof tombHas === 'function' && tombHas(store, r.id)) {
-          try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, r.id); } catch(e){}
+          try { if (typeof deleteFromSupabase === 'function' && tombPartage(store, r.id)) deleteFromSupabase(table, r.id); } catch(e){}
           continue;
         }
         var ex = byId[r.id];
@@ -28799,6 +28806,25 @@ var PARAMS_PARTAGES = [
 var PARAMS_LOCAUX_RE = /^(id|params_maj|reset_broadcast|purge_tombstones|reinit_postes|plan_comptable_.*|_.*|.*(api_key|secret|token|password|pwd).*)$/i;
 function _paramPartage(k) { return !PARAMS_LOCAUX_RE.test(String(k)); }
 
+/* Clôtures d'exercice (params.cloture_*) : un poste qui ne les reçoit pas peut saisir en exercice clos, puis effacer la clôture du cloud au premier réglage enregistré.
+   Fusion : la valeur la plus récente (cloture_maj) l'emporte ; sans horodatage, « clos » l'emporte. */
+function _fusionnerClotures(dst, src) {
+  if (!dst || !src) return; var dm = dst.cloture_maj = dst.cloture_maj || {}, sm = src.cloture_maj || {};
+  Object.keys(src).forEach(function(k){
+    if (k.indexOf('cloture_') !== 0 || k === 'cloture_maj') return;
+    var sv = src[k], dv = dst[k], st = sm[k] || '', dt = dm[k] || '';
+    if (dv === undefined) { dst[k] = sv; if (st) dm[k] = st; return; }
+    if (dv === sv) { if (st && !dt) dm[k] = st; return; }
+    if (st && dt) { if (st > dt) { dst[k] = sv; dm[k] = st; } return; }
+    if (sv === true) { dst[k] = true; if (st) dm[k] = st; }
+  });
+}
+/* Numérotation des pièces (params.seq_ecr) : le plus haut numéro attribué l'emporte, par clé. */
+function _fusionnerSeqEcr(dst, src) {
+  if (!dst || !src || !src.seq_ecr) return; var d = dst.seq_ecr = dst.seq_ecr || {};
+  Object.keys(src.seq_ecr).forEach(function(k){ if ((src.seq_ecr[k] || 0) > (d[k] || 0)) d[k] = src.seq_ecr[k]; });
+}
+function _empreinteClotures(o) { return JSON.stringify([Object.keys(o).filter(function(k){ return k.indexOf('cloture_') === 0; }).sort().map(function(k){ return [k, o[k]]; }), o.seq_ecr || null]); }
 function _paramsToucher() {
   DATA.params = DATA.params || {};
   DATA.params.id = 'main';
@@ -28838,6 +28864,8 @@ async function _pullPlanComptableCloud() {
     loc.plan_comptable_supprimes = suppFusion;
     loc.plan_comptable_custom    = ajoutsFusion;
     loc.plan_comptable_modifs    = modifsFusion;
+    var _avantCl = _empreinteClotures(loc); _fusionnerClotures(loc, remote); _fusionnerSeqEcr(loc, remote);
+    if (_avantCl !== _empreinteClotures(loc)) changed = true;
 
     /* Socle remplacé ailleurs : on l'adopte si ce poste n'a encore jamais
        remplacé son socle, OU si le remplacement distant est postérieur au
@@ -28933,6 +28961,8 @@ function _pullCurseurs() {
 }
 function _pullCurseurSet(table, iso) {
   try {
+    /* Jamais au-delà de « maintenant + 5 min » : un poste en avance d'horloge ferait sauter à tous les autres les écritures suivantes. */
+    var _plafond = new Date(Date.now() + 300000).toISOString(); if (iso && iso > _plafond) iso = _plafond;
     var c = _pullCurseurs(); c[table] = iso;
     localStorage.setItem(PULL_CURSEURS_KEY, JSON.stringify(c));
   } catch(e){}
@@ -28991,6 +29021,8 @@ async function _pullTable(table) {
   var curseur = complet ? null : (_pullCurseurEffectif(table) || null);
   if (curseur) {
     try {
+      /* marge de 2 min : un poste dont l'horloge retarde écrit « avant » le curseur ; l'application est idempotente (_remoteWins). */
+      var _cm = Date.parse(curseur); if (!isNaN(_cm)) curseur = new Date(_cm - 120000).toISOString();
       var rows = await sbFetch(table + '?updated_at=gt.' + encodeURIComponent(curseur) + '&select=*', 'GET');
       if (rows !== null && rows !== undefined) return { rows: rows, incremental: true };
     } catch(e) {
@@ -29147,6 +29179,7 @@ async function _syncUsersSeul(){
     if (!cloudPlusRecent) continue;
     if (idx>=0) DATA.users[idx] = ru; else DATA.users.push(ru);
     try{ _pulling = true; await dbPut('users', ru); } finally { _pulling = false; }
+    try{ _verifierSessionApresSync(ru); }catch(e){}
     n++;
   }
   return n;
@@ -29850,6 +29883,14 @@ async function startSession(user) {
 }
 
 /** Vérifie la session persistante — signature + hash requis. Retourne l'utilisateur ou null. */
+/* Un compte désactivé ou dont le rôle a changé sur un autre poste ne garde pas ses droits jusqu'à la reconnexion. */
+function _verifierSessionApresSync(ru) {
+  var cu = APP.currentUser; if (!cu || !ru || cu.id !== ru.id) return;
+  if (ru.statut === 'inactif' || (ru.role && cu.role && ru.role !== cu.role)) {
+    try { toast(ru.statut === 'inactif' ? '🔒 Votre compte a été désactivé.' : '🔒 Votre rôle a changé : reconnexion nécessaire.', 'warning', 8000); } catch (e) {}
+    setTimeout(function(){ try { logout(true); } catch (e) {} }, 1500);
+  }
+}
 async function checkSession() {
   var token = localStorage.getItem('pici_auth_token');
   if (!token) return null;
@@ -29870,6 +29911,7 @@ async function checkSession() {
     if (epoch && (!payload.iat || payload.iat < epoch)) throw {r:'distance'};
     var u = DATA.users.find(function(x){ return x.id === payload.id; });
     if (!u) throw {r:'invalide'};
+    if (u.statut === 'inactif') throw {r:'invalide'};                      /* compte désactivé : plus de reprise de session */
     /* [FIX] Un hash différent ne signifie pas toujours "invalidée par un
        administrateur" : migratePasswords() (exécutée une fois au démarrage,
        silencieusement, pour convertir un mot de passe en clair vers un hash)
@@ -51734,7 +51776,7 @@ function exportJournalCSV() {
   var d1 = document.getElementById('filter-date-debut') ? document.getElementById('filter-date-debut').value : '';
   var d2 = document.getElementById('filter-date-fin') ? document.getElementById('filter-date-fin').value : '';
   if (d1 && d2 && d1 > d2) { var tmp = d1; d1 = d2; d2 = tmp; }
-  var _q = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+  var _q = function(v){ v = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(v) && !/^-?\d+([.,]\d+)?$/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
   var rows = ['Journal;N° Écriture;Date;Pièce;Libellé;Compte;Sens;Montant (FCFA);Mode;Programme'];
   var divFExp = (typeof _comptaDivisionFilter === 'function') ? _comptaDivisionFilter() : '';
   DATA.ecritures.filter(function(e){
@@ -56426,6 +56468,7 @@ function openUserModal() {
 }
 
 async function createUserFromModal() {
+  if (typeof hasRole === 'function' && !hasRole('admin')) { toast('🔒 La gestion des comptes est réservée aux administrateurs.', 'error'); return; }
   var nom   = (document.getElementById('new-user-nom')||{}).value||'';
   var login = (document.getElementById('new-user-login')||{}).value||'';
   var pwd   = (document.getElementById('new-user-pwd')||{}).value||'';
@@ -56522,6 +56565,10 @@ async function changeUserPassword(userId) {
 /** Échappe les caractères HTML (anti-XSS pour affichage dynamique) */
 /* Échappe aussi " et ' : la sortie sert dans des attributs (title, value, download, href) — sans cela,
    un motif ou un nom de fichier contenant un guillemet injectait un attribut (XSS stockée). */
+/* Affichage sûr d'une valeur qui a pu être stockée DÉJÀ échappée (anciens libellés) : décode les 5 entités puis ré-échappe — jamais de double échappement, jamais de HTML actif. */
+function escAff(str) {
+  return escHtml(String(str == null ? '' : str).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&'));
+}
 function escHtml(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
@@ -63895,6 +63942,9 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
   if (d.statut === 'cloture' && code !== 'cloture') return { ok: false, erreur: 'Dossier clôturé : utilisez une correction motivée.' };
   if (FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return { ok: false, erreur: 'Étape ' + FC_STATUTS[e.statut].toLowerCase() + ' : utilisez une correction motivée (l\'historique est conservé).' };
   if (e.statut === statut) return { ok: true, dossier: d };
+  /* Droits : seuls le responsable du dossier, celui de l'étape ou un administrateur changent un statut (la décision de validation passe par Validations : APP._valContexte). */
+  var _acSt = fcActeur();
+  if (!APP._valContexte && !fcPeutGererDossier(d) && fcResponsableEtape(d, e) !== _acSt.id) return { ok: false, erreur: "Seuls le responsable du dossier, celui de l'étape ou un administrateur changent le statut d'une étape." };
   var motif = String(o.motif || '').trim();
   if (['rejete', 'annule', 'bloque'].indexOf(statut) !== -1 && !motif) return { ok: false, erreur: 'Un motif est obligatoire pour le statut « ' + FC_STATUTS[statut] + ' ».' };
   if (FC_STATUTS_ACTIFS.indexOf(statut) !== -1 && !(e.responsable_id || d.responsable_id)) return { ok: false, erreur: 'Aucun responsable n\'est affecté à cette étape.' };
@@ -63933,6 +63983,7 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
     if (restantes.length) {
       if (!o.derogation) return { ok: false, erreur: 'Clôture impossible : ' + restantes.length + ' étape(s) non terminée(s) ou non écartée(s).', etapes_restantes: true };
       if (!motif) return { ok: false, erreur: 'Une clôture avec étapes restantes exige un motif.' };
+      if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) peut clôturer avec des étapes restantes.' };
       derogation = true;
     }
   }
@@ -63941,12 +63992,14 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
     if (restants.length) {
       if (!o.derogation) return { ok: false, erreur: 'Contrôles essentiels non conclus : ' + restants.map(function(c){ return c.libelle; }).join(', ') + '.', controles_restants: true };
       if (!motif) return { ok: false, erreur: 'Une dérogation exige un motif.' };
+      if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) peut déroger aux contrôles essentiels.' };
       derogation = true;
     }
   }
   if (statut === 'termine' && e.justificatif_requis && !e.justificatifs.length) {
     if (!o.derogation) return { ok: false, erreur: 'Cette étape exige un justificatif avant d\'être terminée.', justificatif_manquant: true };
     if (!motif) return { ok: false, erreur: 'Une dérogation exige un motif.' };
+    if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) peut terminer une étape sans justificatif.' };
     derogation = true;
   }
   if (statut === 'termine') fcRattraperValidationEtape(d, e);
@@ -66412,7 +66465,7 @@ function fcRechercherDocuments(c) {
     return q.split(/\s+/).every(function(m){ return champs.indexOf(m) !== -1; });
   }).sort(function(a, b){ return b.depose_le.localeCompare(a.depose_le); });
 }
-function fcCsvEchapper(v) { v = String(v == null ? '' : v); return /[";\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+function fcCsvEchapper(v) { v = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(v) && !/^-?\d+([.,]\d+)?$/.test(v)) v = "'" + v;   /* injection de formule Excel */ return /[";\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
 function fcCsv(lignes) { return '﻿' + lignes.map(function(l){ return l.map(fcCsvEchapper).join(';'); }).join('\r\n'); }
 function fcTelechargerTexte(nom, texte, type) {
   var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([texte], { type: type || 'text/csv;charset=utf-8' })); a.download = nom; document.body.appendChild(a); a.click();
@@ -67925,7 +67978,9 @@ function fcRattraperValidationEtape(d, e) {
 function fcValidationRequise(d, e) {
   if (!fcValidationFonctionsActive() || !e || FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return '';
   var f = fcEquipeEtape(e.code).valide; if (!f) return '';
-  return fcUsersFonction(f).length ? f : '';
+  if (fcUsersFonction(f).length) return f;
+  /* Plus personne ne porte la fonction : la validation reste EXIGÉE et revient aux administrateurs actifs (sinon l'étape se terminerait sans contrôle). */
+  return (DATA.users || []).some(function(u){ return u.statut !== 'inactif' && u.role === 'admin'; }) ? f : '';
 }
 function fcPeutValiderEtape(f) { return fcEstAdmin() || fcRolesFonction(f).indexOf(fcRoleActeur()) !== -1; }
 /* Une validation n'a de sens que lorsque l'étape peut être terminée : on ne la demande pas tant que ses étapes préalables (ou, pour la clôture, toutes les autres étapes) ne sont pas terminées. */
@@ -67963,7 +68018,9 @@ async function fcDecisionValidationEtape(dossierId, code, decision, motif) {
   if (!APP._valContexte) return { ok: false, erreur: 'La décision de validation se prend uniquement dans le module Validations (hiérarchie).' };
   var d = fcDossier(dossierId), e = d && fcEtape(d, code);
   if (!d || !e) return { ok: false, erreur: 'Dossier ou étape introuvable.' };
-  var f = (e.validation && e.validation.statut === 'demandee') ? e.validation.fonction : fcValidationRequise(d, e);
+  if (FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return { ok: false, erreur: 'Étape déjà ' + (FC_STATUTS[e.statut] || e.statut).toLowerCase() + ' : aucune validation à rendre.' };
+  if (!(e.validation && e.validation.statut === 'demandee')) return { ok: false, erreur: 'Aucune demande de validation en attente pour cette étape.' };
+  var f = e.validation.fonction || fcValidationRequise(d, e);
   if (!f) return { ok: false, erreur: 'Aucune validation à rendre pour cette étape.' };
   if (!fcPeutValiderEtape(f)) return { ok: false, erreur: 'Validation réservée à la fonction « ' + fcLibFonction(f) + ' » (ou à un administrateur).' };
   var a = fcActeur(), maintenant = new Date().toISOString(); motif = String(motif || '').trim();
@@ -81178,6 +81235,7 @@ async function cloturerExercice(annee, divisionId) {
         (verrou global 'cloture_ANNEE' consulté partout ailleurs dans l'appli). */
   DATA.params = Object.assign(DATA.params||{}, {});
   DATA.params['cloture_'+annee+refSuffixe] = true;
+  (DATA.params.cloture_maj = DATA.params.cloture_maj || {})['cloture_'+annee+refSuffixe] = new Date().toISOString();
   await dbPut('params', DATA.params);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
 
@@ -81214,6 +81272,7 @@ async function rouvrirExercice(annee, divisionId) {
   });
 
   DATA.params['cloture_'+annee+refSuffixe] = false;
+  (DATA.params.cloture_maj = DATA.params.cloture_maj || {})['cloture_'+annee+refSuffixe] = new Date().toISOString();
   await dbPut('params', DATA.params);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
 
@@ -93027,22 +93086,8 @@ async function refreshDocumentsForEntity(entity_type, entity_id) {
     }).join('') : '');
 }
 
-async function apercuDocument(docId) {
-  var docs = await dbGetAll('documents');
-  var doc = docs.find(function(d){ return d.id === docId; });
-  if (!doc) return;
-  if (doc.type && doc.type.startsWith('image/')) {
-    var win = window.open('', '', 'width=800,height=700');
-    win.document.write('<html><head><title>'+doc.name+'</title></head><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;">'
-      +'<img src="'+doc.blob+'" style="max-width:100%;max-height:100vh;object-fit:contain;" alt="'+doc.name+'">'
-      +'</body></html>');
-  } else {
-    var win = window.open('', '', 'width=900,height=700');
-    win.document.write('<html><head><title>'+doc.name+'</title></head><body style="margin:0;">'
-      +'<iframe src="'+doc.blob+'" width="100%" height="100%" style="border:none;position:absolute;top:0;left:0;width:100%;height:100%;"></iframe>'
-      +'</body></html>');
-  }
-}
+/* Ancien aperçu (fenêtre jamais fermée, iframe de n'importe quel type) : remplacé par le calque sûr de la GED. */
+async function apercuDocument(docId) { return gedApercu('documents', docId); }
 
 async function telechargerDocument(docId) {
   var docs = await dbGetAll('documents');
@@ -93252,8 +93297,8 @@ function gedPopulerFiltres(all) {
   var modules = [...new Set(all.map(function(d){ return d.module; }))].sort();
   var divisions = [...new Set(all.map(function(d){ return d.division; }))].sort();
   var curMod = modSel.value, curDiv = divSel.value;
-  modSel.innerHTML = '<option value="">Tous les modules</option>' + modules.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('');
-  divSel.innerHTML = '<option value="">Toutes les divisions</option>' + divisions.map(function(dv){ return '<option value="'+dv+'">'+dv+'</option>'; }).join('');
+  modSel.innerHTML = '<option value="">Tous les modules</option>' + modules.map(function(m){ return '<option value="'+escAff(m)+'">'+escAff(m)+'</option>'; }).join('');
+  divSel.innerHTML = '<option value="">Toutes les divisions</option>' + divisions.map(function(dv){ return '<option value="'+escAff(dv)+'">'+escAff(dv)+'</option>'; }).join('');
   modSel.value = modules.includes(curMod) ? curMod : '';
   divSel.value = divisions.includes(curDiv) ? curDiv : '';
 }
@@ -93281,9 +93326,9 @@ function gedBarList(counts, kind) {
     var pct = Math.max(4, Math.round(e[1]/max*100));
     var color = GED_PALETTE[i % GED_PALETTE.length];
     var isActive = actif === e[0];
-    var safe = e[0].replace(/'/g, "\\'");
-    return '<div class="ged-bar-row'+(isActive?' active':'')+'" onclick="gedToggleFiltre(\''+kind+'\',\''+safe+'\')">'
-      +'<div class="ged-bar-top"><span class="ged-bar-name">'+e[0]+'</span><span class="ged-bar-count">'+e[1]+'</span></div>'
+    var safe = encodeURIComponent(e[0]);   /* sûr dans l'attribut ET dans la chaîne JS */
+    return '<div class="ged-bar-row'+(isActive?' active':'')+'" onclick="gedToggleFiltre(\''+kind+'\',decodeURIComponent(\''+safe+'\'))">'
+      +'<div class="ged-bar-top"><span class="ged-bar-name">'+escAff(e[0])+'</span><span class="ged-bar-count">'+e[1]+'</span></div>'
       +'<div class="ged-bar-track"><div class="ged-bar-fill" style="width:'+pct+'%;background:'+color+';"></div></div>'
     +'</div>';
   }).join('');
@@ -93395,10 +93440,10 @@ async function gedFiltrer() {
         +'<div style="flex:1;">'
           +'<div style="font-size:14px;font-weight:700;">'+icon+' '+escHtml(doc.name)+(doc.archive ? ' <span class="badge badge-rouge" style="font-size:10px;">🗄 Archivé</span>' : '')+'</div>'
           +'<div style="font-size:11px;color:var(--blanc-dim);margin-top:3px;">'
-            +'<strong style="color:var(--or);">'+doc.module+'</strong> · 🏢 '+doc.division
+            +'<strong style="color:var(--or);">'+escAff(doc.module)+'</strong> · 🏢 '+escAff(doc.division)
             +' · '+dateShort(doc.date)+' · '+((doc.size||0)/1024).toFixed(1)+' KB'
           +'</div>'
-          +(doc.description?'<div style="font-size:12px;color:var(--blanc-dim);margin-top:2px;">'+doc.description+'</div>':'')
+          +(doc.description?'<div style="font-size:12px;color:var(--blanc-dim);margin-top:2px;">'+escAff(doc.description)+'</div>':'')
         +'</div>'
         +'<div style="display:flex;gap:6px;">'
           +'<button class="btn btn-secondary btn-sm btn-icon" onclick="gedApercu(\''+doc.store+'\',\''+doc.id+'\')" title="Aperçu">👁️</button>'
@@ -93430,6 +93475,11 @@ async function gedApercu(store, id) {
   var c = await _gedContenu(store, id, 'consultation'); if (!c) return;
   var burl;
   try { burl = URL.createObjectURL(await (await fetch(c.url)).blob()); } catch (e) { toast('Aperçu impossible : fichier illisible.', 'error'); return; }
+  var _tp = '';
+  try { _tp = String((await (await fetch(c.url)).blob()).type || '').toLowerCase(); } catch (e) {}
+  var _estImage = /^image\/(png|jpe?g|gif|webp|bmp)$/.test(_tp), _estPdf = _tp === 'application/pdf';
+  if (!_estImage && !_estPdf) { URL.revokeObjectURL(burl); toast('Aperçu indisponible pour ce type de fichier (' + (_tp || 'inconnu') + ') : téléchargez-le.', 'info'); return; }
+  c.mime = _estImage ? 'image/*' : 'application/pdf';
   var old = document.getElementById('ged-apercu'); if (old) old.remove();
   var ov = document.createElement('div'); ov.id = 'ged-apercu';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:99999;display:flex;flex-direction:column;padding:12px;';
@@ -93470,9 +93520,9 @@ async function renderSignaturesGlobaux() {
   container.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'
     + sigs.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).map(function(sig) {
       return '<div class="card">'
-        +'<div style="font-weight:700;font-size:14px;margin-bottom:6px;">✍️ '+sig.signataire+'</div>'
-        +'<div style="font-size:12px;color:var(--blanc-dim);">'+sig.entity_type+' — '+dateShort(sig.date)+'</div>'
-        +(sig.commentaire?'<div style="font-size:12px;color:var(--blanc-dim);margin-top:4px;font-style:italic;">"'+sig.commentaire+'"</div>':'')
+        +'<div style="font-weight:700;font-size:14px;margin-bottom:6px;">✍️ '+escAff(sig.signataire)+'</div>'
+        +'<div style="font-size:12px;color:var(--blanc-dim);">'+escAff(sig.entity_type)+' — '+dateShort(sig.date)+'</div>'
+        +(sig.commentaire?'<div style="font-size:12px;color:var(--blanc-dim);margin-top:4px;font-style:italic;">"'+escAff(sig.commentaire)+'"</div>':'')
         +'<div style="margin-top:10px;">'
           +'<img src="'+sig.image_blob+'" style="width:100%;border:1px solid var(--bord);border-radius:var(--r);background:white;" alt="Signature">'
         +'</div>'
@@ -93489,9 +93539,9 @@ async function apercuSignature(sigId) {
   var sig = sigs.find(function(s){ return s.id===sigId; });
   if (!sig) return;
   var win = window.open('','','width=600,height=400');
-  win.document.write('<html><head><title>Signature — '+sig.signataire+'</title></head><body style="margin:20px;font-family:Arial;">'
-    +'<h3>✍️ Signature de '+sig.signataire+'</h3>'
-    +'<p>Date : '+dateShort(sig.date)+'<br>Objet : '+(sig.commentaire||'—')+'</p>'
+  win.document.write('<html><head><title>Signature — '+escAff(sig.signataire)+'</title></head><body style="margin:20px;font-family:Arial;">'
+    +'<h3>✍️ Signature de '+escAff(sig.signataire)+'</h3>'
+    +'<p>Date : '+dateShort(sig.date)+'<br>Objet : '+escAff(sig.commentaire||'—')+'</p>'
     +'<img src="'+sig.image_blob+'" style="border:1px solid #ccc;max-width:100%;background:white;" alt="Signature">'
     +'</body></html>');
   win.document.close();
@@ -94333,9 +94383,11 @@ function _rtTableStore(){
 }
 
 /* Marque une écriture propre pour l'ignorer en retour Realtime */
-function _rtMarkMyWrite(id){
-  _RT.myWrites[id] = Date.now();
-  setTimeout(function(){ delete _RT.myWrites[id]; }, 30000); /* réseau CI lent : le rebond realtime peut dépasser 8 s */
+function _rtMarkMyWrite(id, modifie, suppression){
+  var e = _RT.myWrites[id] || (_RT.myWrites[id] = { ms: [], del: false, t: 0 });
+  e.t = Date.now(); if (modifie !== undefined && modifie !== null && e.ms.indexOf(String(modifie)) === -1) e.ms.push(String(modifie)); if (e.ms.length > 8) e.ms.shift(); if (suppression) e.del = true;
+  var t0 = e.t;
+  setTimeout(function(){ var c = _RT.myWrites[id]; if (c && c.t === t0) delete _RT.myWrites[id]; }, 30000); /* réseau CI lent : le rebond realtime peut dépasser 8 s */
 }
 
 /* Patch syncToSupabase pour marquer les écritures propres */
@@ -94343,7 +94395,7 @@ function _rtMarkMyWrite(id){
   var _orig = syncToSupabase;
   syncToSupabase = async function(table, obj){
     var r = await _orig.apply(this, arguments);
-    if (obj && obj.id) _rtMarkMyWrite(obj.id);
+    if (obj && obj.id) _rtMarkMyWrite(obj.id, obj._modifie || '', false);
     return r;
   };
 })();
@@ -94353,7 +94405,7 @@ function _rtMarkMyWrite(id){
   var _orig = typeof deleteFromSupabase === 'function' ? deleteFromSupabase : null;
   if (!_orig) return;
   deleteFromSupabase = async function(table, id){
-    _rtMarkMyWrite(id);
+    _rtMarkMyWrite(id, null, true);
     return _orig.apply(this, arguments);
   };
 })();
@@ -94382,7 +94434,11 @@ async function _rtApply(table, eventType, newRow, oldRow){
   if (!DATA[store]) DATA[store] = [];
   var id = (newRow && newRow.id) || (oldRow && oldRow.id);
   if (!id) return;
-  if (_RT.myWrites[id]) return;    /* propre écriture reflétée → ignorer */
+  var _mw = _RT.myWrites[id];
+  if (_mw) {   /* propre écriture reflétée → ignorer ; mais JAMAIS la modification/suppression d'un AUTRE poste dans les 30 s */
+    if (eventType === 'DELETE') { if (_mw.del) return; }
+    else { var _inc = _supaUnwrap(table, newRow), _im = _inc && _inc._modifie; if (!_im || _mw.ms.indexOf(String(_im)) !== -1) return; }
+  }
 
   _RT.active && _RT._flash();
 
@@ -94403,7 +94459,7 @@ async function _rtApply(table, eventType, newRow, oldRow){
        Auto-guérison : on renvoie une suppression Supabase pour purger la
        ligne fantôme côté serveur, au lieu de la laisser revenir en boucle. */
     if (typeof tombHas === 'function' && tombHas(store, incoming.id)) {
-      try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, incoming.id); } catch(e){}
+      try { if (typeof deleteFromSupabase === 'function' && tombPartage(store, incoming.id)) deleteFromSupabase(table, incoming.id); } catch(e){}
       return;
     }
     var idx = DATA[store].findIndex(function(x){ return x.id === incoming.id; });
@@ -94422,6 +94478,7 @@ async function _rtApply(table, eventType, newRow, oldRow){
   }
   /* Rafraîchir la page active si elle concerne ce module */
   _rtRefreshPage(store);
+  if (store === 'users' && eventType !== 'DELETE') { var _uu = (DATA.users || []).find(function(x){ return x.id === id; }); if (_uu) { try { _verifierSessionApresSync(_uu); } catch (e) {} } }
   /* ── custom_roles : cas à part ──────────────────────────────────────
      Contrairement aux autres stores, les permissions ne sont pas lues
      depuis DATA.custom_roles mais depuis SYSTEM_ROLES/CUSTOM_ROLES en
@@ -111154,6 +111211,7 @@ function togglePwdVisibility(inputId, eyeId) {
 (function() {
   var _origCreate = createUserFromModal;
   createUserFromModal = async function() {
+    if (typeof hasRole === 'function' && !hasRole('admin')) { toast('🔒 La gestion des comptes est réservée aux administrateurs.', 'error'); return; }
     var editId = document.getElementById('modal-user-create').dataset.editId || '';
     var isEdit = !!editId;
     var nom    = (document.getElementById('new-user-nom')||{}).value.trim();
@@ -111191,6 +111249,12 @@ function togglePwdVisibility(inputId, eyeId) {
 
     /* Mot de passe */
     var user = isEdit ? DATA.users.find(function(u){ return u.id===editId; }) : null;
+    if (isEdit && user) {
+      var _quiC = APP.currentUser && APP.currentUser.id;
+      if (user.id === _quiC && (role !== user.role || statut !== user.statut)) { toast('🔒 Vous ne pouvez pas modifier votre propre rôle ni votre statut.', 'error'); return; }
+      var _etaitAdm = user.role === 'admin' && user.statut !== 'inactif';
+      if (_etaitAdm && (role !== 'admin' || statut === 'inactif') && !DATA.users.some(function(u){ return u.id !== user.id && u.role === 'admin' && u.statut !== 'inactif'; })) { toast('🔒 Il doit rester au moins un administrateur actif.', 'error'); return; }
+    }
     if (!isEdit) {
       /* Création : mot de passe obligatoire */
       if (!pwd)        { toast('⚠️ Mot de passe obligatoire.', 'error'); return; }
@@ -121919,13 +121983,34 @@ function valStatutBadge(st){ var m={en_attente:'badge-or',valide:'badge-vert',re
 function valPending(type,refId){ return (DATA.validations||[]).find(function(v){return v.type===type&&v.ref_id===refId&&v.statut==='en_attente';}); }
 async function valCreate(type,refId,libelle,montant,meta){
   if(valPending(type,refId)){ toast('Déjà en attente de validation.','info'); return null; }
-  var v={ id:uid(), type:type, ref_id:refId, libelle:libelle||valTypeLabel(type), montant:montant||0, meta:meta||{}, statut:'en_attente', demandeur:(APP.currentUser&&APP.currentUser.nom)||'—', date_demande:today(), valideur:null, date_decision:null, motif:'', created_at:today() };
+  var v={ id:uid(), type:type, ref_id:refId, libelle:libelle||valTypeLabel(type), montant:montant||0, meta:meta||{}, statut:'en_attente', demandeur_id:(APP.currentUser&&APP.currentUser.id)||null, demandeur:(APP.currentUser&&APP.currentUser.nom)||'—', date_demande:today(), valideur:null, date_decision:null, motif:'', created_at:today() };
   DATA.validations.push(v); v._modifie=new Date().toISOString(); await dbPut('validations',v); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',v);
   etudesLiveRefresh('validations');
   return v;
 }
+/* Un demandeur ne valide pas sa propre demande (sauf administrateur, avec confirmation et trace). */
+function valControleDemandeur(v,decision){
+  if(decision!=='valide') return true;
+  var moi=APP.currentUser||{};
+  var meme=v.demandeur_id ? v.demandeur_id===moi.id : !!(v.demandeur && v.demandeur===(moi.nom||'—'));
+  if(!meme) return true;
+  if(typeof hasRole!=='function'||!hasRole('admin')){ toast('⛔ Vous ne pouvez pas valider votre propre demande.','error'); return false; }
+  if(!confirm('Vous êtes à l\'origine de cette demande.\n\nLa valider vous-même (dérogation d\'administrateur, tracée) ?')) return false;
+  try{ if(typeof logAction==='function') logAction('VALIDATION_PROPRE_DEMANDE',(v.libelle||v.id)); }catch(e){}
+  return true;
+}
 async function valDecide(id,decision,motif){
   var v=(DATA.validations||[]).find(function(x){return x.id===id;}); if(!v)return;
+  /* Une demande déjà décidée ne se décide pas une 2e fois (double clic, liste périmée) ; un seul traitement à la fois par demande. */
+  if(v.statut!=='en_attente'){ toast('Cette demande a déjà été traitée.','info'); try{ renderValidations(); }catch(e){} return; }
+  APP._valEnCours=APP._valEnCours||{}; if(APP._valEnCours[id]) return; APP._valEnCours[id]=true;
+  try{ return await valDecideCoeur(v,id,decision,motif); } finally { delete APP._valEnCours[id]; }
+}
+async function valDecideCoeur(v,id,decision,motif){
+  if(typeof valPeutDecider==='function' && !valPeutDecider(v)){ toast('⛔ Vous n\'avez pas le droit de décider cette demande.','error'); return; }
+  if(decision!=='valide' && !String(motif||'').trim() && v.type!=='etape_fonciere'){ toast('Un motif est obligatoire pour rejeter une demande.','error'); return; }
+  if(decision==='valide' && v.type!=='etape_fonciere' && v.montant && typeof exigerPlafond==='function' && !exigerPlafond(v.montant,'Cette validation')) return;
+  if(v.type!=='etape_fonciere' && !valControleDemandeur(v,decision)) return;
   if(v.type==='etape_fonciere') return valDecideEtapeFonciere(v,decision,motif);
   if(v.type==='demande_course'||v.type==='rapport_course'){
     if(typeof paPeutAutoriser==='function' && !paPeutAutoriser()){ toast('⛔ Autorisation réservée au validateur désigné (Paramètres › Parc auto).','error'); return; }
@@ -122014,12 +122099,16 @@ function valPeutDecider(v){
 async function valDecideEtapeFonciere(v,decision,motif){
   var m=v.meta||{};
   if(typeof fcDecisionValidationEtape!=='function'){ toast('Module Foncier indisponible.','error'); return; }
+  if(!valControleDemandeur(v,decision)) return;
   if(decision==='valide' && !(APP._valApercuVus||{})[v.id] && !confirm('Vous n’avez pas consulté ce dossier (boutons « 👁 Aperçu » ou « 📁 Dossier »).\n\nValider quand même ?')) return;
   var r; APP._valContexte=true;
-  try{ r=await fcDecisionValidationEtape(m.dossier_id,m.code,decision==='valide'?'validee':'refusee',motif||''); }
+  try{
+    r=await fcDecisionValidationEtape(m.dossier_id,m.code,decision==='valide'?'validee':'refusee',motif||'');
+    /* l'auto-terminaison qui suit une validation fait partie de la décision : elle reste dans le contexte Validations */
+    if(r&&r.ok&&r.validee&&!r.terminee&&typeof fcTerminerApresValidation==='function') r=Object.assign({},r,{terminee:((await fcTerminerApresValidation(m.dossier_id,m.code,r.avertissement))||{}).ok===true});
+  }
   finally{ APP._valContexte=false; }
   if(!r||!r.ok){ toast((r&&r.erreur)||'Décision impossible.','error'); return; }
-  if(r.validee && !r.terminee && typeof fcTerminerApresValidation==='function') r=Object.assign({},r,{terminee:((await fcTerminerApresValidation(m.dossier_id,m.code,r.avertissement))||{}).ok===true});
   renderValidations();
   if(typeof fcRender==='function'){ try{ fcRender(); if(APP._fcSel===m.dossier_id) fcRenderDetail(m.dossier_id); }catch(e){} }
   etudesLiveRefresh('validations');
@@ -122032,8 +122121,8 @@ async function valSyncEtapeFonciere(d,e,decision,par,motif){
   if(decision==='en_attente'){
     if(v) return v;
     var vv=e.validation||{};
-    v={ id:uid(), type:'etape_fonciere', ref_id:ref, libelle:d.reference+' — '+e.libelle, montant:0, meta:{dossier_id:d.id,code:e.code,fonction:vv.fonction||'',dossier_ref:d.reference,fonction_lib:fcLibFonction(vv.fonction)},
-        statut:'en_attente', demandeur:vv.demande_par||(APP.currentUser&&APP.currentUser.nom)||'—', date_demande:(vv.demande_le||'').slice(0,10)||today(), valideur:null, date_decision:null, motif:'', created_at:today() };
+    v={ id:uid(), type:'etape_fonciere', ref_id:ref, libelle:d.reference+' — '+e.libelle, montant:0, meta:{dossier_id:d.id,code:e.code,fonction:vv.fonction||'',dossier_ref:d.reference,fonction_lib:fcLibFonction(vv.fonction),demande_le:vv.demande_le||''},
+        statut:'en_attente', demandeur_id:vv.demande_par_id||(APP.currentUser&&APP.currentUser.id)||null, demandeur:vv.demande_par||(APP.currentUser&&APP.currentUser.nom)||'—', date_demande:(vv.demande_le||'').slice(0,10)||today(), valideur:null, date_decision:null, motif:'', created_at:today() };
     DATA.validations.push(v);
   } else {
     if(!v) return null;
@@ -122060,9 +122149,11 @@ function valReconcilierEtapesFoncieres(){
     .sort(function(a,b){return String(b.created_at||'').localeCompare(String(a.created_at||''));});
   enAtt.forEach(function(v){
     var m=v.meta||{}, d=fcDossier(m.dossier_id), e=d&&fcEtape(d,m.code), cl=null;
-    if(!d||!e) cl=['rejete','Sans objet : dossier ou étape introuvable','Système',''];
-    else if(e.validation&&e.validation.statut==='validee') cl=['valide','',e.validation.par||'—',(e.validation.le||'').slice(0,10)];
-    else if(e.validation&&e.validation.statut==='refusee') cl=['rejete',e.validation.motif||'Refusée',e.validation.decide_par||'—',(e.validation.decide_le||'').slice(0,10)];
+    /* la décision du dossier doit être POSTÉRIEURE à la demande : sinon c'est une demande plus récente que l'état (périmé) de ce poste */
+    var apres=function(dec){ if(!dec) return false; if(m.demande_le) return String(dec)>=String(m.demande_le); return !v.date_demande||String(dec).slice(0,10)>=v.date_demande; };
+    if(!d||!e){ if(typeof tombHas==='function'&&tombHas('dossiers_fonciers',m.dossier_id)) cl=['rejete','Sans objet : dossier supprimé','Système','']; }   /* absent localement ≠ supprimé : pas encore synchronisé ? */
+    else if(e.validation&&e.validation.statut==='validee'&&apres(e.validation.le)) cl=['valide','',e.validation.par||'—',(e.validation.le||'').slice(0,10)];
+    else if(e.validation&&e.validation.statut==='refusee'&&apres(e.validation.decide_le)) cl=['rejete',e.validation.motif||'Refusée',e.validation.decide_par||'—',(e.validation.decide_le||'').slice(0,10)];
     else if(vues[v.ref_id]) cl=['rejete','Sans objet : doublon d\'une demande plus récente','Système',''];
     else if(['cloture','annule'].indexOf(d.statut)!==-1) cl=['rejete','Sans objet : dossier '+d.statut,'Système',''];
     else if(FIN.indexOf(e.statut)!==-1) cl=['rejete','Sans objet : étape déjà '+String((typeof FC_STATUTS!=='undefined'&&FC_STATUTS[e.statut])||e.statut).toLowerCase(),'Système',''];
@@ -122295,12 +122386,12 @@ function renderValidations(){
       if(v.statut==='en_attente'){
         if(valPeutDecider(v)) acts='<button class="btn btn-primary btn-sm" onclick="valDecide(\''+v.id+'\',\'valide\')">✅ Valider</button> <button class="btn btn-danger btn-sm" onclick="valReject(\''+v.id+'\')">⛔ Rejeter</button>';
         else acts='<span style="font-size:11px;color:var(--blanc-dim);">'+(v.type==='etape_fonciere'?'réservé à la fonction « '+escHtml((v.meta||{}).fonction_lib||(v.meta||{}).fonction||'')+' »':'réservé à la hiérarchie')+'</span>';
-      } else { acts='<span style="font-size:11px;color:var(--blanc-dim);">'+(v.valideur||'')+' · '+(v.date_decision||'')+(v.motif?(' · '+v.motif):'')+'</span>'; }
+      } else { acts='<span style="font-size:11px;color:var(--blanc-dim);">'+escAff(v.valideur||'')+' · '+escAff(v.date_decision||'')+(v.motif?(' · '+escAff(v.motif)):'')+'</span>'; }
       if(v.type==='etape_fonciere') acts='<button class="btn btn-secondary btn-sm" onclick="valApercuEtapeFonciere(\''+v.id+'\')">👁 Aperçu</button> <button class="btn btn-secondary btn-sm" onclick="valOuvrirDossierFoncier(\''+((v.meta||{}).dossier_id||'')+'\',\''+((v.meta||{}).code||'')+'\',\''+v.id+'\')">📁 Dossier</button> '+acts;
       if(v.type==='demande_course'||v.type==='rapport_course') acts='<button class="btn btn-secondary btn-sm" onclick="paCourseApercu(\''+v.ref_id+'\',\''+(v.type==='rapport_course'?'rapport':'demande')+'\')">👁 Voir</button> '+acts;
       if(v.type==='attestation_solde_cession') acts='<button class="btn btn-secondary btn-sm" onclick="cesAttApercu(\''+v.ref_id+'\')">👁 Voir</button> '+acts;
       if(v.type==='attestation_solde' || v.type==='attestation_solde_finale') acts='<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">👁 Voir</button> <button class="btn btn-secondary btn-sm" title="Versements, reçus, bons de caisse et écritures à l\'appui de l\'attestation" onclick="attSoldePieces(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">🔎 Pièces</button> '+acts;
-      return '<tr><td>'+valTypeLabel(v.type)+'</td><td style="font-size:12px;">'+v.libelle+'</td><td style="text-align:right;font-weight:600;">'+fmtF(Math.round(v.montant||0))+'</td><td style="font-size:11px;">'+(v.demandeur||'—')+'</td><td>'+(v.date_demande||'—')+'</td><td>'+valStatutBadge(v.statut)+'</td><td style="white-space:nowrap;">'+acts+'</td></tr>';
+      return '<tr><td>'+valTypeLabel(v.type)+'</td><td style="font-size:12px;">'+escAff(v.libelle)+'</td><td style="text-align:right;font-weight:600;">'+fmtF(Math.round(v.montant||0))+'</td><td style="font-size:11px;">'+escAff(v.demandeur||'—')+'</td><td>'+(v.date_demande||'—')+'</td><td>'+valStatutBadge(v.statut)+'</td><td style="white-space:nowrap;">'+acts+'</td></tr>';
         } });
       tb.innerHTML=rt.lignes; if(bar) bar.innerHTML=rt.barre; if(pied) pied.innerHTML=rt.pied;
     }
@@ -124399,6 +124490,8 @@ function tombAdd(store, id) {
   var t = _tombLoad(); t[store] = t[store] || [];
   if (t[store].indexOf(String(id)) === -1) { t[store].push(String(id)); _tombSave(t); }
 }
+/* Suppression PARTAGÉE (pi_suppressions, réellement voulue et propagée) — par opposition à un tombstone local hérité d'une remise à zéro ou d'un import annulé. */
+function tombPartage(store, id) { return (DATA.suppressions_sync || []).some(function(t){ return t && t.store === store && t.record_id !== undefined && String(t.record_id) === String(id); }); }
 function tombHas(store, id) { var t = _tombLoad(); return (t[store] || []).indexOf(String(id)) !== -1; }
 function tombRemove(store, id) { var t = _tombLoad(); if (t[store]) { t[store] = t[store].filter(function(x){ return x !== String(id); }); _tombSave(t); } }
 function tombList() { return _tombLoad(); }

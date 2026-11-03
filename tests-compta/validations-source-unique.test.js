@@ -80,10 +80,13 @@ test('réconciliation : lignes restées « en attente » alors que l\'étape est
       const orpheline = Object.assign({}, base, { id: 'orph', ref_id: 'inconnu|x', meta: { dossier_id: 'inconnu', code: 'x' } });
       DATA.validations.push(orpheline);
       renderValidations();
+      o.sansTombstone = V().find(v => v.id === 'orph').statut;     /* dossier absent localement mais pas supprimé (peut-être pas encore synchronisé) : on n'y touche pas */
+      tombAdd('dossiers_fonciers', 'inconnu'); renderValidations();   /* supprimé (tombstone) : sans objet */
       o.enAttente = V().filter(v => v.statut === 'en_attente').length;
       o.statuts = V().map(v => v.id === 'orph' ? 'orph:' + v.statut : v.statut).sort();
       return o;
     }, DEMANDE.toString());
+    assert.equal(r.sansTombstone, 'en_attente');
     assert.equal(r.enAttente, 0);
     assert.deepEqual(r.statuts, ['orph:rejete', 'valide']);
   } finally { await app.fermer(); }
