@@ -7572,9 +7572,9 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
                   <div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">Détermine les caisses visibles par cet utilisateur : la caisse d'une autre division ne lui est jamais accessible.</div>
                 </div>
                 <div class="form-group span-2" id="new-user-pin-group" style="display:none;">
-                  <label>Code PIN caisse (4 chiffres) <span id="pin-req-star">*</span></label>
+                  <label>Code PIN caisse (4 à 6 chiffres, sans suite ni chiffres identiques) <span id="pin-req-star">*</span></label>
                   <div style="position:relative;">
-                    <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="new-user-pin" class="form-control" placeholder="Ex: 4821" autocomplete="off">
+                    <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="new-user-pin" class="form-control" placeholder="Ex: 4821" autocomplete="off">
                     <button type="button" onclick="togglePwdVisibility('new-user-pin','eye-pin')"
                       style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;" id="eye-pin">👁️</button>
                   </div>
@@ -110953,10 +110953,8 @@ function togglePwdVisibility(inputId, eyeId) {
 
     /* Code PIN de caisse : obligatoire à la création d'une caissière (attribué
        à ce moment, comme demandé), optionnel en modification (vide = inchangé). */
-    if (roleEstCaissiere(role)) {
-      if (!isEdit && !pin) { toast('⚠️ Le code PIN de caisse est obligatoire pour le rôle Caissière.', 'error'); return; }
-      if (pin && !/^[0-9]{4}$/.test(pin)) { toast('⚠️ Le code PIN doit comporter exactement 4 chiffres.', 'error'); return; }
-    }
+    if (roleEstCaissiere(role) && !isEdit && !pin) { toast('⚠️ Le code PIN de caisse est obligatoire pour le rôle Caissière.', 'error'); return; }
+    if (pin) { var _errPinAdm = _caissePinValide(pin); if (_errPinAdm) { toast('⚠️ ' + _errPinAdm, 'error'); return; } }   /* tout rôle : le PIN est enregistré quel que soit le rôle */
 
     /* Email format check si renseigné */
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -111005,10 +111003,7 @@ function togglePwdVisibility(inputId, eyeId) {
          n'est pas « caissière ». Auparavant cette purge effaçait aussi le PIN
          qu'un manager/comptable/admin s'était défini lui-même (self-service),
          au premier enregistrement de son profil pour une raison sans rapport. */
-      if (pin) {
-        user.caisse_pin_salt = generateSalt();
-        user.caisse_pin_hash = await hashPassword(pin, user.caisse_pin_salt);
-      }
+      if (pin) { await _caissePinHasher(user, pin); _caissePinSucces(user); }
       user._modifie = new Date().toISOString();
       await dbPut('users', user);
       if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', user);
@@ -111022,10 +111017,7 @@ function togglePwdVisibility(inputId, eyeId) {
       var hash = await hashPassword(pwd, salt);
       var newUser = { id:uid(), nom:nom, login:login, email:email, role:role, statut:statut,
         division_id: divisionId, password_hash:hash, salt:salt };
-      if (pin) {
-        newUser.caisse_pin_salt = generateSalt();
-        newUser.caisse_pin_hash = await hashPassword(pin, newUser.caisse_pin_salt);
-      }
+      if (pin) await _caissePinHasher(newUser, pin);
       DATA.users.push(newUser);
       await dbPut('users', newUser);
       if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', newUser);
@@ -140344,6 +140336,62 @@ document.addEventListener('click', function(){ if (APP.currentPage === 'caisse' 
 document.addEventListener('keydown', function(){ if (APP.currentPage === 'caisse' && !CAISSE_UI.verrouille) caisseNoterActivite(); }, true);
 setInterval(caisseVerifierInactivite, 30000);
 
+/* ═══ CODE PIN CAISSE : politique, hachage et limitation d'essais ═══
+   Un PIN de 4 chiffres n'offre que 10 000 combinaisons : il protège contre l'usage involontaire, pas contre
+   un acharnement. On renforce donc ce qui peut l'être côté navigateur : PIN de 4 à 6 chiffres sans suites ni
+   chiffres identiques, hachage PBKDF2 (migration transparente des anciens SHA-256 à la première vérification
+   réussie) et blocage croissant après 3 échecs. Limite connue : tout cela s'exécute dans le navigateur ; une
+   barrière réelle demanderait une vérification côté serveur. */
+var CAISSE_PIN_ITER = 210000;
+function _caissePinValide(pin) {
+  pin = String(pin || '');
+  if (!/^[0-9]{4,6}$/.test(pin)) return 'Le code PIN doit comporter 4 à 6 chiffres.';
+  if (/^(\d)\1+$/.test(pin)) return 'Code PIN trop simple : chiffres identiques.';
+  if ('0123456789'.indexOf(pin) >= 0 || '9876543210'.indexOf(pin) >= 0) return 'Code PIN trop simple : suite de chiffres.';
+  return '';
+}
+async function _caissePinHasher(user, pin) {
+  user.caisse_pin_salt = generateSalt();
+  user.caisse_pin_algo = 'pbkdf2'; user.caisse_pin_iter = CAISSE_PIN_ITER;
+  user.caisse_pin_hash = await pbkdf2Client(pin, user.caisse_pin_salt, CAISSE_PIN_ITER);
+}
+async function _caissePinVerifier(user, pin) {
+  if (!user || !user.caisse_pin_hash) return false;
+  var ok;
+  if (user.caisse_pin_algo === 'pbkdf2') ok = (await pbkdf2Client(pin, user.caisse_pin_salt || '', user.caisse_pin_iter || CAISSE_PIN_ITER)) === user.caisse_pin_hash;
+  else ok = (await hashPassword(pin, user.caisse_pin_salt || '')) === user.caisse_pin_hash;
+  if (ok && user.caisse_pin_algo !== 'pbkdf2') {   /* migration transparente vers PBKDF2 */
+    try {
+      await _caissePinHasher(user, pin);
+      user._modifie = new Date().toISOString();
+      await dbPut('users', user);
+      if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', user);
+    } catch (e) {}
+  }
+  return ok;
+}
+function _caissePinEtat(user) {
+  try { return JSON.parse(localStorage.getItem('caisse_pin_essais_' + (user && user.id)) || '{}') || {}; } catch (e) { return {}; }
+}
+function _caissePinAttente(user) {
+  var e = _caissePinEtat(user);
+  return e.jusqua && e.jusqua > Date.now() ? Math.ceil((e.jusqua - Date.now()) / 1000) : 0;
+}
+function _caissePinMsgAttente(sec) {
+  return '⏳ Trop d\'essais : réessayez dans ' + (sec >= 120 ? Math.ceil(sec / 60) + ' min' : sec + ' s') + '.';
+}
+/* Enregistre un échec ; renvoie { restants, attente }. À partir du 3e échec : 30 s, puis le délai double (1 h au plus). */
+function _caissePinEchec(user) {
+  var e = _caissePinEtat(user), n = (e.n || 0) + 1, delai = n >= 3 ? Math.min(30 * Math.pow(2, n - 3), 3600) : 0;
+  try { localStorage.setItem('caisse_pin_essais_' + user.id, JSON.stringify({ n: n, jusqua: delai ? Date.now() + delai * 1000 : 0 })); } catch (e2) {}
+  if ((n === 3 || n % 5 === 0) && typeof ajouterHistorique === 'function') {
+    try { ajouterHistorique('user', user.id, 'pin_caisse_echecs', n + ' échecs consécutifs de code PIN / mot de passe caisse sur ce poste'); } catch (e3) {}
+  }
+  return { restants: Math.max(0, 3 - n), attente: delai };
+}
+function _caissePinSucces(user) { try { localStorage.removeItem('caisse_pin_essais_' + (user && user.id)); } catch (e) {} }
+function _caissePinMsgEchec(r) { return r.attente ? _caissePinMsgAttente(r.attente) : '❌ Code incorrect (' + r.restants + ' essai(s) avant blocage).'; }
+
 function caisseVerrouiller() {
   CAISSE_UI.verrouille = true;
   var aUnPin = !!(APP.currentUser && APP.currentUser.caisse_pin_hash);
@@ -140361,11 +140409,12 @@ async function caisseDeverrouiller() {
   var u = APP.currentUser;
   var eErr = document.getElementById('cv-err');
   var ok = false;
+  var _att = u ? _caissePinAttente(u) : 0;
+  if (_att > 0) { if (eErr) eErr.textContent = _caissePinMsgAttente(_att); return; }
   if (u && u.caisse_pin_hash) {
     var pinSaisi = (document.getElementById('cv-pin')||{}).value || '';
     if (!pinSaisi) { if (eErr) eErr.textContent = 'Saisissez votre code PIN.'; return; }
-    var pinHash = await hashPassword(pinSaisi, u.caisse_pin_salt || '');
-    ok = (pinHash === u.caisse_pin_hash);
+    ok = await _caissePinVerifier(u, pinSaisi);
   } else {
     var pwdSaisi = (document.getElementById('cv-pwd')||{}).value || '';
     if (!pwdSaisi) { if (eErr) eErr.textContent = 'Saisissez votre mot de passe.'; return; }
@@ -140384,7 +140433,8 @@ async function caisseDeverrouiller() {
     }
     ok = pwdOk;
   }
-  if (!ok) { if (eErr) eErr.textContent = '❌ Code incorrect.'; return; }
+  if (!ok) { if (eErr) eErr.textContent = _caissePinMsgEchec(_caissePinEchec(u)); return; }
+  _caissePinSucces(u);
   CAISSE_UI.verrouille = false;
   caisseNoterActivite();
   closeModal('modal-caisse-verrou');
@@ -142434,9 +142484,12 @@ async function caisseDefinirPinConfirmer() {
   var pin1 = document.getElementById('cdp-pin1').value || '';
   var pin2 = document.getElementById('cdp-pin2').value || '';
   if (!mdp) { err.textContent = 'Saisissez votre mot de passe.'; return; }
-  if (!/^[0-9]{4}$/.test(pin1)) { err.textContent = 'Le code PIN doit comporter exactement 4 chiffres.'; return; }
+  var _errPin = _caissePinValide(pin1);
+  if (_errPin) { err.textContent = _errPin; return; }
   if (pin1 !== pin2) { err.textContent = 'Les deux codes PIN ne correspondent pas.'; return; }
   var u = APP.currentUser;
+  var _attDef = _caissePinAttente(u);
+  if (_attDef > 0) { err.textContent = _caissePinMsgAttente(_attDef); return; }
   /* [FIX] Ne vérifiait que l'ancien hash SHA-256+sel — un compte déjà migré
      vers PBKDF2 (migration transparente à la connexion, voir staff-login)
      avait alors un password_hash au format PBKDF2, jamais reconnu par
@@ -142452,9 +142505,9 @@ async function caisseDefinirPinConfirmer() {
   } else if (u.password) {
     mdpValide = (mdp === u.password);
   }
-  if (!mdpValide) { err.textContent = '❌ Mot de passe incorrect.'; return; }
-  u.caisse_pin_salt = generateSalt();
-  u.caisse_pin_hash = await hashPassword(pin1, u.caisse_pin_salt);
+  if (!mdpValide) { var _rd = _caissePinEchec(u); err.textContent = _rd.attente ? _caissePinMsgAttente(_rd.attente) : '❌ Mot de passe incorrect (' + _rd.restants + ' essai(s) avant blocage).'; return; }
+  _caissePinSucces(u);
+  await _caissePinHasher(u, pin1);
   u._modifie = new Date().toISOString();
   await dbPut('users', u);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_users', u);
@@ -142551,8 +142604,10 @@ async function caisseOuvrir() {
   }
   var pinSaisi = (document.getElementById('co-pin')||{}).value || '';
   if (!pinSaisi) { toast('⚠️ Veuillez saisir votre code PIN.', 'error'); return; }
-  var pinHash = await hashPassword(pinSaisi, APP.currentUser.caisse_pin_salt || '');
-  if (pinHash !== APP.currentUser.caisse_pin_hash) { toast('❌ Code PIN incorrect.', 'error'); return; }
+  var _attOuv = _caissePinAttente(APP.currentUser);
+  if (_attOuv > 0) { toast(_caissePinMsgAttente(_attOuv), 'error', 6000); return; }
+  if (!(await _caissePinVerifier(APP.currentUser, pinSaisi))) { toast(_caissePinMsgEchec(_caissePinEchec(APP.currentUser)), 'error', 6000); return; }
+  _caissePinSucces(APP.currentUser);
   var session = {
     id: uid(), caisse_id: caisseId, date: today(),
     fond_ouverture: fond, fond_cloture_theorique: null, fond_cloture_reel: null, ecart: null,
@@ -151292,7 +151347,7 @@ goTo = function(page) {
       <div class="form-group" id="co-pin-group" style="display:none;">
         <div id="co-pin-present">
           <label>Code PIN *</label>
-          <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" class="form-control" id="co-pin" placeholder="••••" autocomplete="off">
+          <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" class="form-control" id="co-pin" placeholder="••••" autocomplete="off">
           <div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">Votre code PIN personnel, requis pour toute ouverture de caisse.</div>
         </div>
         <div id="co-pin-absent" style="display:none;padding:10px 12px;background:var(--card2);border-radius:var(--r);border:1px solid var(--rouge);">
@@ -151326,18 +151381,18 @@ goTo = function(page) {
       <button class="btn btn-secondary btn-icon" onclick="closeModal('modal-caisse-definir-pin')">✕</button>
     </div>
     <div class="modal-body">
-      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">Ce code à 4 chiffres vous sera demandé à chaque ouverture de caisse et pour déverrouiller l'écran après une inactivité prolongée. Il est personnel — ne le partagez pas.</div>
+      <div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">Ce code (4 à 6 chiffres) vous sera demandé à chaque ouverture de caisse et pour déverrouiller l'écran après une inactivité prolongée. Il est personnel — ne le partagez pas.</div>
       <div class="form-group">
         <label>Mot de passe de votre compte (vérification d'identité) *</label>
         <input type="password" class="form-control" id="cdp-mdp" autocomplete="current-password">
       </div>
       <div class="form-group">
-        <label>Nouveau code PIN (4 chiffres) *</label>
-        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" class="form-control" id="cdp-pin1" placeholder="••••" autocomplete="off">
+        <label>Nouveau code PIN (4 à 6 chiffres, sans suite ni chiffres identiques) *</label>
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" class="form-control" id="cdp-pin1" placeholder="••••" autocomplete="off">
       </div>
       <div class="form-group">
         <label>Confirmer le code PIN *</label>
-        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" class="form-control" id="cdp-pin2" placeholder="••••" autocomplete="off">
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" class="form-control" id="cdp-pin2" placeholder="••••" autocomplete="off">
       </div>
       <div id="cdp-err" style="color:var(--rouge);font-size:12px;"></div>
     </div>
@@ -151381,7 +151436,7 @@ goTo = function(page) {
       <div style="margin-bottom:12px;font-size:13px;color:var(--blanc-dim);">Verrouillée après 10 minutes d'inactivité. Ressaisissez votre code pour continuer — aucune donnée n'a été perdue.</div>
       <div class="form-group" id="cv-pin-group" style="display:none;">
         <label>Code PIN</label>
-        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" class="form-control" id="cv-pin" placeholder="••••" autocomplete="off" onkeydown="if(event.key==='Enter') caisseDeverrouiller();">
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" class="form-control" id="cv-pin" placeholder="••••" autocomplete="off" onkeydown="if(event.key==='Enter') caisseDeverrouiller();">
       </div>
       <div class="form-group" id="cv-pwd-group" style="display:none;">
         <label>Mot de passe</label>
