@@ -27202,6 +27202,7 @@ async function syncToSupabase(table, obj, opts) {
          on conserve SES valeurs pour les clés que ce poste n'a pas touchées.
          Sinon un poste au réglage périmé écrasait le paramétrage du groupe
          en enregistrant n'importe quel autre champ. */
+      _fusionnerClotures(obj, _remoteParams); _fusionnerSeqEcr(obj, _remoteParams);   /* clôtures et numérotation : jamais effacées par un poste en retard */
       var _rM = _remoteParams && _remoteParams.params_maj || '';
       var _lM = obj.params_maj || '';
       if (_rM && _rM > _lM && typeof PARAMS_PARTAGES !== 'undefined') {
@@ -27345,7 +27346,7 @@ function _filtrerFantomes(table, store, ids) {
   ids.forEach(function(id){
     if (tombHas(store, id)) {
       fantomes.push(id);
-      try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, id); } catch(e){}
+      try { if (typeof deleteFromSupabase === 'function' && tombPartage(store, id)) deleteFromSupabase(table, id); } catch(e){}
     } else vivants.push(id);
   });
   return { vivants: vivants, fantomes: fantomes };
@@ -27811,7 +27812,7 @@ async function syncPullStore(store){
        cloud. On ignore la ligne et on relance sa purge cloud à la place. */
     if (typeof tombHas === 'function' && tombHas(store, r.id)) {
       fantomes++;
-      try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, r.id); } catch(_){}
+      try { if (typeof deleteFromSupabase === 'function' && tombPartage(store, r.id)) deleteFromSupabase(table, r.id); } catch(_){}
       continue;
     }
     var ex = byId[r.id];
@@ -27875,7 +27876,7 @@ async function analyserDivergence(){
            qui la ressusciterait. On la purge côté cloud à la place. */
         if (typeof tombHas === 'function' && tombHas(store, id)) {
           fantomes++;
-          try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, id); } catch(e){}
+          try { if (typeof deleteFromSupabase === 'function' && tombPartage(store, id)) deleteFromSupabase(table, id); } catch(e){}
           return;
         }
         pullN++;
@@ -28733,7 +28734,7 @@ async function syncFromSupabase() {
            ligne et on renvoie une suppression au cloud pour purger la
            ligne fantôme au lieu de la laisser revenir en boucle. ── */
         if (typeof tombHas === 'function' && tombHas(store, r.id)) {
-          try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, r.id); } catch(e){}
+          try { if (typeof deleteFromSupabase === 'function' && tombPartage(store, r.id)) deleteFromSupabase(table, r.id); } catch(e){}
           continue;
         }
         var ex = byId[r.id];
@@ -28799,6 +28800,25 @@ var PARAMS_PARTAGES = [
 var PARAMS_LOCAUX_RE = /^(id|params_maj|reset_broadcast|purge_tombstones|reinit_postes|plan_comptable_.*|_.*|.*(api_key|secret|token|password|pwd).*)$/i;
 function _paramPartage(k) { return !PARAMS_LOCAUX_RE.test(String(k)); }
 
+/* Clôtures d'exercice (params.cloture_*) : un poste qui ne les reçoit pas peut saisir en exercice clos, puis effacer la clôture du cloud au premier réglage enregistré.
+   Fusion : la valeur la plus récente (cloture_maj) l'emporte ; sans horodatage, « clos » l'emporte. */
+function _fusionnerClotures(dst, src) {
+  if (!dst || !src) return; var dm = dst.cloture_maj = dst.cloture_maj || {}, sm = src.cloture_maj || {};
+  Object.keys(src).forEach(function(k){
+    if (k.indexOf('cloture_') !== 0 || k === 'cloture_maj') return;
+    var sv = src[k], dv = dst[k], st = sm[k] || '', dt = dm[k] || '';
+    if (dv === undefined) { dst[k] = sv; if (st) dm[k] = st; return; }
+    if (dv === sv) { if (st && !dt) dm[k] = st; return; }
+    if (st && dt) { if (st > dt) { dst[k] = sv; dm[k] = st; } return; }
+    if (sv === true) { dst[k] = true; if (st) dm[k] = st; }
+  });
+}
+/* Numérotation des pièces (params.seq_ecr) : le plus haut numéro attribué l'emporte, par clé. */
+function _fusionnerSeqEcr(dst, src) {
+  if (!dst || !src || !src.seq_ecr) return; var d = dst.seq_ecr = dst.seq_ecr || {};
+  Object.keys(src.seq_ecr).forEach(function(k){ if ((src.seq_ecr[k] || 0) > (d[k] || 0)) d[k] = src.seq_ecr[k]; });
+}
+function _empreinteClotures(o) { return JSON.stringify([Object.keys(o).filter(function(k){ return k.indexOf('cloture_') === 0; }).sort().map(function(k){ return [k, o[k]]; }), o.seq_ecr || null]); }
 function _paramsToucher() {
   DATA.params = DATA.params || {};
   DATA.params.id = 'main';
@@ -28838,6 +28858,8 @@ async function _pullPlanComptableCloud() {
     loc.plan_comptable_supprimes = suppFusion;
     loc.plan_comptable_custom    = ajoutsFusion;
     loc.plan_comptable_modifs    = modifsFusion;
+    var _avantCl = _empreinteClotures(loc); _fusionnerClotures(loc, remote); _fusionnerSeqEcr(loc, remote);
+    if (_avantCl !== _empreinteClotures(loc)) changed = true;
 
     /* Socle remplacé ailleurs : on l'adopte si ce poste n'a encore jamais
        remplacé son socle, OU si le remplacement distant est postérieur au
@@ -28933,6 +28955,8 @@ function _pullCurseurs() {
 }
 function _pullCurseurSet(table, iso) {
   try {
+    /* Jamais au-delà de « maintenant + 5 min » : un poste en avance d'horloge ferait sauter à tous les autres les écritures suivantes. */
+    var _plafond = new Date(Date.now() + 300000).toISOString(); if (iso && iso > _plafond) iso = _plafond;
     var c = _pullCurseurs(); c[table] = iso;
     localStorage.setItem(PULL_CURSEURS_KEY, JSON.stringify(c));
   } catch(e){}
@@ -28991,6 +29015,8 @@ async function _pullTable(table) {
   var curseur = complet ? null : (_pullCurseurEffectif(table) || null);
   if (curseur) {
     try {
+      /* marge de 2 min : un poste dont l'horloge retarde écrit « avant » le curseur ; l'application est idempotente (_remoteWins). */
+      var _cm = Date.parse(curseur); if (!isNaN(_cm)) curseur = new Date(_cm - 120000).toISOString();
       var rows = await sbFetch(table + '?updated_at=gt.' + encodeURIComponent(curseur) + '&select=*', 'GET');
       if (rows !== null && rows !== undefined) return { rows: rows, incremental: true };
     } catch(e) {
@@ -81199,6 +81225,7 @@ async function cloturerExercice(annee, divisionId) {
         (verrou global 'cloture_ANNEE' consulté partout ailleurs dans l'appli). */
   DATA.params = Object.assign(DATA.params||{}, {});
   DATA.params['cloture_'+annee+refSuffixe] = true;
+  (DATA.params.cloture_maj = DATA.params.cloture_maj || {})['cloture_'+annee+refSuffixe] = new Date().toISOString();
   await dbPut('params', DATA.params);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
 
@@ -81235,6 +81262,7 @@ async function rouvrirExercice(annee, divisionId) {
   });
 
   DATA.params['cloture_'+annee+refSuffixe] = false;
+  (DATA.params.cloture_maj = DATA.params.cloture_maj || {})['cloture_'+annee+refSuffixe] = new Date().toISOString();
   await dbPut('params', DATA.params);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
 
@@ -94354,9 +94382,11 @@ function _rtTableStore(){
 }
 
 /* Marque une écriture propre pour l'ignorer en retour Realtime */
-function _rtMarkMyWrite(id){
-  _RT.myWrites[id] = Date.now();
-  setTimeout(function(){ delete _RT.myWrites[id]; }, 30000); /* réseau CI lent : le rebond realtime peut dépasser 8 s */
+function _rtMarkMyWrite(id, modifie, suppression){
+  var e = _RT.myWrites[id] || (_RT.myWrites[id] = { ms: [], del: false, t: 0 });
+  e.t = Date.now(); if (modifie !== undefined && modifie !== null && e.ms.indexOf(String(modifie)) === -1) e.ms.push(String(modifie)); if (e.ms.length > 8) e.ms.shift(); if (suppression) e.del = true;
+  var t0 = e.t;
+  setTimeout(function(){ var c = _RT.myWrites[id]; if (c && c.t === t0) delete _RT.myWrites[id]; }, 30000); /* réseau CI lent : le rebond realtime peut dépasser 8 s */
 }
 
 /* Patch syncToSupabase pour marquer les écritures propres */
@@ -94364,7 +94394,7 @@ function _rtMarkMyWrite(id){
   var _orig = syncToSupabase;
   syncToSupabase = async function(table, obj){
     var r = await _orig.apply(this, arguments);
-    if (obj && obj.id) _rtMarkMyWrite(obj.id);
+    if (obj && obj.id) _rtMarkMyWrite(obj.id, obj._modifie || '', false);
     return r;
   };
 })();
@@ -94374,7 +94404,7 @@ function _rtMarkMyWrite(id){
   var _orig = typeof deleteFromSupabase === 'function' ? deleteFromSupabase : null;
   if (!_orig) return;
   deleteFromSupabase = async function(table, id){
-    _rtMarkMyWrite(id);
+    _rtMarkMyWrite(id, null, true);
     return _orig.apply(this, arguments);
   };
 })();
@@ -94403,7 +94433,11 @@ async function _rtApply(table, eventType, newRow, oldRow){
   if (!DATA[store]) DATA[store] = [];
   var id = (newRow && newRow.id) || (oldRow && oldRow.id);
   if (!id) return;
-  if (_RT.myWrites[id]) return;    /* propre écriture reflétée → ignorer */
+  var _mw = _RT.myWrites[id];
+  if (_mw) {   /* propre écriture reflétée → ignorer ; mais JAMAIS la modification/suppression d'un AUTRE poste dans les 30 s */
+    if (eventType === 'DELETE') { if (_mw.del) return; }
+    else { var _inc = _supaUnwrap(table, newRow), _im = _inc && _inc._modifie; if (!_im || _mw.ms.indexOf(String(_im)) !== -1) return; }
+  }
 
   _RT.active && _RT._flash();
 
@@ -94424,7 +94458,7 @@ async function _rtApply(table, eventType, newRow, oldRow){
        Auto-guérison : on renvoie une suppression Supabase pour purger la
        ligne fantôme côté serveur, au lieu de la laisser revenir en boucle. */
     if (typeof tombHas === 'function' && tombHas(store, incoming.id)) {
-      try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, incoming.id); } catch(e){}
+      try { if (typeof deleteFromSupabase === 'function' && tombPartage(store, incoming.id)) deleteFromSupabase(table, incoming.id); } catch(e){}
       return;
     }
     var idx = DATA[store].findIndex(function(x){ return x.id === incoming.id; });
@@ -124455,6 +124489,8 @@ function tombAdd(store, id) {
   var t = _tombLoad(); t[store] = t[store] || [];
   if (t[store].indexOf(String(id)) === -1) { t[store].push(String(id)); _tombSave(t); }
 }
+/* Suppression PARTAGÉE (pi_suppressions, réellement voulue et propagée) — par opposition à un tombstone local hérité d'une remise à zéro ou d'un import annulé. */
+function tombPartage(store, id) { return (DATA.suppressions_sync || []).some(function(t){ return t && t.store === store && t.record_id !== undefined && String(t.record_id) === String(id); }); }
 function tombHas(store, id) { var t = _tombLoad(); return (t[store] || []).indexOf(String(id)) !== -1; }
 function tombRemove(store, id) { var t = _tombLoad(); if (t[store]) { t[store] = t[store].filter(function(x){ return x !== String(id); }); _tombSave(t); } }
 function tombList() { return _tombLoad(); }
