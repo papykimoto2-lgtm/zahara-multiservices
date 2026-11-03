@@ -7655,7 +7655,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
               </div>
               <div class="form-group">
                 <label>Clé API Anthropic</label>
-                <input type="password" id="param-ia-key" class="form-control" placeholder="sk-ant-..." autocomplete="off">
+                <div style="font-size:12px;">Clé gérée côté serveur (Vercel : <code>ANTHROPIC_API_KEY</code>). Aucune saisie nécessaire.</div>
               </div>
               <div style="display:flex;gap:10px;margin-top:12px;">
                 <button class="btn btn-primary btn-sm" style="background:linear-gradient(135deg,#7C3AED,#4A94E0);border:none;" onclick="saveIAConfig()">💾 Enregistrer la clé IA</button>
@@ -24864,6 +24864,12 @@ var APP = {
          financement programme, caisse, souscriptions) */
       { code: '31',   label: 'Stocks de marchandises',                          classe: '3', nature: 'actif' },
       { code: '4011', label: 'Fournisseurs — dettes en compte',                 classe: '4', nature: 'passif' },
+      /* ── Comptes SYSCOHADA révisé manquants (ajout seul : aucun code existant n'est modifié ; 131/139 volontairement exclus : la clôture suit alors le plan, 121/129) ── */
+      { code: '4441', label: 'État, TVA due',                                   classe: '4', nature: 'passif' },
+      { code: '4449', label: 'État, crédit de TVA à reporter',                  classe: '4', nature: 'actif' },
+      { code: '4451', label: 'État, TVA récupérable sur immobilisations',       classe: '4', nature: 'actif' },
+      { code: '4454', label: 'État, TVA récupérable sur services extérieurs',   classe: '4', nature: 'actif' },
+      { code: '891',  label: 'Impôts sur les bénéfices de l\'exercice',         classe: '8', nature: 'charge' },
       { code: '4452', label: 'État, TVA récupérable sur achats',                classe: '4', nature: 'variable' },
       { code: '4471', label: 'État, impôts retenus à la source (AIRSI)',        classe: '4', nature: 'passif' },
       { code: '4651', label: 'Financeurs — apports reçus sur programmes',       classe: '4', nature: 'passif' },
@@ -26056,13 +26062,10 @@ async function iaaAppelBoucle(messages) {
   var rounds = 0;
   while (rounds < 5) {
     rounds++;
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    var resp = await fetch('/api/ia-proxy', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': IA.key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
@@ -26269,9 +26272,9 @@ async function iaComptaSynthese() {
     var resume = anomalies.map(function (a) { return '[' + a.niveau + '] ' + a.categorie + ' (' + a.ref + ') : ' + a.texte; }).join('\n') || 'Aucune anomalie détectée.';
     var prompt = "Tu es un expert-comptable SYSCOHADA/OHADA. Voici les anomalies détectées automatiquement dans le journal comptable d'une entreprise ivoirienne :\n\n" + resume
       + "\n\nRédige une synthèse courte (6-10 lignes max) en français : priorise les 3 actions les plus urgentes, explique brièvement le risque de chaque catégorie, et propose une correction concrète pour chacune. Sois direct et opérationnel.";
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    var resp = await fetch('/api/ia-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': IA.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 800, messages: [{ role: 'user', content: prompt }] })
     });
     if (!resp.ok) throw new Error('API error ' + resp.status);
@@ -26300,9 +26303,9 @@ async function iaComptaGenererEcriture() {
       + "Utilise UNIQUEMENT des codes du plan comptable fourni. Si le montant n'est pas explicite dans le texte, estime-le au mieux ou mets 0 sur chaque ligne et signale-le dans l'explication.\n\n"
       + "Réponds UNIQUEMENT en JSON valide, sans texte autour :\n"
       + '{ "lignes": [ {"compte":"<code>","sens":"D|C","montant":<number>,"libelle":"<string>"}, ... ], "journal_suggere":"<achats|ventes|banque|caisse|od|général>", "explication":"<string 1-2 phrases>" }';
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    var resp = await fetch('/api/ia-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': IA.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
     });
     if (!resp.ok) throw new Error('API error ' + resp.status);
@@ -26361,17 +26364,13 @@ function iaComptaPrevisionTexte() {
     + '(Projection linéaire simple basée sur la tendance récente — à ajuster selon les événements connus.)';
 }
 
+/* La clé Anthropic est gardée côté serveur (variable Vercel ANTHROPIC_API_KEY, relais /api/ia-proxy) : plus rien dans le navigateur. */
 function getIAConfig() {
-  var k = (localStorage.getItem('ia_anthropic_key') || '').trim();
-  IA.key = k;
+  try { localStorage.removeItem('ia_anthropic_key'); } catch (e) {}
+  IA.key = 'serveur';
 }
 function saveIAConfig() {
-  var k = (document.getElementById('param-ia-key') || {}).value;
-  if (!k) { k = ''; }
-  k = k.trim();
-  localStorage.setItem('ia_anthropic_key', k);
-  IA.key = k;
-  toast(k ? '🤖 Clé IA enregistrée.' : '🤖 Clé IA effacée.', k ? 'success' : 'info');
+  toast('🤖 La clé IA est gérée côté serveur (Vercel : ANTHROPIC_API_KEY).', 'info');
 }
 
 /* Projet Supabase de ce déploiement : lu une seule fois depuis l'écran de
@@ -44928,6 +44927,18 @@ function prochainNumeroRef(store, prefixe, annee, largeur) {
       if (!isNaN(n) && n > max) max = n;
     }
   });
+  /* Écritures : numéro JAMAIS réutilisé. Plus haut numéro attribué mémorisé dans params.seq_ecr, même si la pièce est supprimée ensuite. */
+  if (store === 'ecritures') {
+    DATA.params = DATA.params || {};
+    var seq = DATA.params.seq_ecr || (DATA.params.seq_ecr = {});
+    var cle = prefixe + '-' + annee;
+    if ((seq[cle] || 0) > max) max = seq[cle];
+    seq[cle] = max + 1;
+    try {
+      _paramsToucher();
+      Promise.resolve(dbPut('params', DATA.params)).then(function(){ if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params); }).catch(function(){});
+    } catch (e) {}
+  }
   return String(max + 1).padStart(largeur || 4, '0');
 }
 
@@ -51887,9 +51898,11 @@ function buildTresorerie() {
 }
 
 async function deleteEcriture(id) {
-  if (!confirm('Supprimer cette écriture ?')) return;
+  if (!confirm('Supprimer cette écriture ?\nSon numéro ne sera pas réutilisé (la suppression est tracée au journal d\'audit).')) return;
+  var _eSup = (DATA.ecritures || []).filter(function(x){ return x.id === id; })[0];
   var ok = await deleteRecord('ecritures', id);
   if (ok === false) return; /* bloqué : exercice clos ou élément référencé ailleurs */
+  if (_eSup && typeof logAction === 'function') logAction('SUPPRESSION_ECRITURE', (_eSup.ref || _eSup.id) + ' — ' + (_eSup.libelle || '') + ' — ' + (_eSup.date || ''));
   filterEcritures();
   buildCompteResultat();
   toast('Écriture supprimée.', 'info');
@@ -54030,7 +54043,7 @@ function loadParamFields() {
   sv('param-sb-url', SB.url);
   sv('param-sb-key', SB.key);
   getIAConfig();
-  sv('param-ia-key', IA.key);
+  
   setTimeout(updateSBStatusBadge, 50);
   // Charger rôles custom et reconstruire la matrice
   loadCustomRoles().then(function(){ rebuildRoleMatrix(); renderRolesList(); renderRolesMatrix(); });
@@ -96644,13 +96657,10 @@ async function lancerAnalyseIA(force) {
     if (!IA.key) {
       throw new Error('Clé API Anthropic non configurée. Allez dans Paramètres → Intelligence Artificielle pour saisir votre clé sk-ant-...');
     }
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    var resp = await fetch('/api/ia-proxy', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': IA.key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
@@ -115470,13 +115480,10 @@ async function _scanImageIA(fl, isPdfImage) {
     + 'Renvoie UNIQUEMENT un JSON : {"bornes":[{"nom":"B1","x":123456.78,"y":234567.89,"z":0}]}. '
     + 'X = Est/Easting/Abscisse, Y = Nord/Northing/Ordonnée, Z = altitude si présente sinon 0. '
     + 'Coordonnées UTM en mètres. Aucun texte hors JSON.';
-  var resp = await fetch('https://api.anthropic.com/v1/messages', {
+  var resp = await fetch('/api/ia-proxy', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': IA.key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
@@ -115552,9 +115559,9 @@ async function mrcScanPlanMasse() {
       + 'usage ∈ residentiel|commercial|voirie|espace_vert|equipement. '
       + 'type réserve ∈ voirie|espace_vert|equipement|servitude. '
       + 'Superficies en m². Si une info manque, mets 0 ou "". Aucun texte hors JSON.';
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    var resp = await fetch('/api/ia-proxy', {
       method: 'POST',
-      headers: { 'Content-Type':'application/json', 'x-api-key':IA.key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+      headers: { 'Content-Type':'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514', max_tokens: 4000,
         messages: [{ role:'user', content: [
@@ -115937,9 +115944,9 @@ async function dqeScanPlanAnalyser() {
       + '"murs":[{"type":"porteur","x1":5,"y1":10,"x2":60,"y2":10,"epaisseur":0.20},{"type":"cloison","x1":35,"y1":15,"x2":35,"y2":40,"epaisseur":0.10}], '
       + '"surface_totale_habitable":0, "nb_chambres":0}. '
       + 'Longueur/largeur/épaisseur en mètres, surface en m², bbox et x1/y1/x2/y2 en pourcentage (0-100) de l\'image — jamais en mètres ni en pixels. N\'inclus PAS les portes, fenêtres — uniquement les pièces et les murs.';
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    var resp = await fetch('/api/ia-proxy', {
       method: 'POST',
-      headers: { 'Content-Type':'application/json', 'x-api-key':IA.key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+      headers: { 'Content-Type':'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514', max_tokens: 4000,
         messages: [{ role:'user', content: [
