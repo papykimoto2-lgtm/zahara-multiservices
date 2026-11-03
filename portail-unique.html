@@ -6868,11 +6868,24 @@
   function _anaDemarrer(){
     ANALYTICS.sessionId = _anaUid();
     ANALYTICS.debut = Date.now();
+    var sid = ANALYTICS.sessionId;
     _anaEnvoyer({
-      session_id: ANALYTICS.sessionId, event_type:'session_start',
+      session_id: sid, event_type:'session_start',
       timezone: _anaTimezone(), langue: navigator.language || '',
       appareil: _anaAppareil(), referrer_domaine: _anaReferrerDomaine()
-    });
+    }).then(function(){ _anaLocaliser(sid); });
+  }
+  /* Pays et ville : déduits côté serveur de l'adresse IP, qui n'est jamais stockée.
+     Désactivé si le navigateur envoie « Ne pas me suivre » ou Global Privacy Control. */
+  function _anaLocaliser(sid){
+    try {
+      if (navigator.doNotTrack === '1' || window.doNotTrack === '1' || navigator.globalPrivacyControl) return;
+      fetch(SB_URL+'/functions/v1/portail-geo', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY },
+        body: JSON.stringify({ session_id: sid })
+      }).catch(function(){});
+    } catch(e){}
   }
   function _anaOngletVu(nom){
     if (!nom || ANALYTICS.ongletsVus[nom]) return; /* un seul événement par onglet et par visite */
