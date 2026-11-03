@@ -140440,6 +140440,198 @@ function caisseBanniereApresCloture() {
     + '. Le solde et l\'écart de ces sessions ont été recalculés : vérifiez-les avant toute régularisation.</div>';
 }
 
+/* ═══ NOTIFICATIONS DE CAISSE PAR WHATSAPP / E-MAIL ═══════════════════
+   Texte de synthèse (caisses visibles : état, solde, bons en attente, à ventiler + alertes) envoyé au choix par
+   WhatsApp (lien wa.me) ou e-mail (EmailJS s'il est configuré, sinon application de messagerie). */
+function caisseNotifTexte(seuilH) {
+  seuilH = seuilH || 24;
+  var soc = (DATA.params && DATA.params.societe) || 'ImmoSuite ERP';
+  var vis = caissesVisibles(), n = new Date();
+  var t = '💰 État des caisses — ' + soc + '\n' + n.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+    + ' à ' + n.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '\n';
+  vis.forEach(function(c){
+    var ses = caisseGetSessionOuverte(c.id);
+    var mv = DATA.caisse_mouvements || [];
+    var attente = mv.filter(function(m){ return m.caisse_id === c.id && m.requiert_validation && m.valide !== true && !m.rejete; }).length;
+    var aVent = mv.filter(function(m){
+      if (m.caisse_id !== c.id || !_caisseMvtEffectif(m) || m.statut === 'ventile') return false;
+      var s = (DATA.caisse_sessions || []).find(function(x){ return x.id === m.session_id; });
+      return s && s.statut === 'cloturee';
+    });
+    var montVent = aVent.reduce(function(a, m){ return a + (parseFloat(m.montant) || 0); }, 0);
+    t += '\n• ' + (c.nom || '?') + ' : ' + (ses ? 'OUVERTE — ' + fmtF(caisseSoldeSession(ses)) + ' FCFA en caisse' : 'fermée');
+    if (attente) t += '\n   ⏳ ' + attente + ' bon(s) en attente de validation';
+    if (aVent.length) t += '\n   🧾 ' + aVent.length + ' à ventiler (' + fmtF(montVent) + ' FCFA)';
+  });
+  var alertes = [];
+  caisseSessionsAnciennes(seuilH).forEach(function(s){
+    var c = (DATA.caisses || []).find(function(x){ return x.id === s.caisse_id; });
+    alertes.push('⚠️ Session ouverte depuis plus de ' + seuilH + ' h : ' + (c ? c.nom : '?') + ' (ouverte le ' + dateShort(String(s.date || '').slice(0, 10)) + ' par ' + (s.ouverte_par || '—') + ', ' + Math.round(caisseHeuresOuverte(s)) + ' h)');
+  });
+  var limite = Date.now() - 7 * 86400000, ids = vis.map(function(c){ return c.id; }), par = {};
+  (DATA.caisse_mouvements || []).forEach(function(m){
+    var tm = new Date(m.valide_le || m.created_at || 0).getTime();
+    if (!(m.saisi_apres_cloture || m.valide_apres_cloture) || ids.indexOf(m.caisse_id) < 0 || tm < limite) return;
+    var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
+    var sx = (DATA.caisse_sessions || []).find(function(x){ return x.id === m.session_id; });
+    var k = (c ? c.nom : '?') + ' — session du ' + (sx ? dateShort(String(sx.date || '').slice(0, 10)) : '?');
+    par[k] = (par[k] || 0) + 1;
+  });
+  Object.keys(par).forEach(function(k){ alertes.push('⚠️ Bon(s) ajouté(s) ou validé(s) après clôture (7 j) : ' + k + ' (' + par[k] + ')'); });
+  t += '\n\n' + (alertes.length ? 'Alertes :\n' + alertes.join('\n') : '✅ Aucune alerte.');
+  return t;
+}
+function caisseNotifDestinataires() {
+  return (DATA.users || []).filter(function(u){ return u.actif !== false && (u.tel || u.email); });
+}
+function caisseNotifOuvrir() {
+  if (!caissesVisibles().length) { toast('Aucune caisse à notifier.', 'info'); return; }
+  var old = document.getElementById('modal-caisse-notif'); if (old) old.remove();
+  var us = caisseNotifDestinataires();
+  var opts = '<option value="">— Choisir un destinataire —</option>' + us.map(function(u){
+    return '<option value="' + escHtml(u.id) + '">' + escHtml((u.nom || u.login || '?') + (u.role ? ' (' + u.role + ')' : '')) + '</option>';
+  }).join('');
+  var st = 'width:100%;padding:8px;border:1px solid var(--bordure,#ccc);border-radius:8px;background:var(--card2);color:var(--blanc);font-size:13px;margin-top:4px;';
+  var d = document.createElement('div');
+  d.id = 'modal-caisse-notif';
+  d.setAttribute('style', 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:14px;');
+  d.innerHTML = '<div style="background:var(--card);color:var(--blanc);border-radius:14px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:18px;">'
+    + '<h3 style="margin:0 0 10px;font-size:16px;">📤 Envoyer l\'état des caisses</h3>'
+    + '<label style="font-size:12px;">Destinataire</label><select id="cn-dest" style="' + st + '" onchange="caisseNotifChoisir()">' + opts + '</select>'
+    + '<label style="font-size:12px;display:block;margin-top:8px;">WhatsApp (numéro)</label><input id="cn-tel" style="' + st + '" placeholder="Ex. 07 00 00 00 00 — vide : choisir le contact dans WhatsApp" inputmode="tel">'
+    + '<label style="font-size:12px;display:block;margin-top:8px;">E-mail</label><input id="cn-mail" style="' + st + '" placeholder="adresse@exemple.com" inputmode="email">'
+    + '<label style="font-size:12px;display:block;margin-top:8px;">Message (modifiable)</label><textarea id="cn-msg" rows="11" style="' + st + 'font-family:inherit;">' + escHtml(caisseNotifTexte()) + '</textarea>'
+    + caisseNotifAutoHtml(st)
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+    + '<button class="btn btn-success" onclick="caisseNotifEnvoyerWA()">💬 WhatsApp</button>'
+    + '<button class="btn btn-primary" onclick="caisseNotifEnvoyerEmail()">✉️ E-mail</button>'
+    + '<button class="btn btn-secondary" onclick="document.getElementById(\'modal-caisse-notif\').remove()">Fermer</button></div></div>';
+  document.body.appendChild(d);
+}
+function caisseNotifChoisir() {
+  var id = (document.getElementById('cn-dest') || {}).value;
+  var u = (DATA.users || []).find(function(x){ return x.id === id; });
+  document.getElementById('cn-tel').value = u && u.tel ? u.tel : '';
+  document.getElementById('cn-mail').value = u && u.email ? u.email : '';
+}
+function caisseNotifEnvoyerWA() {
+  var msg = (document.getElementById('cn-msg') || {}).value || '';
+  var tel = ((document.getElementById('cn-tel') || {}).value || '').trim();
+  if (!msg.trim()) { toast('Message vide.', 'error'); return; }
+  var num = tel ? telWhatsApp(tel) : '';
+  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank');
+  toast(tel ? 'Message WhatsApp préparé.' : 'WhatsApp ouvert : choisissez le contact.', 'success');
+}
+async function caisseNotifEnvoyerEmail() {
+  var msg = (document.getElementById('cn-msg') || {}).value || '';
+  var to = ((document.getElementById('cn-mail') || {}).value || '').trim();
+  var p = DATA.params || {}, soc = p.societe || 'ImmoSuite ERP';
+  var sujet = 'État des caisses — ' + soc;
+  if (!msg.trim()) { toast('Message vide.', 'error'); return; }
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { toast('Adresse e-mail invalide.', 'error'); return; }
+  if (p.emailjs_service && p.emailjs_template && typeof emailjs !== 'undefined') {
+    try {
+      await emailjs.send(p.emailjs_service, p.emailjs_template, { to_email: to, to_name: '', subject: sujet, message: msg, from_name: soc, reply_to: p.email || '' });
+      toast('E-mail envoyé à ' + to + '.', 'success');
+      return;
+    } catch (e) { toast('Envoi EmailJS impossible : ouverture de votre messagerie.', 'error'); }
+  }
+  window.location.href = 'mailto:' + encodeURIComponent(to) + '?subject=' + encodeURIComponent(sujet) + '&body=' + encodeURIComponent(msg);
+}
+function caisseBarreNotif() {
+  return '<div style="grid-column:1/-1;display:flex;justify-content:flex-end;">'
+    + '<button class="btn btn-secondary btn-sm" onclick="caisseNotifOuvrir()" title="Envoyer l\'état des caisses et les alertes par WhatsApp ou e-mail">📤 Envoyer l\'état par WhatsApp / e-mail</button></div>';
+}
+
+/* ── Envoi automatique par e-mail des sessions ouvertes depuis trop longtemps ──
+   Réglages dans DATA.params.caisse_notif_auto (synchronisés) : { actif, seuil_h, relance_h, emails, dernier:{sessionId:ISO} }.
+   S'exécute tant que Menko Immo est ouvert sur l'appareil d'un administrateur, manager ou comptable (aucun serveur) ;
+   utilise EmailJS (Paramètres › Communications). Une session n'est notifiée qu'une fois par période de relance.
+   WhatsApp ne peut pas être envoyé automatiquement (aucune API branchée) : il reste manuel. */
+function caisseNotifAutoConfig() {
+  return Object.assign({ actif: false, serveur: false, seuil_h: 24, relance_h: 24, emails: '', dernier: {} }, (DATA.params && DATA.params.caisse_notif_auto) || {});
+}
+function caisseNotifAutoHtml(st) {
+  var c = caisseNotifAutoConfig();
+  return '<details style="margin-top:12px;border:1px solid var(--bordure,#ccc);border-radius:8px;padding:8px 10px;"' + (c.actif ? ' open' : '') + '>'
+    + '<summary style="cursor:pointer;font-size:13px;font-weight:600;">⚙️ Envoi automatique par e-mail' + (c.actif ? ' — activé' : '') + '</summary>'
+    + '<p style="font-size:12px;color:var(--blanc-dim);margin:6px 0;">Un e-mail est envoyé quand une session reste ouverte au-delà du seuil. Il part tant que Menko Immo est ouvert sur l\'appareil d\'un administrateur, manager ou comptable, via EmailJS (Paramètres › Communications).</p>'
+    + '<label style="font-size:12px;"><input type="checkbox" id="cn-auto-actif"' + (c.actif ? ' checked' : '') + '> Activer l\'envoi automatique</label>'
+    + '<label style="font-size:12px;display:block;margin-top:6px;">Mode d\'envoi</label>'
+    + '<select id="cn-auto-mode" style="' + st + '"><option value="nav"' + (c.serveur ? '' : ' selected') + '>Navigateur (application ouverte)</option>'
+    + '<option value="srv"' + (c.serveur ? ' selected' : '') + '>Serveur 24 h/24 (application fermée possible)</option></select>'
+    + '<div style="display:flex;gap:8px;margin-top:6px;"><div style="flex:1;"><label style="font-size:12px;">Seuil (heures)</label><input id="cn-auto-seuil" type="number" min="1" value="' + escHtml(String(c.seuil_h)) + '" style="' + st + '"></div>'
+    + '<div style="flex:1;"><label style="font-size:12px;">Relance (heures)</label><input id="cn-auto-relance" type="number" min="1" value="' + escHtml(String(c.relance_h)) + '" style="' + st + '"></div></div>'
+    + '<label style="font-size:12px;display:block;margin-top:6px;">Destinataires (adresses e-mail séparées par une virgule)</label>'
+    + '<textarea id="cn-auto-emails" rows="2" style="' + st + '" placeholder="dg@exemple.com, compta@exemple.com">' + escHtml(c.emails || '') + '</textarea>'
+    + '<div style="margin-top:8px;"><button class="btn btn-primary btn-sm" onclick="caisseNotifAutoSauver()">💾 Enregistrer</button></div></details>';
+}
+function caisseNotifAutoEmails(txt) {
+  return String(txt || '').split(/[,;\s]+/).filter(Boolean);
+}
+async function caisseNotifAutoSauver() {
+  var emails = caisseNotifAutoEmails((document.getElementById('cn-auto-emails') || {}).value);
+  var bad = emails.filter(function(x){ return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x); });
+  var actif = !!(document.getElementById('cn-auto-actif') || {}).checked;
+  if (bad.length) { toast('Adresse invalide : ' + bad[0], 'error'); return; }
+  if (actif && !emails.length) { toast('Ajoutez au moins une adresse e-mail pour activer l\'envoi.', 'error'); return; }
+  var old = caisseNotifAutoConfig();
+  DATA.params = DATA.params || {};
+  DATA.params.caisse_notif_auto = {
+    actif: actif, serveur: ((document.getElementById('cn-auto-mode') || {}).value === 'srv'), emails: emails.join(', '), dernier: old.dernier || {},
+    seuil_h: Math.max(1, parseFloat((document.getElementById('cn-auto-seuil') || {}).value) || 24),
+    relance_h: Math.max(1, parseFloat((document.getElementById('cn-auto-relance') || {}).value) || 24)
+  };
+  /* Mode serveur : la fonction lit l'identifiant de service, le modèle et la clé PUBLIQUE EmailJS ici
+     (la clé privée reste un secret du serveur) ; ces trois valeurs ne sont pas confidentielles. */
+  if (DATA.params.caisse_notif_auto.serveur && DATA.params.emailjs_service) {
+    DATA.params.caisse_notif_auto.emailjs = { service: DATA.params.emailjs_service, template: DATA.params.emailjs_template, key: DATA.params.emailjs_key };
+  }
+  _paramsToucher();
+  try { await dbPut('params', DATA.params); if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params); } catch (e) {}
+  var p = DATA.params;
+  var avert = (actif && (!p.emailjs_service || !p.emailjs_template || !p.emailjs_key)) ? ' EmailJS n\'est pas encore configuré : rien ne partira avant.' : '';
+  if (actif && DATA.params.caisse_notif_auto.serveur && !avert) avert = ' Mode serveur : la clé privée EmailJS doit être enregistrée comme secret « EMAILJS_PRIVATE_KEY » dans Supabase.';
+  toast(actif ? 'Envoi automatique activé.' + avert : 'Envoi automatique désactivé.', avert ? 'error' : 'success');
+}
+async function caisseNotifAutoCycle() {
+  try {
+    if (!APP.currentUser || !caisseRoleAdminLike()) return { ignore: 'role' };
+    var cfg = caisseNotifAutoConfig(), p = DATA.params || {};
+    if (!cfg.actif) return { ignore: 'inactif' };
+    if (cfg.serveur) return { ignore: 'serveur' };   /* l'envoi est assuré par la fonction Supabase caisse-alertes */
+    var dest = caisseNotifAutoEmails(cfg.emails).filter(function(x){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x); });
+    if (!dest.length) return { ignore: 'sans_destinataire' };
+    if (!p.emailjs_service || !p.emailjs_template || !p.emailjs_key || typeof emailjs === 'undefined') return { ignore: 'emailjs' };
+    var seuil = Math.max(1, parseFloat(cfg.seuil_h) || 24), relance = Math.max(1, parseFloat(cfg.relance_h) || 24) * 3600000, now = Date.now();
+    var dernier = cfg.dernier || {};
+    var dues = caisseSessionsAnciennes(seuil).filter(function(s){ var d = dernier[s.id]; return !d || now - new Date(d).getTime() >= relance; });
+    if (!dues.length) return { rien: true };
+    var soc = p.societe || 'ImmoSuite ERP', msg = caisseNotifTexte(seuil), ok = 0;
+    emailjs.init(p.emailjs_key);
+    for (var i = 0; i < dest.length; i++) {
+      try {
+        await emailjs.send(p.emailjs_service, p.emailjs_template, { to_email: dest[i], to_name: '', subject: '⚠️ ' + soc + ' — ' + dues.length + ' caisse(s) ouverte(s) depuis plus de ' + seuil + ' h', message: msg, from_name: soc, reply_to: p.email || '' });
+        ok++;
+      } catch (e) { console.warn('[Caisse notif auto] échec e-mail', dest[i], e); }
+    }
+    if (ok) {
+      var ouvertes = {}; (DATA.caisse_sessions || []).forEach(function(s){ if (s.statut === 'ouverte') ouvertes[s.id] = true; });
+      var nv = {}; Object.keys(dernier).forEach(function(k){ if (ouvertes[k]) nv[k] = dernier[k]; });
+      dues.forEach(function(s){ nv[s.id] = new Date(now).toISOString(); });
+      DATA.params.caisse_notif_auto = Object.assign({}, cfg, { dernier: nv });
+      _paramsToucher();
+      try { await dbPut('params', DATA.params); if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params); } catch (e) {}
+      if (typeof toast === 'function') toast('Alerte caisse envoyée par e-mail (' + dues.length + ' session(s)).', 'info');
+    }
+    return { envoyes: ok, sessions: dues.length };
+  } catch (e) { console.warn('[Caisse notif auto]', e); return { erreur: String(e && e.message || e) }; }
+}
+if (!window._caisseNotifAutoTimer) {
+  window._caisseNotifAutoTimer = setInterval(function(){ caisseNotifAutoCycle(); }, 30 * 60000);
+  setTimeout(function(){ caisseNotifAutoCycle(); }, 60000);
+}
+
 /* ═══ RAPPROCHEMENT CUMULÉ PAR CAISSE ═══════════════════════════════════
    Écart réel = dernier comptage − (premier fond + tous les mouvements validés des sessions clôturées).
    Indépendant des écarts enregistrés session par session, qui peuvent se compenser ou se masquer
@@ -141599,7 +141791,7 @@ function caisseRenderListe() {
       + '</div>';
     return;
   }
-  el.innerHTML = caisseBanniereAnciennes() + caisseBanniereReprise() + caisseBanniereApresCloture() + caisseBanniereRemises() + liste.map(function(c) {
+  el.innerHTML = caisseBarreNotif() + caisseBanniereAnciennes() + caisseBanniereReprise() + caisseBanniereApresCloture() + caisseBanniereRemises() + liste.map(function(c) {
     var session = caisseGetSessionOuverte(c.id);
     var ouverte = !!session;
     var solde = ouverte ? caisseSoldeSession(session) : null;
