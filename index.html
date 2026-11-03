@@ -3811,6 +3811,8 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <button class="btn btn-secondary" onclick="backfillEcrituresVersements()" title="Génère les écritures comptables manquantes pour les versements déjà saisis">🧾 Générer écritures manquantes</button>
           <button class="btn btn-secondary" onclick="backfillVentesTerrains()" title="Comptabilise les ventes de parcelles (terrains vendus) sans écriture">🗺️ Comptabiliser ventes terrains</button>
           <button class="btn btn-secondary" onclick="backfillVentesLogements()" title="Comptabilise les ventes de logements (maisons/appartements vendus) sans écriture">🏠 Comptabiliser ventes logements</button>
+          <button class="btn btn-secondary" onclick="regulariserStatutsLots()" title="Passe en « vendu » (et comptabilise la vente) les lots dont le souscripteur a atteint le seuil d'immobilisation">🔄 Régulariser les statuts</button>
+          <button class="btn btn-secondary" onclick="reaffecterDivisionsEcritures()" title="Aligne la division des écritures de vente et de versement sur celle du programme du lot">🏷️ Réaffecter les divisions</button>
           <button class="btn btn-primary" onclick="openPaiementModal()">+ Enregistrer un versement</button>
         </div>
 
@@ -37311,6 +37313,19 @@ function _compteTresoVersement(mode) {
   var cd = (DATA.params && DATA.params.comptes_defaut) || {};
   return mode === 'especes' ? (_compteCaisseSouscripteurs()) : (mode === 'mobile_money' ? (requireCompteDefaut('treso_mobile')) : (requireCompteDefaut('treso_banque')));
 }
+/* Division d'un versement : lot principal, puis programme du souscripteur, puis lots supplémentaires.
+   Avant : seul client.lot_id comptait ; un souscripteur sans lot principal (multi-lots, programme seul)
+   produisait des versements SANS division, exclus des divisions et regroupés sous « Non affecté ». */
+function _divisionClientVersement(client) {
+  if (!client) return '';
+  var ids = [client.lot_id].concat(client.lot_ids || []).filter(Boolean);
+  for (var i = 0; i < ids.length; i++) {
+    var l = (DATA.lots || []).find(function(x){ return x.id === ids[i]; });
+    var d = l ? _progDivId(l.programme_id) : '';
+    if (d) return d;
+  }
+  return _progDivId(client.programme_id) || '';
+}
 async function genererEcritureVersement(versement) {
   var client = DATA.clients.find(function(c){ return c.id === versement.client_id; }) || {};
   var nomClient = (client.nom || '') + ' ' + (client.prenoms || '');
@@ -37319,8 +37334,7 @@ async function genererEcritureVersement(versement) {
   var cd = (DATA.params && DATA.params.comptes_defaut) || {};
   var compteCredit = estFrais ? requireParamCompte('compte_frais_souscription', 'Compte produit des frais de souscription') : (requireCompteDefaut('client_lots'));
   var typeLabels = { apport: 'Apport initial', mensualite: 'Mensualité', regularisation: 'Régularisation', frais_souscription: 'Frais de souscription', autre: 'Versement' };
-  var lotClient = client.lot_id ? (DATA.lots || []).find(function(l){ return l.id === client.lot_id; }) : null;
-  var progClient = lotClient ? (DATA.programmes || []).find(function(p){ return p.id === lotClient.programme_id; }) : null;
+  var divVersement = _divisionClientVersement(client);
   var ecr = {
     id: 'ecr_vrs_' + versement.id,
     ref: versement.ref || ('VRS-' + versement.id),
@@ -37337,7 +37351,7 @@ async function genererEcritureVersement(versement) {
       { compte: compteTreso, sens: 'D', montant: parseFloat(versement.montant) || 0 },
       { compte: compteCredit, sens: 'C', montant: parseFloat(versement.montant) || 0, tiers_id: estFrais ? undefined : versement.client_id }
     ],
-    division: (progClient && progClient.division_id) || '',
+    division: divVersement,
     montant: parseFloat(versement.montant) || 0,
     type: 'actif',
     mode: versement.mode,
@@ -37498,6 +37512,69 @@ async function supprimerVenteLogement(lotId) {
   if (DATA.ecritures.some(function(e){ return e.id === ecrId; })) {
     await deleteRecord('ecritures', ecrId, { skipIntegrity: true });
   }
+}
+
+/* Régularisation : recalcule le statut des lots de tous les souscripteurs ayant atteint le seuil
+   d'immobilisation mais dont un lot n'est pas « vendu ». Réutilise majStatutLotClient, qui
+   passe le lot en « vendu » et comptabilise la vente (idempotent). */
+async function regulariserStatutsLots() {
+  var seuil = parseFloat((DATA.params || {}).seuil_immobilisation_pct) || 70;
+  var cibles = (DATA.clients || []).filter(function(c){
+    var total = parseFloat(c.montant_total) || 0;
+    if (total <= 0 || totalPayePrix(c.id) / total * 100 < seuil) return false;
+    return _lotIdsDeClient(c).some(function(id){
+      var l = (DATA.lots || []).find(function(x){ return x.id === id; });
+      return l && l.statut !== 'vendu';
+    });
+  });
+  if (!cibles.length) { toast('Aucun lot à régulariser : tous les souscripteurs au seuil sont « vendu ».', 'success'); return; }
+  if (!confirm(cibles.length + ' souscripteur(s) ont atteint ' + seuil + ' % mais leur lot n\'est pas « vendu ».\n\nPasser leurs lots en « vendu » et comptabiliser les ventes (4111/702) ?')) return;
+  var ok = 0, ko = 0;
+  for (var i = 0; i < cibles.length; i++) {
+    try { await majStatutLotClient(cibles[i].id); ok++; }
+    catch (e) { ko++; console.warn('[Régularisation statuts]', cibles[i].id, e); }
+  }
+  if (typeof buildBalance === 'function') buildBalance();
+  if (typeof buildBilan === 'function') buildBilan();
+  if (typeof filterEcritures === 'function') filterEcritures();
+  if (typeof publierSyntheseHub === 'function') publierSyntheseHub();
+  toast(ok + ' souscripteur(s) régularisé(s)' + (ko ? ' · ' + ko + ' en erreur (comptes de vente à paramétrer ?)' : '') + '.', ko ? 'error' : 'success');
+}
+
+/* Réaffectation : aligne la division des écritures de vente (ecr_vente_*) et de versement (ecr_vrs_*)
+   sur celle du programme, pour les écritures créées avant que le programme ait une division.
+   Ne touche jamais une écriture dont le programme n'a pas de division, ni les autres écritures. */
+async function reaffecterDivisionsEcritures() {
+  var maj = [];
+  (DATA.ecritures || []).forEach(function(e){
+    var id = e && e.id ? String(e.id) : '', cible = '';
+    var m = id.match(/^ecr_vente_(?:terrain|logement)_(.+)$/);
+    if (m) {
+      var lot = (DATA.lots || []).find(function(l){ return l.id === m[1]; });
+      cible = lot ? _progDivId(lot.programme_id) : '';
+    } else if (id.indexOf('ecr_vrs_') === 0) {
+      var cli = (DATA.clients || []).find(function(c){ return c.id === e.client_id; });
+      cible = cli ? _divisionClientVersement(cli) : '';
+    }
+    if (cible && (e.division || '') !== cible) maj.push({ e: e, cible: cible });
+  });
+  if (!maj.length) { toast('Aucune écriture à réaffecter : les divisions sont déjà alignées.', 'success'); return; }
+  var avant = maj.filter(function(x){ return !x.e.division; }).length;
+  if (!confirm(maj.length + ' écriture(s) de vente/versement seront rattachées à la division de leur programme (dont ' + avant + ' sans division).\n\nContinuer ?')) return;
+  var ok = 0;
+  for (var i = 0; i < maj.length; i++) {
+    try {
+      maj[i].e.division = maj[i].cible;
+      await dbPut('ecritures', maj[i].e);
+      if (typeof syncToSupabase === 'function') syncToSupabase('pi_ecritures', maj[i].e);
+      ok++;
+    } catch (err) { console.warn('[Réaffectation divisions]', maj[i].e.id, err); }
+  }
+  if (typeof buildBalance === 'function') buildBalance();
+  if (typeof buildBilan === 'function') buildBilan();
+  if (typeof filterEcritures === 'function') filterEcritures();
+  if (typeof publierSyntheseHub === 'function') publierSyntheseHub();
+  toast(ok + ' écriture(s) réaffectée(s)' + (ok < maj.length ? ' · ' + (maj.length - ok) + ' en erreur' : '') + '.', ok < maj.length ? 'error' : 'success');
 }
 
 /* Rattrapage : écritures de vente manquantes pour les logements déjà « vendu »
@@ -47547,12 +47624,20 @@ function _lfSoldes(annee, divF) {
   var s = {};
   var _depuis = ecrFiltreDepuisOuverture(parseInt(annee, 10), divF);
   (DATA.ecritures || []).forEach(function(e){
-    if (divF && e.division !== divF) return;
+    if (divF === DIV_SANS) { if (e.division) return; }
+    else if (divF && e.division !== divF) return;
     if (!e.date || e.date >= (parseInt(annee, 10) + 1) + '-01-01') return;
     if (!_depuis(e)) return;
     ecrLignes(e).forEach(function(l){
       var c = String(l.compte || ''); if (!c) return;
-      s[c] = (s[c] || 0) + (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant) || 0);
+      var cle = c;
+      /* Clients (41) et fournisseurs (40) : un solde par TIERS (clé « compte§tiers »). Le préfixe du compte est
+         conservé, donc les totaux par préfixe restent identiques ; mais le classement compte par compte peut
+         séparer les tiers débiteurs (actif) des tiers créditeurs (passif), comme la page Bilan. */
+      if ((c.indexOf('40') === 0 || c.indexOf('41') === 0) && typeof _lettRacine === 'function' && _lettRacine(c)) {
+        var tid = ecrTiersLigne(e, l); if (tid) cle = c + '§' + tid;
+      }
+      s[cle] = (s[cle] || 0) + (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant) || 0);
     });
   });
   return s;
@@ -47571,6 +47656,31 @@ function _lfS(soldes, prefixes, sauf) {
 }
 var _lfD = function(s, p, x){ return _lfS(s, p, x); };                 /* nature débitrice */
 var _lfC = function(s, p, x){ return -_lfS(s, p, x); };                /* nature créditrice */
+/* Classement PAR COMPTE et non par classe : un compte à solde débiteur va à l'actif, un compte à solde créditeur
+   va au passif, et chaque compte n'est repris qu'UNE fois. Sans cela, les comptes 42 à 47 (tiers à nature mixte)
+   figuraient à l'actif (solde net) ET au passif (solde net inversé) : le bilan était déséquilibré du solde net
+   de ces comptes. */
+function _lfParCompte(soldes, prefixes, sauf, signe) {
+  var tot = 0;
+  Object.keys(soldes).forEach(function(c){
+    if (!prefixes.some(function(p){ return c.indexOf(p) === 0; })) return;
+    if (sauf && sauf.some(function(p){ return c.indexOf(p) === 0; })) return;
+    var v = soldes[c];
+    if (signe > 0 ? v > 0 : v < 0) tot += Math.abs(v);
+  });
+  return tot;
+}
+var _lfSoldeDeb = function(s, p, x){ return _lfParCompte(s, p, x, 1); };   /* somme des comptes débiteurs */
+var _lfSoldeCre = function(s, p, x){ return _lfParCompte(s, p, x, -1); };  /* somme des comptes créditeurs */
+
+/* Banques et établissements financiers (52 à 56, hors 565) : classement COMPTE PAR COMPTE.
+   Un compte débiteur va à l'actif (Trésorerie-Actif), un compte créditeur au passif (DR, concours bancaires).
+   Avant : le solde NET de 52 à 58 allait à l'actif ET le solde créditeur net au passif — un découvert était
+   déduit de l'actif et ajouté au passif (bilan déséquilibré de son montant), et deux comptes bancaires
+   (l'un à découvert) se compensaient sans que le découvert n'apparaisse. 57 et 58 (caisses, régies) restent nets. */
+var _LF_BANQUES = ['52','53','54','55','56'];
+function _lfTresoActif(s) { return _lfSoldeDeb(s, _LF_BANQUES, ['565']) + _lfD(s, ['57','58']); }
+function _lfTresoDecouvert(s) { return _lfSoldeCre(s, _LF_BANQUES, ['565']); }
 
 function _lfCalc(annee, divF) {
   var s = _lfSoldes(annee, divF);
@@ -47598,15 +47708,15 @@ function _lfCalc(annee, divF) {
 
   B.BA = _lfD(s, ['485','488']);
   B.BB = _lfD(s, ['31','32','33','34','35','36','37','38']) + _lfC(s, ['39']);
-  B.BH = _lfD(s, ['409']);
-  B.BI = _lfD(s, ['41'], ['419']) + _lfC(s, ['491']);
-  B.BJ = _lfD(s, ['42','43','44','45','46','47'], ['485','488']) + _lfC(s, ['492','493','494','495','496','497','498']);
+  B.BH = _lfD(s, ['409']) + _lfSoldeDeb(s, ['40'], ['409']);          /* avances versées + fournisseurs débiteurs (par tiers) */
+  B.BI = _lfSoldeDeb(s, ['41'], ['419']) + _lfC(s, ['491']);         /* clients débiteurs (par tiers) */
+  B.BJ = _lfSoldeDeb(s, ['42','43','44','45','46','47'], ['485','488','478','479']) + _lfC(s, ['492','493','494','495','496','497','498']);
   B.BG = B.BH + B.BI + B.BJ;
   B.BK = B.BA + B.BB + B.BG;
 
   B.BQ = _lfD(s, ['50']) + _lfC(s, ['590']);
   B.BR = _lfD(s, ['51']) + _lfC(s, ['591']);
-  B.BS = _lfD(s, ['52','53','54','55','57','58']) + _lfC(s, ['592','593','594']);
+  B.BS = _lfTresoActif(s) + _lfC(s, ['592','593','594']);
   B.BT = B.BQ + B.BR + B.BS;
   B.BU = _lfD(s, ['478']);
   B.BZ = B.AZ + B.BK + B.BT + B.BU;
@@ -47675,15 +47785,14 @@ function _lfCalc(annee, divF) {
   B.DD = B.DA + B.DB + B.DC;
   B.DF = B.CP + B.DD;
   B.DH = _lfC(s, ['481','482','484']);
-  B.DI = _lfC(s, ['419']);
-  B.DJ = _lfC(s, ['40'], ['409']);
-  B.DK = _lfC(s, ['42','43','44'], ['409']);
-  B.DM = _lfC(s, ['45','46','47'], ['478','481','482','484']);
+  B.DI = _lfC(s, ['419']) + _lfSoldeCre(s, ['41'], ['419']);           /* avances reçues + clients créditeurs (par tiers) */
+  B.DJ = _lfSoldeCre(s, ['40'], ['409']);                              /* fournisseurs créditeurs (par tiers) */
+  B.DK = _lfSoldeCre(s, ['42','43','44'], ['409']);
+  B.DM = _lfSoldeCre(s, ['45','46','47'], ['478','479','481','482','484']);
   B.DN = _lfC(s, ['499','599']);
   B.DP = B.DH + B.DI + B.DJ + B.DK + B.DM + B.DN;
   B.DQ = _lfC(s, ['565']);
-  B.DR = _lfC(s, ['52','56'], ['565']);
-  B.DR = B.DR > 0 ? B.DR : 0;
+  B.DR = _lfTresoDecouvert(s);
   B.DT = B.DQ + B.DR;
   B.DV = _lfC(s, ['479']);
   B.DZ = B.DF + B.DP + B.DT + B.DV;
@@ -47721,14 +47830,16 @@ function _lfCalc2(annee, divF) {
 
   act('BA', ['485','488'], null);
   act('BB', ['31','32','33','34','35','36','37','38'], ['39']);
-  act('BH', ['409'], null);
-  act('BI', ['41'], ['491'], ['419']);
-  act('BJ', ['42','43','44','45','46','47'], ['492','493','494','495','496','497','498'], ['485','488','478']);
+  A.BH = { b: _lfD(s, ['409']) + _lfSoldeDeb(s, ['40'], ['409']), a: 0 }; A.BH.n = A.BH.b;
+  A.BI = { b: _lfSoldeDeb(s, ['41'], ['419']), a: _lfAmo(s, ['491']) }; A.BI.n = A.BI.b - A.BI.a;
+  /* BJ : comptes 42 à 47 À SOLDE DÉBITEUR seulement (les soldes créditeurs sont au passif, DK / DM) ; 478 (BU) et 479 (DV) ont leur propre ligne. */
+  A.BJ = { b: _lfSoldeDeb(s, ['42','43','44','45','46','47'], ['485','488','478','479']), a: _lfAmo(s, ['492','493','494','495','496','497','498']) };
+  A.BJ.n = A.BJ.b - A.BJ.a;
   A.BG = { b: A.BH.b + A.BI.b + A.BJ.b, a: A.BH.a + A.BI.a + A.BJ.a }; A.BG.n = A.BG.b - A.BG.a;
   A.BK = { b: A.BA.b + A.BB.b + A.BG.b, a: A.BA.a + A.BB.a + A.BG.a }; A.BK.n = A.BK.b - A.BK.a;
   act('BQ', ['50'], ['590']);
   act('BR', ['51'], ['591']);
-  act('BS', ['52','53','54','55','57','58'], ['592','593','594']);
+  A.BS = { b: _lfTresoActif(s), a: _lfAmo(s, ['592','593','594']) }; A.BS.n = A.BS.b - A.BS.a;
   A.BT = { b: A.BQ.b + A.BR.b + A.BS.b, a: A.BQ.a + A.BR.a + A.BS.a }; A.BT.n = A.BT.b - A.BT.a;
   act('BU', ['478'], null);
   A.BZ = { b: A.AZ.b + A.BK.b + A.BT.b + A.BU.b, a: A.AZ.a + A.BK.a + A.BT.a + A.BU.a }; A.BZ.n = A.BZ.b - A.BZ.a;
@@ -47829,6 +47940,24 @@ function consoCalcul(annee) {
     lignes.push(row);
   });
 
+  /* Écritures SANS division : elles n'appartenaient à aucune entité et sortaient donc de la consolidation sans
+     avertissement (chiffre d'affaires et charges manquants). Elles sont regroupées sur une ligne « Non affecté »,
+     intégrée à 100 %, ajoutée EN DERNIER (la société mère reste une vraie entité). */
+  var nonAffecte = null;
+  (function(){
+    var dep = ecrFiltreDepuisOuverture(annee, DIV_SANS), nb = 0;
+    (DATA.ecritures || []).forEach(function(e){
+      if (e.division || !e.date || e.date >= (parseInt(annee, 10) + 1) + '-01-01' || !dep(e)) return;
+      nb++;
+    });
+    if (!nb) return;
+    var calc = _lfCalc2(annee, DIV_SANS);
+    if (!Object.keys(calc.s).some(function(c){ return Math.abs(calc.s[c]) >= 1; })) return;
+    nonAffecte = { nb: nb };
+    lignes.push({ id: DIV_SANS, nom: 'Non affecté (sans division)', methode: 'IG', pct: 100, quote: 1,
+      B: calc.B, A: calc.A, R: calc.R, s: calc.s, agrege: true, nonAffecte: true });
+  })();
+
   function cum(k, src) {
     return lignes.reduce(function(a, r){
       if (!r.agrege) return a;
@@ -47856,7 +47985,7 @@ function consoCalcul(annee) {
   var goodwill = 0, minoritaires = 0;
   if (mere) {
     lignes.forEach(function(r){
-      if (!r.agrege || r.id === mere.id) return;
+      if (!r.agrege || r.id === mere.id || r.nonAffecte) return;   /* « Non affecté » n'est pas une filiale */
       var q = (parseFloat(r.pct) || 100) / 100;
       var cpFille = r.B.CP || 0;
       var quotePart = cpFille * q;
@@ -47885,7 +48014,7 @@ function consoCalcul(annee) {
   conso.CP_groupe = (totalAgrege.CP || 0) - minoritaires - (mere ? _consoSolde(mere.s, ['26']) : 0) + goodwill;
 
   return { annee: annee, cfg: cfg, lignes: lignes, agrege: totalAgrege, elim: elim,
-    elimRec: elimRecMontant, conso: conso, mere: mere };
+    elimRec: elimRecMontant, conso: conso, mere: mere, nonAffecte: nonAffecte };
 }
 
 /* ── Paramétrage du périmètre ── */
@@ -48029,6 +48158,7 @@ function genererConsolidation() {
     + '<div style="text-align:center;"><h1>COMPTES CONSOLIDÉS DU GROUPE</h1>'
     + '<div>SYSCOHADA révisé · Exercice clos le 31/12/' + annee + ' · Montants en FCFA</div></div>'
     + '<div style="text-align:right;font-size:8.5px;">Société mère :<br>' + escHtml(K.mere ? K.mere.nom : '—') + '</div></div>'
+    + (K.nonAffecte ? '<div class="ctrl ko">⚠ ' + K.nonAffecte.nb + ' écriture(s) sans division sont regroupées dans la colonne « Non affecté (sans division) ». Affectez-leur une division pour une consolidation par entité exacte.</div>' : '')
     + bilan + resultat + notes
     + '<div style="margin-top:10px;font-size:8.5px;color:#555;">Consolidation établie par agrégation des comptes sociaux de chaque entité, '
     + 'élimination des soldes portés sur les comptes de liaison intra-groupe et des titres de participation détenus au sein du périmètre. '
@@ -49249,6 +49379,8 @@ function genererLiasseFiscale() {
    division, on part de son dernier à-nouveau ; en vue consolidée, du dernier à-nouveau
    consolidé ou de celui de la division de l'écriture. Sans à-nouveau (jamais clôturé,
    ou reprise par bilan d'ouverture), tout l'historique est cumulé comme avant. */
+/* Pseudo-division : écritures SANS division (voir consoCalcul, ligne « Non affecté »). */
+var DIV_SANS = '__sans_division__';
 function ecrFiltreDepuisOuverture(an, divF) {
   var kCons = 0, kDiv = {};
   (DATA.ecritures || []).forEach(function(e){
@@ -49258,8 +49390,12 @@ function ecrFiltreDepuisOuverture(an, divF) {
     var d = e.division || '';
     if (d) kDiv[d] = Math.max(kDiv[d] || 0, k); else kCons = Math.max(kCons, k);
   });
+  /* Écritures sans division : leur historique est repris par le dernier à-nouveau du groupe (quelle que soit
+     la division qui le porte), sinon on le compterait deux fois avec le bilan d'ouverture. */
+  var kTous = Object.keys(kDiv).reduce(function(m, k){ return Math.max(m, kDiv[k]); }, kCons);
   return function(e) {
     var y = parseInt(String(e.date).slice(0, 4), 10);
+    if (divF === DIV_SANS) return y >= kTous;
     var d = e.division || '';
     var depuis = Math.max(divF ? 0 : kCons, d ? (kDiv[d] || 0) : 0);
     return y >= depuis;
@@ -140304,6 +140440,198 @@ function caisseBanniereApresCloture() {
     + '. Le solde et l\'écart de ces sessions ont été recalculés : vérifiez-les avant toute régularisation.</div>';
 }
 
+/* ═══ NOTIFICATIONS DE CAISSE PAR WHATSAPP / E-MAIL ═══════════════════
+   Texte de synthèse (caisses visibles : état, solde, bons en attente, à ventiler + alertes) envoyé au choix par
+   WhatsApp (lien wa.me) ou e-mail (EmailJS s'il est configuré, sinon application de messagerie). */
+function caisseNotifTexte(seuilH) {
+  seuilH = seuilH || 24;
+  var soc = (DATA.params && DATA.params.societe) || 'ImmoSuite ERP';
+  var vis = caissesVisibles(), n = new Date();
+  var t = '💰 État des caisses — ' + soc + '\n' + n.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+    + ' à ' + n.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '\n';
+  vis.forEach(function(c){
+    var ses = caisseGetSessionOuverte(c.id);
+    var mv = DATA.caisse_mouvements || [];
+    var attente = mv.filter(function(m){ return m.caisse_id === c.id && m.requiert_validation && m.valide !== true && !m.rejete; }).length;
+    var aVent = mv.filter(function(m){
+      if (m.caisse_id !== c.id || !_caisseMvtEffectif(m) || m.statut === 'ventile') return false;
+      var s = (DATA.caisse_sessions || []).find(function(x){ return x.id === m.session_id; });
+      return s && s.statut === 'cloturee';
+    });
+    var montVent = aVent.reduce(function(a, m){ return a + (parseFloat(m.montant) || 0); }, 0);
+    t += '\n• ' + (c.nom || '?') + ' : ' + (ses ? 'OUVERTE — ' + fmtF(caisseSoldeSession(ses)) + ' FCFA en caisse' : 'fermée');
+    if (attente) t += '\n   ⏳ ' + attente + ' bon(s) en attente de validation';
+    if (aVent.length) t += '\n   🧾 ' + aVent.length + ' à ventiler (' + fmtF(montVent) + ' FCFA)';
+  });
+  var alertes = [];
+  caisseSessionsAnciennes(seuilH).forEach(function(s){
+    var c = (DATA.caisses || []).find(function(x){ return x.id === s.caisse_id; });
+    alertes.push('⚠️ Session ouverte depuis plus de ' + seuilH + ' h : ' + (c ? c.nom : '?') + ' (ouverte le ' + dateShort(String(s.date || '').slice(0, 10)) + ' par ' + (s.ouverte_par || '—') + ', ' + Math.round(caisseHeuresOuverte(s)) + ' h)');
+  });
+  var limite = Date.now() - 7 * 86400000, ids = vis.map(function(c){ return c.id; }), par = {};
+  (DATA.caisse_mouvements || []).forEach(function(m){
+    var tm = new Date(m.valide_le || m.created_at || 0).getTime();
+    if (!(m.saisi_apres_cloture || m.valide_apres_cloture) || ids.indexOf(m.caisse_id) < 0 || tm < limite) return;
+    var c = (DATA.caisses || []).find(function(x){ return x.id === m.caisse_id; });
+    var sx = (DATA.caisse_sessions || []).find(function(x){ return x.id === m.session_id; });
+    var k = (c ? c.nom : '?') + ' — session du ' + (sx ? dateShort(String(sx.date || '').slice(0, 10)) : '?');
+    par[k] = (par[k] || 0) + 1;
+  });
+  Object.keys(par).forEach(function(k){ alertes.push('⚠️ Bon(s) ajouté(s) ou validé(s) après clôture (7 j) : ' + k + ' (' + par[k] + ')'); });
+  t += '\n\n' + (alertes.length ? 'Alertes :\n' + alertes.join('\n') : '✅ Aucune alerte.');
+  return t;
+}
+function caisseNotifDestinataires() {
+  return (DATA.users || []).filter(function(u){ return u.actif !== false && (u.tel || u.email); });
+}
+function caisseNotifOuvrir() {
+  if (!caissesVisibles().length) { toast('Aucune caisse à notifier.', 'info'); return; }
+  var old = document.getElementById('modal-caisse-notif'); if (old) old.remove();
+  var us = caisseNotifDestinataires();
+  var opts = '<option value="">— Choisir un destinataire —</option>' + us.map(function(u){
+    return '<option value="' + escHtml(u.id) + '">' + escHtml((u.nom || u.login || '?') + (u.role ? ' (' + u.role + ')' : '')) + '</option>';
+  }).join('');
+  var st = 'width:100%;padding:8px;border:1px solid var(--bordure,#ccc);border-radius:8px;background:var(--card2);color:var(--blanc);font-size:13px;margin-top:4px;';
+  var d = document.createElement('div');
+  d.id = 'modal-caisse-notif';
+  d.setAttribute('style', 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:14px;');
+  d.innerHTML = '<div style="background:var(--card);color:var(--blanc);border-radius:14px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:18px;">'
+    + '<h3 style="margin:0 0 10px;font-size:16px;">📤 Envoyer l\'état des caisses</h3>'
+    + '<label style="font-size:12px;">Destinataire</label><select id="cn-dest" style="' + st + '" onchange="caisseNotifChoisir()">' + opts + '</select>'
+    + '<label style="font-size:12px;display:block;margin-top:8px;">WhatsApp (numéro)</label><input id="cn-tel" style="' + st + '" placeholder="Ex. 07 00 00 00 00 — vide : choisir le contact dans WhatsApp" inputmode="tel">'
+    + '<label style="font-size:12px;display:block;margin-top:8px;">E-mail</label><input id="cn-mail" style="' + st + '" placeholder="adresse@exemple.com" inputmode="email">'
+    + '<label style="font-size:12px;display:block;margin-top:8px;">Message (modifiable)</label><textarea id="cn-msg" rows="11" style="' + st + 'font-family:inherit;">' + escHtml(caisseNotifTexte()) + '</textarea>'
+    + caisseNotifAutoHtml(st)
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+    + '<button class="btn btn-success" onclick="caisseNotifEnvoyerWA()">💬 WhatsApp</button>'
+    + '<button class="btn btn-primary" onclick="caisseNotifEnvoyerEmail()">✉️ E-mail</button>'
+    + '<button class="btn btn-secondary" onclick="document.getElementById(\'modal-caisse-notif\').remove()">Fermer</button></div></div>';
+  document.body.appendChild(d);
+}
+function caisseNotifChoisir() {
+  var id = (document.getElementById('cn-dest') || {}).value;
+  var u = (DATA.users || []).find(function(x){ return x.id === id; });
+  document.getElementById('cn-tel').value = u && u.tel ? u.tel : '';
+  document.getElementById('cn-mail').value = u && u.email ? u.email : '';
+}
+function caisseNotifEnvoyerWA() {
+  var msg = (document.getElementById('cn-msg') || {}).value || '';
+  var tel = ((document.getElementById('cn-tel') || {}).value || '').trim();
+  if (!msg.trim()) { toast('Message vide.', 'error'); return; }
+  var num = tel ? telWhatsApp(tel) : '';
+  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank');
+  toast(tel ? 'Message WhatsApp préparé.' : 'WhatsApp ouvert : choisissez le contact.', 'success');
+}
+async function caisseNotifEnvoyerEmail() {
+  var msg = (document.getElementById('cn-msg') || {}).value || '';
+  var to = ((document.getElementById('cn-mail') || {}).value || '').trim();
+  var p = DATA.params || {}, soc = p.societe || 'ImmoSuite ERP';
+  var sujet = 'État des caisses — ' + soc;
+  if (!msg.trim()) { toast('Message vide.', 'error'); return; }
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { toast('Adresse e-mail invalide.', 'error'); return; }
+  if (p.emailjs_service && p.emailjs_template && typeof emailjs !== 'undefined') {
+    try {
+      await emailjs.send(p.emailjs_service, p.emailjs_template, { to_email: to, to_name: '', subject: sujet, message: msg, from_name: soc, reply_to: p.email || '' });
+      toast('E-mail envoyé à ' + to + '.', 'success');
+      return;
+    } catch (e) { toast('Envoi EmailJS impossible : ouverture de votre messagerie.', 'error'); }
+  }
+  window.location.href = 'mailto:' + encodeURIComponent(to) + '?subject=' + encodeURIComponent(sujet) + '&body=' + encodeURIComponent(msg);
+}
+function caisseBarreNotif() {
+  return '<div style="grid-column:1/-1;display:flex;justify-content:flex-end;">'
+    + '<button class="btn btn-secondary btn-sm" onclick="caisseNotifOuvrir()" title="Envoyer l\'état des caisses et les alertes par WhatsApp ou e-mail">📤 Envoyer l\'état par WhatsApp / e-mail</button></div>';
+}
+
+/* ── Envoi automatique par e-mail des sessions ouvertes depuis trop longtemps ──
+   Réglages dans DATA.params.caisse_notif_auto (synchronisés) : { actif, seuil_h, relance_h, emails, dernier:{sessionId:ISO} }.
+   S'exécute tant que Menko Immo est ouvert sur l'appareil d'un administrateur, manager ou comptable (aucun serveur) ;
+   utilise EmailJS (Paramètres › Communications). Une session n'est notifiée qu'une fois par période de relance.
+   WhatsApp ne peut pas être envoyé automatiquement (aucune API branchée) : il reste manuel. */
+function caisseNotifAutoConfig() {
+  return Object.assign({ actif: false, serveur: false, seuil_h: 24, relance_h: 24, emails: '', dernier: {} }, (DATA.params && DATA.params.caisse_notif_auto) || {});
+}
+function caisseNotifAutoHtml(st) {
+  var c = caisseNotifAutoConfig();
+  return '<details style="margin-top:12px;border:1px solid var(--bordure,#ccc);border-radius:8px;padding:8px 10px;"' + (c.actif ? ' open' : '') + '>'
+    + '<summary style="cursor:pointer;font-size:13px;font-weight:600;">⚙️ Envoi automatique par e-mail' + (c.actif ? ' — activé' : '') + '</summary>'
+    + '<p style="font-size:12px;color:var(--blanc-dim);margin:6px 0;">Un e-mail est envoyé quand une session reste ouverte au-delà du seuil. Il part tant que Menko Immo est ouvert sur l\'appareil d\'un administrateur, manager ou comptable, via EmailJS (Paramètres › Communications).</p>'
+    + '<label style="font-size:12px;"><input type="checkbox" id="cn-auto-actif"' + (c.actif ? ' checked' : '') + '> Activer l\'envoi automatique</label>'
+    + '<label style="font-size:12px;display:block;margin-top:6px;">Mode d\'envoi</label>'
+    + '<select id="cn-auto-mode" style="' + st + '"><option value="nav"' + (c.serveur ? '' : ' selected') + '>Navigateur (application ouverte)</option>'
+    + '<option value="srv"' + (c.serveur ? ' selected' : '') + '>Serveur 24 h/24 (application fermée possible)</option></select>'
+    + '<div style="display:flex;gap:8px;margin-top:6px;"><div style="flex:1;"><label style="font-size:12px;">Seuil (heures)</label><input id="cn-auto-seuil" type="number" min="1" value="' + escHtml(String(c.seuil_h)) + '" style="' + st + '"></div>'
+    + '<div style="flex:1;"><label style="font-size:12px;">Relance (heures)</label><input id="cn-auto-relance" type="number" min="1" value="' + escHtml(String(c.relance_h)) + '" style="' + st + '"></div></div>'
+    + '<label style="font-size:12px;display:block;margin-top:6px;">Destinataires (adresses e-mail séparées par une virgule)</label>'
+    + '<textarea id="cn-auto-emails" rows="2" style="' + st + '" placeholder="dg@exemple.com, compta@exemple.com">' + escHtml(c.emails || '') + '</textarea>'
+    + '<div style="margin-top:8px;"><button class="btn btn-primary btn-sm" onclick="caisseNotifAutoSauver()">💾 Enregistrer</button></div></details>';
+}
+function caisseNotifAutoEmails(txt) {
+  return String(txt || '').split(/[,;\s]+/).filter(Boolean);
+}
+async function caisseNotifAutoSauver() {
+  var emails = caisseNotifAutoEmails((document.getElementById('cn-auto-emails') || {}).value);
+  var bad = emails.filter(function(x){ return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x); });
+  var actif = !!(document.getElementById('cn-auto-actif') || {}).checked;
+  if (bad.length) { toast('Adresse invalide : ' + bad[0], 'error'); return; }
+  if (actif && !emails.length) { toast('Ajoutez au moins une adresse e-mail pour activer l\'envoi.', 'error'); return; }
+  var old = caisseNotifAutoConfig();
+  DATA.params = DATA.params || {};
+  DATA.params.caisse_notif_auto = {
+    actif: actif, serveur: ((document.getElementById('cn-auto-mode') || {}).value === 'srv'), emails: emails.join(', '), dernier: old.dernier || {},
+    seuil_h: Math.max(1, parseFloat((document.getElementById('cn-auto-seuil') || {}).value) || 24),
+    relance_h: Math.max(1, parseFloat((document.getElementById('cn-auto-relance') || {}).value) || 24)
+  };
+  /* Mode serveur : la fonction lit l'identifiant de service, le modèle et la clé PUBLIQUE EmailJS ici
+     (la clé privée reste un secret du serveur) ; ces trois valeurs ne sont pas confidentielles. */
+  if (DATA.params.caisse_notif_auto.serveur && DATA.params.emailjs_service) {
+    DATA.params.caisse_notif_auto.emailjs = { service: DATA.params.emailjs_service, template: DATA.params.emailjs_template, key: DATA.params.emailjs_key };
+  }
+  _paramsToucher();
+  try { await dbPut('params', DATA.params); if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params); } catch (e) {}
+  var p = DATA.params;
+  var avert = (actif && (!p.emailjs_service || !p.emailjs_template || !p.emailjs_key)) ? ' EmailJS n\'est pas encore configuré : rien ne partira avant.' : '';
+  if (actif && DATA.params.caisse_notif_auto.serveur && !avert) avert = ' Mode serveur : la clé privée EmailJS doit être enregistrée comme secret « EMAILJS_PRIVATE_KEY » dans Supabase.';
+  toast(actif ? 'Envoi automatique activé.' + avert : 'Envoi automatique désactivé.', avert ? 'error' : 'success');
+}
+async function caisseNotifAutoCycle() {
+  try {
+    if (!APP.currentUser || !caisseRoleAdminLike()) return { ignore: 'role' };
+    var cfg = caisseNotifAutoConfig(), p = DATA.params || {};
+    if (!cfg.actif) return { ignore: 'inactif' };
+    if (cfg.serveur) return { ignore: 'serveur' };   /* l'envoi est assuré par la fonction Supabase caisse-alertes */
+    var dest = caisseNotifAutoEmails(cfg.emails).filter(function(x){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x); });
+    if (!dest.length) return { ignore: 'sans_destinataire' };
+    if (!p.emailjs_service || !p.emailjs_template || !p.emailjs_key || typeof emailjs === 'undefined') return { ignore: 'emailjs' };
+    var seuil = Math.max(1, parseFloat(cfg.seuil_h) || 24), relance = Math.max(1, parseFloat(cfg.relance_h) || 24) * 3600000, now = Date.now();
+    var dernier = cfg.dernier || {};
+    var dues = caisseSessionsAnciennes(seuil).filter(function(s){ var d = dernier[s.id]; return !d || now - new Date(d).getTime() >= relance; });
+    if (!dues.length) return { rien: true };
+    var soc = p.societe || 'ImmoSuite ERP', msg = caisseNotifTexte(seuil), ok = 0;
+    emailjs.init(p.emailjs_key);
+    for (var i = 0; i < dest.length; i++) {
+      try {
+        await emailjs.send(p.emailjs_service, p.emailjs_template, { to_email: dest[i], to_name: '', subject: '⚠️ ' + soc + ' — ' + dues.length + ' caisse(s) ouverte(s) depuis plus de ' + seuil + ' h', message: msg, from_name: soc, reply_to: p.email || '' });
+        ok++;
+      } catch (e) { console.warn('[Caisse notif auto] échec e-mail', dest[i], e); }
+    }
+    if (ok) {
+      var ouvertes = {}; (DATA.caisse_sessions || []).forEach(function(s){ if (s.statut === 'ouverte') ouvertes[s.id] = true; });
+      var nv = {}; Object.keys(dernier).forEach(function(k){ if (ouvertes[k]) nv[k] = dernier[k]; });
+      dues.forEach(function(s){ nv[s.id] = new Date(now).toISOString(); });
+      DATA.params.caisse_notif_auto = Object.assign({}, cfg, { dernier: nv });
+      _paramsToucher();
+      try { await dbPut('params', DATA.params); if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params); } catch (e) {}
+      if (typeof toast === 'function') toast('Alerte caisse envoyée par e-mail (' + dues.length + ' session(s)).', 'info');
+    }
+    return { envoyes: ok, sessions: dues.length };
+  } catch (e) { console.warn('[Caisse notif auto]', e); return { erreur: String(e && e.message || e) }; }
+}
+if (!window._caisseNotifAutoTimer) {
+  window._caisseNotifAutoTimer = setInterval(function(){ caisseNotifAutoCycle(); }, 30 * 60000);
+  setTimeout(function(){ caisseNotifAutoCycle(); }, 60000);
+}
+
 /* ═══ RAPPROCHEMENT CUMULÉ PAR CAISSE ═══════════════════════════════════
    Écart réel = dernier comptage − (premier fond + tous les mouvements validés des sessions clôturées).
    Indépendant des écarts enregistrés session par session, qui peuvent se compenser ou se masquer
@@ -141463,7 +141791,7 @@ function caisseRenderListe() {
       + '</div>';
     return;
   }
-  el.innerHTML = caisseBanniereAnciennes() + caisseBanniereReprise() + caisseBanniereApresCloture() + caisseBanniereRemises() + liste.map(function(c) {
+  el.innerHTML = caisseBarreNotif() + caisseBanniereAnciennes() + caisseBanniereReprise() + caisseBanniereApresCloture() + caisseBanniereRemises() + liste.map(function(c) {
     var session = caisseGetSessionOuverte(c.id);
     var ouverte = !!session;
     var solde = ouverte ? caisseSoldeSession(session) : null;
