@@ -48,7 +48,7 @@ test('une demande de validation d\'étape foncière apparaît dans Validations e
   assert.equal(r.doublon, 1);
 });
 
-test('refus depuis Validations : motif obligatoire, étape non terminée, redemande possible ; décision côté dossier clôt la ligne', async () => {
+test('refus depuis Validations : motif obligatoire, étape non terminée, redemande possible ; la validation depuis Validations clôt la ligne', async () => {
   const app = await ouvrirApp(); await preparer(app.page);
   const r = await app.page.evaluate(async () => {
     const d = (await fcOuvrirDossier({ parcelle_id: 'p1', type: 'acd', responsable_id: 's1' })).dossier, o = {};
@@ -63,12 +63,13 @@ test('refus depuis Validations : motif obligatoire, étape non terminée, redema
     APP.currentUser = { id: 's1', nom: 'Foncier 1', role: 'service_foncier' };
     await fcDemanderValidationEtape(d.id, 'identification_procedure'); o.nb = V().length; o.derniere = V()[1].statut;
     APP.currentUser = { id: 'dir', nom: 'Directeur', role: 'admin' };
-    await fcDecisionValidationEtape(d.id, 'identification_procedure', 'validee'); o.clos = V()[1].statut;
+    o.directInterdit = (await fcDecisionValidationEtape(d.id, 'identification_procedure', 'validee')).ok;   /* plus de décision depuis le dossier */
+    await valDecide(V()[1].id, 'valide', ''); o.clos = V()[1].statut;
     return o;
   });
   assert.equal(r.sansMotif, 'en_attente');
   assert.equal(r.refus, 'rejete:Pièce manquante'); assert.equal(r.etape, 'refusee');
-  assert.equal(r.nb, 2); assert.equal(r.derniere, 'en_attente'); assert.equal(r.clos, 'valide');
+  assert.equal(r.nb, 2); assert.equal(r.derniere, 'en_attente'); assert.equal(r.directInterdit, false); assert.equal(r.clos, 'valide');
 });
 
 test('rattrapage : une demande antérieure sans ligne centrale y est ajoutée', async () => {

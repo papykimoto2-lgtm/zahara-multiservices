@@ -63952,9 +63952,7 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
   if (statut === 'termine') fcRattraperValidationEtape(d, e);
   var valF = (statut === 'termine') ? fcValidationRequise(d, e) : '';
   if (valF && !(e.validation && e.validation.statut === 'validee')) {
-    if (!fcPeutValiderEtape(valF)) return { ok: false, validation_requise: true, fonction: valF, erreur: 'Cette étape doit être validée par la fonction « ' + fcLibFonction(valF) + ' » avant d\'être terminée.' };
-    var av = fcActeur(); e.validation = { statut: 'validee', fonction: valF, par: av.nom, par_id: av.id, le: new Date().toISOString(), motif: '' };
-    await valSyncEtapeFonciere(d, e, 'valide', av.nom, '');
+    return { ok: false, validation_requise: true, fonction: valF, erreur: 'Cette étape doit être validée par la fonction « ' + fcLibFonction(valF) + ' » dans le module Validations avant d\'être terminée.' };
   }
   var ancien = e.statut, a = fcActeur();
   e.statut = statut;
@@ -67878,7 +67876,9 @@ async function fcDemanderValidationEtape(dossierId, code) {
   await fcNotifierUsers(fcUsersFonction(f).map(function(u){ return u.id; }), { dedup: 'valid:' + d.id + ':' + code + ':' + e.validation.demande_le, titre: 'Validation demandée', message: d.reference + '\n' + e.libelle + ' — demandée par ' + a.nom, template_code: 'validation_etape', dossier_id: d.id, urgent: false }, { acteur_id: a.id });
   return { ok: true, demande: true };
 }
+/* La HIÉRARCHIE décide UNIQUEMENT dans le module Validations (valDecideEtapeFonciere pose APP._valContexte). Aucune autre porte : ni bouton du dossier, ni « Terminer » d'un validateur. */
 async function fcDecisionValidationEtape(dossierId, code, decision, motif) {
+  if (!APP._valContexte) return { ok: false, erreur: 'La décision de validation se prend uniquement dans le module Validations (hiérarchie).' };
   var d = fcDossier(dossierId), e = d && fcEtape(d, code);
   if (!d || !e) return { ok: false, erreur: 'Dossier ou étape introuvable.' };
   var f = (e.validation && e.validation.statut === 'demandee') ? e.validation.fonction : fcValidationRequise(d, e);
@@ -67907,7 +67907,7 @@ function fcValidationHtml(d, e) {
   var f = fcValidationRequise(d, e), v = e.validation || {};
   if (!f) return v.statut === 'validee' ? '<br><span style="font-size:11px;color:#2e7d4f;" title="Validation par fonction">🔏 Validée par ' + escHtml(v.par || '') + ' (' + escHtml(fcLibFonction(v.fonction)) + ')</span>' : '';
   var q = "'" + d.id + "','" + e.code + "'", lib = escHtml(fcLibFonction(f)), actif = FC_STATUTS_ACTIFS.indexOf(e.statut) !== -1, peut = fcPeutValiderEtape(f);
-  if (v.statut === 'demandee') return '<br><span style="font-size:11px;color:#8a5a00;">⏳ Validation en attente — ' + lib + (peut ? ' <button class="btn btn-primary btn-sm" onclick="fcValiderEtapeUI(' + q + ',true)">✅ Valider</button> <button class="btn btn-secondary btn-sm" onclick="fcValiderEtapeUI(' + q + ',false)">⛔ Refuser</button>' : '') + '</span>';
+  if (v.statut === 'demandee') return '<br><span style="font-size:11px;color:#8a5a00;">⏳ Validation en attente — ' + lib + ' · décision dans le module Validations <button class="btn btn-secondary btn-sm" onclick="goTo(\'validations\')">📋 Ouvrir Validations</button></span>';
   if (v.statut === 'validee') return '<br><span style="font-size:11px;color:#2e7d4f;">🔏 Validée par ' + escHtml(v.par || '') + ' (' + lib + ') — reste à terminer l\'étape' + (actif ? '' : ' (démarrez-la)') + ' <button class="btn btn-primary btn-sm" onclick="fcActionEtapeUI(' + q + ',\'termine\')">✅ Terminer cette étape</button></span>';
   if (v.statut === 'refusee') return '<br><span style="font-size:11px;color:#c0392b;">⛔ Validation refusée par ' + escHtml(v.decide_par || '') + ' : ' + escHtml(v.motif || '') + (actif ? ' <button class="btn btn-secondary btn-sm" onclick="fcDemanderValidationUI(' + q + ')">Redemander</button>' : '') + '</span>';
   var obst = fcObstacleValidation(d, e);
@@ -67915,12 +67915,8 @@ function fcValidationHtml(d, e) {
   return '<br><span style="font-size:11px;color:#5b6b7a;">🔏 À valider par ' + lib + ' avant d\'être terminée' + (actif ? ' <button class="btn btn-secondary btn-sm" onclick="fcDemanderValidationUI(' + q + ')">Demander la validation</button>' : '') + '</span>';
 }
 async function fcDemanderValidationUI(id, code) { if (fcMsg(await fcDemanderValidationEtape(id, code), 'Validation demandée.')) { fcRender(); fcRenderDetail(id); } }
-async function fcValiderEtapeUI(id, code, ok) {
-  var motif = ok ? '' : (prompt('Motif du refus (obligatoire) :') || '');
-  var r = await fcDecisionValidationEtape(id, code, ok ? 'validee' : 'refusee', motif);
-  if (r && r.ok && r.validee && !r.terminee) { await fcTerminerApresValidation(id, code, r.avertissement); fcRender(); fcRenderDetail(id); return; }
-  if (fcMsg(r, ok ? 'Validée : étape terminée.' : 'Validation refusée.')) { fcRender(); fcRenderDetail(id); }
-}
+/* Conservée pour compatibilité : la décision n'est plus possible depuis le dossier. */
+async function fcValiderEtapeUI() { toast('La validation se décide dans le module Validations (hiérarchie).', 'info'); goTo('validations'); }
 
 /* ── Prochaine action : une seule carte « quoi faire maintenant, par qui, avec quoi » ── */
 function fcProchaineAction(d) {
@@ -67941,7 +67937,7 @@ function fcPanneauProchaineAction(d) {
   var e = a.etape, q = "'" + d.id + "','" + e.code + "'", btn = '', note = '';
   if (a.valide && a.validation === 'demandee') {
     note = '⏳ En attente de la validation de la fonction « ' + escHtml(fcLibFonction(a.valide)) + ' ».';
-    if (fcPeutValiderEtape(a.valide)) btn = '<button class="btn btn-primary btn-sm" onclick="fcValiderEtapeUI(' + q + ',true)">✅ Valider et terminer</button> <button class="btn btn-secondary btn-sm" onclick="fcValiderEtapeUI(' + q + ',false)">⛔ Refuser</button>';
+    btn = '<button class="btn btn-secondary btn-sm" onclick="goTo(\'validations\')">📋 Ouvrir Validations</button>';
   } else if (!a.active) btn = '<button class="btn btn-primary btn-sm" onclick="fcActionEtapeUI(' + q + ',\'en_cours\')">▶️ Démarrer</button>';
   else if (a.valide && a.validation !== 'validee' && !fcPeutValiderEtape(a.valide)) btn = '<button class="btn btn-primary btn-sm" onclick="fcDemanderValidationUI(' + q + ')">🔏 Demander la validation (' + escHtml(fcLibFonction(a.valide)) + ')</button>';
   else btn = '<button class="btn btn-primary btn-sm" onclick="fcActionEtapeUI(' + q + ',\'termine\')">✅ Terminer cette étape</button>';
@@ -121842,7 +121838,7 @@ function valPending(type,refId){ return (DATA.validations||[]).find(function(v){
 async function valCreate(type,refId,libelle,montant,meta){
   if(valPending(type,refId)){ toast('Déjà en attente de validation.','info'); return null; }
   var v={ id:uid(), type:type, ref_id:refId, libelle:libelle||valTypeLabel(type), montant:montant||0, meta:meta||{}, statut:'en_attente', demandeur:(APP.currentUser&&APP.currentUser.nom)||'—', date_demande:today(), valideur:null, date_decision:null, motif:'', created_at:today() };
-  DATA.validations.push(v); await dbPut('validations',v); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',v);
+  DATA.validations.push(v); v._modifie=new Date().toISOString(); await dbPut('validations',v); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',v);
   etudesLiveRefresh('validations');
   return v;
 }
@@ -121937,7 +121933,9 @@ async function valDecideEtapeFonciere(v,decision,motif){
   var m=v.meta||{};
   if(typeof fcDecisionValidationEtape!=='function'){ toast('Module Foncier indisponible.','error'); return; }
   if(decision==='valide' && !(APP._valApercuVus||{})[v.id] && !confirm('Vous n’avez pas consulté ce dossier (boutons « 👁 Aperçu » ou « 📁 Dossier »).\n\nValider quand même ?')) return;
-  var r=await fcDecisionValidationEtape(m.dossier_id,m.code,decision==='valide'?'validee':'refusee',motif||'');
+  var r; APP._valContexte=true;
+  try{ r=await fcDecisionValidationEtape(m.dossier_id,m.code,decision==='valide'?'validee':'refusee',motif||''); }
+  finally{ APP._valContexte=false; }
   if(!r||!r.ok){ toast((r&&r.erreur)||'Décision impossible.','error'); return; }
   if(r.validee && !r.terminee && typeof fcTerminerApresValidation==='function') r=Object.assign({},r,{terminee:((await fcTerminerApresValidation(m.dossier_id,m.code,r.avertissement))||{}).ok===true});
   renderValidations();
@@ -121958,10 +121956,39 @@ async function valSyncEtapeFonciere(d,e,decision,par,motif){
   } else {
     if(!v) return null;
     v.statut=decision; v.valideur=par||'—'; v.date_decision=today(); v.motif=motif||'';
+    /* Doublons : une étape ne doit jamais rester « en attente » parce qu'une 2e ligne identique n'a pas été clôturée. */
+    (DATA.validations||[]).forEach(function(x){
+      if(x!==v&&x.type==='etape_fonciere'&&x.ref_id===ref&&x.statut==='en_attente'){
+        x.statut=decision; x.valideur=par||'—'; x.date_decision=today(); x.motif=motif||''; x._modifie=new Date().toISOString();
+        try{ dbPut('validations',x); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',x); }catch(e){}
+      }
+    });
   }
+  v._modifie=new Date().toISOString();
   await dbPut('validations',v); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',v);
   etudesLiveRefresh('validations');
   return v;
+}
+/* Réconciliation : une ligne « en attente » dont l'étape a été décidée ailleurs (autre poste, ancienne donnée, doublon) sort de la liste.
+   L'état du dossier (qui, lui, se synchronise) fait foi. Retourne le nombre de lignes clôturées. */
+function valReconcilierEtapesFoncieres(){
+  if(typeof fcDossier!=='function'||typeof fcEtape!=='function') return 0;
+  var n=0, vues={}, FIN=(typeof FC_STATUTS_FINAUX!=='undefined')?FC_STATUTS_FINAUX:['termine','annule'];
+  var enAtt=(DATA.validations||[]).filter(function(v){return v.type==='etape_fonciere'&&v.statut==='en_attente';})
+    .sort(function(a,b){return String(b.created_at||'').localeCompare(String(a.created_at||''));});
+  enAtt.forEach(function(v){
+    var m=v.meta||{}, d=fcDossier(m.dossier_id), e=d&&fcEtape(d,m.code), cl=null;
+    if(!d||!e) cl=['rejete','Sans objet : dossier ou étape introuvable','Système',''];
+    else if(e.validation&&e.validation.statut==='validee') cl=['valide','',e.validation.par||'—',(e.validation.le||'').slice(0,10)];
+    else if(e.validation&&e.validation.statut==='refusee') cl=['rejete',e.validation.motif||'Refusée',e.validation.decide_par||'—',(e.validation.decide_le||'').slice(0,10)];
+    else if(vues[v.ref_id]) cl=['rejete','Sans objet : doublon d\'une demande plus récente','Système',''];
+    else if(['cloture','annule'].indexOf(d.statut)!==-1) cl=['rejete','Sans objet : dossier '+d.statut,'Système',''];
+    else if(FIN.indexOf(e.statut)!==-1) cl=['rejete','Sans objet : étape déjà '+String((typeof FC_STATUTS!=='undefined'&&FC_STATUTS[e.statut])||e.statut).toLowerCase(),'Système',''];
+    if(!cl){ vues[v.ref_id]=true; return; }
+    v.statut=cl[0]; v.motif=cl[1]; v.valideur=cl[2]; v.date_decision=cl[3]||today(); v._modifie=new Date().toISOString(); n++;
+    try{ Promise.resolve(dbPut('validations',v)).catch(function(){}); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',v); }catch(e){}
+  });
+  return n;
 }
 /* Rattrapage : demandes déjà posées avant l'intégration (statut « demandée » sans ligne centrale). */
 async function valRattraperEtapes(){
@@ -122159,6 +122186,7 @@ async function valActualiserDepuisCloud(){
   finally{ APP._valPullEnCours=false; }
 }
 function renderValidations(){
+  try{ valReconcilierEtapesFoncieres(); }catch(e){ console.warn('[Validations] réconciliation',e); }
   var all=(DATA.validations||[]);
   var enAtt=all.filter(function(v){return v.statut==='en_attente';});
   var kpi=document.getElementById('kpi-validations');
@@ -122942,7 +122970,7 @@ async function attSoldeAnnulerValidation(clientId, kind){
   a.date_brouillon = today();
   (DATA.validations||[]).filter(function(v){ return v.type===champ && v.ref_id===clientId && v.statut==='valide'; }).forEach(function(v){
     v.statut = 'annule'; v.motif = "Validation annulée par "+qui+" le "+today()+" : "+motif;
-    dbPut('validations', v); if(typeof syncToSupabase==='function') syncToSupabase('pi_validations', v);
+    v._modifie=new Date().toISOString(); dbPut('validations', v); if(typeof syncToSupabase==='function') syncToSupabase('pi_validations', v);
   });
   await attLierJuridique(c, 'Validation de l\''+attLibKind(kind).toLowerCase()+' N° '+a.numero+' annulée par '+qui+' ('+motif+'). Retour en brouillon.', kind);
   attSoldeSauver(c);
@@ -124856,7 +124884,7 @@ async function cesAttAnnulerValidation(id) {
   ['html', 'valide_par', 'valide_le', 'date_emission', 'publie_le', 'date_demande', 'demandeur', 'motif'].forEach(function(k){ delete a[k]; });
   (DATA.validations || []).filter(function(v){ return v.type === CES_ATT_TYPE && v.ref_id === id && v.statut === 'valide'; }).forEach(function(v){
     v.statut = 'annule'; v.motif = 'Validation annulée par ' + qui + ' le ' + today() + ' : ' + motif;
-    dbPut('validations', v); if (typeof syncToSupabase === 'function') syncToSupabase('pi_validations', v);
+    v._modifie=new Date().toISOString(); dbPut('validations', v); if (typeof syncToSupabase === 'function') syncToSupabase('pi_validations', v);
   });
   cesAttSauver(c); cesRender();
   if (typeof renderValidations === 'function') renderValidations();
