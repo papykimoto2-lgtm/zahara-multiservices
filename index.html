@@ -64012,6 +64012,72 @@ async function fcCorrigerEtape(dossierId, code, champs, motif) {
   return { ok: true, modifications: touche };
 }
 
+/* Modification des informations d'une étape (libellé, responsable, échéance, observations).
+   Chaque changement est tracé au journal du dossier (avant → après). Le libellé d'origine est conservé (libelle_origine).
+   Une étape déjà terminée/écartée/rejetée n'est modifiable qu'avec un motif. Le statut ne se change PAS ici (circuit : statuts + Validations). */
+async function fcModifierEtape(dossierId, code, champs, motif) {
+  var d = fcDossier(dossierId), e = d && fcEtape(d, code);
+  if (!d || !e) return { ok: false, erreur: 'Dossier ou étape introuvable.' };
+  if (['cloture', 'annule'].indexOf(d.statut) !== -1) return { ok: false, erreur: 'Dossier ' + d.statut + ' : aucune modification.' };
+  var a = fcActeur();
+  if (!fcPeutGererDossier(d) && fcResponsableEtape(d, e) !== a.id) return { ok: false, erreur: "Seuls le responsable du dossier, celui de l'étape ou un administrateur modifient une étape." };
+  var autorises = ['libelle', 'responsable_id', 'date_cible', 'observations'];
+  for (var k in (champs || {})) if (autorises.indexOf(k) === -1) return { ok: false, erreur: 'Champ non modifiable ici : ' + k };
+  var figee = FC_STATUTS_FINAUX.indexOf(e.statut) !== -1; motif = String(motif || '').trim();
+  var nouv = {};
+  if ('libelle' in champs) { var l = String(champs.libelle || '').trim().replace(/\s+/g, ' '); if (!l) return { ok: false, erreur: "Le libellé de l'étape est obligatoire." }; if (l.length > 160) return { ok: false, erreur: 'Libellé trop long (160 caractères maximum).' }; nouv.libelle = l; }
+  if ('responsable_id' in champs) { var r = String(champs.responsable_id || ''); if (r && !(DATA.users || []).some(function(u){ return u.id === r; })) return { ok: false, erreur: 'Responsable inconnu.' }; nouv.responsable_id = r; }
+  if ('date_cible' in champs) { var dt = String(champs.date_cible || ''); if (dt && fcDateSaisie(dt) === null) return { ok: false, erreur: "Date d'échéance invalide (AAAA-MM-JJ)." }; nouv.date_cible = dt ? fcDateSaisie(dt) : ''; }
+  if ('observations' in champs) { var o = String(champs.observations || '').trim(); if (o.length > 1000) return { ok: false, erreur: 'Observations trop longues (1000 caractères maximum).' }; nouv.observations = o; }
+  var changes = Object.keys(nouv).filter(function(k){ return String(e[k] || '') !== String(nouv[k] || ''); });
+  if (!changes.length) return { ok: true, modifications: 0 };
+  if (figee && !motif) return { ok: false, erreur: 'Cette étape est ' + (FC_STATUTS[e.statut] || e.statut).toLowerCase() + ' : le motif de la modification est obligatoire.' };
+  var avant = {};
+  changes.forEach(function(k){ avant[k] = e[k]; });
+  if (changes.indexOf('libelle') !== -1 && !e.libelle_origine) e.libelle_origine = e.libelle;
+  changes.forEach(function(k){ e[k] = nouv[k]; if (k === 'date_cible') delete e.date_cible_auto; });
+  await fcSauver(d);
+  var LIB = { libelle: 'libellé', responsable_id: 'responsable', date_cible: 'échéance', observations: 'observations' };
+  for (var i = 0; i < changes.length; i++) {
+    var c = changes[i], av = c === 'responsable_id' ? fcNomUtilisateur(avant[c]) : String(avant[c] || '—'), ap = c === 'responsable_id' ? fcNomUtilisateur(nouv[c]) : String(nouv[c] || '—');
+    await fcEvenement(d, code, 'modification_etape', e.libelle + ' : ' + LIB[c] + ' modifié', { ancien: av, nouveau: ap, motif: motif, champ: c });
+  }
+  /* la demande de validation en attente porte le libellé de l'étape */
+  if (changes.indexOf('libelle') !== -1) (DATA.validations || []).forEach(function(v){
+    if (v.type === 'etape_fonciere' && v.statut === 'en_attente' && v.ref_id === d.id + '|' + code) { v.libelle = d.reference + ' — ' + e.libelle; v._modifie = new Date().toISOString(); try { dbPut('validations', v); if (typeof syncToSupabase === 'function') syncToSupabase('pi_validations', v); } catch (x) {} }
+  });
+  return { ok: true, modifications: changes.length };
+}
+/* Fenêtre de modification d'une étape */
+function fcModifierEtapeUI(id, code) {
+  var d = fcDossier(id), e = d && fcEtape(d, code); if (!d || !e) return;
+  var old = document.getElementById('fc-modal-etape'); if (old) old.remove();
+  var figee = FC_STATUTS_FINAUX.indexOf(e.statut) !== -1;
+  var users = (DATA.users || []).filter(function(u){ return u.statut !== 'inactif'; });
+  var opts = '<option value="">— responsable du dossier (' + escHtml(fcNomUtilisateur(d.responsable_id)) + ') —</option>' + users.map(function(u){ return '<option value="' + escHtml(u.id) + '"' + (u.id === e.responsable_id ? ' selected' : '') + '>' + escHtml(u.nom || u.login || u.id) + '</option>'; }).join('');
+  var ov = document.createElement('div'); ov.id = 'fc-modal-etape';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99998;display:flex;align-items:center;justify-content:center;padding:12px;';
+  ov.innerHTML = '<div class="card" style="max-width:520px;width:100%;max-height:92vh;overflow:auto;border:1px solid var(--or);">'
+    + '<div class="card-title">✏️ Modifier l\'étape — ' + escHtml(FC_PHASES[e.phase] ? e.phase + ' · ' + FC_PHASES[e.phase] : '') + '</div>'
+    + '<div style="font-size:11px;color:var(--dim);margin-bottom:8px;">' + escHtml(d.reference) + ' · statut : ' + escHtml(FC_STATUTS[e.statut] || e.statut) + (e.libelle_origine && e.libelle_origine !== e.libelle ? ' · libellé d\'origine : « ' + escHtml(e.libelle_origine) + ' »' : '') + '. Le statut se change dans la liste des étapes.</div>'
+    + '<div class="form-group"><label>Libellé</label><input class="form-control" id="fc-me-lib" maxlength="160" value="' + escHtml(e.libelle) + '"></div>'
+    + '<div class="form-group"><label>Responsable de l\'étape</label><select class="filter-select" id="fc-me-resp" style="width:100%;">' + opts + '</select></div>'
+    + '<div class="form-group"><label>Échéance</label><input type="date" class="form-control" id="fc-me-ech" value="' + escHtml(e.date_cible || '') + '"></div>'
+    + '<div class="form-group"><label>Observations</label><textarea class="form-control" id="fc-me-obs" rows="3" maxlength="1000">' + escHtml(e.observations || '') + '</textarea></div>'
+    + '<div class="form-group"><label>Motif ' + (figee ? '(obligatoire : étape déjà ' + escHtml((FC_STATUTS[e.statut] || e.statut).toLowerCase()) + ')' : '(facultatif)') + '</label><input class="form-control" id="fc-me-motif" maxlength="300"></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;"><button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById(\'fc-modal-etape\').remove()">Annuler</button>'
+    + '<button type="button" class="btn btn-primary btn-sm" onclick="fcEnregistrerEtapeUI(\'' + id + '\',\'' + code + '\')">Enregistrer</button></div></div>';
+  document.body.appendChild(ov);
+  var f = document.getElementById('fc-me-lib'); if (f) f.focus();
+}
+async function fcEnregistrerEtapeUI(id, code) {
+  var g = function(i){ var el = document.getElementById(i); return el ? el.value : ''; };
+  var r = await fcModifierEtape(id, code, { libelle: g('fc-me-lib'), responsable_id: g('fc-me-resp'), date_cible: g('fc-me-ech'), observations: g('fc-me-obs') }, g('fc-me-motif'));
+  if (!fcMsg(r, r.modifications ? 'Étape modifiée (' + r.modifications + ' champ(s)).' : 'Aucune modification.')) return;
+  var m = document.getElementById('fc-modal-etape'); if (m) m.remove();
+  fcRender(); fcRenderDetail(id);
+}
+
 /* Retard (RM-11) : un dépassement n'est pas un rejet, et un délai administratif n'est pas un retard interne. */
 function fcEtatEcheance(e, aujourdhui) {
   var t = aujourdhui || fcAuj();
@@ -64359,7 +64425,7 @@ function fcRenderDetail(id) {
       + '<td>' + e.justificatifs.length + ' <button class="btn btn-secondary btn-sm" onclick="fcJustifUI(\'' + d.id + '\',\'' + e.code + '\')">+</button> <button class="btn btn-secondary btn-sm" title="Fichiers joints à cette étape" onclick="fcPiecesUI(\'' + d.id + '\',\'' + e.code + '\')">📎 ' + fcPiecesEtape(d.id, e.code).length + (fcPiecesEtape(d.id, e.code).some(function(x){ return x.statut === 'a_verifier'; }) ? ' ⚠' : '') + '</button>'
       + e.justificatifs.map(function(j){ return '<div style="font-size:11px;color:var(--dim);">' + escHtml(j.reference || j.note) + ' · ' + escHtml(FC_SOURCES[j.source] || j.source) + '</div>'; }).join('') + '</td>'
       + '<td style="font-size:11px;">' + escHtml(e.visibilite) + '</td>'
-      + '<td>' + (figee ? '<button class="btn btn-secondary btn-sm" onclick="fcCorrigerUI(\'' + d.id + '\',\'' + e.code + '\')">Corriger</button>' : '<button class="btn btn-secondary btn-sm" onclick="fcEcheanceUI(\'' + d.id + '\',\'' + e.code + '\')">Échéance</button>') + (e.visibilite === 'souscripteur' ? ' <button class="btn btn-secondary btn-sm" title="Publier une information au souscripteur" onclick="fcPublierUI(\'' + d.id + '\',\'' + e.code + '\')">Publier</button>' : '') + fcActionsEtapeHtml(d, e) + '</td></tr>';
+      + '<td>' + (['cloture', 'annule'].indexOf(d.statut) === -1 ? '<button class="btn btn-secondary btn-sm" title="Modifier le libellé, le responsable, l\'échéance, les observations" onclick="fcModifierEtapeUI(\'' + d.id + '\',\'' + e.code + '\')">✏️ Modifier</button> ' : '') + (figee ? '<button class="btn btn-secondary btn-sm" onclick="fcCorrigerUI(\'' + d.id + '\',\'' + e.code + '\')">Corriger</button>' : '<button class="btn btn-secondary btn-sm" onclick="fcEcheanceUI(\'' + d.id + '\',\'' + e.code + '\')">Échéance</button>') + (e.visibilite === 'souscripteur' ? ' <button class="btn btn-secondary btn-sm" title="Publier une information au souscripteur" onclick="fcPublierUI(\'' + d.id + '\',\'' + e.code + '\')">Publier</button>' : '') + fcActionsEtapeHtml(d, e) + '</td></tr>';
   });
   h += '</tbody></table></div>';
   var _nbFait = d.etapes.filter(function(e){ return e.statut === 'termine'; }).length;
@@ -65168,7 +65234,7 @@ async function fcRetirerUI(pubId) {
   var m = prompt('Motif du retrait (obligatoire) :'); if (!m) return;
   fcMsg(await fcRetirerPublication(pubId, m), 'Publication retirée.'); fcRender();
 }
-fcProtegerMutations(['fcOuvrirDossier', 'fcChangerStatutEtape', 'fcAjouterJustificatif', 'fcDefinirIssue', 'fcCorrigerEtape', 'fcEnregistrerIntervenant', 'fcCreerMission',
+fcProtegerMutations(['fcOuvrirDossier', 'fcModifierEtape', 'fcChangerStatutEtape', 'fcAjouterJustificatif', 'fcDefinirIssue', 'fcCorrigerEtape', 'fcEnregistrerIntervenant', 'fcCreerMission',
   'fcChangerStatutMission', 'fcSoumettreLivrable', 'fcValiderLivrable', 'fcRefuserLivrable', 'fcPublierInformation', 'fcRetirerPublication', 'fcCreerDemande', 'fcRepondreDemande', 'fcChangerStatutDemande', 'fcGenererAccesIntervenant', 'fcRevoquerAccesIntervenant', 'fcEnvoyerMessageMission', 'fcMarquerMessagesLus']);
 
 /* ══════════════════════════════════════════════════════════════════════════
