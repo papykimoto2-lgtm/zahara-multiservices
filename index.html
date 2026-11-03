@@ -25439,14 +25439,19 @@ function _ecrAncienIDB(id) {
     } catch (e) { resolve(null); }
   });
 }
+/* Empreinte du contenu comptable d'une pièce (date, comptes, sens, montants) — hors lettrage/liens. */
+function _ecrSigContenu(e) {
+  var L = (typeof ecrLignes === 'function') ? ecrLignes(e) : (e.lignes || []);
+  return String(e.date || '').slice(0, 10) + '|' + L.map(function(l){ return (l.compte || '') + ':' + (l.sens || '') + ':' + Math.round(parseFloat(l.montant) || 0); }).join(';');
+}
 function dbPut(store, obj, opts) {
   opts = opts || {};
   if (store !== 'ecritures' || !obj || obj.id === undefined || _pulling || obj._forceCloture
       || !db || !db.objectStoreNames.contains('ecritures')) return _dbPutBrut(store, obj, opts);
   return _ecrAncienIDB(obj.id).then(function(old) {
     if (old) {
-      var viseeEcrasee = !!old.valide_le && !obj.valide_le && !opts.forceVisa;
-      var exerciceClos = !!old.date && typeof exerciceEstClos === 'function' && exerciceEstClos(old.date) && !opts.forceCloture;
+      var viseeEcrasee = !!old.valide_le && !opts.forceVisa && (!obj.valide_le || _ecrSigContenu(old) !== _ecrSigContenu(obj));
+      var exerciceClos = !!old.date && typeof exerciceEstClos === 'function' && exerciceEstClos(old.date, old.division) && !opts.forceCloture;
       if (viseeEcrasee || exerciceClos) {
         obj._rejete = true;
         if (Array.isArray(DATA.ecritures)) {
@@ -34240,6 +34245,11 @@ async function logAudit(entite, entiteId, action, avant, apres) {
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_audit_log', entry);
 }
 
+/* Journal des actions comptables sensibles (visa, dévisa, contre-passation, réouverture…) — branché sur le journal d'audit. */
+function logAction(type, detail) {
+  try { return logAudit('action_compta', type, String(type) + ' — ' + String(detail || ''), null, null).catch(function(){}); } catch (e) { return null; }
+}
+
 function auditHistorique(entite, entiteId) {
   return (DATA.audit_log || []).filter(function(e){ return e.entite === entite && e.entite_id === entiteId; })
     .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
@@ -41947,15 +41957,16 @@ function detectJournalCode(e) {
 
   var cd = (DATA.params && DATA.params.comptes_defaut) || {};
   var comptes = _ecritureComptes(e);
-  var startsAny = function(pref) { return comptes.some(function(c){ return c === pref || (c && c.indexOf(pref) === 0); }); };
+  var startsAny = function(pref) { return !!pref && comptes.some(function(c){ return c === pref || (c && c.indexOf(pref) === 0); }); };
 
-  var cCaisse = requireCompteDefaut('treso_caisse');
-  var cMobile = requireCompteDefaut('treso_mobile');
-  var cBanque = requireCompteDefaut('treso_banque');
-  var cPaie   = requireCompteDefaut('paie_charge');
+  /* Lecture tolérante : un compte par défaut non paramétré ne doit jamais empêcher de saisir une écriture. */
+  var cCaisse = cd.treso_caisse || '';
+  var cMobile = cd.treso_mobile || '';
+  var cBanque = cd.treso_banque || '';
+  var cPaie   = cd.paie_charge || '';
 
   if (startsAny(cCaisse) || startsAny('57')) return 'CA';
-  if (startsAny(cMobile) || startsAny('53')) return 'MM';
+  if (startsAny(cMobile) || startsAny('55')) return 'MM';
   if (startsAny(cBanque) || startsAny('52')) return 'BQ';
   if (startsAny(cPaie)) return 'PA';
 
@@ -41970,7 +41981,13 @@ function detectJournalCode(e) {
 }
 
 /** Journal effectif d'une écriture : explicite si présent, sinon détecté */
-function getEcritureJournal(e) { return e.journal || detectJournalCode(e); }
+function getEcritureJournal(e) {
+  if (e.journal) return e.journal;
+  if (e._jc) return e._jc;
+  var j = detectJournalCode(e);
+  try { Object.defineProperty(e, '_jc', { value: j, writable: true, configurable: true, enumerable: false }); } catch (x) {}
+  return j;
+}
 
 function journalBadgeHtml(code) {
   var j = journalInfo(code);
@@ -46814,12 +46831,12 @@ async function saveEcriture() {
     return;
   }
 
-  var totD = lignesValides.filter(function(l){ return l.sens==='D'; }).reduce(function(s,l){ return s+parseFloat(l.montant); }, 0);
-  var totC = lignesValides.filter(function(l){ return l.sens==='C'; }).reduce(function(s,l){ return s+parseFloat(l.montant); }, 0);
-  if (Math.abs(totD - totC) >= 1) { toast('Écriture déséquilibrée : Débit ' + fmtF(totD) + ' ≠ Crédit ' + fmtF(totC) + '.', 'error'); return; }
+  var totD = lignesValides.filter(function(l){ return l.sens==='D'; }).reduce(function(s,l){ return s+Math.round(parseFloat(l.montant)); }, 0);
+  var totC = lignesValides.filter(function(l){ return l.sens==='C'; }).reduce(function(s,l){ return s+Math.round(parseFloat(l.montant)); }, 0);
+  if (totD !== totC) { toast('Écriture déséquilibrée : Débit ' + fmtF(totD) + ' ≠ Crédit ' + fmtF(totC) + '.', 'error'); return; }
 
   /* Verrou exercice clos */
-  if (typeof exerciceEstClos === 'function' && exerciceEstClos(date)) {
+  if (typeof exerciceEstClos === 'function' && exerciceEstClos(date, (document.getElementById('e-division')||{}).value || '')) {
     toast('🔒 Exercice ' + new Date(date).getFullYear() + ' clôturé — écritures verrouillées.', 'error');
     return;
   }
@@ -46848,7 +46865,7 @@ async function saveEcriture() {
     piece: document.getElementById('e-piece').value.trim(),
     type: typeAuto,
     libelle: libelle,
-    lignes: lignesValides.map(function(l){ var o = { compte:l.compte, sens:l.sens, montant:parseFloat(l.montant), libelle:l.libelle||'' }; if (l.tiers_id) o.tiers_id = l.tiers_id; return o; }),
+    lignes: lignesValides.map(function(l){ var o = { compte:l.compte, sens:l.sens, montant:Math.round(parseFloat(l.montant)), libelle:l.libelle||'' }; if (l.tiers_id) o.tiers_id = l.tiers_id; return o; }),
     /* Champs legacy dérivés — 1ère ligne D/C — pour compatibilité affichage/print/lettrage secondaires */
     compte: lignesDebit[0].compte,
     compte_debit: lignesDebit[0].compte,
@@ -46888,7 +46905,8 @@ async function saveEcriture() {
 }
 
 /* ── JOURNAL ─────────────────────────────────────────── */
-function filterEcritures() {
+function filterEcritures(plus) {
+  if (plus !== true) window._ecrLimit = 200; /* pagination : 200 lignes, « Afficher plus » */
   populateJournauxSelects();
   var year = document.getElementById('filter-annee-compta').value;
   var type = document.getElementById('filter-type-ecriture') ? document.getElementById('filter-type-ecriture').value : '';
@@ -46985,29 +47003,33 @@ function filterEcritures() {
   }
 
   var totDebit = 0, totCredit = 0;
-  tbody.innerHTML = list.map(function(e) {
-    var cDebit = idxPlan[e.compte_debit || e.compte];
-    var cCredit = idxPlan[e.compte_credit];
-    var prog = e.programme_id ? ((idxProg[e.programme_id]||{}).nom || '') : '';
-    /* Totaux calculés sur les lignes D/C réelles (et non sur le montant en
-       double) : sinon le contrôle d'équilibre ne pouvait jamais échouer. */
+  /* Totaux sur la liste COMPLÈTE (avant pagination). */
+  list.forEach(function(e) {
     if (Array.isArray(e.lignes) && e.lignes.length) {
       e.lignes.forEach(function(l){
         var mnt = parseFloat(l.montant) || 0;
         if (l.sens === 'D') totDebit += mnt; else if (l.sens === 'C') totCredit += mnt;
       });
-    } else { totDebit += e.montant; totCredit += e.montant; }
+    } else { var m0 = parseFloat(e.montant) || 0; totDebit += m0; totCredit += m0; }
+  });
+  var _lim = window._ecrLimit || 200;
+  tbody.innerHTML = list.slice(0, _lim).map(function(e) {
+    var cDebit = idxPlan[e.compte_debit || e.compte];
+    var cCredit = idxPlan[e.compte_credit];
+    var prog = e.programme_id ? ((idxProg[e.programme_id]||{}).nom || '') : '';
+    /* Totaux calculés sur les lignes D/C réelles (et non sur le montant en
+       double) : sinon le contrôle d'équilibre ne pouvait jamais échouer. */
     return '<tr>'
-      + '<td style="font-family:monospace;font-size:11px;color:var(--bleu);">' + (e.ref||'—') + '</td>'
+      + '<td style="font-family:monospace;font-size:11px;color:var(--bleu);">' + escHtml(e.ref||'—') + '</td>'
       + '<td>' + journalBadgeHtml(getEcritureJournal(e)) + '</td>'
       + '<td style="font-size:11px;white-space:nowrap;">' + dateShort(e.date) + '</td>'
-      + '<td><span style="color:var(--rouge);font-weight:600;font-size:12px;">' + (e.compte_debit||e.compte||'?') + '</span><br><span style="font-size:10px;color:var(--blanc-dim);">' + (cDebit ? cDebit.label.slice(0,28) : '') + '</span></td>'
-      + '<td><span style="color:var(--vert);font-weight:600;font-size:12px;">' + (e.compte_credit||'?') + '</span><br><span style="font-size:10px;color:var(--blanc-dim);">' + (cCredit ? cCredit.label.slice(0,28) : '') + '</span></td>'
+      + '<td><span style="color:var(--rouge);font-weight:600;font-size:12px;">' + (e.compte_debit||e.compte||'?') + '</span><br><span style="font-size:10px;color:var(--blanc-dim);">' + escHtml(cDebit ? cDebit.label.slice(0,28) : '') + '</span></td>'
+      + '<td><span style="color:var(--vert);font-weight:600;font-size:12px;">' + (e.compte_credit||'?') + '</span><br><span style="font-size:10px;color:var(--blanc-dim);">' + escHtml(cCredit ? cCredit.label.slice(0,28) : '') + '</span></td>'
       + '<td>' + escHtml(e.libelle||'') + (e.piece ? '<br><span style="font-size:10px;color:var(--bleu);">Pièce: ' + escHtml(e.piece) + '</span>' : '') + '</td>'
       + '<td style="font-weight:600;color:var(--rouge);text-align:right;">' + fmtF(e.montant) + '</td>'
       + '<td style="font-weight:600;color:var(--vert);text-align:right;">' + fmtF(e.montant) + '</td>'
-      + '<td style="font-size:11px;">' + prog + '</td>'
-      + '<td style="font-size:11px;">' + (e.mode||'') + '</td>'
+      + '<td style="font-size:11px;">' + escHtml(prog) + '</td>'
+      + '<td style="font-size:11px;">' + escHtml(e.mode||'') + '</td>'
       + '<td style="white-space:nowrap;">'
       + (typeof ecrStatutLabel === 'function' ? ecrStatutLabel(e) + ' ' : '')
       + (e.contrepassee_par ? '<span class="badge badge-rouge" title="Annulée par ' + escHtml(e.contrepassee_par) + '">↩ annulée</span> ' : '')
@@ -47016,7 +47038,7 @@ function filterEcritures() {
           : '<button class="btn btn-secondary btn-sm btn-icon" onclick="openEcritureModal(\'' + e.id + '\')">✏️</button> <button class="btn btn-danger btn-sm btn-icon" onclick="deleteEcriture(\'' + e.id + '\')">🗑</button>')
       + '</td>'
       + '</tr>';
-  }).join('');
+  }).join('') + (list.length > _lim ? '<tr><td colspan="11" style="text-align:center;padding:12px;"><button class="btn btn-secondary btn-sm" onclick="window._ecrLimit=(window._ecrLimit||200)+200;filterEcritures(true)">Afficher 200 de plus (' + (list.length - _lim) + ' restantes)</button></td></tr>' : '');
 
   var totEl = document.getElementById('journal-totaux');
   if (totEl) {
@@ -49586,6 +49608,7 @@ function dashEncaisseLots(filterFn, natureFilter) {
 function dashDecaissements(filterFn) {
   var t = 0;
   _dashArr('ecritures').forEach(function(e){
+    if (e.type === 'cloture' || e.journal === 'CLO') return;
     if (filterFn && !filterFn(e)) return;
     ecrLignes(e).forEach(function(l){
       if ((l.compte||'').charAt(0) === '6') t += (l.sens === 'D' ? 1 : -1) * (parseFloat(l.montant)||0);
@@ -49602,6 +49625,7 @@ function dashDecaissements(filterFn) {
 function dashProduits(filterFn) {
   var t = 0;
   _dashArr('ecritures').forEach(function(e){
+    if (e.type === 'cloture' || e.journal === 'CLO') return;
     if (filterFn && !filterFn(e)) return;
     ecrLignes(e).forEach(function(l){
       if ((l.compte||'').charAt(0) === '7') t += (l.sens === 'C' ? 1 : -1) * (parseFloat(l.montant)||0);
@@ -51465,7 +51489,7 @@ function referentielMapCR() {
 
 function _calcResultat(year) {
   var divFCR = _comptaDivisionFilter();
-  var ec = DATA.ecritures.filter(function(e){ return e.date && e.date.startsWith(year) && (!divFCR || e.division === divFCR); });
+  var ec = DATA.ecritures.filter(function(e){ return e.date && e.date.startsWith(year) && e.type !== 'cloture' && e.journal !== 'CLO' && (!divFCR || e.division === divFCR); });
   /* Soldes NETS : une charge = débits − crédits, un produit = crédits − débits.
      Les anciens totaux bruts (débits seuls / crédits seuls) ignoraient toute
      contre-passation, tout avoir et tout rabais : une vente annulée restait
@@ -51530,7 +51554,7 @@ function _calcResultat(year) {
 function _crMvtMap(year){
   var mD = {}, mC = {};
   var divFMvt = _comptaDivisionFilter();
-  DATA.ecritures.filter(function(e){ return e.date && e.date.startsWith(year) && (!divFMvt || e.division === divFMvt); }).forEach(function(e){
+  DATA.ecritures.filter(function(e){ return e.date && e.date.startsWith(year) && e.type !== 'cloture' && e.journal !== 'CLO' && (!divFMvt || e.division === divFMvt); }).forEach(function(e){
     ecrLignes(e).forEach(function(l){
       if (!l.compte) return;
       if (l.sens === 'D') mD[l.compte] = (mD[l.compte]||0) + (parseFloat(l.montant)||0);
@@ -51695,7 +51719,8 @@ function exportJournalCSV() {
   var d1 = document.getElementById('filter-date-debut') ? document.getElementById('filter-date-debut').value : '';
   var d2 = document.getElementById('filter-date-fin') ? document.getElementById('filter-date-fin').value : '';
   if (d1 && d2 && d1 > d2) { var tmp = d1; d1 = d2; d2 = tmp; }
-  var rows = ['Journal,N° Écriture,Date,Pièce,Libellé,Compte,Sens,Montant (FCFA),Mode,Programme'];
+  var _q = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+  var rows = ['Journal;N° Écriture;Date;Pièce;Libellé;Compte;Sens;Montant (FCFA);Mode;Programme'];
   var divFExp = (typeof _comptaDivisionFilter === 'function') ? _comptaDivisionFilter() : '';
   DATA.ecritures.filter(function(e){
     var matchPeriode = (d1 || d2)
@@ -51703,18 +51728,19 @@ function exportJournalCSV() {
       : ((!year || (e.date && e.date.startsWith(year))) && (!mois || (e.date && e.date.startsWith(mois))));
     return matchPeriode && (!journalF || getEcritureJournal(e) === journalF) && (!divFExp || (e.division||'') === divFExp);
   })
-    .sort(function(a,b){ return new Date(a.date)-new Date(b.date); })
+    .sort(function(a,b){ return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; })
     .forEach(function(e) {
       var prog = e.programme_id ? ((DATA.programmes.find(function(p){ return p.id===e.programme_id; })||{}).nom||'') : '';
       var jCode = getEcritureJournal(e);
       ecrLignes(e).forEach(function(l){
-        rows.push([jCode, e.ref, e.date, e.piece||'', '"'+(l.libelle||e.libelle)+'"', l.compte, l.sens==='D'?'Débit':'Crédit', l.montant, e.mode||'', prog].join(','));
+        rows.push([_q(jCode), _q(e.ref), _q(e.date), _q(e.piece||''), _q(l.libelle||e.libelle), _q(l.compte), _q(l.sens==='D'?'Débit':'Crédit'), Math.round(parseFloat(l.montant)||0), _q(e.mode||''), _q(prog)].join(';'));
       });
     });
   var blob = new Blob(['\uFEFF'+rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
   var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   var suffixePeriode = (d1 || d2) ? ((d1||'debut') + '_a_' + (d2||'fin')) : year;
   a.download = 'journal_' + (journalF ? journalF + '_' : '') + suffixePeriode + '_SYSCOHADA.csv'; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
   toast('Journal exporté.', 'success');
 }
 
@@ -86010,7 +86036,7 @@ function renderReleveTable() {
       +'<td>'+r.date+'</td>'
       +'<td style="font-family:monospace;font-size:11px;color:var(--bleu);">'+r.banque+'</td>'
       +'<td style="font-family:monospace;font-size:11px;">'+r.ref+'</td>'
-      +'<td style="max-width:200px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.libelle+'</td>'
+      +'<td style="max-width:200px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(r.libelle)+'</td>'
       +'<td style="font-size:11px;"><span class="badge badge-neutre">'+r.mode+'</span></td>'
       +'<td style="text-align:right;color:var(--rouge);font-weight:'+(r.debit>0?'700':'400')+';">'+(r.debit>0?fmtF(r.debit)+' FCFA':'—')+'</td>'
       +'<td style="text-align:right;color:var(--vert);font-weight:'+(r.credit>0?'700':'400')+';">'+(r.credit>0?fmtF(r.credit)+' FCFA':'—')+'</td>'
@@ -86318,7 +86344,7 @@ function buildEcarts() {
       return '<tr>'
         +'<td>'+r.date+'</td>'
         +'<td style="font-family:monospace;font-size:11px;">'+r.ref+'</td>'
-        +'<td style="font-size:12px;">'+r.libelle+'</td>'
+        +'<td style="font-size:12px;">'+escHtml(r.libelle)+'</td>'
         +'<td style="color:var(--rouge);">'+(r.debit>0?fmtF(r.debit)+' FCFA':'—')+'</td>'
         +'<td style="color:var(--vert);">'+(r.credit>0?fmtF(r.credit)+' FCFA':'—')+'</td>'
         +'<td style="font-size:11px;color:var(--or);">'+causes[0]+'</td>'
@@ -114288,7 +114314,7 @@ function edsRenderSyscohada() {
   /* l'immobilisation en cours = contrepartie des charges incorporées : on retire le doublon 231 */
   lignes = lignes.filter(function(x) { return x.compte !== '231'; });
   var rows = lignes.map(function(l) {
-    return '<tr><td><strong>' + l.compte + '</strong></td><td>' + l.libelle + '</td><td style="text-align:right;">' + (l.debit ? fmtF(l.debit) : '') + '</td><td style="text-align:right;">' + (l.credit ? fmtF(l.credit) : '') + '</td></tr>';
+    return '<tr><td><strong>' + escHtml(l.compte) + '</strong></td><td>' + escHtml(l.libelle) + '</td><td style="text-align:right;">' + (l.debit ? fmtF(l.debit) : '') + '</td><td style="text-align:right;">' + (l.credit ? fmtF(l.credit) : '') + '</td></tr>';
   }).join('');
   zone.innerHTML =
     '<h3 style="margin:0 0 6px;">Imputations prévisionnelles — ' + e.nom + '</h3>' +
@@ -123346,7 +123372,7 @@ async function dosTogglePortail(v){ dosCurrent.publie_portail=v; await dosPersis
 function dosPrintPV(kind){
   var d=dosCurrent; var soc=(DATA.params&&(DATA.params.societe||DATA.params.nom_societe))||'';
   var titres={pre:'PROCÈS-VERBAL DE PRÉ-RÉCEPTION',provisoire:'PROCÈS-VERBAL DE RÉCEPTION PROVISOIRE',definitif:'PROCÈS-VERBAL DE RÉCEPTION DÉFINITIVE'};
-  var res=(d.reserves||[]).map(function(r,i){return '<tr><td>'+(i+1)+'</td><td>'+r.libelle+'</td><td>'+(r.localisation||'')+'</td><td>'+(r.gravite||'')+'</td><td>'+(r.delai||'')+'</td><td>'+(dosResLevee(r)?'Levée':(r.statut||'ouverte'))+'</td></tr>';}).join('')||'<tr><td colspan="6" style="text-align:center;">Aucune réserve</td></tr>';
+  var res=(d.reserves||[]).map(function(r,i){return '<tr><td>'+(i+1)+'</td><td>'+escHtml(r.libelle)+'</td><td>'+escHtml(r.localisation||'')+'</td><td>'+(r.gravite||'')+'</td><td>'+(r.delai||'')+'</td><td>'+(dosResLevee(r)?'Levée':(r.statut||'ouverte'))+'</td></tr>';}).join('')||'<tr><td colspan="6" style="text-align:center;">Aucune réserve</td></tr>';
   var extra='';
   if(kind==='definitif') extra='<p><strong>Clés remises :</strong> '+(d.definitive.cles_remises||0)+' &nbsp;·&nbsp; <strong>Documents de garantie :</strong> '+(d.definitive.docs_garantie?'remis':'—')+'</p>';
   if(kind==='provisoire'&&d.visite.observations_souscripteur) extra='<p><strong>Observations du souscripteur :</strong> '+d.visite.observations_souscripteur+'</p>';
