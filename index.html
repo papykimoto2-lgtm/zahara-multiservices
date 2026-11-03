@@ -67375,8 +67375,19 @@ async function fcSupprimerDossier(id, motif) {
   motif = String(motif || '').trim(); if (motif.length < 10) return { ok: false, erreur: 'Motif obligatoire (10 caractères minimum).' };
   var ob = fcObstaclesSuppression(d); if (ob.length) return { ok: false, erreur: 'Suppression impossible (trace comptable) : ' + ob.join(' ; ') + '. Annulez puis archivez le dossier.' };
   var snap = JSON.parse(JSON.stringify(d)), ref = d.reference;
+  /* Le journal du dossier et ses validations disparaissent avec lui : on les conserve DANS l'instantané d'audit (qui, quand, quoi). */
+  var lignesVal = (DATA.validations || []).filter(function(v){ return v.type === 'etape_fonciere' && (v.meta || {}).dossier_id === id; });
+  snap._validations = lignesVal.map(function(v){ return { libelle: v.libelle, statut: v.statut, demandeur: v.demandeur, date_demande: v.date_demande, valideur: v.valideur, date_decision: v.date_decision, motif: v.motif, fonction: (v.meta || {}).fonction_lib || (v.meta || {}).fonction || '' }; });
+  snap._journal = (DATA.evenements_fonciers || []).filter(function(x){ return x.dossier_id === id; }).slice(0, 2000).map(function(x){ return { date: x.date, acteur: x.acteur, type: x.type, etape: x.etape_code || x.code || '', description: x.description || x.libelle || '' }; });
   try { snap._motif_suppression = motif; await logAudit('dossiers_fonciers', id, 'delete', snap, null); } catch (e) { return { ok: false, erreur: 'Journal d’audit indisponible : suppression refusée.' }; }
-  var liens = [['evenements_fonciers'], ['missions_foncieres'], ['pieces_foncieres']];
+  /* Demandes de validation encore en attente : closes tout de suite (plus de ligne orpheline « à valider » dans le module Validations). */
+  var acteurSup = fcActeur().nom || 'Système';
+  for (var iv = 0; iv < lignesVal.length; iv++) {
+    var lv = lignesVal[iv]; if (lv.statut !== 'en_attente') continue;
+    lv.statut = 'rejete'; lv.motif = 'Dossier supprimé : ' + motif; lv.valideur = acteurSup; lv.date_decision = fcAuj(); lv._modifie = new Date().toISOString();
+    try { await dbPut('validations', lv); if (typeof syncToSupabase === 'function') syncToSupabase('pi_validations', lv); } catch (e) {}
+  }
+  var liens = [['evenements_fonciers'], ['missions_foncieres'], ['pieces_foncieres'], ['publications_foncieres'], ['demandes_fonciers'], ['notifications_foncieres']];
   for (var i = 0; i < liens.length; i++) {
     var s = liens[i][0], l = (DATA[s] || []).filter(function(x){ return x.dossier_id === id; });
     for (var j = 0; j < l.length; j++) await deleteRecord(s, l[j].id, { skipIntegrity: true });
@@ -67392,8 +67403,13 @@ async function fcSupprimerDossierUI(id) {
   if (!fcEstAdmin()) { toast('Réservé aux administrateurs.', 'error'); return; }
   var ob = fcObstaclesSuppression(d);
   if (ob.length) { toast('Suppression impossible (trace comptable). Annulez puis archivez le dossier.', 'error'); return; }
-  var m = prompt('Supprimer définitivement le dossier ' + d.reference + ' (étapes, missions, pièces et journal liés) ? Irréversible.\nMotif (10 caractères min) :', '');
+  var lv = (DATA.validations || []).filter(function(v){ return v.type === 'etape_fonciere' && (v.meta || {}).dossier_id === id; }),
+      rendues = lv.filter(function(v){ return v.statut !== 'en_attente'; }).length, attente = lv.length - rendues;
+  var m = prompt('Supprimer définitivement le dossier ' + d.reference + ' (étapes, missions, pièces, publications, demandes, notifications et journal liés) ? Irréversible.\n'
+    + (lv.length ? 'Validations : ' + rendues + ' déjà rendue(s) (conservées dans l\'Historique de Validations et au journal d\'audit), ' + attente + ' en attente (clôturées « Dossier supprimé »).\n' : '')
+    + 'Pour garder tout l\'historique, annulez puis archivez le dossier au lieu de le supprimer.\nMotif (10 caractères min) :', '');
   if (m === null) return;
+  if (rendues && !confirm('Ce dossier compte ' + rendues + ' validation(s) déjà rendue(s) par la hiérarchie.\n\nConfirmer la suppression définitive ?')) return;
   var r = await fcSupprimerDossier(id, m);
   if (fcMsg(r, 'Dossier ' + (r.reference || '') + ' supprimé.')) fcRender();
 }
