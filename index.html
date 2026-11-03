@@ -29147,6 +29147,7 @@ async function _syncUsersSeul(){
     if (!cloudPlusRecent) continue;
     if (idx>=0) DATA.users[idx] = ru; else DATA.users.push(ru);
     try{ _pulling = true; await dbPut('users', ru); } finally { _pulling = false; }
+    try{ _verifierSessionApresSync(ru); }catch(e){}
     n++;
   }
   return n;
@@ -29850,6 +29851,14 @@ async function startSession(user) {
 }
 
 /** Vérifie la session persistante — signature + hash requis. Retourne l'utilisateur ou null. */
+/* Un compte désactivé ou dont le rôle a changé sur un autre poste ne garde pas ses droits jusqu'à la reconnexion. */
+function _verifierSessionApresSync(ru) {
+  var cu = APP.currentUser; if (!cu || !ru || cu.id !== ru.id) return;
+  if (ru.statut === 'inactif' || (ru.role && cu.role && ru.role !== cu.role)) {
+    try { toast(ru.statut === 'inactif' ? '🔒 Votre compte a été désactivé.' : '🔒 Votre rôle a changé : reconnexion nécessaire.', 'warning', 8000); } catch (e) {}
+    setTimeout(function(){ try { logout(true); } catch (e) {} }, 1500);
+  }
+}
 async function checkSession() {
   var token = localStorage.getItem('pici_auth_token');
   if (!token) return null;
@@ -29870,6 +29879,7 @@ async function checkSession() {
     if (epoch && (!payload.iat || payload.iat < epoch)) throw {r:'distance'};
     var u = DATA.users.find(function(x){ return x.id === payload.id; });
     if (!u) throw {r:'invalide'};
+    if (u.statut === 'inactif') throw {r:'invalide'};                      /* compte désactivé : plus de reprise de session */
     /* [FIX] Un hash différent ne signifie pas toujours "invalidée par un
        administrateur" : migratePasswords() (exécutée une fois au démarrage,
        silencieusement, pour convertir un mot de passe en clair vers un hash)
@@ -56426,6 +56436,7 @@ function openUserModal() {
 }
 
 async function createUserFromModal() {
+  if (typeof hasRole === 'function' && !hasRole('admin')) { toast('🔒 La gestion des comptes est réservée aux administrateurs.', 'error'); return; }
   var nom   = (document.getElementById('new-user-nom')||{}).value||'';
   var login = (document.getElementById('new-user-login')||{}).value||'';
   var pwd   = (document.getElementById('new-user-pwd')||{}).value||'';
@@ -63895,6 +63906,9 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
   if (d.statut === 'cloture' && code !== 'cloture') return { ok: false, erreur: 'Dossier clôturé : utilisez une correction motivée.' };
   if (FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return { ok: false, erreur: 'Étape ' + FC_STATUTS[e.statut].toLowerCase() + ' : utilisez une correction motivée (l\'historique est conservé).' };
   if (e.statut === statut) return { ok: true, dossier: d };
+  /* Droits : seuls le responsable du dossier, celui de l'étape ou un administrateur changent un statut (la décision de validation passe par Validations : APP._valContexte). */
+  var _acSt = fcActeur();
+  if (!APP._valContexte && !fcPeutGererDossier(d) && fcResponsableEtape(d, e) !== _acSt.id) return { ok: false, erreur: "Seuls le responsable du dossier, celui de l'étape ou un administrateur changent le statut d'une étape." };
   var motif = String(o.motif || '').trim();
   if (['rejete', 'annule', 'bloque'].indexOf(statut) !== -1 && !motif) return { ok: false, erreur: 'Un motif est obligatoire pour le statut « ' + FC_STATUTS[statut] + ' ».' };
   if (FC_STATUTS_ACTIFS.indexOf(statut) !== -1 && !(e.responsable_id || d.responsable_id)) return { ok: false, erreur: 'Aucun responsable n\'est affecté à cette étape.' };
@@ -63933,6 +63947,7 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
     if (restantes.length) {
       if (!o.derogation) return { ok: false, erreur: 'Clôture impossible : ' + restantes.length + ' étape(s) non terminée(s) ou non écartée(s).', etapes_restantes: true };
       if (!motif) return { ok: false, erreur: 'Une clôture avec étapes restantes exige un motif.' };
+      if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) peut clôturer avec des étapes restantes.' };
       derogation = true;
     }
   }
@@ -63941,12 +63956,14 @@ async function fcChangerStatutEtape(dossierId, code, statut, o) {
     if (restants.length) {
       if (!o.derogation) return { ok: false, erreur: 'Contrôles essentiels non conclus : ' + restants.map(function(c){ return c.libelle; }).join(', ') + '.', controles_restants: true };
       if (!motif) return { ok: false, erreur: 'Une dérogation exige un motif.' };
+      if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) peut déroger aux contrôles essentiels.' };
       derogation = true;
     }
   }
   if (statut === 'termine' && e.justificatif_requis && !e.justificatifs.length) {
     if (!o.derogation) return { ok: false, erreur: 'Cette étape exige un justificatif avant d\'être terminée.', justificatif_manquant: true };
     if (!motif) return { ok: false, erreur: 'Une dérogation exige un motif.' };
+    if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) peut terminer une étape sans justificatif.' };
     derogation = true;
   }
   if (statut === 'termine') fcRattraperValidationEtape(d, e);
@@ -67925,7 +67942,9 @@ function fcRattraperValidationEtape(d, e) {
 function fcValidationRequise(d, e) {
   if (!fcValidationFonctionsActive() || !e || FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return '';
   var f = fcEquipeEtape(e.code).valide; if (!f) return '';
-  return fcUsersFonction(f).length ? f : '';
+  if (fcUsersFonction(f).length) return f;
+  /* Plus personne ne porte la fonction : la validation reste EXIGÉE et revient aux administrateurs actifs (sinon l'étape se terminerait sans contrôle). */
+  return (DATA.users || []).some(function(u){ return u.statut !== 'inactif' && u.role === 'admin'; }) ? f : '';
 }
 function fcPeutValiderEtape(f) { return fcEstAdmin() || fcRolesFonction(f).indexOf(fcRoleActeur()) !== -1; }
 /* Une validation n'a de sens que lorsque l'étape peut être terminée : on ne la demande pas tant que ses étapes préalables (ou, pour la clôture, toutes les autres étapes) ne sont pas terminées. */
@@ -67963,7 +67982,9 @@ async function fcDecisionValidationEtape(dossierId, code, decision, motif) {
   if (!APP._valContexte) return { ok: false, erreur: 'La décision de validation se prend uniquement dans le module Validations (hiérarchie).' };
   var d = fcDossier(dossierId), e = d && fcEtape(d, code);
   if (!d || !e) return { ok: false, erreur: 'Dossier ou étape introuvable.' };
-  var f = (e.validation && e.validation.statut === 'demandee') ? e.validation.fonction : fcValidationRequise(d, e);
+  if (FC_STATUTS_FINAUX.indexOf(e.statut) !== -1) return { ok: false, erreur: 'Étape déjà ' + (FC_STATUTS[e.statut] || e.statut).toLowerCase() + ' : aucune validation à rendre.' };
+  if (!(e.validation && e.validation.statut === 'demandee')) return { ok: false, erreur: 'Aucune demande de validation en attente pour cette étape.' };
+  var f = e.validation.fonction || fcValidationRequise(d, e);
   if (!f) return { ok: false, erreur: 'Aucune validation à rendre pour cette étape.' };
   if (!fcPeutValiderEtape(f)) return { ok: false, erreur: 'Validation réservée à la fonction « ' + fcLibFonction(f) + ' » (ou à un administrateur).' };
   var a = fcActeur(), maintenant = new Date().toISOString(); motif = String(motif || '').trim();
@@ -94422,6 +94443,7 @@ async function _rtApply(table, eventType, newRow, oldRow){
   }
   /* Rafraîchir la page active si elle concerne ce module */
   _rtRefreshPage(store);
+  if (store === 'users' && eventType !== 'DELETE') { var _uu = (DATA.users || []).find(function(x){ return x.id === id; }); if (_uu) { try { _verifierSessionApresSync(_uu); } catch (e) {} } }
   /* ── custom_roles : cas à part ──────────────────────────────────────
      Contrairement aux autres stores, les permissions ne sont pas lues
      depuis DATA.custom_roles mais depuis SYSTEM_ROLES/CUSTOM_ROLES en
@@ -111154,6 +111176,7 @@ function togglePwdVisibility(inputId, eyeId) {
 (function() {
   var _origCreate = createUserFromModal;
   createUserFromModal = async function() {
+    if (typeof hasRole === 'function' && !hasRole('admin')) { toast('🔒 La gestion des comptes est réservée aux administrateurs.', 'error'); return; }
     var editId = document.getElementById('modal-user-create').dataset.editId || '';
     var isEdit = !!editId;
     var nom    = (document.getElementById('new-user-nom')||{}).value.trim();
@@ -111191,6 +111214,12 @@ function togglePwdVisibility(inputId, eyeId) {
 
     /* Mot de passe */
     var user = isEdit ? DATA.users.find(function(u){ return u.id===editId; }) : null;
+    if (isEdit && user) {
+      var _quiC = APP.currentUser && APP.currentUser.id;
+      if (user.id === _quiC && (role !== user.role || statut !== user.statut)) { toast('🔒 Vous ne pouvez pas modifier votre propre rôle ni votre statut.', 'error'); return; }
+      var _etaitAdm = user.role === 'admin' && user.statut !== 'inactif';
+      if (_etaitAdm && (role !== 'admin' || statut === 'inactif') && !DATA.users.some(function(u){ return u.id !== user.id && u.role === 'admin' && u.statut !== 'inactif'; })) { toast('🔒 Il doit rester au moins un administrateur actif.', 'error'); return; }
+    }
     if (!isEdit) {
       /* Création : mot de passe obligatoire */
       if (!pwd)        { toast('⚠️ Mot de passe obligatoire.', 'error'); return; }
@@ -121919,13 +121948,34 @@ function valStatutBadge(st){ var m={en_attente:'badge-or',valide:'badge-vert',re
 function valPending(type,refId){ return (DATA.validations||[]).find(function(v){return v.type===type&&v.ref_id===refId&&v.statut==='en_attente';}); }
 async function valCreate(type,refId,libelle,montant,meta){
   if(valPending(type,refId)){ toast('Déjà en attente de validation.','info'); return null; }
-  var v={ id:uid(), type:type, ref_id:refId, libelle:libelle||valTypeLabel(type), montant:montant||0, meta:meta||{}, statut:'en_attente', demandeur:(APP.currentUser&&APP.currentUser.nom)||'—', date_demande:today(), valideur:null, date_decision:null, motif:'', created_at:today() };
+  var v={ id:uid(), type:type, ref_id:refId, libelle:libelle||valTypeLabel(type), montant:montant||0, meta:meta||{}, statut:'en_attente', demandeur_id:(APP.currentUser&&APP.currentUser.id)||null, demandeur:(APP.currentUser&&APP.currentUser.nom)||'—', date_demande:today(), valideur:null, date_decision:null, motif:'', created_at:today() };
   DATA.validations.push(v); v._modifie=new Date().toISOString(); await dbPut('validations',v); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',v);
   etudesLiveRefresh('validations');
   return v;
 }
+/* Un demandeur ne valide pas sa propre demande (sauf administrateur, avec confirmation et trace). */
+function valControleDemandeur(v,decision){
+  if(decision!=='valide') return true;
+  var moi=APP.currentUser||{};
+  var meme=v.demandeur_id ? v.demandeur_id===moi.id : !!(v.demandeur && v.demandeur===(moi.nom||'—'));
+  if(!meme) return true;
+  if(typeof hasRole!=='function'||!hasRole('admin')){ toast('⛔ Vous ne pouvez pas valider votre propre demande.','error'); return false; }
+  if(!confirm('Vous êtes à l\'origine de cette demande.\n\nLa valider vous-même (dérogation d\'administrateur, tracée) ?')) return false;
+  try{ if(typeof logAction==='function') logAction('VALIDATION_PROPRE_DEMANDE',(v.libelle||v.id)); }catch(e){}
+  return true;
+}
 async function valDecide(id,decision,motif){
   var v=(DATA.validations||[]).find(function(x){return x.id===id;}); if(!v)return;
+  /* Une demande déjà décidée ne se décide pas une 2e fois (double clic, liste périmée) ; un seul traitement à la fois par demande. */
+  if(v.statut!=='en_attente'){ toast('Cette demande a déjà été traitée.','info'); try{ renderValidations(); }catch(e){} return; }
+  APP._valEnCours=APP._valEnCours||{}; if(APP._valEnCours[id]) return; APP._valEnCours[id]=true;
+  try{ return await valDecideCoeur(v,id,decision,motif); } finally { delete APP._valEnCours[id]; }
+}
+async function valDecideCoeur(v,id,decision,motif){
+  if(typeof valPeutDecider==='function' && !valPeutDecider(v)){ toast('⛔ Vous n\'avez pas le droit de décider cette demande.','error'); return; }
+  if(decision!=='valide' && !String(motif||'').trim() && v.type!=='etape_fonciere'){ toast('Un motif est obligatoire pour rejeter une demande.','error'); return; }
+  if(decision==='valide' && v.type!=='etape_fonciere' && v.montant && typeof exigerPlafond==='function' && !exigerPlafond(v.montant,'Cette validation')) return;
+  if(v.type!=='etape_fonciere' && !valControleDemandeur(v,decision)) return;
   if(v.type==='etape_fonciere') return valDecideEtapeFonciere(v,decision,motif);
   if(v.type==='demande_course'||v.type==='rapport_course'){
     if(typeof paPeutAutoriser==='function' && !paPeutAutoriser()){ toast('⛔ Autorisation réservée au validateur désigné (Paramètres › Parc auto).','error'); return; }
@@ -122014,12 +122064,16 @@ function valPeutDecider(v){
 async function valDecideEtapeFonciere(v,decision,motif){
   var m=v.meta||{};
   if(typeof fcDecisionValidationEtape!=='function'){ toast('Module Foncier indisponible.','error'); return; }
+  if(!valControleDemandeur(v,decision)) return;
   if(decision==='valide' && !(APP._valApercuVus||{})[v.id] && !confirm('Vous n’avez pas consulté ce dossier (boutons « 👁 Aperçu » ou « 📁 Dossier »).\n\nValider quand même ?')) return;
   var r; APP._valContexte=true;
-  try{ r=await fcDecisionValidationEtape(m.dossier_id,m.code,decision==='valide'?'validee':'refusee',motif||''); }
+  try{
+    r=await fcDecisionValidationEtape(m.dossier_id,m.code,decision==='valide'?'validee':'refusee',motif||'');
+    /* l'auto-terminaison qui suit une validation fait partie de la décision : elle reste dans le contexte Validations */
+    if(r&&r.ok&&r.validee&&!r.terminee&&typeof fcTerminerApresValidation==='function') r=Object.assign({},r,{terminee:((await fcTerminerApresValidation(m.dossier_id,m.code,r.avertissement))||{}).ok===true});
+  }
   finally{ APP._valContexte=false; }
   if(!r||!r.ok){ toast((r&&r.erreur)||'Décision impossible.','error'); return; }
-  if(r.validee && !r.terminee && typeof fcTerminerApresValidation==='function') r=Object.assign({},r,{terminee:((await fcTerminerApresValidation(m.dossier_id,m.code,r.avertissement))||{}).ok===true});
   renderValidations();
   if(typeof fcRender==='function'){ try{ fcRender(); if(APP._fcSel===m.dossier_id) fcRenderDetail(m.dossier_id); }catch(e){} }
   etudesLiveRefresh('validations');
@@ -122032,8 +122086,8 @@ async function valSyncEtapeFonciere(d,e,decision,par,motif){
   if(decision==='en_attente'){
     if(v) return v;
     var vv=e.validation||{};
-    v={ id:uid(), type:'etape_fonciere', ref_id:ref, libelle:d.reference+' — '+e.libelle, montant:0, meta:{dossier_id:d.id,code:e.code,fonction:vv.fonction||'',dossier_ref:d.reference,fonction_lib:fcLibFonction(vv.fonction)},
-        statut:'en_attente', demandeur:vv.demande_par||(APP.currentUser&&APP.currentUser.nom)||'—', date_demande:(vv.demande_le||'').slice(0,10)||today(), valideur:null, date_decision:null, motif:'', created_at:today() };
+    v={ id:uid(), type:'etape_fonciere', ref_id:ref, libelle:d.reference+' — '+e.libelle, montant:0, meta:{dossier_id:d.id,code:e.code,fonction:vv.fonction||'',dossier_ref:d.reference,fonction_lib:fcLibFonction(vv.fonction),demande_le:vv.demande_le||''},
+        statut:'en_attente', demandeur_id:vv.demande_par_id||(APP.currentUser&&APP.currentUser.id)||null, demandeur:vv.demande_par||(APP.currentUser&&APP.currentUser.nom)||'—', date_demande:(vv.demande_le||'').slice(0,10)||today(), valideur:null, date_decision:null, motif:'', created_at:today() };
     DATA.validations.push(v);
   } else {
     if(!v) return null;
@@ -122060,9 +122114,11 @@ function valReconcilierEtapesFoncieres(){
     .sort(function(a,b){return String(b.created_at||'').localeCompare(String(a.created_at||''));});
   enAtt.forEach(function(v){
     var m=v.meta||{}, d=fcDossier(m.dossier_id), e=d&&fcEtape(d,m.code), cl=null;
-    if(!d||!e) cl=['rejete','Sans objet : dossier ou étape introuvable','Système',''];
-    else if(e.validation&&e.validation.statut==='validee') cl=['valide','',e.validation.par||'—',(e.validation.le||'').slice(0,10)];
-    else if(e.validation&&e.validation.statut==='refusee') cl=['rejete',e.validation.motif||'Refusée',e.validation.decide_par||'—',(e.validation.decide_le||'').slice(0,10)];
+    /* la décision du dossier doit être POSTÉRIEURE à la demande : sinon c'est une demande plus récente que l'état (périmé) de ce poste */
+    var apres=function(dec){ if(!dec) return false; if(m.demande_le) return String(dec)>=String(m.demande_le); return !v.date_demande||String(dec).slice(0,10)>=v.date_demande; };
+    if(!d||!e){ if(typeof tombHas==='function'&&tombHas('dossiers_fonciers',m.dossier_id)) cl=['rejete','Sans objet : dossier supprimé','Système','']; }   /* absent localement ≠ supprimé : pas encore synchronisé ? */
+    else if(e.validation&&e.validation.statut==='validee'&&apres(e.validation.le)) cl=['valide','',e.validation.par||'—',(e.validation.le||'').slice(0,10)];
+    else if(e.validation&&e.validation.statut==='refusee'&&apres(e.validation.decide_le)) cl=['rejete',e.validation.motif||'Refusée',e.validation.decide_par||'—',(e.validation.decide_le||'').slice(0,10)];
     else if(vues[v.ref_id]) cl=['rejete','Sans objet : doublon d\'une demande plus récente','Système',''];
     else if(['cloture','annule'].indexOf(d.statut)!==-1) cl=['rejete','Sans objet : dossier '+d.statut,'Système',''];
     else if(FIN.indexOf(e.statut)!==-1) cl=['rejete','Sans objet : étape déjà '+String((typeof FC_STATUTS!=='undefined'&&FC_STATUTS[e.statut])||e.statut).toLowerCase(),'Système',''];

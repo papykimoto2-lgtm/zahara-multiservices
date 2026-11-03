@@ -56,6 +56,7 @@ test('RM-10 : une notification qui échoue n\'annule pas l\'opération ; elle es
   const r = await app.page.evaluate(async function (id) {
     var original = fcCreerNotification; var avant = DATA.notifications_foncieres.length;
     window.fcCreerNotification = async function () { throw new Error('panne de la file'); };
+    APP.currentUser = { id: 'u3', nom: 'Directeur', role: 'admin' };   /* seul le responsable ou un administrateur change un statut ; l'agent u2 n'en a plus le droit */
     var op = await fcChangerStatutEtape(id, 'creation_dossier', 'bloque', { motif: 'pièce illisible' });
     var evBloque = DATA.evenements_fonciers.filter(function (e) { return e.type === 'changement_statut'; }).length;
     var manque = DATA.notifications_foncieres.length === avant;
