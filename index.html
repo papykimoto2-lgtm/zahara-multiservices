@@ -93121,6 +93121,15 @@ async function gedCollecter() {
     var module = GED_CAT_PORTAIL[d.categorie] || GED_CAT_PORTAIL.document;
     out.push({ id:d.id, store:'portail_medias', name:d.nom||d.titre||('media-'+d.id), mime:d.mime||'image/jpeg', size:d.taille||0, date:(d.date||'').slice(0,10), module:module, division:'Non affecté', description:d.titre||'' });
   });
+  /* Pièces des dossiers fonciers (Foncier › Suivi / Documents) : métadonnées dans pieces_foncieres, fichier local ou stockage privé. Archivées incluses (badge). */
+  (DATA.pieces_foncieres || []).forEach(function(pf) {
+    if (pf.remplacee_par) return;                                   /* anciennes versions : consultables depuis Foncier › Documents */
+    if (typeof fcPieceLisible === 'function' && !fcPieceLisible(pf)) return;   /* confidentialité respectée */
+    var dos = typeof fcDossier === 'function' ? fcDossier(pf.dossier_id) : null, et = dos && typeof fcEtape === 'function' ? fcEtape(dos, pf.etape_code) : null;
+    var dv = dos && (dos.division_id || dos.division) ? _nomDivision(dos.division_id || dos.division) : 'Non affecté';
+    out.push({ id:pf.id, store:'pieces_foncieres', name:pf.nom, mime:pf.type, size:pf.taille||0, date:(pf.depose_le||'').slice(0,10), module:'Foncier — Dossiers', division:dv,
+      description:(dos ? ('Dossier ' + (dos.reference||'')) : '') + (et ? (' · ' + et.libelle) : '') + (pf.retire ? (' · ARCHIVÉ : ' + (pf.retire_motif||'')) : ''), archive:!!pf.retire });
+  });
   return out;
 }
 
@@ -93260,10 +93269,10 @@ async function gedFiltrer() {
 
   container.innerHTML = filtered.map(function(doc) {
     var icon = typeIcon[doc.mime] || '📎';
-    return '<div class="card" style="margin-bottom:10px;">'
+    return '<div class="card" style="margin-bottom:10px;' + (doc.archive ? 'opacity:.8;' : '') + '">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
         +'<div style="flex:1;">'
-          +'<div style="font-size:14px;font-weight:700;">'+icon+' '+doc.name+'</div>'
+          +'<div style="font-size:14px;font-weight:700;">'+icon+' '+escHtml(doc.name)+(doc.archive ? ' <span class="badge badge-rouge" style="font-size:10px;">🗄 Archivé</span>' : '')+'</div>'
           +'<div style="font-size:11px;color:var(--blanc-dim);margin-top:3px;">'
             +'<strong style="color:var(--or);">'+doc.module+'</strong> · 🏢 '+doc.division
             +' · '+dateShort(doc.date)+' · '+((doc.size||0)/1024).toFixed(1)+' KB'
@@ -93273,37 +93282,55 @@ async function gedFiltrer() {
         +'<div style="display:flex;gap:6px;">'
           +'<button class="btn btn-secondary btn-sm btn-icon" onclick="gedApercu(\''+doc.store+'\',\''+doc.id+'\')" title="Aperçu">👁️</button>'
           +'<button class="btn btn-secondary btn-sm btn-icon" onclick="gedTelecharger(\''+doc.store+'\',\''+doc.id+'\')" title="Télécharger">⬇</button>'
-          +'<button class="btn btn-danger btn-sm btn-icon" onclick="gedSupprimer(\''+doc.store+'\',\''+doc.id+'\')" title="Supprimer">🗑</button>'
+          +(doc.store === 'pieces_foncieres' ? '' : '<button class="btn btn-danger btn-sm btn-icon" onclick="gedSupprimer(\''+doc.store+'\',\''+doc.id+'\')" title="Supprimer">🗑</button>')
         +'</div>'
       +'</div>'
     +'</div>';
   }).join('');
 }
 
-async function gedApercu(store, id) {
-  var rec = await _gedGetRecord(store, id);
-  if (!rec) return;
-  var blob = rec[_gedBlobField(rec)];
-  var mime = rec.type || rec.mime || '';
-  var name = rec.name || rec.nom || rec.titre || 'document';
-  var win = window.open('', '', 'width=900,height=700');
-  if (mime.indexOf('image/') === 0) {
-    win.document.write('<html><head><title>'+name+'</title></head><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="'+blob+'" style="max-width:100%;max-height:100vh;object-fit:contain;" alt="'+name+'"></body></html>');
-  } else {
-    win.document.write('<html><head><title>'+name+'</title></head><body style="margin:0;"><iframe src="'+blob+'" width="100%" height="100%" style="border:none;position:absolute;top:0;left:0;width:100%;height:100%;"></iframe></body></html>');
+/* Contenu d'un document de la GED : { nom, mime, url } (url = data URL). Pièces foncières : accès journalisé + fichier local ou URL signée du stockage privé. */
+async function _gedContenu(store, id, action) {
+  if (store === 'pieces_foncieres') {
+    var r = await fcAccederPiece(id, action);
+    if (!r.ok) { toast(r.erreur, 'error'); return null; }
+    var c = await fcContenuPiece(r.piece);
+    if (!c) { toast("Le fichier n'est pas disponible (hors ligne ou stockage inaccessible). Réessayez en ligne.", 'error'); return null; }
+    return { nom: r.piece.nom, mime: r.piece.type || '', url: c };
   }
+  var rec = await _gedGetRecord(store, id);
+  if (!rec) { toast('Document introuvable.', 'error'); return null; }
+  var u = rec[_gedBlobField(rec)];
+  if (!u) { toast("Le fichier n'est pas disponible.", 'error'); return null; }
+  return { nom: rec.name || rec.nom || rec.titre || 'document', mime: rec.type || rec.mime || '', url: u };
+}
+/* Aperçu dans la page (calque) : plus de fenêtre contextuelle, que les navigateurs bloquent après un chargement asynchrone. */
+async function gedApercu(store, id) {
+  var c = await _gedContenu(store, id, 'consultation'); if (!c) return;
+  var burl;
+  try { burl = URL.createObjectURL(await (await fetch(c.url)).blob()); } catch (e) { toast('Aperçu impossible : fichier illisible.', 'error'); return; }
+  var old = document.getElementById('ged-apercu'); if (old) old.remove();
+  var ov = document.createElement('div'); ov.id = 'ged-apercu';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:99999;display:flex;flex-direction:column;padding:12px;';
+  var fermer = function(){ URL.revokeObjectURL(burl); ov.remove(); };
+  ov.innerHTML = '<div style="color:#fff;margin-bottom:8px;display:flex;justify-content:space-between;gap:8px;align-items:center;"><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(c.nom) + '</b>'
+    + '<span style="white-space:nowrap;"><a class="btn btn-secondary btn-sm" href="' + burl + '" download="' + escHtml(c.nom) + '">⬇</a> <button class="btn btn-secondary btn-sm" id="ged-apercu-x">Fermer</button></span></div>'
+    + (c.mime.indexOf('image/') === 0
+        ? '<div style="flex:1;overflow:auto;text-align:center;"><img alt="Aperçu du document" src="' + burl + '" style="max-width:100%;max-height:100%;object-fit:contain;"></div>'
+        : '<iframe src="' + burl + '" style="flex:1;background:#fff;border:0;"></iframe>');
+  document.body.appendChild(ov);
+  document.getElementById('ged-apercu-x').onclick = fermer;
+  ov.addEventListener('click', function(e){ if (e.target === ov) fermer(); });
 }
 
 async function gedTelecharger(store, id) {
-  var rec = await _gedGetRecord(store, id);
-  if (!rec) return;
+  var c = await _gedContenu(store, id, 'telechargement'); if (!c) return;
   var a = document.createElement('a');
-  a.href = rec[_gedBlobField(rec)];
-  a.download = rec.name || rec.nom || rec.titre || 'document';
-  a.click();
+  a.href = c.url; a.download = c.nom; document.body.appendChild(a); a.click(); a.remove();
 }
 
 async function gedSupprimer(store, id) {
+  if (store === 'pieces_foncieres') { toast('Une pièce de dossier foncier ne se supprime pas : archivez-la depuis Foncier › Documents (motif conservé au journal).', 'info'); return; }
   if (!confirm('Supprimer ce document ?')) return;
   if (await deleteRecord(store, id) === false) return;
   toast('Document supprimé.', 'info');
