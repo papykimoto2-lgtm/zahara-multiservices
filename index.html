@@ -25450,8 +25450,14 @@ function _ecrSigContenu(e) {
   var L = (typeof ecrLignes === 'function') ? ecrLignes(e) : (e.lignes || []);
   return String(e.date || '').slice(0, 10) + '|' + L.map(function(l){ return (l.compte || '') + ':' + (l.sens || '') + ':' + Math.round(parseFloat(l.montant) || 0); }).join(';');
 }
+/* Types de fichiers « actifs » : jamais téléversés dans les documents (XSS stockée via aperçu). */
+function docTypeInterdit(o) {
+  var t = String((o && (o.type || o.mime)) || '').toLowerCase(), n = String((o && (o.name || o.nom)) || '').toLowerCase();
+  return /^(text\/html|application\/xhtml|image\/svg|text\/xml|application\/xml|text\/javascript|application\/javascript|application\/x-javascript)/.test(t) || /\.(html?|xhtml|svg|xml|js|mjs)$/.test(n);
+}
 function dbPut(store, obj, opts) {
   opts = opts || {};
+  if (store === 'documents' && obj && !_pulling && docTypeInterdit(obj)) { try { toast('⛔ Type de fichier non autorisé (HTML, SVG, script) : ' + (obj.name || ''), 'error'); } catch (e) {} return Promise.resolve(false); }
   if (store !== 'ecritures' || !obj || obj.id === undefined || _pulling || obj._forceCloture
       || !db || !db.objectStoreNames.contains('ecritures')) return _dbPutBrut(store, obj, opts);
   return _ecrAncienIDB(obj.id).then(function(old) {
@@ -51770,7 +51776,7 @@ function exportJournalCSV() {
   var d1 = document.getElementById('filter-date-debut') ? document.getElementById('filter-date-debut').value : '';
   var d2 = document.getElementById('filter-date-fin') ? document.getElementById('filter-date-fin').value : '';
   if (d1 && d2 && d1 > d2) { var tmp = d1; d1 = d2; d2 = tmp; }
-  var _q = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+  var _q = function(v){ v = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(v) && !/^-?\d+([.,]\d+)?$/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
   var rows = ['Journal;N° Écriture;Date;Pièce;Libellé;Compte;Sens;Montant (FCFA);Mode;Programme'];
   var divFExp = (typeof _comptaDivisionFilter === 'function') ? _comptaDivisionFilter() : '';
   DATA.ecritures.filter(function(e){
@@ -56559,6 +56565,10 @@ async function changeUserPassword(userId) {
 /** Échappe les caractères HTML (anti-XSS pour affichage dynamique) */
 /* Échappe aussi " et ' : la sortie sert dans des attributs (title, value, download, href) — sans cela,
    un motif ou un nom de fichier contenant un guillemet injectait un attribut (XSS stockée). */
+/* Affichage sûr d'une valeur qui a pu être stockée DÉJÀ échappée (anciens libellés) : décode les 5 entités puis ré-échappe — jamais de double échappement, jamais de HTML actif. */
+function escAff(str) {
+  return escHtml(String(str == null ? '' : str).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&'));
+}
 function escHtml(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
@@ -66455,7 +66465,7 @@ function fcRechercherDocuments(c) {
     return q.split(/\s+/).every(function(m){ return champs.indexOf(m) !== -1; });
   }).sort(function(a, b){ return b.depose_le.localeCompare(a.depose_le); });
 }
-function fcCsvEchapper(v) { v = String(v == null ? '' : v); return /[";\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+function fcCsvEchapper(v) { v = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(v) && !/^-?\d+([.,]\d+)?$/.test(v)) v = "'" + v;   /* injection de formule Excel */ return /[";\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
 function fcCsv(lignes) { return '﻿' + lignes.map(function(l){ return l.map(fcCsvEchapper).join(';'); }).join('\r\n'); }
 function fcTelechargerTexte(nom, texte, type) {
   var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([texte], { type: type || 'text/csv;charset=utf-8' })); a.download = nom; document.body.appendChild(a); a.click();
@@ -93076,22 +93086,8 @@ async function refreshDocumentsForEntity(entity_type, entity_id) {
     }).join('') : '');
 }
 
-async function apercuDocument(docId) {
-  var docs = await dbGetAll('documents');
-  var doc = docs.find(function(d){ return d.id === docId; });
-  if (!doc) return;
-  if (doc.type && doc.type.startsWith('image/')) {
-    var win = window.open('', '', 'width=800,height=700');
-    win.document.write('<html><head><title>'+doc.name+'</title></head><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;">'
-      +'<img src="'+doc.blob+'" style="max-width:100%;max-height:100vh;object-fit:contain;" alt="'+doc.name+'">'
-      +'</body></html>');
-  } else {
-    var win = window.open('', '', 'width=900,height=700');
-    win.document.write('<html><head><title>'+doc.name+'</title></head><body style="margin:0;">'
-      +'<iframe src="'+doc.blob+'" width="100%" height="100%" style="border:none;position:absolute;top:0;left:0;width:100%;height:100%;"></iframe>'
-      +'</body></html>');
-  }
-}
+/* Ancien aperçu (fenêtre jamais fermée, iframe de n'importe quel type) : remplacé par le calque sûr de la GED. */
+async function apercuDocument(docId) { return gedApercu('documents', docId); }
 
 async function telechargerDocument(docId) {
   var docs = await dbGetAll('documents');
@@ -93301,8 +93297,8 @@ function gedPopulerFiltres(all) {
   var modules = [...new Set(all.map(function(d){ return d.module; }))].sort();
   var divisions = [...new Set(all.map(function(d){ return d.division; }))].sort();
   var curMod = modSel.value, curDiv = divSel.value;
-  modSel.innerHTML = '<option value="">Tous les modules</option>' + modules.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('');
-  divSel.innerHTML = '<option value="">Toutes les divisions</option>' + divisions.map(function(dv){ return '<option value="'+dv+'">'+dv+'</option>'; }).join('');
+  modSel.innerHTML = '<option value="">Tous les modules</option>' + modules.map(function(m){ return '<option value="'+escAff(m)+'">'+escAff(m)+'</option>'; }).join('');
+  divSel.innerHTML = '<option value="">Toutes les divisions</option>' + divisions.map(function(dv){ return '<option value="'+escAff(dv)+'">'+escAff(dv)+'</option>'; }).join('');
   modSel.value = modules.includes(curMod) ? curMod : '';
   divSel.value = divisions.includes(curDiv) ? curDiv : '';
 }
@@ -93330,9 +93326,9 @@ function gedBarList(counts, kind) {
     var pct = Math.max(4, Math.round(e[1]/max*100));
     var color = GED_PALETTE[i % GED_PALETTE.length];
     var isActive = actif === e[0];
-    var safe = e[0].replace(/'/g, "\\'");
-    return '<div class="ged-bar-row'+(isActive?' active':'')+'" onclick="gedToggleFiltre(\''+kind+'\',\''+safe+'\')">'
-      +'<div class="ged-bar-top"><span class="ged-bar-name">'+e[0]+'</span><span class="ged-bar-count">'+e[1]+'</span></div>'
+    var safe = encodeURIComponent(e[0]);   /* sûr dans l'attribut ET dans la chaîne JS */
+    return '<div class="ged-bar-row'+(isActive?' active':'')+'" onclick="gedToggleFiltre(\''+kind+'\',decodeURIComponent(\''+safe+'\'))">'
+      +'<div class="ged-bar-top"><span class="ged-bar-name">'+escAff(e[0])+'</span><span class="ged-bar-count">'+e[1]+'</span></div>'
       +'<div class="ged-bar-track"><div class="ged-bar-fill" style="width:'+pct+'%;background:'+color+';"></div></div>'
     +'</div>';
   }).join('');
@@ -93444,10 +93440,10 @@ async function gedFiltrer() {
         +'<div style="flex:1;">'
           +'<div style="font-size:14px;font-weight:700;">'+icon+' '+escHtml(doc.name)+(doc.archive ? ' <span class="badge badge-rouge" style="font-size:10px;">🗄 Archivé</span>' : '')+'</div>'
           +'<div style="font-size:11px;color:var(--blanc-dim);margin-top:3px;">'
-            +'<strong style="color:var(--or);">'+doc.module+'</strong> · 🏢 '+doc.division
+            +'<strong style="color:var(--or);">'+escAff(doc.module)+'</strong> · 🏢 '+escAff(doc.division)
             +' · '+dateShort(doc.date)+' · '+((doc.size||0)/1024).toFixed(1)+' KB'
           +'</div>'
-          +(doc.description?'<div style="font-size:12px;color:var(--blanc-dim);margin-top:2px;">'+doc.description+'</div>':'')
+          +(doc.description?'<div style="font-size:12px;color:var(--blanc-dim);margin-top:2px;">'+escAff(doc.description)+'</div>':'')
         +'</div>'
         +'<div style="display:flex;gap:6px;">'
           +'<button class="btn btn-secondary btn-sm btn-icon" onclick="gedApercu(\''+doc.store+'\',\''+doc.id+'\')" title="Aperçu">👁️</button>'
@@ -93479,6 +93475,11 @@ async function gedApercu(store, id) {
   var c = await _gedContenu(store, id, 'consultation'); if (!c) return;
   var burl;
   try { burl = URL.createObjectURL(await (await fetch(c.url)).blob()); } catch (e) { toast('Aperçu impossible : fichier illisible.', 'error'); return; }
+  var _tp = '';
+  try { _tp = String((await (await fetch(c.url)).blob()).type || '').toLowerCase(); } catch (e) {}
+  var _estImage = /^image\/(png|jpe?g|gif|webp|bmp)$/.test(_tp), _estPdf = _tp === 'application/pdf';
+  if (!_estImage && !_estPdf) { URL.revokeObjectURL(burl); toast('Aperçu indisponible pour ce type de fichier (' + (_tp || 'inconnu') + ') : téléchargez-le.', 'info'); return; }
+  c.mime = _estImage ? 'image/*' : 'application/pdf';
   var old = document.getElementById('ged-apercu'); if (old) old.remove();
   var ov = document.createElement('div'); ov.id = 'ged-apercu';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:99999;display:flex;flex-direction:column;padding:12px;';
@@ -93519,9 +93520,9 @@ async function renderSignaturesGlobaux() {
   container.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">'
     + sigs.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).map(function(sig) {
       return '<div class="card">'
-        +'<div style="font-weight:700;font-size:14px;margin-bottom:6px;">✍️ '+sig.signataire+'</div>'
-        +'<div style="font-size:12px;color:var(--blanc-dim);">'+sig.entity_type+' — '+dateShort(sig.date)+'</div>'
-        +(sig.commentaire?'<div style="font-size:12px;color:var(--blanc-dim);margin-top:4px;font-style:italic;">"'+sig.commentaire+'"</div>':'')
+        +'<div style="font-weight:700;font-size:14px;margin-bottom:6px;">✍️ '+escAff(sig.signataire)+'</div>'
+        +'<div style="font-size:12px;color:var(--blanc-dim);">'+escAff(sig.entity_type)+' — '+dateShort(sig.date)+'</div>'
+        +(sig.commentaire?'<div style="font-size:12px;color:var(--blanc-dim);margin-top:4px;font-style:italic;">"'+escAff(sig.commentaire)+'"</div>':'')
         +'<div style="margin-top:10px;">'
           +'<img src="'+sig.image_blob+'" style="width:100%;border:1px solid var(--bord);border-radius:var(--r);background:white;" alt="Signature">'
         +'</div>'
@@ -93538,9 +93539,9 @@ async function apercuSignature(sigId) {
   var sig = sigs.find(function(s){ return s.id===sigId; });
   if (!sig) return;
   var win = window.open('','','width=600,height=400');
-  win.document.write('<html><head><title>Signature — '+sig.signataire+'</title></head><body style="margin:20px;font-family:Arial;">'
-    +'<h3>✍️ Signature de '+sig.signataire+'</h3>'
-    +'<p>Date : '+dateShort(sig.date)+'<br>Objet : '+(sig.commentaire||'—')+'</p>'
+  win.document.write('<html><head><title>Signature — '+escAff(sig.signataire)+'</title></head><body style="margin:20px;font-family:Arial;">'
+    +'<h3>✍️ Signature de '+escAff(sig.signataire)+'</h3>'
+    +'<p>Date : '+dateShort(sig.date)+'<br>Objet : '+escAff(sig.commentaire||'—')+'</p>'
     +'<img src="'+sig.image_blob+'" style="border:1px solid #ccc;max-width:100%;background:white;" alt="Signature">'
     +'</body></html>');
   win.document.close();
@@ -122385,12 +122386,12 @@ function renderValidations(){
       if(v.statut==='en_attente'){
         if(valPeutDecider(v)) acts='<button class="btn btn-primary btn-sm" onclick="valDecide(\''+v.id+'\',\'valide\')">✅ Valider</button> <button class="btn btn-danger btn-sm" onclick="valReject(\''+v.id+'\')">⛔ Rejeter</button>';
         else acts='<span style="font-size:11px;color:var(--blanc-dim);">'+(v.type==='etape_fonciere'?'réservé à la fonction « '+escHtml((v.meta||{}).fonction_lib||(v.meta||{}).fonction||'')+' »':'réservé à la hiérarchie')+'</span>';
-      } else { acts='<span style="font-size:11px;color:var(--blanc-dim);">'+(v.valideur||'')+' · '+(v.date_decision||'')+(v.motif?(' · '+v.motif):'')+'</span>'; }
+      } else { acts='<span style="font-size:11px;color:var(--blanc-dim);">'+escAff(v.valideur||'')+' · '+escAff(v.date_decision||'')+(v.motif?(' · '+escAff(v.motif)):'')+'</span>'; }
       if(v.type==='etape_fonciere') acts='<button class="btn btn-secondary btn-sm" onclick="valApercuEtapeFonciere(\''+v.id+'\')">👁 Aperçu</button> <button class="btn btn-secondary btn-sm" onclick="valOuvrirDossierFoncier(\''+((v.meta||{}).dossier_id||'')+'\',\''+((v.meta||{}).code||'')+'\',\''+v.id+'\')">📁 Dossier</button> '+acts;
       if(v.type==='demande_course'||v.type==='rapport_course') acts='<button class="btn btn-secondary btn-sm" onclick="paCourseApercu(\''+v.ref_id+'\',\''+(v.type==='rapport_course'?'rapport':'demande')+'\')">👁 Voir</button> '+acts;
       if(v.type==='attestation_solde_cession') acts='<button class="btn btn-secondary btn-sm" onclick="cesAttApercu(\''+v.ref_id+'\')">👁 Voir</button> '+acts;
       if(v.type==='attestation_solde' || v.type==='attestation_solde_finale') acts='<button class="btn btn-secondary btn-sm" onclick="attSoldeApercu(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">👁 Voir</button> <button class="btn btn-secondary btn-sm" title="Versements, reçus, bons de caisse et écritures à l\'appui de l\'attestation" onclick="attSoldePieces(\''+v.ref_id+'\',\''+attKindDeType(v.type)+'\')">🔎 Pièces</button> '+acts;
-      return '<tr><td>'+valTypeLabel(v.type)+'</td><td style="font-size:12px;">'+v.libelle+'</td><td style="text-align:right;font-weight:600;">'+fmtF(Math.round(v.montant||0))+'</td><td style="font-size:11px;">'+(v.demandeur||'—')+'</td><td>'+(v.date_demande||'—')+'</td><td>'+valStatutBadge(v.statut)+'</td><td style="white-space:nowrap;">'+acts+'</td></tr>';
+      return '<tr><td>'+valTypeLabel(v.type)+'</td><td style="font-size:12px;">'+escAff(v.libelle)+'</td><td style="text-align:right;font-weight:600;">'+fmtF(Math.round(v.montant||0))+'</td><td style="font-size:11px;">'+escAff(v.demandeur||'—')+'</td><td>'+(v.date_demande||'—')+'</td><td>'+valStatutBadge(v.statut)+'</td><td style="white-space:nowrap;">'+acts+'</td></tr>';
         } });
       tb.innerHTML=rt.lignes; if(bar) bar.innerHTML=rt.barre; if(pied) pied.innerHTML=rt.pied;
     }
