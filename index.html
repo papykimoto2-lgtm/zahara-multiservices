@@ -66126,12 +66126,13 @@ function fcPiecesVueSouscripteur(clientId, d) {
 /* ── Interface ── */
 function fcTailleLisible(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' Ko'; }
 function fcLienPiece(p) { return '<a href="#" onclick="fcTelechargerPieceUI(\'' + p.id + '\');return false;" style="font-size:12px;">⬇ ' + escHtml(p.nom) + '</a> <span style="font-size:11px;color:var(--dim);">v' + (p.version || 1) + ' · ' + fcTailleLisible(p.taille) + (p.categorie ? ' · ' + escHtml(FC_CATEGORIES_DOC[p.categorie] || '') : '') + (p.confidentialite === 'restreinte' ? ' · 🔒' : '') + '</span>'; }
-function fcPiecesUI(dossierId, code) { APP._fcPiecesSel = { d: dossierId, c: code }; fcRenderDetail(dossierId); var el = document.getElementById('fc-pieces'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth' }); }
+/* Le panneau de jonction vit dans l'onglet « Pièces & courriers » : on y bascule, sinon le clic sur le trombone d'une étape (onglet « Étapes ») ne montrait rien. */
+function fcPiecesUI(dossierId, code) { APP._fcPiecesSel = { d: dossierId, c: code }; APP._fcOnglet = 'pieces'; fcRenderDetail(dossierId); var el = document.getElementById('fc-pieces'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth' }); }
 function fcPanneauPieces(d) {
   var s = APP._fcPiecesSel; if (!s || s.d !== d.id) return '';
   var e = fcEtape(d, s.c); if (!e) return '';
   var liste = fcPiecesEtape(d.id, s.c, true).filter(fcPieceLisible);
-  var h = '<div class="card" id="fc-pieces" style="border:1px solid var(--or);"><div class="card-title">📎 Pièces jointes — ' + escHtml(e.libelle) + '</div>';
+  var h = '<div class="card" id="fc-pieces" style="border:1px solid var(--or);"><div class="card-title">📎 Pièces jointes — ' + escHtml(e.libelle) + ' <button type="button" class="btn btn-secondary btn-sm" style="float:right;" onclick="fcOnglet(\'etapes\')">← Retour aux étapes</button></div>';
   h += liste.length ? liste.map(function(p){
     return '<div style="padding:6px 0;border-bottom:1px solid var(--bord,#eee);font-size:12px;' + (p.retire ? 'opacity:.55;' : '') + '">' + (p.retire ? escHtml(p.nom) : fcLienPiece(p))
       + ' · ' + (p.depose_par.role === 'souscripteur' ? '<b>déposée par ' + escHtml(p.depose_par.nom || 'le souscripteur') + '</b>' : 'jointe par ' + escHtml(p.depose_par.nom || 'le promoteur'))
