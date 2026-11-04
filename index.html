@@ -27,7 +27,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.196 · 2026-11-04 — Revue comptabilité (lots 1 à 4) : liasse toujours équilibrée, configuration TVA séparée du taux par défaut, liquidation de TVA unique par mois, clôture par division verrouillée et clôtures exclusives, bilan d\'ouverture visé, FEC (dates, arrondi par pièce), écritures lettrées protégées, lettrage numéroté à la suite, rapprochement bancaire (sens, double pointage, banques), import CSV du relevé, libellés de relevé échappés ; v14.195 · 2026-11-04 — Souscripteurs : badge « 📎 n » des documents joints dans la liste et filtre « Documents joints » (avec / sans) ; v14.194 · 2026-11-03 — GED : détail par source et numéro de version affichés ; trombone des étapes foncières ; pièces foncières dans la GED ; v14.193 · 2026-10-30 — SMQ : contexte de l’organisme et parties intéressées (enjeux, forces/faiblesses/opportunités/menaces, revue annuelle, lien vers les risques) ; v14.192 · 2026-10-30 — Validations : aperçu du dossier foncier et ouverture directe sur l’étape à valider ; v14.191 · 2026-10-30 — SMQ : matrice des compétences (référentiel, évaluations, écarts, plan de formation, indicateur) ; v14.190 · 2026-10-30 — Validations : les étapes de dossier foncier à valider y figurent et s’y décident ; v14.189 · 2026-10-30 — SMQ : calcul automatique des indicateurs de performance (21 formules, relevés conservés, état vs cible) ; v14.188 · 2026-10-30 — SMQ : politique qualité versionnée, objectifs qualité, registre des risques et opportunités (matrice) ; v14.187 · 2026-10-30 — SMQ : revue de direction (éléments d’entrée calculés depuis l’ERP, décisions suivies, compte rendu) ; v14.186 · 2026-10-30 — SMQ : audits internes (programme annuel, indépendance, constats, création des NC, clôture conditionnée) ; v14.185 · 2026-10-30 — Manuels & flux : manuel SMQ + 2 diagrammes ; v14.184 · 2026-10-30 — SMQ : onglet Qualité (maîtrise documentaire, non-conformités et actions correctives, réclamations, satisfaction) ; v14.183 · 2026-10-30 — SMQ : fiche de chaque processus (pilote, indicateurs de performance, système documentaire) avec suggestions à valider ; v14.182 · 2026-10-30 — Correctif : rejets budget/engagement/transfert/réappro soumis au droit et au plafond comme la validation ; numérotation FED, DA, BC, BL, PVR, LIV, DRC, OM, CTX, FV, AV, FS, SIT, rapports sur le plus grand numéro attribué ; v14.181 · 2026-10-30 — Manuels & flux : vue « Cartographie des processus » (management, réalisation, support) ; v14.180 · 2026-10-30 — Manuels & flux : manuel Validations et délégations + 3 diagrammes ; v14.179 · 2026-10-30 — Manuels & flux : lien « Détail des procédures (PDF) » sous chaque diagramme, vers le manuel qui le décrit ; v14.178 · 2026-10-30 — Correctif : références BIEN/CAND/KYC/DS/ART/OT/BAIL/MANDAT/QUIT/JUR/ANCR/DSP/rapports de chantier basées sur le plus grand numéro attribué (plus de doublon après suppression) ; v14.177 · 2026-10-30 — Correctif : références de versement Mobile Money (VRS) basées sur le plus grand numéro attribué, plus de doublon après suppression ; v14.176 · 2026-10-30 — Manuels & flux : portail des acteurs détaillé (12 espaces) + 3 diagrammes ; v14.175 · 2026-10-30 — Manuels & flux : réorganisation par phases dans le sens de la marche en avant (frise, numérotation, sections) ; v14.174 · 2026-10-30 — Manuels & flux : carte commerciale et portail des acteurs + 3 diagrammes ; v14.173 · 2026-10-30 — Manuels & flux : 5 manuels (FNE, calendrier, messagerie, cartographie SIG, pilotage) + 9 diagrammes ; v14.172 · 2026-10-30 — Manuels & flux : 11 manuels (programmes, conception, aménagement, budget, locatif, copropriété, parc auto, accueil, réunions, diaspora, administration) + 16 diagrammes ; v14.171 · 2026-10-30 — Manuels & flux : manuels Conventions, Suivi de chantier et DQE + 5 diagrammes ; v14.170 · 2026-10-30 — Manuels & flux : manuels Réception/Livraison, Stock et Trésorerie + 6 diagrammes ; v14.169 · 2026-10-30 — Manuels & flux : manuels CRM, LBC/FT et Juridique + 7 diagrammes ; v14.168 · 2026-10-30 — Manuels & flux : manuels Paie et RH + 6 diagrammes ; v14.167 · 2026-10-30 — Manuels & flux : manuels Achats et Fournisseurs + 3 diagrammes ; v14.166 · 2026-10-30 — Manuels & flux : manuels Paiements et Relances + 4 diagrammes ; v14.165 · 2026-10-30 — Manuels & flux : les diagrammes s\’affichent au clic sur un manuel ; v14.164 · 2026-10-30 — Manuels & flux : 12 diagrammes de flux supplémentaires (souscripteur, caisse, comptabilité, foncier, portefeuille) ; v14.163 · 2026-10-30 — Paramètres › « Manuels & flux » : catalogue des manuels de procédures (PDF) et diagrammes de flux imprimables ; v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\’engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\’un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\’agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\’un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\’envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\’application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\’entreprise sur l\’attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\’une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\’écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\’équilibre ; Sous-comptes de caisse : le compte d\’une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\’est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\’efface plus le cloud, et un ordre de remise à zéro diffusé n\’entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.197 · 2026-11-04 — Report Menko : relations intragroupe (CSV sûr, soldes cumulés, appariement des opérations, conventions validées et alertes), audit de la clôture / réouverture / FEC (motif obligatoire, droits), détection et création des comptes manquants du plan ; v14.196 · 2026-11-04 — Revue comptabilité (lots 1 à 4) : liasse toujours équilibrée, configuration TVA séparée du taux par défaut, liquidation de TVA unique par mois, clôture par division verrouillée et clôtures exclusives, bilan d\'ouverture visé, FEC (dates, arrondi par pièce), écritures lettrées protégées, lettrage numéroté à la suite, rapprochement bancaire (sens, double pointage, banques), import CSV du relevé, libellés de relevé échappés ; v14.195 · 2026-11-04 — Souscripteurs : badge « 📎 n » des documents joints dans la liste et filtre « Documents joints » (avec / sans) ; v14.194 · 2026-11-03 — GED : détail par source et numéro de version affichés ; trombone des étapes foncières ; pièces foncières dans la GED ; v14.193 · 2026-10-30 — SMQ : contexte de l’organisme et parties intéressées (enjeux, forces/faiblesses/opportunités/menaces, revue annuelle, lien vers les risques) ; v14.192 · 2026-10-30 — Validations : aperçu du dossier foncier et ouverture directe sur l’étape à valider ; v14.191 · 2026-10-30 — SMQ : matrice des compétences (référentiel, évaluations, écarts, plan de formation, indicateur) ; v14.190 · 2026-10-30 — Validations : les étapes de dossier foncier à valider y figurent et s’y décident ; v14.189 · 2026-10-30 — SMQ : calcul automatique des indicateurs de performance (21 formules, relevés conservés, état vs cible) ; v14.188 · 2026-10-30 — SMQ : politique qualité versionnée, objectifs qualité, registre des risques et opportunités (matrice) ; v14.187 · 2026-10-30 — SMQ : revue de direction (éléments d’entrée calculés depuis l’ERP, décisions suivies, compte rendu) ; v14.186 · 2026-10-30 — SMQ : audits internes (programme annuel, indépendance, constats, création des NC, clôture conditionnée) ; v14.185 · 2026-10-30 — Manuels & flux : manuel SMQ + 2 diagrammes ; v14.184 · 2026-10-30 — SMQ : onglet Qualité (maîtrise documentaire, non-conformités et actions correctives, réclamations, satisfaction) ; v14.183 · 2026-10-30 — SMQ : fiche de chaque processus (pilote, indicateurs de performance, système documentaire) avec suggestions à valider ; v14.182 · 2026-10-30 — Correctif : rejets budget/engagement/transfert/réappro soumis au droit et au plafond comme la validation ; numérotation FED, DA, BC, BL, PVR, LIV, DRC, OM, CTX, FV, AV, FS, SIT, rapports sur le plus grand numéro attribué ; v14.181 · 2026-10-30 — Manuels & flux : vue « Cartographie des processus » (management, réalisation, support) ; v14.180 · 2026-10-30 — Manuels & flux : manuel Validations et délégations + 3 diagrammes ; v14.179 · 2026-10-30 — Manuels & flux : lien « Détail des procédures (PDF) » sous chaque diagramme, vers le manuel qui le décrit ; v14.178 · 2026-10-30 — Correctif : références BIEN/CAND/KYC/DS/ART/OT/BAIL/MANDAT/QUIT/JUR/ANCR/DSP/rapports de chantier basées sur le plus grand numéro attribué (plus de doublon après suppression) ; v14.177 · 2026-10-30 — Correctif : références de versement Mobile Money (VRS) basées sur le plus grand numéro attribué, plus de doublon après suppression ; v14.176 · 2026-10-30 — Manuels & flux : portail des acteurs détaillé (12 espaces) + 3 diagrammes ; v14.175 · 2026-10-30 — Manuels & flux : réorganisation par phases dans le sens de la marche en avant (frise, numérotation, sections) ; v14.174 · 2026-10-30 — Manuels & flux : carte commerciale et portail des acteurs + 3 diagrammes ; v14.173 · 2026-10-30 — Manuels & flux : 5 manuels (FNE, calendrier, messagerie, cartographie SIG, pilotage) + 9 diagrammes ; v14.172 · 2026-10-30 — Manuels & flux : 11 manuels (programmes, conception, aménagement, budget, locatif, copropriété, parc auto, accueil, réunions, diaspora, administration) + 16 diagrammes ; v14.171 · 2026-10-30 — Manuels & flux : manuels Conventions, Suivi de chantier et DQE + 5 diagrammes ; v14.170 · 2026-10-30 — Manuels & flux : manuels Réception/Livraison, Stock et Trésorerie + 6 diagrammes ; v14.169 · 2026-10-30 — Manuels & flux : manuels CRM, LBC/FT et Juridique + 7 diagrammes ; v14.168 · 2026-10-30 — Manuels & flux : manuels Paie et RH + 6 diagrammes ; v14.167 · 2026-10-30 — Manuels & flux : manuels Achats et Fournisseurs + 3 diagrammes ; v14.166 · 2026-10-30 — Manuels & flux : manuels Paiements et Relances + 4 diagrammes ; v14.165 · 2026-10-30 — Manuels & flux : les diagrammes s\’affichent au clic sur un manuel ; v14.164 · 2026-10-30 — Manuels & flux : 12 diagrammes de flux supplémentaires (souscripteur, caisse, comptabilité, foncier, portefeuille) ; v14.163 · 2026-10-30 — Paramètres › « Manuels & flux » : catalogue des manuels de procédures (PDF) et diagrammes de flux imprimables ; v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\’engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\’un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\’agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\’un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\’envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\’application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\’entreprise sur l\’attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\’une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\’écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\’équilibre ; Sous-comptes de caisse : le compte d\’une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\’est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\’efface plus le cloud, et un ordre de remise à zéro diffusé n\’entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -44360,6 +44360,85 @@ function plancptToutDeplier(ouvrir) {
    à chaque rendu de la liste (renderPlanComptableParam), donc toujours à jour
    après un ajout manuel, une auto-création (saveComptesDefaut), un import ou
    une suppression. */
+/* ══════════════════════════════════════════════════════════════════
+   COMPTES NÉCESSAIRES À L'APPLICATION ET ABSENTS DU PLAN
+   Certains comptes sont écrits « en dur » par l'application (à-nouveaux, liquidation de TVA, régularisations de fin d'exercice,
+   amortissements…). Quand le plan ne les contient pas, leurs écritures retombent « hors plan » (libellé d'alerte, nature devinée).
+   Cette table leur donne un libellé SYSCOHADA propre ; comptesManquantsPlan() y ajoute les comptes mouvementés hors plan, et
+   creerComptesManquants() les inscrit au plan en une fois (plan_comptable_custom), après confirmation.
+══════════════════════════════════════════════════════════════════ */
+var COMPTES_SYSTEME = [
+  { code: '28',   label: 'Amortissements des immobilisations' },
+  { code: '2812', label: 'Amortissements des brevets, licences, logiciels et droits similaires' },
+  { code: '428',  label: 'Personnel, charges à payer et produits à recevoir' },
+  { code: '4431', label: 'État, TVA facturée sur ventes' },
+  { code: '4435', label: 'État, TVA facturée sur factures à établir' },
+  { code: '4441', label: 'État, TVA due' },
+  { code: '4449', label: 'État, crédit de TVA à reporter' },
+  { code: '4451', label: 'État, TVA récupérable sur immobilisations' },
+  { code: '4452', label: 'État, TVA récupérable sur achats' },
+  { code: '4455', label: 'État, TVA récupérable sur factures non parvenues' },
+  { code: '476',  label: 'Charges constatées d\'avance' },
+  { code: '477',  label: 'Produits constatés d\'avance' },
+  { code: '6461', label: 'TVA non déductible (quote-part du prorata) — compte technique, à valider avec votre comptable' },
+  { code: '890',  label: 'Compte de liaison d\'ouverture (contrepartie du bilan d\'ouverture et des à-nouveaux) — compte technique' }
+];
+var _LIB_LOC_CPT = { locataire: 'Clients — locataires', loyers: 'Loyers (produits accessoires)', charges_prov: 'Provisions pour charges locatives reçues', tva: 'TVA facturée sur loyers',
+  depot: 'Dépôts et cautionnements reçus', rs: 'Retenue à la source sur loyers', mandant: 'Comptes des propriétaires mandants', commission: 'Commissions de gestion locative',
+  frais_agence: 'Frais d\'agence', demarcheur_commission: 'Commissions de démarchage', travaux: 'Entretien et réparations des biens immobiliers', fournisseur: 'Fournisseurs — gestion locative',
+  refact_locataire: 'Refacturation aux locataires' };
+var _LIB_DSP_CPT = { sequestre: 'Séquestre diaspora — avances des souscripteurs', client: 'Clients — souscripteurs diaspora', frais_transfert: 'Frais de transfert de fonds',
+  perte_change: 'Pertes de change', gain_change: 'Gains de change' };
+function comptesSystemeRequis() {
+  var out = COMPTES_SYSTEME.slice(), vus = {};
+  out.forEach(function(c){ vus[c.code] = true; });
+  var ajoute = function(code, label){ code = String(code || '').trim(); if (/^[1-9]\d*$/.test(code) && !vus[code]) { vus[code] = true; out.push({ code: code, label: label }); } };
+  try { if (typeof LOC_CPT !== 'undefined') Object.keys(_LIB_LOC_CPT).forEach(function(k){ ajoute(LOC_CPT[k], _LIB_LOC_CPT[k]); }); } catch (e) {}
+  try { if (typeof DSP_CPT !== 'undefined') Object.keys(_LIB_DSP_CPT).forEach(function(k){ ajoute(DSP_CPT[k], _LIB_DSP_CPT[k]); }); } catch (e) {}
+  return out;
+}
+/* Comptes à créer : mouvementés hors plan + comptes système absents. Chaque entrée : code, label, classe, nature, motif. */
+function comptesManquantsPlan() {
+  var existe = {};
+  (APP.planComptable || []).forEach(function(c){ if (c && !c._horsPlan) existe[c.code] = true; });
+  var sys = {}; comptesSystemeRequis().forEach(function(c){ sys[c.code] = c; });
+  var res = [], vus = {};
+  var nature = function(code){ return (typeof _natureHeritee === 'function') ? _natureHeritee(code) : ((typeof _natureParClasse === 'function') ? _natureParClasse(code) : 'variable'); };
+  var libelleParent = function(code){ var p = (typeof compteParentDe === 'function') ? compteParentDe(code) : null; return p ? (p.label + ' — détail ' + code) : ''; };
+  (APP._comptesHorsPlan || []).forEach(function(code){
+    if (existe[code] || vus[code]) return;
+    vus[code] = true;
+    res.push({ code: code, label: sys[code] ? sys[code].label : (libelleParent(code) || ('Compte ' + code + ' (créé depuis les écritures — à renommer)')), classe: code.charAt(0), nature: nature(code), motif: 'mouvementé hors plan' });
+  });
+  Object.keys(sys).forEach(function(code){
+    if (existe[code] || vus[code]) return;
+    vus[code] = true;
+    res.push({ code: code, label: sys[code].label, classe: code.charAt(0), nature: nature(code), motif: 'utilisé par l\'application' });
+  });
+  return res.sort(function(a, b){ return a.code.localeCompare(b.code, undefined, { numeric: true }); });
+}
+async function creerComptesManquants() {
+  if (!exigerDroit('Comptabilite', 'm', 'le plan comptable')) return;
+  var L = comptesManquantsPlan();
+  if (!L.length) { toast('Aucun compte manquant : le plan contient tous les comptes utilisés par l\'application.', 'info'); return; }
+  if (!confirm(L.length + ' compte(s) vont être ajoutés au plan comptable :\n\n' + L.slice(0, 25).map(function(c){ return c.code + ' — ' + c.label; }).join('\n') + (L.length > 25 ? '\n…' : '') + '\n\nContinuer ?')) return;
+  DATA.params = DATA.params || {};
+  DATA.params.plan_comptable_custom = DATA.params.plan_comptable_custom || [];
+  var n = 0;
+  L.forEach(function(c){
+    if (DATA.params.plan_comptable_custom.some(function(x){ return x && x.code === c.code; })) return;
+    DATA.params.plan_comptable_custom.push({ code: c.code, label: c.label, classe: c.classe, nature: c.nature });
+    n++;
+  });
+  rebuildPlanComptable();
+  await dbPut('params', DATA.params);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params);
+  if (typeof logAction === 'function') logAction('PLAN_COMPTABLE_COMPTES_CREES', n + ' compte(s) : ' + L.map(function(c){ return c.code; }).join(', '));
+  toast('✅ ' + n + ' compte(s) ajouté(s) au plan comptable.', 'success');
+  try { renderDashboardPlanComptable(); } catch (e) {}
+  try { if (typeof renderPlanComptable === 'function') renderPlanComptable(); } catch (e) {}
+}
+
 function renderDashboardPlanComptable(){
   var kpiEl = document.getElementById('pc-kpi-grid');
   var chartEl = document.getElementById('pc-repartition-classes');
@@ -44404,9 +44483,13 @@ function renderDashboardPlanComptable(){
   }
 
   if (alerteEl) {
-    alerteEl.innerHTML = horsPlan.length
-      ? '<div class="alert alert-error">⚠️ <strong>' + horsPlan.length + ' compte(s)</strong> mouvementé(s) dans des écritures mais absent(s) du plan comptable : <strong>' + escHtml(horsPlan.slice(0,10).join(', ')) + (horsPlan.length>10?'…':'') + '</strong>. Cliquez sur « ➕ Ajouter un compte » ci-dessous pour leur donner un vrai libellé.</div>'
-      : '';
+    var _manq = comptesManquantsPlan();
+    alerteEl.innerHTML = (horsPlan.length
+      ? '<div class="alert alert-error">⚠️ <strong>' + horsPlan.length + ' compte(s)</strong> mouvementé(s) dans des écritures mais absent(s) du plan comptable : <strong>' + escHtml(horsPlan.slice(0,10).join(', ')) + (horsPlan.length>10?'…':'') + '</strong>. Ils sont réintégrés d\'office dans les états (nature déduite).</div>'
+      : '')
+      + (_manq.length
+        ? '<div class="alert alert-warn" style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;"><span>➕ <strong>' + _manq.length + ' compte(s) à créer</strong> : ' + escHtml(_manq.slice(0, 8).map(function(c){ return c.code; }).join(', ')) + (_manq.length > 8 ? '…' : '') + ' — mouvementés hors plan ou écrits par l\'application (TVA, à-nouveaux, amortissements…).</span><button class="btn btn-primary btn-sm" onclick="creerComptesManquants()">Créer les comptes manquants</button></div>'
+        : '');
   }
 }
 
@@ -45937,7 +46020,7 @@ var TVA_COLLECTEE = [
   ['44311','TVA facturée sur ventes'], ['44312','TVA facturée sur prestations de services'],
   ['44313','TVA facturée sur travaux'], ['4431','TVA facturée (global)'],
   ['4432','TVA facturée sur prestations'], ['4433','TVA facturée sur travaux immobiliers'],
-  ['4434','TVA sur livraisons à soi-même'], ['4435','TVA sur production immobilisée']
+  ['4434','TVA sur livraisons à soi-même'], ['4435','TVA sur factures à établir']
 ];
 var TVA_DEDUCTIBLE = [
   ['4451','TVA récupérable sur immobilisations'], ['4452','TVA récupérable sur achats'],
@@ -48432,6 +48515,105 @@ function _intragMatrice(annee) {
   return { divs: divs, lignes: lignes };
 }
 
+/* Soldes CUMULÉS des comptes de liaison à la clôture de l'exercice, par division : même base que la consolidation
+   (soldes depuis le dernier bilan d'ouverture / à-nouveau). La matrice ci-dessus ne voit que les mouvements de
+   l'année : un déséquilibre né les années précédentes (opération passée d'un seul côté) n'y apparaît pas. */
+function _intragMatriceCumulee(annee) {
+  var cfg = _consoCfg(), an = parseInt(annee, 10);
+  var divs = _consoDivisions().concat([{ id: DIV_SANS, nom: 'Sans division / inconnue' }]);
+  var comptes = {}, utilisees = {};
+  divs.forEach(function(d){
+    var sol = _lfSoldes(an, d.id);
+    Object.keys(sol).forEach(function(k){
+      var c = k.split('§')[0];
+      if (!cfg.liaison.some(function(pf){ return c.indexOf(pf) === 0; })) return;
+      (comptes[c] = comptes[c] || {})[d.id] = ((comptes[c][d.id]) || 0) + sol[k];
+      if (Math.abs(sol[k]) >= 0.5) utilisees[d.id] = true;
+    });
+  });
+  divs = divs.filter(function(d){ return utilisees[d.id]; });
+  var lignes = Object.keys(comptes).sort().map(function(compte){
+    var parDiv = comptes[compte], total = 0;
+    divs.forEach(function(d){ total += parDiv[d.id] || 0; });
+    return { compte: compte, parDiv: parDiv, total: total };
+  }).filter(function(l){ return divs.some(function(d){ return Math.abs(l.parDiv[d.id] || 0) >= 0.5; }); });
+  return { divs: divs, lignes: lignes };
+}
+function _intragMatriceHtml(mat, titre, note) {
+  if (!mat.lignes.length) return '';
+  var th = '<tr><th>Compte</th>' + mat.divs.map(function(d){ return '<th class="num">' + escHtml(d.nom) + '</th>'; }).join('') + '<th class="num">Écart</th></tr>';
+  var rows = mat.lignes.map(function(l){
+    var ko = Math.abs(l.total) >= 1;
+    return '<tr' + (ko ? ' style="background:rgba(220,38,38,.12);"' : '') + '><td style="font-family:monospace;">' + escHtml(l.compte) + '</td>'
+      + mat.divs.map(function(d){ var v = l.parDiv[d.id] || 0; return '<td class="num">' + (v ? fmtF(v) : '—') + '</td>'; }).join('')
+      + '<td class="num" style="font-weight:700;' + (ko ? 'color:#dc2626;' : '') + '">' + fmtF(l.total) + (ko ? ' ⚠️' : ' ✔️') + '</td></tr>';
+  }).join('');
+  return '<h4 style="margin:16px 0 8px;">' + titre + '</h4><div style="font-size:11px;color:var(--blanc-dim);margin-bottom:6px;">' + note + '</div>'
+    + '<div class="table-wrap"><table><thead>' + th + '</thead><tbody>' + rows + '</tbody></table></div>';
+}
+/* Appariement des opérations de liaison : chaque ligne d'une division est rapprochée de sa contrepartie dans UNE AUTRE division
+   (même compte, sens opposé, même montant à 1 FCFA, date la plus proche à 60 jours près). Les lignes restées seules sont des
+   opérations enregistrées d'un seul côté : c'est ce que le commissaire aux comptes veut voir pièce par pièce. */
+function _intragAppariement(annee) {
+  var flux = _intragFlux(annee).map(function(x, i){ return Object.assign({ _i: i, div: x.division || DIV_SANS }, x); });
+  var parCompte = {};
+  flux.forEach(function(x){ (parCompte[x.compte] = parCompte[x.compte] || []).push(x); });
+  var apparies = [], sansMiroir = [], jours = function(a, b){ return Math.abs((new Date(a) - new Date(b)) / 864e5); };
+  Object.keys(parCompte).sort().forEach(function(compte){
+    var L = parCompte[compte], D = L.filter(function(x){ return x.sens === 'D'; }), C = L.filter(function(x){ return x.sens === 'C'; }), pris = {};
+    D.forEach(function(d){
+      var best = null, bestJ = 1e9;
+      C.forEach(function(c){
+        if (pris[c._i] || c.div === d.div || Math.abs(c.montant - d.montant) >= 1) return;
+        var j = jours(c.date, d.date);
+        if (j <= 60 && j < bestJ) { best = c; bestJ = j; }
+      });
+      if (best) { pris[best._i] = true; pris[d._i] = true; apparies.push({ debit: d, credit: best, ecartJours: Math.round(bestJ) }); }
+    });
+    L.forEach(function(x){ if (!pris[x._i]) sansMiroir.push(x); });
+  });
+  sansMiroir.sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
+  return { apparies: apparies, sansMiroir: sansMiroir };
+}
+function _intragSansMiroirHtml(annee, pdf) {
+  var A = _intragAppariement(annee);
+  if (!A.apparies.length && !A.sansMiroir.length) return '';
+  var titre = 'Appariement des opérations — exercice ' + escHtml(annee);
+  var resume = A.apparies.length + ' opération(s) retrouvée(s) des deux côtés · <strong style="color:' + (A.sansMiroir.length ? '#dc2626' : '#0a7a3d') + ';">' + A.sansMiroir.length + ' ligne(s) sans miroir</strong>';
+  var rows = A.sansMiroir.map(function(x){
+    return '<tr><td>' + dateShort(x.date) + '</td><td>' + escHtml(_nomDivision(x.division)) + '</td><td>' + escHtml(x.piece || '—') + '</td><td style="font-family:monospace;">' + escHtml(x.compte) + '</td><td>' + escHtml(x.libelle) + '</td>'
+      + '<td class="num">' + (x.sens === 'D' ? fmtF(x.montant) : '') + '</td><td class="num">' + (x.sens === 'C' ? fmtF(x.montant) : '') + '</td></tr>';
+  }).join('');
+  var tbl = A.sansMiroir.length
+    ? '<table><thead><tr><th>Date</th><th>Division</th><th>Pièce</th><th>Compte</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead><tbody>' + rows + '</tbody></table>'
+    : '';
+  if (pdf) return '<h3>2 ter. ' + titre + '</h3><p>' + resume.replace(/<[^>]+>/g, '') + '</p>' + tbl;
+  return '<h4 style="margin:16px 0 8px;">' + titre + '</h4><div style="font-size:11px;color:var(--blanc-dim);margin-bottom:6px;">Chaque ligne d\'un compte de liaison est rapprochée de sa contrepartie dans une autre division (même montant, sens opposé, date à 60 jours près). ' + resume + '</div>'
+    + (tbl ? '<div class="table-wrap">' + tbl + '</div>' : '');
+}
+/* Conventions à présenter pour l'exercice : signées au plus tard pendant l'exercice et non échues avant son 1er janvier. */
+function _intragConvPourExercice(annee) {
+  var deb = String(annee) + '-01-01';
+  return (DATA.conventions_reglementees || []).filter(function(c){
+    return (c.date_signature || '').slice(0, 4) <= String(annee) && !(c.date_fin && c.date_fin < deb);
+  }).sort(function(a, b){ return (a.date_signature || '').localeCompare(b.date_signature || ''); });
+}
+/* Points d'attention pour le commissaire aux comptes : conventions non autorisées, flux sans aucune convention. */
+function _intragAlertesConv(annee) {
+  var conv = _intragConvPourExercice(annee).filter(function(c){ return c.statut !== 'annulee'; });
+  var nonAutorisees = conv.filter(function(c){ return !c.approuvee_ca; });
+  var apresSignature = conv.filter(function(c){ return c.approuvee_ca && c.date_approbation_ca && c.date_signature && c.date_approbation_ca > c.date_signature; });
+  var actives = conv.filter(function(c){ return (c.statut || 'active') === 'active'; });
+  return { nonAutorisees: nonAutorisees, apresSignature: apresSignature, fluxSansConvention: _intragFlux(annee).length > 0 && actives.length === 0 };
+}
+function _intragAlertesConvHtml(annee) {
+  var a = _intragAlertesConv(annee), h = '';
+  if (a.fluxSansConvention) h += '<div class="alert alert-warn" style="margin-bottom:8px;font-size:12px;">⚠️ Des flux existent sur les comptes de liaison en ' + escHtml(annee) + ' mais <strong>aucune convention active</strong> n\'est enregistrée : une convention entre parties liées doit être autorisée et inscrite au registre (AUSCGIE art. 438 et suivants).</div>';
+  if (a.nonAutorisees.length) h += '<div class="alert alert-warn" style="margin-bottom:8px;font-size:12px;">⚠️ <strong>' + a.nonAutorisees.length + ' convention(s)</strong> sans autorisation du conseil d\'administration : ' + a.nonAutorisees.slice(0, 5).map(function(c){ return escHtml(c.objet || c.id); }).join(' · ') + (a.nonAutorisees.length > 5 ? '…' : '') + '</div>';
+  if (a.apresSignature.length) h += '<div class="alert alert-warn" style="margin-bottom:8px;font-size:12px;">⚠️ <strong>' + a.apresSignature.length + ' convention(s)</strong> autorisée(s) <strong>après</strong> leur signature : l\'autorisation doit être préalable.</div>';
+  return h;
+}
+
 /* ── Flux de caisse entre divisions ─────────────────────────────────────
    Le registre ne lit que les ÉCRITURES sur comptes de liaison. Or les
    mouvements d'argent entre divisions passent par la caisse (transfert
@@ -48620,7 +48802,12 @@ function _intragRenderCaisseApercu() {
    colonnes, et Excel FR affichait tout sur une seule colonne. */
 function _intragCsv(lignes) {
   return '\uFEFF' + lignes.map(function(r){
-    return r.map(function(v){ v = (v === null || v === undefined) ? '' : String(v); return '"' + v.replace(/"/g, '""') + '"'; }).join(';');
+    return r.map(function(v){
+      v = (v === null || v === undefined) ? '' : String(v);
+      /* Cellule qui commence par = + - @ (ou tabulation) : un tableur l'exécuterait comme une formule (libellés importés = données non fiables). Un nombre négatif reste un nombre. */
+      if (/^[=+\-@\t\r]/.test(v) && !/^-?\d+([.,]\d+)?$/.test(v)) v = "'" + v;
+      return '"' + v.replace(/"/g, '""') + '"';
+    }).join(';');
   }).join('\r\n');
 }
 function _intragTelecharger(csv, nom) {
@@ -48726,7 +48913,9 @@ function _intragRenderFlux() {
       + '. Corrigez la date du versement ou de la pièce d\'origine : l\'écriture sera régénérée à la bonne date.</div>';
   }
 
-  el.innerHTML = filtres + alerte + tbl + matriceHtml + _intragRenderFluxCaisse(_intragAnnee);
+  var cumHtml = _intragMatriceHtml(_intragMatriceCumulee(_intragAnnee), 'Réciprocité sur soldes cumulés au 31/12/' + escHtml(_intragAnnee),
+    'Soldes depuis le dernier bilan d\'ouverture (même base que la consolidation). Un écart ici avec une matrice des mouvements équilibrée signale une opération passée d\'un seul côté lors d\'un exercice précédent.');
+  el.innerHTML = filtres + alerte + _intragAlertesConvHtml(_intragAnnee) + tbl + matriceHtml + cumHtml + _intragSansMiroirHtml(_intragAnnee) + _intragRenderFluxCaisse(_intragAnnee);
 }
 
 function _intragExportCSV() {
@@ -48798,12 +48987,12 @@ function _intragRenderConventions() {
     return '<tr><td>' + escHtml(CONV_REG_TYPES[c.type] || c.type) + '</td><td>' + partie + '</td>'
       + '<td>' + dateShort(c.date_signature) + '</td><td class="num">' + (c.montant ? fmtF(c.montant) : '—') + '</td>'
       + '<td>' + escHtml(c.objet || '') + '</td>'
-      + '<td style="text-align:center;">' + (c.approuvee_ca ? ('✔️ ' + (c.date_approbation_ca ? dateShort(c.date_approbation_ca) : '')) : '⚠️ non') + '</td>'
-      + '<td>' + statutBadge + '</td>'
+      + '<td style="text-align:center;">' + (c.approuvee_ca ? ('✔️ ' + (c.date_approbation_ca ? dateShort(c.date_approbation_ca) : '')) : '⚠️ non') + (c.date_approbation_ag ? '<div style="font-size:10px;color:var(--blanc-dim);">AG ' + dateShort(c.date_approbation_ag) + '</div>' : '') + '</td>'
+      + '<td>' + statutBadge + (c.date_fin ? '<div style="font-size:10px;color:var(--blanc-dim);">fin ' + dateShort(c.date_fin) + '</div>' : '') + '</td>'
       + '<td><button class="btn btn-secondary btn-sm" onclick="ouvrirConventionReglementee(\'' + c.id + '\')">✏️</button></td></tr>';
   }).join('');
 
-  el.innerHTML = filtres + '<div class="table-wrap"><table><thead><tr><th>Type</th><th>Parties</th><th>Date</th><th class="num">Montant</th><th>Objet</th><th>Approb. CA</th><th>Statut</th><th></th></tr></thead><tbody>'
+  el.innerHTML = filtres + _intragAlertesConvHtml(_intragAnnee || String(new Date().getFullYear())) + '<div class="table-wrap"><table><thead><tr><th>Type</th><th>Parties</th><th>Date</th><th class="num">Montant</th><th>Objet</th><th>Approb. CA</th><th>Statut</th><th></th></tr></thead><tbody>'
     + (rows || '<tr><td colspan="8" style="text-align:center;color:var(--blanc-dim);">Aucune convention enregistrée.</td></tr>') + '</tbody></table></div>';
 }
 
@@ -48841,6 +49030,10 @@ function ouvrirConventionReglementee(id) {
     + '<div class="form-group" style="flex:1;"><label style="display:flex;gap:6px;align-items:center;cursor:pointer;"><input type="checkbox" id="cr-approuvee" ' + (c && c.approuvee_ca ? 'checked' : '') + '> Autorisée par le conseil d\'administration</label></div>'
     + '<div class="form-group" style="flex:1;"><label>Date d\'approbation CA</label><input type="date" class="form-control" id="cr-date-approb" value="' + (c ? c.date_approbation_ca || '' : '') + '"></div>'
     + '</div>'
+    + '<div style="display:flex;gap:10px;">'
+    + '<div class="form-group" style="flex:1;"><label>Approbation par l\'assemblée générale (date)</label><input type="date" class="form-control" id="cr-date-ag" value="' + (c ? c.date_approbation_ag || '' : '') + '"></div>'
+    + '<div class="form-group" style="flex:1;"><label>Date de fin (si échue)</label><input type="date" class="form-control" id="cr-date-fin" value="' + (c ? c.date_fin || '' : '') + '"></div>'
+    + '</div>'
     + '<div class="form-group"><label>Statut</label><select class="form-control" id="cr-statut">'
     + ['active','terminee','annulee'].map(function(s){ return '<option value="' + s + '"' + ((c ? c.statut === s : s === 'active') ? ' selected' : '') + '>' + (s === 'active' ? 'Active' : s === 'terminee' ? 'Terminée' : 'Annulée') + '</option>'; }).join('')
     + '</select></div>'
@@ -48853,8 +49046,16 @@ function ouvrirConventionReglementee(id) {
 
 async function enregistrerConventionReglementee() {
   var g = function(id){ var e = document.getElementById(id); return e ? e.value : ''; };
+  if (!exigerDroit('Comptabilite', g('cr-id') ? 'm' : 'c', 'une convention réglementée')) return;
   var divA = g('cr-div-a'), divB = g('cr-div-b');
   if (!divA || !divB) { toast('Les deux parties à la convention sont obligatoires.', 'error'); return; }
+  if (divA === divB && divA !== '__tiers__') { toast('Une convention suppose deux parties distinctes : choisissez une autre division ou un tiers lié.', 'error'); return; }
+  if (g('cr-montant') !== '' && !(parseFloat(g('cr-montant')) >= 0)) { toast('Le montant ne peut pas être négatif.', 'error'); return; }
+  if (g('cr-date') > today()) { toast('La date de signature ne peut pas être dans le futur.', 'error'); return; }
+  if (g('cr-approuvee') !== '' && (document.getElementById('cr-approuvee') || {}).checked && !g('cr-date-approb')) { toast('Indiquez la date de l\'autorisation du conseil d\'administration.', 'error'); return; }
+  if (g('cr-date-fin') && g('cr-date-fin') < g('cr-date')) { toast('La date de fin précède la date de signature.', 'error'); return; }
+  if ((document.getElementById('cr-approuvee') || {}).checked && g('cr-date-approb') > g('cr-date')
+      && !confirm('L\'autorisation du conseil (' + g('cr-date-approb') + ') est postérieure à la signature (' + g('cr-date') + ').\n\nUne convention réglementée doit être autorisée AVANT sa conclusion. L\'enregistrer quand même ?')) return;
   if (divB === '__tiers__' && !g('cr-tiers').trim()) { toast('Précisez le nom du tiers lié.', 'error'); return; }
   if (!g('cr-date')) { toast('Date de signature obligatoire.', 'error'); return; }
   if (!g('cr-objet').trim()) { toast('Objet de la convention obligatoire.', 'error'); return; }
@@ -48874,11 +49075,14 @@ async function enregistrerConventionReglementee() {
     taux: g('cr-taux').trim(),
     approuvee_ca: !!(document.getElementById('cr-approuvee')||{}).checked,
     date_approbation_ca: g('cr-date-approb'),
+    date_approbation_ag: g('cr-date-ag'),
+    date_fin: g('cr-date-fin'),
     statut: g('cr-statut'),
     notes: g('cr-notes').trim(),
     cree_le: existant.cree_le || new Date().toISOString()
   });
   await _locSave('conventions_reglementees', c, 'pi_conventions_reglementees');
+  if (typeof logAction === 'function') logAction(existant.id ? 'CONVENTION_REGLEMENTEE_MODIFIEE' : 'CONVENTION_REGLEMENTEE_CREEE', (CONV_REG_TYPES[c.type] || c.type) + ' — ' + (c.objet || '') + ' — ' + (c.date_signature || ''));
   document.getElementById('modal-conv-reglementee').classList.remove('open');
   _intragRenderConventions();
   toast('Convention réglementée enregistrée.', 'success');
@@ -48903,7 +49107,7 @@ function _intragExportCACPdf() {
   var annee = (document.getElementById('intrag-export-annee')||{}).value || _intragAnnee;
   var flux = _intragFlux(annee);
   var mat = _intragMatrice(annee);
-  var conventions = (DATA.conventions_reglementees || []).filter(function(c){ return (c.date_signature || '').slice(0,4) <= annee; });
+  var conventions = _intragConvPourExercice(annee);
 
   var rowsFlux = flux.map(function(x){
     return '<tr><td>' + dateShort(x.date) + '</td><td>' + escHtml(_nomDivision(x.division)) + '</td>'
@@ -48921,7 +49125,8 @@ function _intragExportCACPdf() {
     var partie = escHtml(_nomDivision(c.division_a)) + ' ↔ ' + (c.division_b === '__tiers__' ? escHtml(c.tiers_lie || 'Tiers lié') : escHtml(_nomDivision(c.division_b)));
     return '<tr><td>' + escHtml(CONV_REG_TYPES[c.type] || c.type) + '</td><td>' + partie + '</td><td>' + dateShort(c.date_signature) + '</td>'
       + '<td class="num">' + (c.montant ? fmtF(c.montant) : '—') + '</td><td>' + escHtml(c.objet || '') + '</td>'
-      + '<td>' + (c.approuvee_ca ? ('✔ CA du ' + dateShort(c.date_approbation_ca)) : '⚠ non autorisée') + '</td></tr>';
+      + '<td>' + (c.approuvee_ca ? ('✔ CA du ' + dateShort(c.date_approbation_ca)) : '⚠ non autorisée') + (c.date_approbation_ag ? ' · AG du ' + dateShort(c.date_approbation_ag) : '') + '</td>'
+      + '<td>' + (c.statut === 'annulee' ? 'Annulée' : c.statut === 'terminee' ? 'Terminée' : 'Active') + (c.date_fin ? ' (fin ' + dateShort(c.date_fin) + ')' : '') + '</td></tr>';
   }).join('');
 
   var comptesKo = mat.lignes.filter(function(l){ return Math.abs(l.total) >= 1; });
@@ -48936,13 +49141,19 @@ function _intragExportCACPdf() {
 
   var contenu = '<h3>1. Registre détaillé des flux intra-groupe (comptes de liaison : ' + escHtml(_consoCfg().liaison.join(', ')) + ')</h3>'
     + alerte
+    + _intragAlertesConvHtml(annee)
     + '<table><thead><tr><th>Date</th><th>Division</th><th>Pièce</th><th>Compte</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead><tbody>'
     + (rowsFlux || '<tr><td colspan="7">Aucun flux.</td></tr>') + '</tbody></table>'
     + '<h3>2. Matrice de réciprocité par compte de liaison</h3>'
     + '<table><thead>' + thMat + '</thead><tbody>' + rowsMat + '</tbody></table>'
+    + '<h3>2 bis. Réciprocité sur soldes cumulés au 31/12/' + escHtml(annee) + '</h3>'
+    + (function(){ var m = _intragMatriceCumulee(annee); if (!m.lignes.length) return '<p>Aucun solde sur les comptes de liaison.</p>';
+        return '<table><thead><tr><th>Compte</th>' + m.divs.map(function(d){ return '<th class="num">' + escHtml(d.nom) + '</th>'; }).join('') + '<th class="num">Écart</th></tr></thead><tbody>'
+          + m.lignes.map(function(l){ var ko = Math.abs(l.total) >= 1; return '<tr' + (ko ? ' style="color:#b91c1c;font-weight:700;"' : '') + '><td>' + escHtml(l.compte) + '</td>' + m.divs.map(function(d){ return '<td class="num">' + fmtF(l.parDiv[d.id] || 0) + '</td>'; }).join('') + '<td class="num">' + fmtF(l.total) + (ko ? ' ⚠' : ' ✔') + '</td></tr>'; }).join('') + '</tbody></table>'; })()
+    + _intragSansMiroirHtml(annee, true)
     + '<h3>3. Registre des conventions réglementées (AUSCGIE art. 438 et suivants)</h3>'
-    + '<table><thead><tr><th>Type</th><th>Parties</th><th>Date</th><th class="num">Montant</th><th>Objet</th><th>Approbation CA</th></tr></thead><tbody>'
-    + (rowsConv || '<tr><td colspan="6">Aucune convention réglementée enregistrée.</td></tr>') + '</tbody></table>';
+    + '<table><thead><tr><th>Type</th><th>Parties</th><th>Date</th><th class="num">Montant</th><th>Objet</th><th>Approbation</th><th>Statut</th></tr></thead><tbody>'
+    + (rowsConv || '<tr><td colspan="7">Aucune convention réglementée enregistrée.</td></tr>') + '</tbody></table>';
 
   genererEtatPDF({ titre: 'État des transactions intragroupe', sousTitre: 'Dossier commissaire aux comptes — Exercice ' + annee + ' — SYSCOHADA', orientation: 'paysage', couleur: '#B87333', contenu: contenu, reference: 'CAC-' + annee });
 }
@@ -48950,16 +49161,19 @@ function _intragExportCACPdf() {
 function _intragExportCACCsv() {
   var annee = (document.getElementById('intrag-export-annee')||{}).value || _intragAnnee;
   var flux = _intragFlux(annee);
-  var conventions = DATA.conventions_reglementees || [];
+  var conventions = _intragConvPourExercice(annee);
   var rows = [['=== FLUX INTRAGROUPE ==='], ['Date','Division','Journal','Piece','Compte','Sens','Montant','Libelle']];
   flux.forEach(function(x){ rows.push([x.date, x.division ? _nomDivision(x.division) : 'Sans division', x.journal, x.piece, x.compte, x.sens, x.montant, x.libelle || '']); });
   if (!flux.length) rows.push(['AUCUNE ECRITURE SUR LES COMPTES DE LIAISON (' + _consoCfg().liaison.join(', ') + ') : aucun controle de reciprocite n\'a pu etre effectue']);
+  rows.push([]); rows.push(['=== OPERATIONS SANS MIROIR (ligne de liaison sans contrepartie dans une autre division) ===']);
+  rows.push(['Date','Division','Piece','Compte','Sens','Montant','Libelle']);
+  _intragAppariement(annee).sansMiroir.forEach(function(x){ rows.push([x.date, x.division ? _nomDivision(x.division) : 'Sans division', x.piece, x.compte, x.sens, x.montant, x.libelle || '']); });
   rows.push([]); rows.push(['=== CONVENTIONS REGLEMENTEES ===']);
-  rows.push(['Type','DivisionA','DivisionB_Tiers','Date','Montant','Objet','ApprouveeCA','Statut']);
+  rows.push(['Type','DivisionA','DivisionB_Tiers','Date','Montant','Objet','ApprouveeCA','DateApprobationCA','DateApprobationAG','Statut','DateFin']);
   /* [FIX revue] Même périmètre que le PDF : seules les conventions signées au
      plus tard pendant l'exercice exporté (le CSV les exportait toutes). */
-  conventions.filter(function(c){ return (c.date_signature || '').slice(0,4) <= annee; }).forEach(function(c){
-    rows.push([CONV_REG_TYPES[c.type] || c.type, _nomDivision(c.division_a), c.division_b === '__tiers__' ? c.tiers_lie : _nomDivision(c.division_b), c.date_signature, c.montant, c.objet || '', c.approuvee_ca ? 'Oui' : 'Non', c.statut]);
+  conventions.forEach(function(c){
+    rows.push([CONV_REG_TYPES[c.type] || c.type, _nomDivision(c.division_a), c.division_b === '__tiers__' ? c.tiers_lie : _nomDivision(c.division_b), c.date_signature, c.montant, c.objet || '', c.approuvee_ca ? 'Oui' : 'Non', c.date_approbation_ca || '', c.date_approbation_ag || '', c.statut || 'active', c.date_fin || '']);
   });
   _intragTelecharger(_intragCsv(rows), 'dossier_cac_intragroupe_' + annee + '.csv');
 }
@@ -80966,6 +81180,7 @@ function renderClotureFEC() {
 
 /* ── Export FEC (format DGI 18 colonnes) ───────────────────── */
 function exporterFEC(annee, divisionId) {
+  if (!exigerDroit('Comptabilite','v','l\'export du FEC')) return;
   divisionId = divisionId || '';
   var ecr = (DATA.ecritures||[]).filter(function(e){
       if (!(e.date||'').startsWith(String(annee))) return false;
@@ -81046,6 +81261,7 @@ function exporterFEC(annee, divisionId) {
   a.href = URL.createObjectURL(blob);
   a.download = nomFichier;
   a.click();
+  if (typeof logAction === 'function') logAction('EXPORT_FEC', annee + (divisionId ? ' — division ' + divisionId : ' — consolidé') + ' — ' + (lignes.length-1) + ' lignes, ' + ecr.length + ' écritures');
   toast('FEC '+annee+' exporté : '+(lignes.length-1)+' lignes ('+ecr.length+' écritures).', 'success');
 }
 
@@ -81432,6 +81648,7 @@ async function cloturerExercice(annee, divisionId) {
   await dbPut('params', DATA.params);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
 
+  if (typeof logAction === 'function') logAction('CLOTURE_EXERCICE', annee + ' — ' + divLabel + ' — résultat ' + Math.round(resultat) + ' FCFA, ' + nbAN + ' à-nouveaux');
   toast('✅ Exercice '+annee+(divisionId?' — '+divLabel:'')+' clôturé — résultat '+fmtF(resultat)+' FCFA, '+comptesGestion.length+' compte(s) de gestion soldé(s), '+nbAN+' à-nouveaux générés.', 'success');
   renderClotureFEC();
   loadComptabilite();
@@ -81440,6 +81657,7 @@ async function cloturerExercice(annee, divisionId) {
 async function rouvrirExercice(annee, divisionId) {
   divisionId = divisionId || '';
   var divLabel = divisionId ? (_nomDivision ? _nomDivision(divisionId) : divisionId) : 'Toutes divisions (consolidé)';
+  if (!exigerDroit('Comptabilite','v','la réouverture d\'un exercice')) return;
   if (!hasRole('admin')) { toast('Réservé à l\'administrateur.', 'error'); return; }
   var refSuffixe = divisionId ? ('-'+divisionId) : '';
   /* On rouvre dans l'ordre inverse de la clôture : rouvrir N supprime les à-nouveaux
@@ -81451,14 +81669,32 @@ async function rouvrirExercice(annee, divisionId) {
     toast('🔒 Réouverture refusée : l\'exercice '+_plusTard[0]+' est clôturé. Rouvrez-le d\'abord (du plus récent au plus ancien).', 'error', 9000);
     return;
   }
+  /* Clôture consolidée : elle reprend toutes les divisions. Pas de réouverture tant qu'un exercice postérieur est clos dans une division. */
+  if (!divisionId) {
+    var _divPlusTard = Object.keys(_p).filter(function(k){ var m = /^cloture_(\d{4})-(.+)$/.exec(k); return m && _p[k] === true && parseInt(m[1],10) > annee; }).sort();
+    if (_divPlusTard.length) {
+      toast('🔒 Réouverture consolidée refusée : l\'exercice '+_divPlusTard[0].slice(9,13)+' est clôturé pour une division ('+_divPlusTard[0].slice(14)+'). Rouvrez-le d\'abord.', 'error', 9000);
+      return;
+    }
+  }
   if (!confirm('🔓 Rouvrir l\'exercice '+annee+' — '+divLabel+' ?\n\nLes écritures de clôture et à-nouveaux de ce périmètre seront SUPPRIMÉES.')) return;
+  /* Motif obligatoire, conservé au journal d'audit : rouvrir un exercice clos modifie des états déjà remis. */
+  var _motif = (prompt('Motif de la réouverture de l\'exercice '+annee+' (obligatoire, 10 caractères minimum) :', '') || '').trim();
+  if (_motif.length < 10) { toast('Réouverture annulée : un motif d\'au moins 10 caractères est obligatoire.', 'error'); return; }
 
   /* Supprimer écritures CLO et AN liées à ce périmètre uniquement */
   var toDelete = (DATA.ecritures||[]).filter(function(e){
     return (e.reference==='CLOTURE-'+annee+refSuffixe) || (e.reference==='AN-'+(annee+1)+refSuffixe);
   });
+  var _echecs = 0;
   for (var i=0; i<toDelete.length; i++) {
-    await deleteRecord('ecritures', toDelete[i].id, { forceCloture: true, forceVisa: true });
+    if (await deleteRecord('ecritures', toDelete[i].id, { forceCloture: true, forceVisa: true }) === false) _echecs++;
+  }
+  /* Une suppression refusée laisserait l'écriture en base : elle reviendrait au rechargement et une nouvelle clôture doublerait les à-nouveaux. On ne déverrouille pas. */
+  if (_echecs) {
+    toast('⛔ Réouverture interrompue : ' + _echecs + ' écriture(s) de clôture n\'ont pas pu être supprimées. L\'exercice reste clôturé : relancez la réouverture.', 'error', 10000);
+    if (typeof logAction === 'function') logAction('REOUVERTURE_EXERCICE_ECHEC', annee + ' — ' + divLabel + ' — ' + _echecs + ' suppression(s) refusée(s)');
+    return;
   }
   DATA.ecritures = DATA.ecritures.filter(function(e){
     return !(e.reference==='CLOTURE-'+annee+refSuffixe || e.reference==='AN-'+(annee+1)+refSuffixe);
@@ -81469,6 +81705,7 @@ async function rouvrirExercice(annee, divisionId) {
   await dbPut('params', DATA.params);
   if (typeof syncToSupabase==='function') syncToSupabase('pi_params', DATA.params);
 
+  if (typeof logAction === 'function') logAction('REOUVERTURE_EXERCICE', annee + ' — ' + divLabel + ' — ' + toDelete.length + ' écriture(s) de clôture supprimée(s) — motif : ' + _motif);
   toast('Exercice '+annee+(divisionId?' — '+divLabel:'')+' rouvert — '+toDelete.length+' écriture(s) de clôture supprimée(s).', 'info');
   renderClotureFEC();
   loadComptabilite();
