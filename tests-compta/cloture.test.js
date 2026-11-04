@@ -83,6 +83,7 @@ test('clôture : un exercice déjà clos ne se clôture pas deux fois (pas de do
 test('réouverture : refusée si l\'exercice suivant est clos ; autorisée dans l\'ordre inverse', async () => {
   const app = await ouvrirApp();
   try {
+    app.etat.prompts.push('Correction d\'une erreur de saisie');   /* motif de réouverture (obligatoire) */
     const r = await app.page.evaluate(async function (f) {
       eval('(' + f + ')')();
       await cloturerExercice(2025, '');
