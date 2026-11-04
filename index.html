@@ -27,7 +27,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.197 · 2026-11-04 — Report Menko : relations intragroupe (CSV sûr, soldes cumulés, appariement des opérations, conventions validées et alertes), audit de la clôture / réouverture / FEC (motif obligatoire, droits), détection et création des comptes manquants du plan ; v14.196 · 2026-11-04 — Revue comptabilité (lots 1 à 4) : liasse toujours équilibrée, configuration TVA séparée du taux par défaut, liquidation de TVA unique par mois, clôture par division verrouillée et clôtures exclusives, bilan d\'ouverture visé, FEC (dates, arrondi par pièce), écritures lettrées protégées, lettrage numéroté à la suite, rapprochement bancaire (sens, double pointage, banques), import CSV du relevé, libellés de relevé échappés ; v14.195 · 2026-11-04 — Souscripteurs : badge « 📎 n » des documents joints dans la liste et filtre « Documents joints » (avec / sans) ; v14.194 · 2026-11-03 — GED : détail par source et numéro de version affichés ; trombone des étapes foncières ; pièces foncières dans la GED ; v14.193 · 2026-10-30 — SMQ : contexte de l’organisme et parties intéressées (enjeux, forces/faiblesses/opportunités/menaces, revue annuelle, lien vers les risques) ; v14.192 · 2026-10-30 — Validations : aperçu du dossier foncier et ouverture directe sur l’étape à valider ; v14.191 · 2026-10-30 — SMQ : matrice des compétences (référentiel, évaluations, écarts, plan de formation, indicateur) ; v14.190 · 2026-10-30 — Validations : les étapes de dossier foncier à valider y figurent et s’y décident ; v14.189 · 2026-10-30 — SMQ : calcul automatique des indicateurs de performance (21 formules, relevés conservés, état vs cible) ; v14.188 · 2026-10-30 — SMQ : politique qualité versionnée, objectifs qualité, registre des risques et opportunités (matrice) ; v14.187 · 2026-10-30 — SMQ : revue de direction (éléments d’entrée calculés depuis l’ERP, décisions suivies, compte rendu) ; v14.186 · 2026-10-30 — SMQ : audits internes (programme annuel, indépendance, constats, création des NC, clôture conditionnée) ; v14.185 · 2026-10-30 — Manuels & flux : manuel SMQ + 2 diagrammes ; v14.184 · 2026-10-30 — SMQ : onglet Qualité (maîtrise documentaire, non-conformités et actions correctives, réclamations, satisfaction) ; v14.183 · 2026-10-30 — SMQ : fiche de chaque processus (pilote, indicateurs de performance, système documentaire) avec suggestions à valider ; v14.182 · 2026-10-30 — Correctif : rejets budget/engagement/transfert/réappro soumis au droit et au plafond comme la validation ; numérotation FED, DA, BC, BL, PVR, LIV, DRC, OM, CTX, FV, AV, FS, SIT, rapports sur le plus grand numéro attribué ; v14.181 · 2026-10-30 — Manuels & flux : vue « Cartographie des processus » (management, réalisation, support) ; v14.180 · 2026-10-30 — Manuels & flux : manuel Validations et délégations + 3 diagrammes ; v14.179 · 2026-10-30 — Manuels & flux : lien « Détail des procédures (PDF) » sous chaque diagramme, vers le manuel qui le décrit ; v14.178 · 2026-10-30 — Correctif : références BIEN/CAND/KYC/DS/ART/OT/BAIL/MANDAT/QUIT/JUR/ANCR/DSP/rapports de chantier basées sur le plus grand numéro attribué (plus de doublon après suppression) ; v14.177 · 2026-10-30 — Correctif : références de versement Mobile Money (VRS) basées sur le plus grand numéro attribué, plus de doublon après suppression ; v14.176 · 2026-10-30 — Manuels & flux : portail des acteurs détaillé (12 espaces) + 3 diagrammes ; v14.175 · 2026-10-30 — Manuels & flux : réorganisation par phases dans le sens de la marche en avant (frise, numérotation, sections) ; v14.174 · 2026-10-30 — Manuels & flux : carte commerciale et portail des acteurs + 3 diagrammes ; v14.173 · 2026-10-30 — Manuels & flux : 5 manuels (FNE, calendrier, messagerie, cartographie SIG, pilotage) + 9 diagrammes ; v14.172 · 2026-10-30 — Manuels & flux : 11 manuels (programmes, conception, aménagement, budget, locatif, copropriété, parc auto, accueil, réunions, diaspora, administration) + 16 diagrammes ; v14.171 · 2026-10-30 — Manuels & flux : manuels Conventions, Suivi de chantier et DQE + 5 diagrammes ; v14.170 · 2026-10-30 — Manuels & flux : manuels Réception/Livraison, Stock et Trésorerie + 6 diagrammes ; v14.169 · 2026-10-30 — Manuels & flux : manuels CRM, LBC/FT et Juridique + 7 diagrammes ; v14.168 · 2026-10-30 — Manuels & flux : manuels Paie et RH + 6 diagrammes ; v14.167 · 2026-10-30 — Manuels & flux : manuels Achats et Fournisseurs + 3 diagrammes ; v14.166 · 2026-10-30 — Manuels & flux : manuels Paiements et Relances + 4 diagrammes ; v14.165 · 2026-10-30 — Manuels & flux : les diagrammes s\’affichent au clic sur un manuel ; v14.164 · 2026-10-30 — Manuels & flux : 12 diagrammes de flux supplémentaires (souscripteur, caisse, comptabilité, foncier, portefeuille) ; v14.163 · 2026-10-30 — Paramètres › « Manuels & flux » : catalogue des manuels de procédures (PDF) et diagrammes de flux imprimables ; v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\’engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\’un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\’agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\’un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\’envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\’application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\’entreprise sur l\’attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\’une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\’écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\’équilibre ; Sous-comptes de caisse : le compte d\’une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\’est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\’efface plus le cloud, et un ordre de remise à zéro diffusé n\’entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.198 · 2026-11-04 — Comptes codés en dur : trésorerie selon le mode de paiement, TVA due / crédit / non déductible, liaison d\'ouverture et comptes de régularisation paramétrables (Paramètres → Comptes par défaut), le compte de liaison n\'est plus pris pour un impôt sur le résultat dans la liasse ; v14.197 · 2026-11-04 — Report Menko : relations intragroupe (CSV sûr, soldes cumulés, appariement des opérations, conventions validées et alertes), audit de la clôture / réouverture / FEC (motif obligatoire, droits), détection et création des comptes manquants du plan ; v14.196 · 2026-11-04 — Revue comptabilité (lots 1 à 4) : liasse toujours équilibrée, configuration TVA séparée du taux par défaut, liquidation de TVA unique par mois, clôture par division verrouillée et clôtures exclusives, bilan d\'ouverture visé, FEC (dates, arrondi par pièce), écritures lettrées protégées, lettrage numéroté à la suite, rapprochement bancaire (sens, double pointage, banques), import CSV du relevé, libellés de relevé échappés ; v14.195 · 2026-11-04 — Souscripteurs : badge « 📎 n » des documents joints dans la liste et filtre « Documents joints » (avec / sans) ; v14.194 · 2026-11-03 — GED : détail par source et numéro de version affichés ; trombone des étapes foncières ; pièces foncières dans la GED ; v14.193 · 2026-10-30 — SMQ : contexte de l’organisme et parties intéressées (enjeux, forces/faiblesses/opportunités/menaces, revue annuelle, lien vers les risques) ; v14.192 · 2026-10-30 — Validations : aperçu du dossier foncier et ouverture directe sur l’étape à valider ; v14.191 · 2026-10-30 — SMQ : matrice des compétences (référentiel, évaluations, écarts, plan de formation, indicateur) ; v14.190 · 2026-10-30 — Validations : les étapes de dossier foncier à valider y figurent et s’y décident ; v14.189 · 2026-10-30 — SMQ : calcul automatique des indicateurs de performance (21 formules, relevés conservés, état vs cible) ; v14.188 · 2026-10-30 — SMQ : politique qualité versionnée, objectifs qualité, registre des risques et opportunités (matrice) ; v14.187 · 2026-10-30 — SMQ : revue de direction (éléments d’entrée calculés depuis l’ERP, décisions suivies, compte rendu) ; v14.186 · 2026-10-30 — SMQ : audits internes (programme annuel, indépendance, constats, création des NC, clôture conditionnée) ; v14.185 · 2026-10-30 — Manuels & flux : manuel SMQ + 2 diagrammes ; v14.184 · 2026-10-30 — SMQ : onglet Qualité (maîtrise documentaire, non-conformités et actions correctives, réclamations, satisfaction) ; v14.183 · 2026-10-30 — SMQ : fiche de chaque processus (pilote, indicateurs de performance, système documentaire) avec suggestions à valider ; v14.182 · 2026-10-30 — Correctif : rejets budget/engagement/transfert/réappro soumis au droit et au plafond comme la validation ; numérotation FED, DA, BC, BL, PVR, LIV, DRC, OM, CTX, FV, AV, FS, SIT, rapports sur le plus grand numéro attribué ; v14.181 · 2026-10-30 — Manuels & flux : vue « Cartographie des processus » (management, réalisation, support) ; v14.180 · 2026-10-30 — Manuels & flux : manuel Validations et délégations + 3 diagrammes ; v14.179 · 2026-10-30 — Manuels & flux : lien « Détail des procédures (PDF) » sous chaque diagramme, vers le manuel qui le décrit ; v14.178 · 2026-10-30 — Correctif : références BIEN/CAND/KYC/DS/ART/OT/BAIL/MANDAT/QUIT/JUR/ANCR/DSP/rapports de chantier basées sur le plus grand numéro attribué (plus de doublon après suppression) ; v14.177 · 2026-10-30 — Correctif : références de versement Mobile Money (VRS) basées sur le plus grand numéro attribué, plus de doublon après suppression ; v14.176 · 2026-10-30 — Manuels & flux : portail des acteurs détaillé (12 espaces) + 3 diagrammes ; v14.175 · 2026-10-30 — Manuels & flux : réorganisation par phases dans le sens de la marche en avant (frise, numérotation, sections) ; v14.174 · 2026-10-30 — Manuels & flux : carte commerciale et portail des acteurs + 3 diagrammes ; v14.173 · 2026-10-30 — Manuels & flux : 5 manuels (FNE, calendrier, messagerie, cartographie SIG, pilotage) + 9 diagrammes ; v14.172 · 2026-10-30 — Manuels & flux : 11 manuels (programmes, conception, aménagement, budget, locatif, copropriété, parc auto, accueil, réunions, diaspora, administration) + 16 diagrammes ; v14.171 · 2026-10-30 — Manuels & flux : manuels Conventions, Suivi de chantier et DQE + 5 diagrammes ; v14.170 · 2026-10-30 — Manuels & flux : manuels Réception/Livraison, Stock et Trésorerie + 6 diagrammes ; v14.169 · 2026-10-30 — Manuels & flux : manuels CRM, LBC/FT et Juridique + 7 diagrammes ; v14.168 · 2026-10-30 — Manuels & flux : manuels Paie et RH + 6 diagrammes ; v14.167 · 2026-10-30 — Manuels & flux : manuels Achats et Fournisseurs + 3 diagrammes ; v14.166 · 2026-10-30 — Manuels & flux : manuels Paiements et Relances + 4 diagrammes ; v14.165 · 2026-10-30 — Manuels & flux : les diagrammes s\’affichent au clic sur un manuel ; v14.164 · 2026-10-30 — Manuels & flux : 12 diagrammes de flux supplémentaires (souscripteur, caisse, comptabilité, foncier, portefeuille) ; v14.163 · 2026-10-30 — Paramètres › « Manuels & flux » : catalogue des manuels de procédures (PDF) et diagrammes de flux imprimables ; v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\’engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\’un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\’agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\’un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\’envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\’application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\’entreprise sur l\’attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\’une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\’écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\’équilibre ; Sous-comptes de caisse : le compte d\’une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\’est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\’efface plus le cloud, et un ordre de remise à zéro diffusé n\’entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -8534,6 +8534,18 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
               <div class="form-group"><label>Résiliation — Dette de remboursement au souscripteur</label><input class="form-control" id="cd-resiliation-dette" list="dl-plan-comptable" placeholder="4197"></div>
               <div class="form-group"><label>Résiliation — Retenue conservée (produit)</label><input class="form-control" id="cd-resiliation-produit" list="dl-plan-comptable" placeholder="758"></div>
               <div class="form-group"><label>Virement interne entre caisses (compte relais)</label><input class="form-control" id="cd-virement-interne" list="dl-plan-comptable" placeholder="585"></div>
+              <div class="form-group" style="grid-column:1/-1;"><strong>Comptes techniques</strong> <span style="font-size:11px;color:var(--blanc-dim);">— laissés vides, l'application garde les comptes indiqués en exemple. Renseignez-les si votre plan comptable utilise d'autres codes (par exemple 44410000 pour la TVA due).</span></div>
+              <div class="form-group"><label>TVA — État, TVA due (liquidation)</label><input class="form-control" id="cd-tva-due" list="dl-plan-comptable" placeholder="4441"></div>
+              <div class="form-group"><label>TVA — Crédit de TVA à reporter</label><input class="form-control" id="cd-tva-credit" list="dl-plan-comptable" placeholder="4449"></div>
+              <div class="form-group"><label>TVA non déductible (prorata) et arrondi de liquidation</label><input class="form-control" id="cd-tva-non-deductible" list="dl-plan-comptable" placeholder="6461"></div>
+              <div class="form-group"><label>Compte de liaison d'ouverture (bilan d'ouverture, à-nouveaux)</label><input class="form-control" id="cd-liaison-ouverture" list="dl-plan-comptable" placeholder="890"></div>
+              <div class="form-group"><label>Régularisation — Charges constatées d'avance</label><input class="form-control" id="cd-regul-cca" list="dl-plan-comptable" placeholder="476"></div>
+              <div class="form-group"><label>Régularisation — Produits constatés d'avance</label><input class="form-control" id="cd-regul-pca" list="dl-plan-comptable" placeholder="477"></div>
+              <div class="form-group"><label>Régularisation — Factures non parvenues</label><input class="form-control" id="cd-regul-fnp" list="dl-plan-comptable" placeholder="408"></div>
+              <div class="form-group"><label>Régularisation — Factures à établir</label><input class="form-control" id="cd-regul-fae" list="dl-plan-comptable" placeholder="418"></div>
+              <div class="form-group"><label>Régularisation — Charges à payer</label><input class="form-control" id="cd-regul-cap" list="dl-plan-comptable" placeholder="428"></div>
+              <div class="form-group"><label>TVA sur factures non parvenues</label><input class="form-control" id="cd-tva-fnp" list="dl-plan-comptable" placeholder="4455"></div>
+              <div class="form-group"><label>TVA sur factures à établir</label><input class="form-control" id="cd-tva-fae" list="dl-plan-comptable" placeholder="4435"></div>
 
               <div class="form-group"><label>Taux Impôt sur les Sociétés (%)</label><input type="number" step="0.1" class="form-control" id="cd-taux-is" placeholder="25"></div>
               <div class="form-group"></div>
@@ -31919,6 +31931,23 @@ function requireParamCompte(cle, libelle) {
   return val;
 }
 
+/* Compte par défaut « souple » : la valeur paramétrée (Paramètres → Comptes par défaut), sinon l'ancien compte codé en dur.
+   Aucune erreur ni message si le paramètre est vide : le comportement historique est conservé. */
+function cptDefautSouple(cle, defaut) {
+  var cd = (DATA.params && DATA.params.comptes_defaut) || {};
+  var v = String(cd[cle] == null ? '' : cd[cle]).trim();
+  return v || defaut;
+}
+/* Trésorerie selon le mode de paiement (espèces → caisse, mobile money → compte mobile, sinon banque), sans toast ni exception. */
+function _cptTresoSouple(mode) {
+  return mode === 'especes' ? cptDefautSouple('treso_caisse', '571') : (mode === 'mobile_money' ? cptDefautSouple('treso_mobile', '531') : cptDefautSouple('treso_banque', '521'));
+}
+function _tvaCptDue()    { return cptDefautSouple('tva_due', '4441'); }
+function _tvaCptCredit() { return cptDefautSouple('tva_credit', '4449'); }
+function _tvaCptRejet()  { return cptDefautSouple('tva_non_deductible', '6461'); }
+/* Compte technique de liaison (contrepartie du bilan d'ouverture et des à-nouveaux). À ne jamais confondre avec 89x (impôt sur le résultat). */
+function _cptLiaison()   { return cptDefautSouple('liaison_ouverture', '890'); }
+
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 
 /* Onglets de l'aide « Hiérarchie foncière » */
@@ -36762,7 +36791,7 @@ async function comptabiliserPaiementCommission(comm, modePaiement) {
   if (comm.ecriture_paiement_id) return; // déjà comptabilisé
 
   var compteProvision = getCompteCommission(comm.type_beneficiaire, 'paiement_debit');
-  var comptePaiement  = modePaiement === 'especes' ? '571' : '521';
+  var comptePaiement  = _cptTresoSouple(modePaiement);
   var typeB = comm.type_beneficiaire === 'commercial' ? 'Commercial' : 'Apporteur';
 
   var an     = (comm.date_paiement||today()).slice(0,4);
@@ -42102,6 +42131,10 @@ var NATURE_LABELS_CPT = { actif:'Actif', passif:'Passif', actif_contra:'Actif so
 /* Libellés des clés de comptes_defaut — partagé entre le formulaire de saisie
    (auto-création + datalist) et la règle d'audit d'intégrité « Comptes par défaut ». */
 var LIBELLES_COMPTES_DEFAUT = {
+  tva_due:'TVA — État, TVA due', tva_credit:'TVA — Crédit de TVA à reporter', tva_non_deductible:'TVA — Part non déductible / arrondi de liquidation',
+  liaison_ouverture:'Compte de liaison d\'ouverture (bilan d\'ouverture, à-nouveaux)',
+  regul_cca:'Régularisation — Charges constatées d\'avance', regul_pca:'Régularisation — Produits constatés d\'avance', regul_fnp:'Régularisation — Factures non parvenues',
+  regul_fae:'Régularisation — Factures à établir', regul_cap:'Régularisation — Charges à payer', tva_fnp:'TVA — sur factures non parvenues', tva_fae:'TVA — sur factures à établir',
   treso_banque:'Trésorerie — Banque', treso_caisse:'Trésorerie — Caisse (espèces)', treso_mobile:'Trésorerie — Mobile Money',
   client_lots:'Client — Souscripteurs (lots)', client_foncier:'Client — Acquéreurs fonciers', fournisseur:'Fournisseur par défaut',
   comm_com_charge:'Commission commerciale — Charge', comm_com_provision:'Commission commerciale — À payer',
@@ -42314,6 +42347,17 @@ function loadComptesDefaut() {
   var _rd=document.getElementById('cd-resiliation-dette'); if(_rd)_rd.value=cd.resiliation_dette|| '';
   var _rp=document.getElementById('cd-resiliation-produit'); if(_rp)_rp.value=cd.resiliation_produit|| '';
   var _vi=document.getElementById('cd-virement-interne'); if(_vi)_vi.value=cd.virement_interne|| '';
+  var _x_tva_due=document.getElementById('cd-tva-due'); if(_x_tva_due)_x_tva_due.value=cd.tva_due|| '';
+  var _x_tva_credit=document.getElementById('cd-tva-credit'); if(_x_tva_credit)_x_tva_credit.value=cd.tva_credit|| '';
+  var _x_tva_non_deductible=document.getElementById('cd-tva-non-deductible'); if(_x_tva_non_deductible)_x_tva_non_deductible.value=cd.tva_non_deductible|| '';
+  var _x_liaison_ouverture=document.getElementById('cd-liaison-ouverture'); if(_x_liaison_ouverture)_x_liaison_ouverture.value=cd.liaison_ouverture|| '';
+  var _x_regul_cca=document.getElementById('cd-regul-cca'); if(_x_regul_cca)_x_regul_cca.value=cd.regul_cca|| '';
+  var _x_regul_pca=document.getElementById('cd-regul-pca'); if(_x_regul_pca)_x_regul_pca.value=cd.regul_pca|| '';
+  var _x_regul_fnp=document.getElementById('cd-regul-fnp'); if(_x_regul_fnp)_x_regul_fnp.value=cd.regul_fnp|| '';
+  var _x_regul_fae=document.getElementById('cd-regul-fae'); if(_x_regul_fae)_x_regul_fae.value=cd.regul_fae|| '';
+  var _x_regul_cap=document.getElementById('cd-regul-cap'); if(_x_regul_cap)_x_regul_cap.value=cd.regul_cap|| '';
+  var _x_tva_fnp=document.getElementById('cd-tva-fnp'); if(_x_tva_fnp)_x_tva_fnp.value=cd.tva_fnp|| '';
+  var _x_tva_fae=document.getElementById('cd-tva-fae'); if(_x_tva_fae)_x_tva_fae.value=cd.tva_fae|| '';
   document.getElementById('cd-taux-is').value = (DATA.params && DATA.params.taux_is != null) ? DATA.params.taux_is : 25;
   renderConflitsSync();
 }
@@ -44253,7 +44297,18 @@ async function saveComptesDefaut() {
     parc_immobilisation:  (document.getElementById('cd-parc-immobilisation')||{}).value ? document.getElementById('cd-parc-immobilisation').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.parc_immobilisation)|| ''),
     resiliation_dette:  (document.getElementById('cd-resiliation-dette')||{}).value ? document.getElementById('cd-resiliation-dette').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.resiliation_dette)|| ''),
     resiliation_produit:  (document.getElementById('cd-resiliation-produit')||{}).value ? document.getElementById('cd-resiliation-produit').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.resiliation_produit)|| ''),
-    virement_interne:  (document.getElementById('cd-virement-interne')||{}).value ? document.getElementById('cd-virement-interne').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.virement_interne)|| '')
+    virement_interne:  (document.getElementById('cd-virement-interne')||{}).value ? document.getElementById('cd-virement-interne').value.trim() : ((DATA.params&&DATA.params.comptes_defaut&&DATA.params.comptes_defaut.virement_interne)|| ''),
+    tva_due: ((document.getElementById('cd-tva-due')||{}).value || '').trim(),
+    tva_credit: ((document.getElementById('cd-tva-credit')||{}).value || '').trim(),
+    tva_non_deductible: ((document.getElementById('cd-tva-non-deductible')||{}).value || '').trim(),
+    liaison_ouverture: ((document.getElementById('cd-liaison-ouverture')||{}).value || '').trim(),
+    regul_cca: ((document.getElementById('cd-regul-cca')||{}).value || '').trim(),
+    regul_pca: ((document.getElementById('cd-regul-pca')||{}).value || '').trim(),
+    regul_fnp: ((document.getElementById('cd-regul-fnp')||{}).value || '').trim(),
+    regul_fae: ((document.getElementById('cd-regul-fae')||{}).value || '').trim(),
+    regul_cap: ((document.getElementById('cd-regul-cap')||{}).value || '').trim(),
+    tva_fnp: ((document.getElementById('cd-tva-fnp')||{}).value || '').trim(),
+    tva_fae: ((document.getElementById('cd-tva-fae')||{}).value || '').trim()
   };
   DATA.params.taux_is = parseFloat(document.getElementById('cd-taux-is').value) || 25;
 
@@ -44389,8 +44444,14 @@ var _LIB_LOC_CPT = { locataire: 'Clients — locataires', loyers: 'Loyers (produ
   refact_locataire: 'Refacturation aux locataires' };
 var _LIB_DSP_CPT = { sequestre: 'Séquestre diaspora — avances des souscripteurs', client: 'Clients — souscripteurs diaspora', frais_transfert: 'Frais de transfert de fonds',
   perte_change: 'Pertes de change', gain_change: 'Gains de change' };
+/* Les comptes écrits par l'application suivent les paramètres : le code attendu n'est plus forcément l'ancien code par défaut. */
+function _codeSystemeParam(code) {
+  var m = { '890': ['liaison_ouverture'], '4441': ['tva_due'], '4449': ['tva_credit'], '6461': ['tva_non_deductible'], '476': ['regul_cca'], '477': ['regul_pca'],
+    '428': ['regul_cap'], '4455': ['tva_fnp'], '4435': ['tva_fae'] };
+  return m[code] ? cptDefautSouple(m[code][0], code) : code;
+}
 function comptesSystemeRequis() {
-  var out = COMPTES_SYSTEME.slice(), vus = {};
+  var out = COMPTES_SYSTEME.map(function(c){ return { code: _codeSystemeParam(c.code), label: c.label }; }), vus = {};
   out.forEach(function(c){ vus[c.code] = true; });
   var ajoute = function(code, label){ code = String(code || '').trim(); if (/^[1-9]\d*$/.test(code) && !vus[code]) { vus[code] = true; out.push({ code: code, label: label }); } };
   try { if (typeof LOC_CPT !== 'undefined') Object.keys(_LIB_LOC_CPT).forEach(function(k){ ajoute(LOC_CPT[k], _LIB_LOC_CPT[k]); }); } catch (e) {}
@@ -46027,7 +46088,7 @@ var TVA_DEDUCTIBLE = [
   ['4453','TVA récupérable sur transports'], ['4454','TVA récupérable sur services extérieurs'],
   ['4455','TVA récupérable sur factures non parvenues'], ['4456','TVA transférée par d\'autres entreprises']
 ];
-var TVA_CPT_DUE = '4441', TVA_CPT_CREDIT = '4449';
+/* Comptes de liquidation de TVA : _tvaCptDue() / _tvaCptCredit() (paramétrables). */
 
 function _tvaCfg() {
   /* La configuration vit sous « tva_cfg » : « tva » est le taux par défaut (nombre) des Paramètres, qui l'écrasait avant. Reprise de l'ancien objet stocké sous « tva ». */
@@ -46730,16 +46791,16 @@ async function passerEcritureTVA() {
   });
   /* Quote-part non déductible : charge définitive, pas un actif */
   if (Math.round(T.rejet)) {
-    lignes.push({ compte: TVA_CPT_DUE === '4441' ? '6461' : '6461', sens: 'D', montant: Math.round(T.rejet), libelle: 'TVA non déductible — prorata ' + T.prorata + ' %' + (T.nonJustif ? ' — dont ' + Math.round(T.nonJustif) + ' sans FNE valide' : '') });
+    lignes.push({ compte: _tvaCptRejet(), sens: 'D', montant: Math.round(T.rejet), libelle: 'TVA non déductible — prorata ' + T.prorata + ' %' + (T.nonJustif ? ' — dont ' + Math.round(T.nonJustif) + ' sans FNE valide' : '') });
   }
-  if (Math.round(T.credAnt)) lignes.push({ compte: TVA_CPT_CREDIT, sens: 'C', montant: Math.round(T.credAnt), libelle: 'Imputation du crédit reporté' });
-  if (Math.round(T.aPayer)) lignes.push({ compte: TVA_CPT_DUE, sens: 'C', montant: Math.round(T.aPayer), libelle: 'TVA due au titre de ' + mois });
-  if (Math.round(T.credit)) lignes.push({ compte: TVA_CPT_CREDIT, sens: 'D', montant: Math.round(T.credit), libelle: 'Crédit de TVA à reporter' });
+  if (Math.round(T.credAnt)) lignes.push({ compte: _tvaCptCredit(), sens: 'C', montant: Math.round(T.credAnt), libelle: 'Imputation du crédit reporté' });
+  if (Math.round(T.aPayer)) lignes.push({ compte: _tvaCptDue(), sens: 'C', montant: Math.round(T.aPayer), libelle: 'TVA due au titre de ' + mois });
+  if (Math.round(T.credit)) lignes.push({ compte: _tvaCptCredit(), sens: 'D', montant: Math.round(T.credit), libelle: 'Crédit de TVA à reporter' });
 
   var sD = lignes.filter(function(l){ return l.sens === 'D'; }).reduce(function(a, l){ return a + l.montant; }, 0);
   var sC = lignes.filter(function(l){ return l.sens === 'C'; }).reduce(function(a, l){ return a + l.montant; }, 0);
   if (Math.abs(sD - sC) > 2) { toast('⛔ Écriture déséquilibrée (' + fmtF(sD - sC) + ') — vérifiez les comptes de TVA.', 'error'); return; }
-  if (sD !== sC) { lignes.push({ compte: '6461', sens: sD < sC ? 'D' : 'C', montant: Math.abs(sD - sC), libelle: 'Arrondi de liquidation' }); }
+  if (sD !== sC) { lignes.push({ compte: _tvaCptRejet(), sens: sD < sC ? 'D' : 'C', montant: Math.abs(sD - sC), libelle: 'Arrondi de liquidation' }); }
 
   var ecr = { id: uid(), date: dateEcr, journal: 'OD', type: 'od', piece: 'TVA-' + mois.replace('-', ''),
     libelle: 'Liquidation TVA — ' + mois, lignes: lignes, source: 'liquidation_tva', tva_mois: mois,
@@ -46824,6 +46885,11 @@ var CUTOFF_TYPES = {
          aide:'Congés payés, primes, intérêts courus non échus à la clôture.' }
 };
 
+/* Comptes de régularisation et de TVA associés : paramétrables (Paramètres → Comptes par défaut), anciens codes par défaut. */
+[['cca', 'regul_cca'], ['pca', 'regul_pca'], ['fnp', 'regul_fnp'], ['fae', 'regul_fae'], ['cap', 'regul_cap']].forEach(function(x){
+  var def = CUTOFF_TYPES[x[0]].cpt;
+  Object.defineProperty(CUTOFF_TYPES[x[0]], 'cpt', { get: function(){ return cptDefautSouple(x[1], def); }, enumerable: true });
+});
 function _cutoffList(annee) {
   return (DATA.params && DATA.params.cutoff && DATA.params.cutoff[annee]) || [];
 }
@@ -46911,7 +46977,7 @@ function cutoffRender() {
 function _cutoffLignes(r, extourne) {
   var t = CUTOFF_TYPES[r.type];
   var L = [], inv = function(x){ return extourne ? (x === 'D' ? 'C' : 'D') : x; };
-  var cptTva = (r.type === 'fnp') ? '4455' : (r.type === 'fae' ? '4435' : null);
+  var cptTva = (r.type === 'fnp') ? cptDefautSouple('tva_fnp', '4455') : (r.type === 'fae' ? cptDefautSouple('tva_fae', '4435') : null);
   /* Sens de la contrepartie : opposé à celui du compte de régularisation. */
   var sensReg = t.sens, sensContre = (t.sens === 'D') ? 'C' : 'D';
   L.push({ compte: t.cpt, sens: inv(sensReg), montant: r.montant + ((cptTva && r.tva) ? r.tva : 0),
@@ -47984,11 +48050,11 @@ function _lfCalc(annee, divF) {
   R.RP = -_lfD(s, ['83','85']);
   R.XH = R.TN + R.TO + R.RO + R.RP;
   R.RQ = -_lfD(s, ['87']);
-  R.RS = -_lfD(s, ['89']);
+  R.RS = -_lfD(s, ['89'], [_cptLiaison()]);   /* le compte de liaison d'ouverture (890) n'est pas un impôt */
   R.XI = R.XG + R.XH + R.RQ + R.RS;
   /* Comptes de gestion hors des rubriques ci-dessus (ex. 7088 frais de souscription, 693 IS, 606, 682, 708, 741/742, 761/762, 782, 801) :
      rien ne doit s'échapper — le résultat est la somme de TOUTES les classes 6, 7 et 8. */
-  R.XJ = -_lfS(s, ['6', '7', '8']) - R.XI;
+  R.XJ = -_lfS(s, ['6', '7', '8'], [_cptLiaison()]) - R.XI;
   if (Math.abs(R.XJ) < 0.5) R.XJ = 0;
   R.XI += R.XJ;
 
@@ -49799,7 +49865,7 @@ function calcBilan(year, divF) {
       else B.diverses -= s;
     } else if (cl === '5') {
       if (p2 === '59' || s > 0) B.tresoActif += s; else B.tresoPassif -= s;
-    } else if (c === '890') {
+    } else if (c === _cptLiaison()) {
       B.liaison -= s;   /* compte technique des à-nouveaux / du bilan d'ouverture : ce n'est pas un résultat */
     } else if (cl === '6' || cl === '7' || cl === '8') {
       B.resultat -= s;
@@ -51826,7 +51892,7 @@ function _calcResultat(year) {
      Les anciens totaux bruts (débits seuls / crédits seuls) ignoraient toute
      contre-passation, tout avoir et tout rabais : une vente annulée restait
      au chiffre d'affaires. */
-  function deb(pfx){ var t=0; ec.forEach(function(e){ ecrLignes(e).forEach(function(l){ if (l.compte !== '890' && pfx.some(function(p){ return (l.compte||'').indexOf(p)===0; })) t += (l.sens==='D' ? 1 : -1) * (parseFloat(l.montant)||0); }); }); return t; }
+  function deb(pfx){ var t=0; ec.forEach(function(e){ ecrLignes(e).forEach(function(l){ if (l.compte !== _cptLiaison() && pfx.some(function(p){ return (l.compte||'').indexOf(p)===0; })) t += (l.sens==='D' ? 1 : -1) * (parseFloat(l.montant)||0); }); }); return t; }
   function cre(pfx){ return 0 - deb(pfx); }
   /* Rubriques par préfixes de comptes, selon le référentiel du plan (voir referentielCompta). */
   var map = referentielMapCR();
@@ -80345,7 +80411,7 @@ async function facVentilerValider() {
   var f = (DATA.factures_fournisseur_attente||[]).find(function(x){ return x.id === _faVentilId; });
   if (!f) return;
   var compteDebit = document.getElementById('fv-compte-debit').value.trim();
-  var compteCredit = document.getElementById('fv-compte-credit').value.trim() || '401';
+  var compteCredit = document.getElementById('fv-compte-credit').value.trim() || cptDefautSouple('fournisseur', '401');
   var montantHT = parseFloat(document.getElementById('fv-montant-ht').value) || 0;
   var tva = parseFloat(document.getElementById('fv-tva').value) || 0;
   var compteTva = document.getElementById('fv-compte-tva').value.trim();
@@ -81546,7 +81612,7 @@ async function cloturerExercice(annee, divisionId) {
       if (!l.compte) return;
       var m = (parseFloat(l.montant)||0) * (l.sens === 'D' ? 1 : -1);
       var cl = String(l.compte).charAt(0);
-      if (l.compte === '890') return;   /* compte technique de liaison : jamais un compte de gestion à solder */
+      if (l.compte === _cptLiaison()) return;   /* compte technique de liaison : jamais un compte de gestion à solder */
       if (cl === '6' || cl === '7' || cl === '8') soldesCptGestion[l.compte] = (soldesCptGestion[l.compte]||0) + m;
       else if ('12345'.indexOf(cl) !== -1) {
         var tid = (typeof _lettRacine === 'function' && _lettRacine(l.compte)) ? ecrTiersLigne(e, l) : '';
@@ -81618,7 +81684,7 @@ async function cloturerExercice(annee, divisionId) {
       net += (po.solde > 0 ? mt : -mt);
     });
     net = arr2(net);
-    if (net) lignesAN.push({ compte: '890', sens: net > 0 ? 'C' : 'D', montant: Math.abs(net), libelle: 'Compte de liaison à-nouveaux '+(annee+1) });
+    if (net) lignesAN.push({ compte: _cptLiaison(), sens: net > 0 ? 'C' : 'D', montant: Math.abs(net), libelle: 'Compte de liaison à-nouveaux '+(annee+1) });
     var totD = lignesAN.filter(function(l){ return l.sens === 'D'; }).reduce(function(t,l){ return t + l.montant; }, 0);
     var an = {
       id: uid(), date: dateAN,
@@ -81883,7 +81949,7 @@ function renderBilanOuverture() {
     if (dateEl) dateEl.value = existantes[0].date || (annee + '-01-01');
     if (noteEl) noteEl.value = existantes[0].notes || '';
     _boLignes = existantes.map(function(e) {
-      var surCompte = e.compte_debit !== '890';
+      var surCompte = e.compte_debit !== _cptLiaison();
       return { compte: surCompte ? e.compte_debit : e.compte_credit, sens: surCompte ? 'D' : 'C', montant: e.montant };
     });
   } else {
@@ -81960,8 +82026,8 @@ async function saveBilanOuverture() {
       piece: ref,
       libelle: 'Bilan d\'ouverture ' + annee + ' — ' + cpt + (cInfo ? ' ' + cInfo.label : '') + (note ? ' (' + note + ')' : ''),
       montant: Math.abs(solde),
-      compte_debit:  solde > 0 ? cpt : '890',
-      compte_credit: solde > 0 ? '890' : cpt,
+      compte_debit:  solde > 0 ? cpt : _cptLiaison(),
+      compte_credit: solde > 0 ? _cptLiaison() : cpt,
       type: 'a_nouveau',
       journal: 'AN',
       division: _comptaDivisionFilter() || '',
@@ -82035,7 +82101,7 @@ function boRenderRecap(){
     + '<thead><tr><th>Division</th><th>Exercice</th><th>Date</th><th style="text-align:right;">Total (débit)</th><th>Comptes</th><th>Note</th><th></th></tr></thead><tbody>'
     + lignesRecap.map(function(g){
       var divNom = (DATA.divisions||[]).find(function(d){ return d.id === g.division; });
-      var total = g.lignes.reduce(function(s,e){ return s + (e.compte_debit!=='890' ? (parseFloat(e.montant)||0) : 0); }, 0);
+      var total = g.lignes.reduce(function(s,e){ return s + (e.compte_debit!==_cptLiaison() ? (parseFloat(e.montant)||0) : 0); }, 0);
       return '<tr>'
         + '<td>' + (divNom ? escHtml(divNom.nom) : (g.division ? escHtml(g.division) : '<span style="color:var(--blanc-dim);">— Sans division —</span>')) + '</td>'
         + '<td>' + escHtml(g.reference.replace('BO-','')) + '</td>'
@@ -82459,7 +82525,7 @@ function showReleveTiersCession(cessionId) {
     + paiements.map(function(p) {
         soldeRunning += p.montant||0;
         var soldeCourant = montantTotal - soldeRunning;
-        var compteTreso = (p.mode === 'especes') ? _compteCaisseSouscripteurs() : (p.mode === 'mobile_money' ? '531' : '521');
+        var compteTreso = (p.mode === 'especes') ? _compteCaisseSouscripteurs() : _cptTresoSouple(p.mode);
         return '<tr>'
           +'<td>'+dateShort(p.date)+'</td>'
           +'<td>Versement'+(p.notes?' — '+p.notes:'')+'</td>'
@@ -125216,7 +125282,7 @@ async function cesGenererEcriture(c) {
   var encInit = Math.max(0, (c.montant_encaisse || 0) - verses);
   var idE = c.ecriture_enc_id || ('ecr_ces_enc_' + c.id), exE = trouve(idE);
   if (encInit > 0) {
-    var compteTreso=(c.mode==='especes')?_compteCaisseSouscripteurs():'521';
+    var compteTreso=(c.mode==='especes')?_compteCaisseSouscripteurs():_cptTresoSouple(c.mode);
     var eenc = await poser(idE, exE, { ref:(exE && exE.ref) || ('ENC-CESS-'+an+'-'+prochainNumeroRef('ecritures','ENC-CESS',an,4)), date:c.date||today(), piece:'CESSION',
       type:'tresorerie', libelle:'Encaissement cession — '+(c.acquereur||''),
       compte:compteTreso, compte_debit:compteTreso, compte_credit:cptTiers, montant:encInit,
@@ -126344,7 +126410,7 @@ async function crecSavePaiement() {
     if (p.ecriture_id && DATA.ecritures) {
       var e = DATA.ecritures.find(function (x) { return x.id === p.ecriture_id; });
       if (e) {
-        var compteTreso = (p.mode === 'especes') ? _compteCaisseSouscripteurs() : (p.mode === 'mobile_money' ? '531' : '521');
+        var compteTreso = (p.mode === 'especes') ? _compteCaisseSouscripteurs() : _cptTresoSouple(p.mode);
         e.date = p.date; e.montant = montant; e.mode = p.mode;
         e.compte = compteTreso; e.compte_debit = compteTreso;
         e.libelle = 'Recouvrement acquéreur foncier — ' + (c.acquereur || '') + ' (modifié)';
@@ -126402,7 +126468,7 @@ async function crecSavePaiement() {
 async function crecGenEcriture(c, p) {
   if (!DATA.ecritures) DATA.ecritures = [];
   var an = (p.date || today()).slice(0, 4);
-  var compteTreso = (p.mode === 'especes') ? _compteCaisseSouscripteurs() : (p.mode === 'mobile_money' ? '531' : '521');
+  var compteTreso = (p.mode === 'especes') ? _compteCaisseSouscripteurs() : _cptTresoSouple(p.mode);
   var compteCre = crecCompte();
   var e = {
     id: uid(), ref: 'ENC-ACQ-' + an + '-' + prochainNumeroRef('ecritures','ENC-ACQ',an,4), date: p.date || today(), piece: 'RECOUVREMENT',
