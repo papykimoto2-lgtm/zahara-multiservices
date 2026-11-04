@@ -29,6 +29,17 @@ La liste affiche 25 dossiers par page. Tapez dans **Recherche** n'importe quel �
 
 Titre individuel : s'ouvre depuis le dossier global (un lot, un souscripteur). Sans titre mère disponible, l'ouverture exige une dérogation motivée. Réglage « Ouverture automatique » : Foncier › Notifications (le dossier s'ouvre quand le souscripteur a soldé le prix initial).
 
+### Changer la procédure d'un dossier ouvert
+
+Bouton **🔀 Changer la procédure** (fiche du dossier, à côté de « Modifier »). Réservé au **responsable du dossier** ou à un **administrateur** ; impossible sur un dossier clôturé ou annulé, et sur un titre individuel (il dépend de son dossier global).
+
+1. Choisir la nouvelle procédure et saisir un **motif** (10 caractères minimum). Un aperçu indique le résultat avant l'enregistrement.
+2. Les étapes **engagées** (commencées, terminées, avec justificatif, observation ou validation) sont **toujours conservées**. Les étapes pas encore commencées sont **remplacées** par celles de la nouvelle procédure (en gardant leur responsable et leur échéance).
+3. Une étape engagée qui n'existe pas dans la nouvelle procédure reste dans le dossier, marquée **hors procédure**, juste après la création du dossier.
+4. Le modèle de dossier de la nouvelle procédure (délais, responsables) ne s'applique qu'aux étapes **nouvelles**.
+5. Si un dossier de la même procédure est déjà ouvert sur la parcelle, une confirmation est demandée.
+6. Le changement est tracé au journal (ancienne et nouvelle procédure, motif, nombre d'étapes conservées, ajoutées et retirées) et dans l'historique des procédures du dossier ; il n'est pas annulable, mais on peut changer de nouveau.
+
 ## 3. Modèles de dossier (Foncier › Modèles de dossier)
 
 Réservé à la direction et aux administrateurs.

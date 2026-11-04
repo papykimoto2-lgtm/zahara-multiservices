@@ -64455,7 +64455,8 @@ function fcRenderDetail(id) {
   var _sec = [], _s0 = h; h = '';
   h += fcBandeauNiveau(d);
   h += fcPanneauModification(d);
-  h += '<div style="margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> <button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer le dossier</button> <button class="btn btn-secondary btn-sm" onclick="fcAllerJalons(\'' + d.parcelle_id + '\')">🧭 Voir les jalons du titre de la parcelle</button></div>';
+  h += fcPanneauChangerProcedure(d);
+  h += '<div style="margin-bottom:8px;"><button class="btn btn-secondary btn-sm" onclick="fcModifierUI(\'' + d.id + '\')">✏️ Modifier</button> ' + (fcDossierOuvert(d) && !fcEstIndividuel(d) && fcPeutGererDossier(d) ? '<button class="btn btn-secondary btn-sm" onclick="fcChangerProcedureUI(\'' + d.id + '\')">🔀 Changer la procédure</button> ' : '') + '<button class="btn btn-secondary btn-sm" onclick="fcImprimerDossierUI(\'' + d.id + '\')">🖨 Imprimer le dossier</button> <button class="btn btn-secondary btn-sm" onclick="fcAllerJalons(\'' + d.parcelle_id + '\')">🧭 Voir les jalons du titre de la parcelle</button></div>';
   h += fcPanneauDossier(d);
   h += fcPanneauUrbain(d);
   h += fcPanneauRisque(d);
@@ -69257,6 +69258,98 @@ async function fcModifierDossier(dossierId, champs) {
 }
 fcProtegerMutations(['fcModifierDossier']);
 
+/* ═══ Changement de procédure d'un dossier déjà ouvert ═══
+   Règle : une étape « engagée » (commencée, terminée, avec justificatif, observation ou validation) est TOUJOURS conservée ;
+   les étapes pas encore commencées sont remplacées par celles de la nouvelle procédure ; une étape engagée qui n'existe pas
+   dans la nouvelle procédure reste dans le dossier, marquée « hors procédure ». L'ancien parcours est tracé au journal
+   (ajout seul) et dans historique_procedures. */
+function fcEtapeEngagee(e) {
+  return ['a_preparer', 'a_venir'].indexOf(e.statut) === -1 || !!e.date_debut || !!e.date_fin || (e.justificatifs || []).length > 0 || !!e.valide_par || !!String(e.observations || '').trim();
+}
+/* Calcule le résultat SANS rien modifier (sert à l'aperçu et à l'application). */
+function fcPlanChangementProcedure(d, type) {
+  var cibles = fcEtapesPour(type, d.situation_initiale || ''), codesCibles = {}, existantes = {};
+  cibles.forEach(function(c){ codesCibles[c.code] = true; });
+  d.etapes.forEach(function(e){ existantes[e.code] = e; });
+  var finales = [], conservees = [], ajoutees = [];
+  var horsProc = d.etapes.filter(function(e){ return !codesCibles[e.code] && fcEtapeEngagee(e); });
+  var retirees = d.etapes.filter(function(e){ return !codesCibles[e.code] && !fcEtapeEngagee(e); });
+  cibles.forEach(function(c){
+    var ex = existantes[c.code];
+    if (ex && fcEtapeEngagee(ex)) { finales.push(ex); conservees.push(ex); return; }
+    if (ex) { c.responsable_id = ex.responsable_id || c.responsable_id; c.date_cible = ex.date_cible || ''; }   /* étape pas commencée : remplacée, en gardant son responsable et son échéance */
+    else ajoutees.push(c);
+    finales.push(c);
+  });
+  var iCrea = finales.findIndex(function(e){ return e.code === 'creation_dossier'; });
+  finales.splice.apply(finales, [iCrea + 1, 0].concat(horsProc));   /* le travail déjà fait hors nouvelle procédure suit la création du dossier */
+  return { finales: finales, conservees: conservees, ajoutees: ajoutees, retirees: retirees, horsProc: horsProc };
+}
+async function fcChangerProcedure(dossierId, nouveauType, motif, o) {
+  o = o || {};
+  var d = fcDossier(dossierId);
+  if (!d) return { ok: false, erreur: 'Dossier introuvable.' };
+  if (!fcPeutGererDossier(d)) return { ok: false, erreur: 'Seul le responsable du dossier (ou un administrateur) peut changer sa procédure.' };
+  if (['cloture', 'annule'].indexOf(d.statut) !== -1) return { ok: false, erreur: 'Dossier ' + d.statut + ' : sa procédure n\'est plus modifiable.' };
+  if (fcEstIndividuel(d)) return { ok: false, erreur: 'Un titre individuel dépend du dossier global de l\'opération : sa procédure ne se change pas.' };
+  if (!FC_PROCEDURES[nouveauType] || nouveauType === 'titre_individuel') return { ok: false, erreur: 'Procédure inconnue ou non applicable à un dossier global.' };
+  if (nouveauType === d.type_procedure) return { ok: false, erreur: 'Le dossier suit déjà cette procédure.' };
+  motif = String(motif || '').trim();
+  if (motif.length < 10) return { ok: false, erreur: 'Motif obligatoire (10 caractères minimum).' };
+  var doublon = (DATA.dossiers_fonciers || []).find(function(x){ return x.id !== d.id && !fcEstIndividuel(x) && x.parcelle_id === d.parcelle_id && x.type_procedure === nouveauType && ['cloture', 'annule'].indexOf(x.statut) === -1; });
+  if (doublon && !o.forcer) return { ok: false, erreur: 'Un dossier « ' + FC_PROCEDURES[nouveauType] + ' » est déjà ouvert sur cette parcelle (' + doublon.reference + ').', doublon: doublon.id };
+  var ancienType = d.type_procedure, ancienLib = FC_PROCEDURES[ancienType] || ancienType, nouvLib = FC_PROCEDURES[nouveauType];
+  var plan = fcPlanChangementProcedure(d, nouveauType);
+  var gardees = {}; plan.conservees.concat(plan.horsProc).forEach(function(e){ gardees[e.code] = { date_cible: e.date_cible, responsable_id: e.responsable_id, date_cible_auto: e.date_cible_auto }; });
+  plan.horsProc.forEach(function(e){ e.hors_procedure = true; });
+  plan.ajoutees.forEach(function(e){ e.responsable_id = e.responsable_id || d.responsable_id; });
+  d.etapes = plan.finales; d.etapes.forEach(function(e, k){ e.ordre = k + 1; });
+  d.historique_procedures = (d.historique_procedures || []).concat([{ type: ancienType, jusqu_au: fcAuj(), motif: motif, par: fcActeur().nom }]);
+  d.type_procedure = nouveauType; d.procedure_a_determiner = false; d.procedure_ref_version = FC_PROCEDURE_REF.version;
+  if (nouveauType === 'immatriculation_urbaine') fcUrbainInit(d, o); else { d.voie_immatriculation = ''; }
+  var modele = fcModeleActif(nouveauType);
+  if (modele) {   /* délais et responsables du modèle : seulement pour les étapes nouvelles, jamais pour celles déjà engagées */
+    fcAppliquerModele(d, modele, {});
+    d.etapes.forEach(function(e){ var g = gardees[e.code]; if (g) { e.date_cible = g.date_cible; e.responsable_id = g.responsable_id; if (g.date_cible_auto === undefined) delete e.date_cible_auto; else e.date_cible_auto = g.date_cible_auto; } });
+  }
+  fcRecalculerStatut(d);
+  await fcSauver(d);
+  await fcEvenement(d, '', 'changement_procedure', 'Procédure changée : ' + ancienLib + ' → ' + nouvLib + ' — motif : ' + motif + ' (' + plan.conservees.length + ' étape(s) engagée(s) conservée(s), ' + plan.ajoutees.length + ' ajoutée(s), ' + plan.retirees.length + ' retirée(s)' + (plan.horsProc.length ? ', ' + plan.horsProc.length + ' hors procédure' : '') + ')', { ancien: ancienType, nouveau: nouveauType, motif: motif, source: 'promoteur' });
+  return { ok: true, dossier: d, conservees: plan.conservees.length, ajoutees: plan.ajoutees.length, retirees: plan.retirees.length, hors_procedure: plan.horsProc.length };
+}
+fcProtegerMutations(['fcChangerProcedure']);
+function fcChangerProcedureUI(id) { APP._fcChgProc = id; APP._fcEdit = null; fcOuvrirDetail(id); }
+function fcPanneauChangerProcedure(d) {
+  if (APP._fcChgProc !== d.id) return '';
+  var types = Object.keys(FC_PROCEDURES).filter(function(k){ return k !== d.type_procedure && k !== 'titre_individuel'; });
+  return '<div class="card" style="border:1px dashed var(--or);"><div class="card-title">🔀 Changer la procédure du dossier ' + escHtml(d.reference) + '</div>'
+    + '<div style="font-size:12px;margin-bottom:8px;">Procédure actuelle : <b>' + escHtml(FC_PROCEDURES[d.type_procedure] || d.type_procedure) + '</b>. Les étapes déjà engagées (commencées, terminées, avec justificatif, observation ou validation) sont <b>conservées</b> ; les étapes pas encore commencées sont <b>remplacées</b> par celles de la nouvelle procédure. L\'ancien parcours reste au journal.</div>'
+    + '<div class="filters-bar" style="align-items:end;flex-wrap:wrap;"><div class="form-group"><label>Nouvelle procédure</label><select class="filter-select" id="fc-cp-type" onchange="fcApercuChangementUI(\'' + d.id + '\')"><option value="">— Choisir —</option>'
+    + types.map(function(k){ return '<option value="' + escHtml(k) + '">' + escHtml(FC_PROCEDURES[k]) + '</option>'; }).join('') + '</select></div>'
+    + '<div class="form-group" id="fc-cp-prop-grp" style="display:none;"><label>Propriétaires terriens</label><select class="filter-select" id="fc-cp-prop"><option value="plusieurs">Plusieurs</option><option value="un">Un seul</option></select></div>'
+    + '<div class="form-group" style="flex:1;min-width:240px;"><label>Motif (obligatoire, 10 caractères minimum)</label><textarea class="form-control" id="fc-cp-motif" rows="2" placeholder="Pourquoi la procédure change (ex. terrain finalement rural, titre existant découvert…)"></textarea></div></div>'
+    + '<div id="fc-cp-apercu" style="font-size:12px;margin:8px 0;"></div>'
+    + '<button class="btn btn-primary btn-sm" onclick="fcEnregistrerChangementProcedureUI(\'' + d.id + '\')">Changer la procédure</button> <button class="btn btn-secondary btn-sm" onclick="APP._fcChgProc=null;fcRenderDetail(\'' + d.id + '\')">Annuler</button></div>';
+}
+function fcApercuChangementUI(id) {
+  var d = fcDossier(id), zone = document.getElementById('fc-cp-apercu'), t = (document.getElementById('fc-cp-type') || {}).value;
+  var g = document.getElementById('fc-cp-prop-grp'); if (g) g.style.display = t === 'immatriculation_urbaine' ? '' : 'none';
+  if (!d || !zone) return;
+  if (!t) { zone.innerHTML = ''; return; }
+  var pl = fcPlanChangementProcedure(d, t), lib = function(l){ return escHtml(l.map(function(e){ return e.libelle; }).slice(0, 5).join(' ; ')) + (l.length > 5 ? ' …' : ''); };
+  zone.innerHTML = '<b>' + pl.conservees.length + '</b> étape(s) engagée(s) conservée(s) · <b>' + pl.ajoutees.length + '</b> étape(s) ajoutée(s) · <b>' + pl.retirees.length + '</b> étape(s) pas commencée(s) retirée(s)'
+    + (pl.retirees.length ? '<div style="color:var(--dim);">Retirées : ' + lib(pl.retirees) + '</div>' : '')
+    + (pl.horsProc.length ? '<div style="color:#c0392b;">⚠️ ' + pl.horsProc.length + ' étape(s) engagée(s) n\'existent pas dans la nouvelle procédure : conservées, marquées « hors procédure » (' + lib(pl.horsProc) + ').</div>' : '');
+}
+async function fcEnregistrerChangementProcedureUI(id) {
+  var g = function(i){ return (document.getElementById(i) || {}).value; }, type = g('fc-cp-type');
+  if (!type) { fcMsg({ ok: false, erreur: 'Choisissez la nouvelle procédure.' }); return; }
+  var opts = type === 'immatriculation_urbaine' ? { plusieurs_proprietaires: g('fc-cp-prop') !== 'un' } : {};
+  var r = await fcChangerProcedure(id, type, g('fc-cp-motif'), opts);
+  if (!r.ok && r.doublon && confirm(r.erreur + '\n\nChanger quand même la procédure de ce dossier ?')) r = await fcChangerProcedure(id, type, g('fc-cp-motif'), Object.assign(opts, { forcer: true }));
+  if (fcMsg(r, 'Procédure changée : ' + r.conservees + ' étape(s) conservée(s), ' + r.ajoutees + ' ajoutée(s), ' + r.retirees + ' retirée(s).')) { APP._fcChgProc = null; fcRender(); }
+}
+
 /* Fiche imprimable : contenu interne complet (observations, contrôles, journal). Les fichiers eux-mêmes ne sont jamais imprimés (noms et références seulement) ;
    les pièces à accès restreint n'y figurent que pour ceux qui y ont accès. */
 function fcHtmlFicheDossier(d) {
@@ -69315,7 +69408,7 @@ function fcPanneauModification(d) {
     + '<div class="form-group"><label>Échéance</label><input type="date" class="form-control" id="fc-m-cible" value="' + escHtml(d.date_cible || '') + '"></div>'
     + '<div class="form-group" style="flex:1;min-width:240px;"><label>Observations</label><textarea class="form-control" id="fc-m-obs" rows="2">' + escHtml(d.observations || '') + '</textarea></div>'
     + '<button class="btn btn-primary btn-sm" onclick="fcEnregistrerModifUI(\'' + d.id + '\')">Enregistrer</button> <button class="btn btn-secondary btn-sm" onclick="APP._fcEdit=null;fcRenderDetail(\'' + d.id + '\')">Annuler</button></div>'
-    + '<div style="font-size:11px;color:var(--dim);">La procédure et la parcelle ne se modifient pas ici ; les étapes se corrigent une par une, avec motif. Un changement de responsable est répercuté sur les étapes qui lui étaient confiées.</div></div>';
+    + '<div style="font-size:11px;color:var(--dim);">La parcelle ne se modifie pas ici ; la procédure se change avec le bouton « 🔀 Changer la procédure » ; les étapes se corrigent une par une, avec motif. Un changement de responsable est répercuté sur les étapes qui lui étaient confiées.</div></div>';
 }
 async function fcEnregistrerModifUI(id) {
   var g = function(i){ return (document.getElementById(i) || {}).value; };
