@@ -27,7 +27,7 @@
    version, SAUF le service worker de l'application (sw.js), nécessaire à son installation
    sur PC et mobile. Ce service worker ne met jamais l'ERP en cache : la page est toujours
    rechargée depuis le réseau, donc on charge toujours la dernière version déployée. ── */
-window.IMMOSUITE_VERSION = 'v14.199 · 2026-11-04 — Lettrage : exercices cumulés depuis le dernier bilan d\'ouverture (case « exercice seul » pour l\'ancien comportement), lignes sans tiers identifié jamais lettrées automatiquement, postes ouverts cumulés ; v14.198 · 2026-11-04 — Comptes codés en dur : trésorerie selon le mode de paiement, TVA due / crédit / non déductible, liaison d\'ouverture et comptes de régularisation paramétrables (Paramètres → Comptes par défaut), le compte de liaison n\'est plus pris pour un impôt sur le résultat dans la liasse ; v14.197 · 2026-11-04 — Report Menko : relations intragroupe (CSV sûr, soldes cumulés, appariement des opérations, conventions validées et alertes), audit de la clôture / réouverture / FEC (motif obligatoire, droits), détection et création des comptes manquants du plan ; v14.196 · 2026-11-04 — Revue comptabilité (lots 1 à 4) : liasse toujours équilibrée, configuration TVA séparée du taux par défaut, liquidation de TVA unique par mois, clôture par division verrouillée et clôtures exclusives, bilan d\'ouverture visé, FEC (dates, arrondi par pièce), écritures lettrées protégées, lettrage numéroté à la suite, rapprochement bancaire (sens, double pointage, banques), import CSV du relevé, libellés de relevé échappés ; v14.195 · 2026-11-04 — Souscripteurs : badge « 📎 n » des documents joints dans la liste et filtre « Documents joints » (avec / sans) ; v14.194 · 2026-11-03 — GED : détail par source et numéro de version affichés ; trombone des étapes foncières ; pièces foncières dans la GED ; v14.193 · 2026-10-30 — SMQ : contexte de l’organisme et parties intéressées (enjeux, forces/faiblesses/opportunités/menaces, revue annuelle, lien vers les risques) ; v14.192 · 2026-10-30 — Validations : aperçu du dossier foncier et ouverture directe sur l’étape à valider ; v14.191 · 2026-10-30 — SMQ : matrice des compétences (référentiel, évaluations, écarts, plan de formation, indicateur) ; v14.190 · 2026-10-30 — Validations : les étapes de dossier foncier à valider y figurent et s’y décident ; v14.189 · 2026-10-30 — SMQ : calcul automatique des indicateurs de performance (21 formules, relevés conservés, état vs cible) ; v14.188 · 2026-10-30 — SMQ : politique qualité versionnée, objectifs qualité, registre des risques et opportunités (matrice) ; v14.187 · 2026-10-30 — SMQ : revue de direction (éléments d’entrée calculés depuis l’ERP, décisions suivies, compte rendu) ; v14.186 · 2026-10-30 — SMQ : audits internes (programme annuel, indépendance, constats, création des NC, clôture conditionnée) ; v14.185 · 2026-10-30 — Manuels & flux : manuel SMQ + 2 diagrammes ; v14.184 · 2026-10-30 — SMQ : onglet Qualité (maîtrise documentaire, non-conformités et actions correctives, réclamations, satisfaction) ; v14.183 · 2026-10-30 — SMQ : fiche de chaque processus (pilote, indicateurs de performance, système documentaire) avec suggestions à valider ; v14.182 · 2026-10-30 — Correctif : rejets budget/engagement/transfert/réappro soumis au droit et au plafond comme la validation ; numérotation FED, DA, BC, BL, PVR, LIV, DRC, OM, CTX, FV, AV, FS, SIT, rapports sur le plus grand numéro attribué ; v14.181 · 2026-10-30 — Manuels & flux : vue « Cartographie des processus » (management, réalisation, support) ; v14.180 · 2026-10-30 — Manuels & flux : manuel Validations et délégations + 3 diagrammes ; v14.179 · 2026-10-30 — Manuels & flux : lien « Détail des procédures (PDF) » sous chaque diagramme, vers le manuel qui le décrit ; v14.178 · 2026-10-30 — Correctif : références BIEN/CAND/KYC/DS/ART/OT/BAIL/MANDAT/QUIT/JUR/ANCR/DSP/rapports de chantier basées sur le plus grand numéro attribué (plus de doublon après suppression) ; v14.177 · 2026-10-30 — Correctif : références de versement Mobile Money (VRS) basées sur le plus grand numéro attribué, plus de doublon après suppression ; v14.176 · 2026-10-30 — Manuels & flux : portail des acteurs détaillé (12 espaces) + 3 diagrammes ; v14.175 · 2026-10-30 — Manuels & flux : réorganisation par phases dans le sens de la marche en avant (frise, numérotation, sections) ; v14.174 · 2026-10-30 — Manuels & flux : carte commerciale et portail des acteurs + 3 diagrammes ; v14.173 · 2026-10-30 — Manuels & flux : 5 manuels (FNE, calendrier, messagerie, cartographie SIG, pilotage) + 9 diagrammes ; v14.172 · 2026-10-30 — Manuels & flux : 11 manuels (programmes, conception, aménagement, budget, locatif, copropriété, parc auto, accueil, réunions, diaspora, administration) + 16 diagrammes ; v14.171 · 2026-10-30 — Manuels & flux : manuels Conventions, Suivi de chantier et DQE + 5 diagrammes ; v14.170 · 2026-10-30 — Manuels & flux : manuels Réception/Livraison, Stock et Trésorerie + 6 diagrammes ; v14.169 · 2026-10-30 — Manuels & flux : manuels CRM, LBC/FT et Juridique + 7 diagrammes ; v14.168 · 2026-10-30 — Manuels & flux : manuels Paie et RH + 6 diagrammes ; v14.167 · 2026-10-30 — Manuels & flux : manuels Achats et Fournisseurs + 3 diagrammes ; v14.166 · 2026-10-30 — Manuels & flux : manuels Paiements et Relances + 4 diagrammes ; v14.165 · 2026-10-30 — Manuels & flux : les diagrammes s\’affichent au clic sur un manuel ; v14.164 · 2026-10-30 — Manuels & flux : 12 diagrammes de flux supplémentaires (souscripteur, caisse, comptabilité, foncier, portefeuille) ; v14.163 · 2026-10-30 — Paramètres › « Manuels & flux » : catalogue des manuels de procédures (PDF) et diagrammes de flux imprimables ; v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\’engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\’un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\’agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\’un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\’envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\’application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\’entreprise sur l\’attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\’une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\’écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\’équilibre ; Sous-comptes de caisse : le compte d\’une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\’est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\’efface plus le cloud, et un ordre de remise à zéro diffusé n\’entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
+window.IMMOSUITE_VERSION = 'v14.200 · 2026-11-05 — Report Menko : documents joints — synchronisation de la liste seule (contenu à la demande pour admin / manager), fiches vidées jamais envoyées ni appliquées, ouverture d\'une fiche sans charger tous les fichiers en mémoire ; v14.199 · 2026-11-04 — Lettrage : exercices cumulés depuis le dernier bilan d\'ouverture (case « exercice seul » pour l\'ancien comportement), lignes sans tiers identifié jamais lettrées automatiquement, postes ouverts cumulés ; v14.198 · 2026-11-04 — Comptes codés en dur : trésorerie selon le mode de paiement, TVA due / crédit / non déductible, liaison d\'ouverture et comptes de régularisation paramétrables (Paramètres → Comptes par défaut), le compte de liaison n\'est plus pris pour un impôt sur le résultat dans la liasse ; v14.197 · 2026-11-04 — Report Menko : relations intragroupe (CSV sûr, soldes cumulés, appariement des opérations, conventions validées et alertes), audit de la clôture / réouverture / FEC (motif obligatoire, droits), détection et création des comptes manquants du plan ; v14.196 · 2026-11-04 — Revue comptabilité (lots 1 à 4) : liasse toujours équilibrée, configuration TVA séparée du taux par défaut, liquidation de TVA unique par mois, clôture par division verrouillée et clôtures exclusives, bilan d\'ouverture visé, FEC (dates, arrondi par pièce), écritures lettrées protégées, lettrage numéroté à la suite, rapprochement bancaire (sens, double pointage, banques), import CSV du relevé, libellés de relevé échappés ; v14.195 · 2026-11-04 — Souscripteurs : badge « 📎 n » des documents joints dans la liste et filtre « Documents joints » (avec / sans) ; v14.194 · 2026-11-03 — GED : détail par source et numéro de version affichés ; trombone des étapes foncières ; pièces foncières dans la GED ; v14.193 · 2026-10-30 — SMQ : contexte de l’organisme et parties intéressées (enjeux, forces/faiblesses/opportunités/menaces, revue annuelle, lien vers les risques) ; v14.192 · 2026-10-30 — Validations : aperçu du dossier foncier et ouverture directe sur l’étape à valider ; v14.191 · 2026-10-30 — SMQ : matrice des compétences (référentiel, évaluations, écarts, plan de formation, indicateur) ; v14.190 · 2026-10-30 — Validations : les étapes de dossier foncier à valider y figurent et s’y décident ; v14.189 · 2026-10-30 — SMQ : calcul automatique des indicateurs de performance (21 formules, relevés conservés, état vs cible) ; v14.188 · 2026-10-30 — SMQ : politique qualité versionnée, objectifs qualité, registre des risques et opportunités (matrice) ; v14.187 · 2026-10-30 — SMQ : revue de direction (éléments d’entrée calculés depuis l’ERP, décisions suivies, compte rendu) ; v14.186 · 2026-10-30 — SMQ : audits internes (programme annuel, indépendance, constats, création des NC, clôture conditionnée) ; v14.185 · 2026-10-30 — Manuels & flux : manuel SMQ + 2 diagrammes ; v14.184 · 2026-10-30 — SMQ : onglet Qualité (maîtrise documentaire, non-conformités et actions correctives, réclamations, satisfaction) ; v14.183 · 2026-10-30 — SMQ : fiche de chaque processus (pilote, indicateurs de performance, système documentaire) avec suggestions à valider ; v14.182 · 2026-10-30 — Correctif : rejets budget/engagement/transfert/réappro soumis au droit et au plafond comme la validation ; numérotation FED, DA, BC, BL, PVR, LIV, DRC, OM, CTX, FV, AV, FS, SIT, rapports sur le plus grand numéro attribué ; v14.181 · 2026-10-30 — Manuels & flux : vue « Cartographie des processus » (management, réalisation, support) ; v14.180 · 2026-10-30 — Manuels & flux : manuel Validations et délégations + 3 diagrammes ; v14.179 · 2026-10-30 — Manuels & flux : lien « Détail des procédures (PDF) » sous chaque diagramme, vers le manuel qui le décrit ; v14.178 · 2026-10-30 — Correctif : références BIEN/CAND/KYC/DS/ART/OT/BAIL/MANDAT/QUIT/JUR/ANCR/DSP/rapports de chantier basées sur le plus grand numéro attribué (plus de doublon après suppression) ; v14.177 · 2026-10-30 — Correctif : références de versement Mobile Money (VRS) basées sur le plus grand numéro attribué, plus de doublon après suppression ; v14.176 · 2026-10-30 — Manuels & flux : portail des acteurs détaillé (12 espaces) + 3 diagrammes ; v14.175 · 2026-10-30 — Manuels & flux : réorganisation par phases dans le sens de la marche en avant (frise, numérotation, sections) ; v14.174 · 2026-10-30 — Manuels & flux : carte commerciale et portail des acteurs + 3 diagrammes ; v14.173 · 2026-10-30 — Manuels & flux : 5 manuels (FNE, calendrier, messagerie, cartographie SIG, pilotage) + 9 diagrammes ; v14.172 · 2026-10-30 — Manuels & flux : 11 manuels (programmes, conception, aménagement, budget, locatif, copropriété, parc auto, accueil, réunions, diaspora, administration) + 16 diagrammes ; v14.171 · 2026-10-30 — Manuels & flux : manuels Conventions, Suivi de chantier et DQE + 5 diagrammes ; v14.170 · 2026-10-30 — Manuels & flux : manuels Réception/Livraison, Stock et Trésorerie + 6 diagrammes ; v14.169 · 2026-10-30 — Manuels & flux : manuels CRM, LBC/FT et Juridique + 7 diagrammes ; v14.168 · 2026-10-30 — Manuels & flux : manuels Paie et RH + 6 diagrammes ; v14.167 · 2026-10-30 — Manuels & flux : manuels Achats et Fournisseurs + 3 diagrammes ; v14.166 · 2026-10-30 — Manuels & flux : manuels Paiements et Relances + 4 diagrammes ; v14.165 · 2026-10-30 — Manuels & flux : les diagrammes s\’affichent au clic sur un manuel ; v14.164 · 2026-10-30 — Manuels & flux : 12 diagrammes de flux supplémentaires (souscripteur, caisse, comptabilité, foncier, portefeuille) ; v14.163 · 2026-10-30 — Paramètres › « Manuels & flux » : catalogue des manuels de procédures (PDF) et diagrammes de flux imprimables ; v14.162 · 2026-10-09 — Souscription de famille / groupe (co-souscripteurs avec parts) et souscription pour mineur via tuteur (représentant légal, justificatif, majorité, alerte), repris dans la fiche de souscription, l\’engagement et le contrat ; v14.161 · 2026-10-09 — Conformité et accessibilité : pages légales (mentions, confidentialité, cookies, conditions, résiliation/remboursement), avis et consentement sur le portail, vidéos externes après accord, contrastes WCAG AA, textes alternatifs des images, étiquettes de champs, navigation au clavier, information du souscripteur sur ses données ; v14.160 · 2026-10-09 — Suivi souscripteurs : plus de faux « conflit de synchronisation » à la remise d\’un accès portail ; v14.159 · 2026-10-09 — Suivi souscripteurs : rapport automatique (statuts, commerciaux, accès portail, retards prioritaires) imprimable et envoyable par WhatsApp/e-mail ; v14.158 · 2026-10-09 — Suivi souscripteurs : filtre par statut (liste déroulante) ; v14.157 · 2026-10-09 — Commercial & CRM : « Suivi souscripteurs » (actions commerciales selon le statut du souscripteur, assignées au commercial, message prêt WhatsApp/e-mail, journal des actions) et remise des accès au portail souscripteur en « envoyer au suivant » ; v14.156 · 2026-10-08 — Mode de livraison par défaut « clé en main » (souscripteurs et lots) ; v14.155 · 2026-10-08 — Téléphones : deux numéros séparés par « / » sont répartis dans les champs 1 et 2 et ne sont plus signalés invalides ; v14.154 · 2026-10-08 — Souscripteurs : filtre « financement bancaire » ; Souscripteurs en financement bancaire : jamais comptés en retard de paiement ; Lien Portail intégré à la barre du haut aussi sur ordinateur (ne recouvre plus le titre) ; Mobile : le lien Portail ne recouvre plus le bouton du menu latéral ; Aide à la saisie : suggestions propres aux prestations multi-services ; Aide à la saisie : suggestions propres à l\’agence de voyage (Zahara Travel) ; Aide à la saisie étendue aux autres modules (travaux, foncier, juridique, conformité, finance, marketing, location, copropriété, agenda) ; Aide à la saisie étendue aux ressources humaines ; Aide à la saisie étendue aux ventes et souscriptions ; Aide à la saisie étendue aux achats, dépenses, caisse, stock et coûts de chantier ; Aide à la saisie étendue (prospects, visites, RDV, juridique, incidents, pointage, congés, mobilité, candidatures) ; Suivi des agréments (journal de procédure, renouvellement, échéancier, alertes, délai réglable) ; Sécurité des paramètres : un poste aux paramètres vides ne peut plus écraser la configuration du cloud ; Rapport de chantier : aide à la saisie (travaux prévus repris, suggestions par catégorie et météo, validateur, date de fin automatique) ; Ordres de mission et PV de mission : suggestions de saisie, reprise d\’un ordre précédent, trame de PV, personnes rencontrées choisies parmi prospects et souscripteurs ; Attestations : plus de faux « conflit de synchronisation » à l\’envoi au DG ; Application installable (PWA) : manifeste ERP, service worker conservé, bouton « Installer l\’application » ; Attestations rattachées au module Juridique : registre (onglet Attestations), liaison au dossier juridique du souscripteur, pièces attendues du dossier ; PV de réunion automatique : créé à la clôture de la séance (numéro unique, résumé, décisions, actions), contrôle de complétude, excusés et ordre du jour dans le PV, prochaine date proposée ; Attestation de solde : deux impressions (sans modification pour le notaire, avec modifications demandées par le souscripteur à titre indicatif), brouillon automatique et zone Documents du souscripteur ; Logo de l\’entreprise sur l\’attestation de solde et sur tous les documents imprimés (états comptables, reçus, factures…) ; Convocations : 4 modèles de message (convocation, rappel, relance, rectificatif), statut en attente/confirmé/excusé, envoi personnalisé et « envoyer au suivant », quorum, e-mail groupé et fichier calendrier ; Réunions de direction : reprise d\’une réunion précédente (cadre, participants, thèmes, objectifs, prochaine date) ; Diffusion du PV : message expliquant pourquoi la liste est vide (seules les séances clôturées) ; PV de réunion : relecture automatique des réunions depuis le cloud si la liste locale est vide, avec compteur ; PV de réunion : la liste propose aussi les séances ouvertes et les réunions planifiées, regroupées par état ; Réunions de direction : aide à la rédaction (suggestions cliquables pour objectifs, documents, ordre du jour, décisions et actions, échéances rapides, résumé du PV généré) ; Réunions de direction : participants choisis dans le personnel (nom — fonction) ou saisis hors liste ; PV de mission structuré rattaché aux ordres de mission ; Synchro : la liste du personnel (pointage, ordres de mission) est toujours reconstituée, même sur un poste dont la copie locale était vide ; Versement : contrôle des comptes comptables AVANT enregistrement ; Attestation de solde (demande → validation DG/gérant → portail et WhatsApp) ; Réception & Livraison : onglet « À livrer (soldés) » ; Portail : la publication automatique n\’écrase plus un contenu déjà publié par du vide ; bouton « Réinitialiser tous les postes » (ordre à distance) ; Journal comptable : filtre par type « trésorerie », classe au débit ou au crédit, recherche sur la pièce et le montant, filtre par montant et par sens, vrai contrôle d\’équilibre ; Sous-comptes de caisse : le compte d\’une caisse se choisit dans le plan (57…) ; les encaissements espèces des souscripteurs passent par la caisse « souscripteurs » ; Réinitialisation des postes à distance (ordre administrateur) ; Un enregistrement supprimé n\’est plus jamais renvoyé au cloud (réconciliation auto, Tout envoyer) ; Un poste ne republie plus tout le registre des suppressions à chaque synchronisation ; Remise à niveau des suppressions locales sur signal (restauration des données) ; Correctif critique : une remise à zéro locale (Supabase conservé) n\’efface plus le cloud, et un ordre de remise à zéro diffusé n\’entraîne plus de suppression sur Supabase.';   /* à incrémenter à CHAQUE livraison : sans cela, impossible de savoir quelle version tourne réellement en ligne */
 (function () {
   try {
     if ('serviceWorker' in navigator) {
@@ -25056,7 +25056,7 @@ var DATA = {
    INDEXEDDB
 ────────────────────────────────────────────────────── */
 var DB_NAME = 'ImmoSuiteDB';
-var DB_VERSION = 166; /* v166: stores 'smq_enjeux', 'smq_parties' — contexte de l’organisme et parties intéressées (ISO 9001 §4.1, §4.2). Migration additive; tables cloud : supabase/pi_smq.sql. */ /* v165: store 'smq_evaluations' — évaluations de compétences (matrice des compétences du SMQ, ISO 9001 §7.2). Migration additive; table cloud : supabase/pi_smq.sql. */ /* v164: stores 'smq_politiques', 'smq_objectifs', 'smq_risques' — politique qualité, objectifs qualité, registre des risques et opportunités. Migration additive; tables cloud : supabase/pi_smq.sql. */ /* v163: store 'smq_revues' — revues de direction du SMQ (entrées, sorties, décisions). Migration additive; table cloud : supabase/pi_smq.sql. */ /* v162: store 'smq_audits' — audits internes du SMQ (programme, constats, rapport). Migration additive; table cloud : supabase/pi_smq.sql. */ /* v161: stores 'smq_documents', 'smq_nc', 'smq_reclamations', 'smq_satisfaction' — SMQ (maîtrise documentaire, non-conformités, réclamations, satisfaction). Migration additive; tables cloud : supabase/pi_smq.sql. */ /* v160: store 'groupes_fonciers' — groupes de mutation (plusieurs dossiers individuels traités ensemble). Local uniquement. Migration additive.
+var DB_VERSION = 167; /* v167: index 'entity_id' et 'entity_type' sur le store 'documents' (lecture des fichiers d'une fiche sans charger toute la table). Migration additive. v166: v166: stores 'smq_enjeux', 'smq_parties' — contexte de l’organisme et parties intéressées (ISO 9001 §4.1, §4.2). Migration additive; tables cloud : supabase/pi_smq.sql. */ /* v165: store 'smq_evaluations' — évaluations de compétences (matrice des compétences du SMQ, ISO 9001 §7.2). Migration additive; table cloud : supabase/pi_smq.sql. */ /* v164: stores 'smq_politiques', 'smq_objectifs', 'smq_risques' — politique qualité, objectifs qualité, registre des risques et opportunités. Migration additive; tables cloud : supabase/pi_smq.sql. */ /* v163: store 'smq_revues' — revues de direction du SMQ (entrées, sorties, décisions). Migration additive; table cloud : supabase/pi_smq.sql. */ /* v162: store 'smq_audits' — audits internes du SMQ (programme, constats, rapport). Migration additive; table cloud : supabase/pi_smq.sql. */ /* v161: stores 'smq_documents', 'smq_nc', 'smq_reclamations', 'smq_satisfaction' — SMQ (maîtrise documentaire, non-conformités, réclamations, satisfaction). Migration additive; tables cloud : supabase/pi_smq.sql. */ /* v160: store 'groupes_fonciers' — groupes de mutation (plusieurs dossiers individuels traités ensemble). Local uniquement. Migration additive.
                           v159: v159: store 'pieces_foncieres' — Foncier Connect, pièces jointes par étape (promoteur et souscripteur). Local uniquement : pièces d'identité et titres, jamais synchronisées. Migration additive.
                           v158: v158: store 'notifications_foncieres' — Foncier Connect phase 4, notifications et relances (local, sans table Supabase). Migration additive.
                           v157: stores 'publications_foncieres' et 'demandes_fonciers' — Foncier Connect phase 3, information du souscripteur (locaux, sans table Supabase). Migration additive.
@@ -25328,6 +25328,15 @@ function _openDB(version, isRetry, resolve, reject) {
         d.createObjectStore(store, { keyPath: 'id' });
       }
     });
+    /* Index des documents : ouvrir une fiche ne doit lire que SES fichiers, jamais toute la table (plusieurs Go sur un poste qui a tout
+       synchronisé : la page plantait « Aïe aïe aïe » faute de mémoire). Création additive, aucune donnée touchée. */
+    try {
+      if (d.objectStoreNames.contains('documents') && e.target.transaction) {
+        var _osDoc = e.target.transaction.objectStore('documents');
+        if (!_osDoc.indexNames.contains('entity_id')) _osDoc.createIndex('entity_id', 'entity_id');
+        if (!_osDoc.indexNames.contains('entity_type')) _osDoc.createIndex('entity_type', 'entity_type');
+      }
+    } catch (eIdx) { console.warn('[STOCKAGE] index documents non créé', eIdx); }
   };
 
   req.onsuccess = function(e) {
@@ -25472,7 +25481,42 @@ function docTypeInterdit(o) {
   var t = String((o && (o.type || o.mime)) || '').toLowerCase(), n = String((o && (o.name || o.nom)) || '').toLowerCase();
   return /^(text\/html|application\/xhtml|image\/svg|text\/xml|application\/xml|text\/javascript|application\/javascript|application\/x-javascript)/.test(t) || /\.(html?|xhtml|svg|xml|js|mjs)$/.test(n);
 }
-/* Index « documents joints par souscripteur » (liste Souscripteurs) : calculé par curseur, sans garder les fichiers en mémoire, et recalculé seulement quand le store 'documents' change. */
+/* Copie « légère » d'un document : tout sauf le contenu du fichier (qui reste dans IndexedDB, lu à la demande). */
+function _docLeger(d) {
+  var c = {}; Object.keys(d).forEach(function(k){ if (k !== 'blob' && k !== 'data') c[k] = d[k]; });
+  c._a_contenu = !!(d.blob || d.data) && !d._sans_contenu;
+  return c;
+}
+/* Parcours des documents SANS jamais les garder tous en mémoire : le filtre s'applique à chaque fiche, seules celles retenues sont
+   conservées (en copie légère, ou entière si avecContenu). Remplace dbGetAll('documents'), qui chargeait tous les fichiers. */
+function docsListeLegere(filtre, avecContenu) {
+  return new Promise(function(resolve) {
+    var out = [];
+    function ajoute(d) { if (!filtre || filtre(d)) out.push(avecContenu ? d : _docLeger(d)); }
+    try {
+      if (!db || db._memory || !db.objectStoreNames.contains('documents')) { dbGetAll('documents').then(function(all){ (all || []).forEach(ajoute); resolve(out); }); return; }
+      var rq = db.transaction('documents', 'readonly').objectStore('documents').openCursor();
+      rq.onsuccess = function() { var cur = rq.result; if (cur) { ajoute(cur.value); cur.continue(); } else resolve(out); };
+      rq.onerror = function() { resolve(out); };
+    } catch (e) { resolve(out); }
+  });
+}
+/* Documents d'une entité (souscripteur, programme, caisse…) : lus par l'index entity_id quand il existe. */
+function docsDeEntite(entityType, entityId, avecContenu) {
+  return new Promise(function(resolve) {
+    var out = [];
+    function ajoute(d) { if (d && d.entity_type === entityType && d.entity_id === entityId) out.push(avecContenu ? d : _docLeger(d)); }
+    try {
+      if (!db || db._memory || !db.objectStoreNames.contains('documents')) { dbGetAll('documents').then(function(all){ (all || []).forEach(ajoute); resolve(out); }); return; }
+      var os = db.transaction('documents', 'readonly').objectStore('documents');
+      var rq = os.indexNames.contains('entity_id') ? os.index('entity_id').openCursor(IDBKeyRange.only(entityId)) : os.openCursor();
+      rq.onsuccess = function() { var cur = rq.result; if (cur) { ajoute(cur.value); cur.continue(); } else resolve(out); };
+      rq.onerror = function() { resolve(out); };
+    } catch (e) { resolve(out); }
+  });
+}
+/* Index « documents joints par souscripteur » (liste Souscripteurs) : calculé par curseurs de CLÉS (sans lire les fichiers) quand les
+   index existent, sinon par balayage ; recalculé seulement quand le store 'documents' change. */
 var _docsClientIdx = null, _docsClientEnCours = false;
 function _docsClientInvalider() { _docsClientIdx = null; }
 function docsClientIndexer(apres) {
@@ -25480,14 +25524,34 @@ function docsClientIndexer(apres) {
   if (!db || !db.objectStoreNames.contains('documents')) { _docsClientIdx = {}; return _docsClientIdx; }
   _docsClientEnCours = true;
   var m = {};
+  function fin() { _docsClientEnCours = false; _docsClientIdx = m; if (apres) apres(); }
   try {
-    var req = db.transaction('documents', 'readonly').objectStore('documents').openCursor();
-    req.onsuccess = function() {
-      var cur = req.result;
-      if (cur) { var d = cur.value; if (d && d.entity_type === 'client' && d.entity_id) m[d.entity_id] = (m[d.entity_id] || 0) + 1; cur.continue(); }
-      else { _docsClientEnCours = false; _docsClientIdx = m; if (apres) apres(); }
-    };
-    req.onerror = function() { _docsClientEnCours = false; _docsClientIdx = {}; };
+    var os = db.transaction('documents', 'readonly').objectStore('documents');
+    if (!db._memory && os.indexNames.contains('entity_type') && os.indexNames.contains('entity_id')) {
+      /* 1) clés primaires des documents de type « client » ; 2) pour chaque entity_id, compter celles de cet ensemble — sans lire un seul fichier */
+      var ids = {};
+      var r1 = os.index('entity_type').openKeyCursor(IDBKeyRange.only('client'));
+      r1.onsuccess = function() {
+        var c1 = r1.result;
+        if (c1) { ids[c1.primaryKey] = true; c1.continue(); return; }
+        var r2 = os.index('entity_id').openKeyCursor();
+        r2.onsuccess = function() {
+          var c2 = r2.result;
+          if (c2) { if (ids[c2.primaryKey] && c2.key) m[c2.key] = (m[c2.key] || 0) + 1; c2.continue(); }
+          else fin();
+        };
+        r2.onerror = function() { fin(); };
+      };
+      r1.onerror = function() { fin(); };
+    } else {
+      var req = os.openCursor();
+      req.onsuccess = function() {
+        var cur = req.result;
+        if (cur) { var d = cur.value; if (d && d.entity_type === 'client' && d.entity_id) m[d.entity_id] = (m[d.entity_id] || 0) + 1; cur.continue(); }
+        else fin();
+      };
+      req.onerror = function() { _docsClientEnCours = false; _docsClientIdx = {}; };
+    }
   } catch (e) { _docsClientEnCours = false; _docsClientIdx = {}; }
   return null;
 }
@@ -27120,6 +27184,11 @@ function _envoiBloqueParTombstone(table, obj) {
 }
 
 async function syncToSupabase(table, obj, opts) {
+  /* Un document reçu sans contenu (liste seule) ne doit JAMAIS repartir vers le cloud : il écraserait le fichier. */
+  if (table === 'pi_documents' && obj && obj._sans_contenu) return true;
+  /* Une fiche de document réduite à ses seuls champs techniques (ni nom, ni rattachement) écraserait le vrai document du cloud
+     (upsert par fusion de ligne) : constaté en production sur 95 documents. Jamais envoyée. */
+  if (table === 'pi_documents' && obj && !obj.name && !obj.entity_type && !obj.titre) { console.warn('[SYNC] pi_documents : fiche vide non envoyée', obj.id); return true; }
   if (obj && obj._rejete) return false;   /* écriture refusée par dbPut (pièce visée / exercice clos) : jamais envoyée au cloud */
   if (_envoiBloqueParTombstone(table, obj)) return true;   /* rien à envoyer : traité comme fait */
   if (table === 'pi_ecritures' && obj && obj.date && !_pulling && !obj._forceCloture && !(opts && opts.forceCloture)
@@ -28996,6 +29065,49 @@ var PULL_TOUJOURS_COMPLET = ['pi_suppressions','pi_params','pi_users','pi_custom
 
 /* Curseur réellement utilisable : si la copie locale d'une table est VIDE, un curseur déjà avancé empêcherait
    à jamais de la reconstituer (le serveur ne renverrait que les lignes plus récentes que le curseur). */
+/* ── Documents joints : la synchronisation courante ne transporte QUE la liste (nom, type, taille, rattachement), sans le contenu ──
+   La table pi_documents pèse plusieurs Go (fichiers en base64) : la télécharger sur chaque poste saturait la base et la bande
+   passante, et un poste neuf mettait des heures à tout recevoir. Le contenu d'un fichier est récupéré À LA DEMANDE, à son
+   ouverture, et seulement sur les postes administrateur et manager (docChargerContenu). Les sessions des portails externes
+   (souscripteur, apporteur…) gardent la synchronisation complète. */
+function _docLocalGet(id) {
+  return new Promise(function(res){
+    try {
+      if (!db || !db.objectStoreNames.contains('documents')) return res(null);
+      var rq = db.transaction('documents', 'readonly').objectStore('documents').get(id);
+      rq.onsuccess = function(){ res(rq.result || null); };
+      rq.onerror = function(){ res(null); };
+    } catch (e) { res(null); }
+  });
+}
+function _docsPullLeger() { return !!(APP.currentUser && APP.currentUser.id); }
+function _docsContenuAutorise() { try { return hasRole('admin') || hasRole('manager'); } catch (e) { return false; } }
+/* Changement de mode (léger ↔ complet) : le curseur des documents repart de zéro une fois. */
+function _docsPullPrepare(leger) {
+  try {
+    var m = leger ? 'leger' : 'complet';
+    if (localStorage.getItem('immosuite_docs_pull_mode') !== m) {
+      _pullCurseurSet('pi_documents', '');
+      localStorage.setItem('immosuite_docs_pull_mode', m);
+    }
+  } catch (e) {}
+}
+/* Contenu d'un document : celui du poste s'il est là, sinon récupéré dans le cloud (administrateur / manager) puis gardé localement. */
+async function docChargerContenu(docId) {
+  var doc = await _docLocalGet(docId);   /* une seule fiche, lue par sa clé */
+  if (doc && !doc._sans_contenu && (doc.blob || doc.data)) return doc;
+  if (!_docsContenuAutorise()) { toast('Le contenu des fichiers joints est réservé aux postes administrateur et manager.', 'error'); return null; }
+  getSBConfig();
+  if (!SB.url || !SB.key || !navigator.onLine) { toast('Connexion requise pour récupérer le fichier.', 'error'); return null; }
+  var rows = null;
+  try { rows = await sbFetch('pi_documents?id=eq.' + encodeURIComponent(docId) + '&select=data', 'GET'); } catch (e) { rows = null; }
+  var full = rows && rows.length ? (rows[0].data || null) : null;
+  if (!full || !(full.blob || full.data)) { toast('Fichier introuvable dans le cloud.', 'error'); return null; }
+  delete full._sans_contenu;
+  var _avant = _pulling; _pulling = true;
+  try { await dbPut('documents', full); } catch (e) {} finally { _pulling = _avant; }
+  return full;
+}
 function _pullCurseurEffectif(table) {
   var cur = _pullCurseurs()[table] || '';
   if (!cur) return '';
@@ -29064,9 +29176,11 @@ async function pullReinitialiserCurseurs() {
   }
 }
 /* Récupère les lignes d'une table, en incrémental quand c'est possible. */
-async function _pullTable(table) {
-  var complet = PULL_TOUJOURS_COMPLET.indexOf(table) !== -1 || PULL_INCR_INAPTES[table];
-  var curseur = complet ? null : (_pullCurseurEffectif(table) || null);
+async function _pullTable(tableDemandee) {
+  var table = tableDemandee;
+  if (table === 'pi_documents' && _docsPullLeger()) { _docsPullPrepare(true); table = 'pi_documents_meta'; }   /* liste sans contenu */
+  var complet = PULL_TOUJOURS_COMPLET.indexOf(tableDemandee) !== -1 || PULL_INCR_INAPTES[tableDemandee];
+  var curseur = complet ? null : (_pullCurseurEffectif(tableDemandee) || null);
   if (curseur) {
     try {
       /* marge de 2 min : un poste dont l'horloge retarde écrit « avant » le curseur ; l'application est idempotente (_remoteWins). */
@@ -29076,7 +29190,7 @@ async function _pullTable(table) {
     } catch(e) {
       /* Colonne absente ou filtre refusé : on retombe en intégral pour cette
          table et on ne réessaiera plus avant la prochaine session. */
-      PULL_INCR_INAPTES[table] = true;
+      PULL_INCR_INAPTES[tableDemandee] = true;
     }
   }
   var all = await sbFetch(table + '?select=*', 'GET');
@@ -29092,6 +29206,7 @@ async function _pullTable(table) {
 async function _appliquerLignesPullTable(table, store, rows) {
   var appliquees = 0;
   if (!rows || !rows.length) return 0;
+  var esDoc = (table === 'pi_documents');
   var _tsMax = _pullCurseurs()[table] || '';
   if (!DATA[store]) DATA[store] = [];
   var byId = {};
@@ -29111,9 +29226,20 @@ async function _appliquerLignesPullTable(table, store, rows) {
       if (_tsPartages[String(r.id)]) { try { if (typeof deleteFromSupabase === 'function') deleteFromSupabase(table, r.id); } catch(e){} }
       continue;
     }
-    var ex = byId[String(r.id)];
+    /* Documents : jamais recopiés dans DATA (fichiers volumineux) — l'existant est lu dans IndexedDB, une fiche à la fois. */
+    var ex = esDoc ? await _docLocalGet(r.id) : byId[String(r.id)];
+    /* Fiche de document vidée dans le cloud (plus de nom ni de rattachement) : on ne l'applique pas ; si ce poste détient le vrai
+       document, on le renvoie pour réparer le cloud. */
+    if (esDoc && !r.name && !r.entity_type && !r.titre) {
+      if (ex && ex.name && (ex.blob || ex.data)) { try { await syncToSupabase('pi_documents', ex, { skipConflict: true }); appliquees++; } catch (e) {} }
+      continue;
+    }
     if (_remoteWins(r, ex)) {
-      byId[String(r.id)] = r;
+      /* Document reçu sans contenu : si ce poste a déjà le fichier, on garde son contenu (mise à jour des seules informations). */
+      if (esDoc && r._sans_contenu && ex && (ex.blob || ex.data)) {
+        r = Object.assign({}, r); if (ex.blob) r.blob = ex.blob; else r.data = ex.data; delete r._sans_contenu;
+      }
+      if (!esDoc) byId[String(r.id)] = r;
       try { await dbPut(store, r); } catch(e) {}
       appliquees++;
     }
@@ -29123,7 +29249,7 @@ async function _appliquerLignesPullTable(table, store, rows) {
     if (_u && (!_tsMax || _u > _tsMax)) _tsMax = _u;
   }
   if (_tsMax) _pullCurseurSet(table, _tsMax);
-  DATA[store] = Object.keys(byId).map(function(k){ return byId[k]; });
+  if (!esDoc) DATA[store] = Object.keys(byId).map(function(k){ return byId[k]; });
   return appliquees;
 }
 
@@ -29175,6 +29301,9 @@ async function _pullBatchViaRPC() {
     curseurs[table] = complet ? '' : _pullCurseurEffectif(table);
     tablesConcernees.push([table, store]);
   }
+  var _leger = _docsPullLeger(); _docsPullPrepare(_leger);
+  curseurs['pi_documents'] = _pullCurseurEffectif('pi_documents');
+  curseurs['_docs_legers'] = _leger ? 'oui' : 'non';   /* la liste des documents sans leur contenu (voir _docsPullLeger) */
   var body = JSON.stringify({ cursors: curseurs });
   var url = SB.url.replace(/\/+$/,'') + '/rest/v1/rpc/pull_incremental';
   var resp = await fetch(url, {
@@ -59515,8 +59644,8 @@ function handleEmpDocFileSelected(input) {
   var empId = APP.editingId;
   var reader = new FileReader();
   reader.onload = async function(e) {
-    var docs = await dbGetAll('documents');
-    var existing = docs.find(function(d) { return d.entity_type === 'employe' && d.entity_id === empId && d.doc_categorie === cat; });
+    var docs = await docsDeEntite('employe', empId);
+    var existing = docs.find(function(d) { return d.doc_categorie === cat; });
     if (existing) { await deleteRecord('documents', existing.id); }
     var doc = {
       id: uid(), entity_type: 'employe', entity_id: empId,
@@ -59547,8 +59676,7 @@ async function renderEmployeeDossier() {
   if (notice) notice.style.display = empId ? 'none' : 'block';
   var mine = [];
   if (empId) {
-    var docs = await dbGetAll('documents');
-    mine = docs.filter(function(d) { return d.entity_type === 'employe' && d.entity_id === empId; });
+    mine = await docsDeEntite('employe', empId);
   }
   container.innerHTML = EMP_DOC_TYPES.map(function(t) {
     var doc = mine.find(function(d) { return d.doc_categorie === t.code; });
@@ -92901,7 +93029,7 @@ async function renderDocumentsSouscripteur() {
   var c = SESSION_SOUSCRIPTEUR;
   var host = document.getElementById('portal-souscripteur-doc-list');
   if (host) {
-    var docs = await dbGetAll('documents');
+    var docs = await docsListeLegere(function(d){ return d.entity_type === 'client' || d.entity_type === 'programme'; });
     var verseCl = (DATA.versements||[]).filter(function(v){ return v.client_id===c.id && v.statut!=='annule' && _versementSurPrix(v); }).reduce(function(s,v){ return s+(parseFloat(v.montant)||0); },0);
     var soldeIntegral = (parseFloat(c.montant_total)||0) > 0 && verseCl >= (parseFloat(c.montant_total)||0);
     var visibles = docs.filter(function(d){
@@ -93574,8 +93702,8 @@ function uploadDocumentForEntity(entity_type, entity_id, file, typeLabel) {
 /* Bascule la visibilité portail d'un document déjà téléversé, sans avoir à
    le re-uploader — utile pour publier une quittance finale a posteriori. */
 async function basculerVisibilitePortailDocument(docId, entity_type, entity_id) {
-  var docs = await dbGetAll('documents');
-  var doc = docs.find(function(d){ return d.id === docId; });
+  /* Le document est renvoyé en entier au cloud : son contenu doit donc être présent (récupéré à la demande si le poste n'a que la fiche). */
+  var doc = await docChargerContenu(docId);
   if (!doc) return;
   if (!doc.visible_portail) {
     doc.visible_portail = true;
@@ -93632,9 +93760,8 @@ async function refreshDocumentsForEntity(entity_type, entity_id) {
   var containerId = entity_type + '-doc-list';
   var container = document.getElementById(containerId);
   if (!container) return;
-  var docs = await dbGetAll('documents');
   var sigs = await dbGetAll('signatures');
-  var filtered = docs.filter(function(d){ return d.entity_type === entity_type && d.entity_id === entity_id; });
+  var filtered = await docsDeEntite(entity_type, entity_id);   /* index + copies légères : ouvrir une fiche ne charge plus tous les fichiers */
   var filteredSigs = sigs.filter(function(s){ return s.entity_type === entity_type && s.entity_id === entity_id; });
 
   if (!filtered.length && !filteredSigs.length) {
@@ -93677,8 +93804,7 @@ async function refreshDocumentsForEntity(entity_type, entity_id) {
 async function apercuDocument(docId) { return gedApercu('documents', docId); }
 
 async function telechargerDocument(docId) {
-  var docs = await dbGetAll('documents');
-  var doc = docs.find(function(d){ return d.id === docId; });
+  var doc = await docChargerContenu(docId);
   if (!doc) return;
   var a = document.createElement('a');
   a.href = doc.blob;
@@ -93846,7 +93972,7 @@ function gedDivisionDoc(entity_type, entity_id) {
 
 async function gedCollecter() {
   var out = [];
-  (await dbGetAll('documents')).forEach(function(d) {
+  (await docsListeLegere()).forEach(function(d) {
     out.push({ id:d.id, store:'documents', name:d.name, mime:d.type, size:d.size||0, date:d.upload_date, module:gedModule(d.entity_type), division:gedDivisionDoc(d.entity_type, d.entity_id), description:d.description||'' });
   });
   var dossiers = DATA.dossiersJuridiques || [];
@@ -93874,7 +94000,10 @@ async function gedCollecter() {
 function _gedBlobField(rec) { return rec.blob!==undefined ? 'blob' : 'data'; }
 async function _gedGetRecord(store, id) {
   var arr = await dbGetAll(store);
-  return arr.find(function(x){ return x.id === id; });
+  var rec = arr.find(function(x){ return x.id === id; });
+  /* Document connu seulement par sa fiche (synchronisation légère) : le contenu est récupéré à la demande (administrateur / manager). */
+  if (store === 'documents' && rec && (rec._sans_contenu || !(rec.blob || rec.data))) rec = await docChargerContenu(id);
+  return rec;
 }
 
 function gedPopulerFiltres(all) {
@@ -96748,7 +96877,7 @@ async function djRenderPieces(d) {
   var z = document.getElementById('dj-pieces'); if (!z) return;
   var c = d && d.client_id ? (DATA.clients || []).find(function(x){ return x.id === d.client_id; }) : null;
   if (!c) { z.innerHTML = ''; return; }
-  var docs = []; try { docs = (await dbGetAll('documents')).filter(function(x){ return x.entity_type === 'client' && x.entity_id === c.id; }); } catch (e) {}
+  var docs = []; try { docs = await docsDeEntite('client', c.id); } catch (e) {}
   var a = c.attestation_solde, solde = typeof attSoldeSolde === 'function' && attSoldeSolde(c).solde, liv = (DATA.livraisons || []).find(function(l){ return l.client_id === c.id; });
   var P = [];
   P.push({ lib:'Contrat de vente / réservation', ok:true, det:'Généré depuis la fiche souscripteur', act:'<button class="btn btn-secondary btn-sm" onclick="printContrat(\'' + c.id + '\')">🖨</button>' });
@@ -118613,8 +118742,7 @@ var _afPendingDocStage = null;
 async function afLoadStageDocs(){
   _afDocCache = [];
   try {
-    var all = await dbGetAll('documents');
-    _afDocCache = (all||[]).filter(function(d){ return d.entity_type==='af_operation' && d.entity_id===(_afOp&&_afOp.id); });
+    _afDocCache = await docsDeEntite('af_operation', _afOp && _afOp.id);
   } catch(e){}
   Object.keys(_afStageLabels).forEach(afRenderStageDocs);
 }
@@ -118663,8 +118791,9 @@ function afRenderStageDocs(stage){
   }).join('');
 }
 
-function afDownloadDoc(id){
+async function afDownloadDoc(id){
   var d = _afDocCache.find(function(x){ return x.id===id; });
+  if(d && (!d.blob || d._sans_contenu)) d = await docChargerContenu(id);
   if(!d||!d.blob){ toast('Fichier introuvable.','error'); return; }
   var a=document.createElement('a'); a.href=d.blob; a.download=d.name||'document'; a.click();
 }
@@ -118967,8 +119096,7 @@ async function afDeleteOperation(){
   else await dbDelete('af_operations',_opId);
   /* purge des pièces jointes liées aux étapes */
   try {
-    var docs = await dbGetAll('documents');
-    var liees = (docs||[]).filter(function(d){ return d.entity_type==='af_operation' && d.entity_id===_opId; });
+    var liees = await docsDeEntite('af_operation', _opId);
     for (var i=0;i<liees.length;i++){ try{ await deleteRecord('documents', liees[i].id, { skipIntegrity:true }); }catch(e){ try{ await dbDelete('documents', liees[i].id); if(typeof deleteFromSupabase==='function') deleteFromSupabase('pi_documents', liees[i].id); }catch(_){} } }
   } catch(e){}
   closeModal('modal-af-operation');
@@ -144945,8 +145073,8 @@ function cvScanChoisi(input) {
 }
 async function cvVoirScan(id) {
   var b = (DATA.bordereaux_caisse || []).find(function(x){ return x.id === id; }); if (!b) return;
-  var all = []; try { all = await dbGetAll('documents'); } catch(e){}
-  var d = (all || []).find(function(x){ return x.id === b.scan_doc_id; }) || (all || []).find(function(x){ return x.entity_type === 'bordereau_caisse' && x.entity_id === id; });
+  var d = null;
+  try { d = b.scan_doc_id ? await _docLocalGet(b.scan_doc_id) : null; if (!d) { var _l = await docsDeEntite('bordereau_caisse', id, true); d = _l[0] || null; } } catch(e){}
   if (!d || !d.blob) { toast('Scan introuvable sur ce poste (synchronisation en cours ?).', 'error'); return; }
   var w = window.open(''); if (w) w.document.write('<iframe src="' + d.blob + '" style="border:0;width:100%;height:100vh;"></iframe>');
 }
@@ -145597,7 +145725,7 @@ function apExporterCSV() {
 async function caisseLoadDocIndex(){
   _caisseDocIndex = {};
   try {
-    var all = await dbGetAll('documents');
+    var all = await docsListeLegere(function(d){ return d.entity_type==='caisse_mouvement'; });
     (all||[]).forEach(function(d){
       if (d.entity_type!=='caisse_mouvement') return;
       (_caisseDocIndex[d.entity_id]=_caisseDocIndex[d.entity_id]||[]).push(d);
@@ -145609,7 +145737,7 @@ function caisseDocCount(mvtId){ return (_caisseDocIndex[mvtId]||[]).length; }
 function cbResetDocs(){ _cbDocs=[]; _cbDocsToDelete=[]; cbRenderDocs(); }
 async function cbLoadDocsFor(mvtId){
   _cbDocs=[]; _cbDocsToDelete=[];
-  try { var all=await dbGetAll('documents'); _cbDocs=(all||[]).filter(function(d){ return d.entity_type==='caisse_mouvement' && d.entity_id===mvtId; }); } catch(e){}
+  try { _cbDocs = await docsDeEntite('caisse_mouvement', mvtId, true); } catch(e){}
   cbRenderDocs();
 }
 function cbTriggerDocUpload(){ var inp=document.getElementById('cb-doc-file-input'); if(inp){ inp.value=''; inp.click(); } }
@@ -145664,7 +145792,7 @@ async function caisseViewDocs(mvtId){
   list.innerHTML='<span style="color:var(--blanc-dim);">Chargement…</span>';
   openModal('modal-caisse-docs');
   var docs=[];
-  try { var all=await dbGetAll('documents'); docs=(all||[]).filter(function(d){ return d.entity_type==='caisse_mouvement' && d.entity_id===mvtId; }); } catch(e){}
+  try { docs = await docsDeEntite('caisse_mouvement', mvtId, true); } catch(e){}
   if(!docs.length){ list.innerHTML='<div style="text-align:center;color:var(--blanc-dim);padding:16px;">Aucune pièce justificative jointe à ce mouvement.</div>'; return; }
   list.innerHTML=docs.map(function(d){
     var isImg=/image/i.test(d.type);
@@ -150547,8 +150675,7 @@ function portplRenderDocuments() {
 async function refreshDocumentsForEntityReadonly(entity_type, entity_id, containerId) {
   var container = document.getElementById(containerId);
   if (!container) return;
-  var docs = await dbGetAll('documents');
-  var filtered = docs.filter(function(d){ return d.entity_type===entity_type && d.entity_id===entity_id; });
+  var filtered = await docsDeEntite(entity_type, entity_id);
   /* [Conditions contractuelles de remise] Un document attaché à un dossier
      souscripteur n'apparaît au portail que si l'admin l'a explicitement
      rendu visible — et, s'il est conditionné au solde intégral (quittance
@@ -151215,7 +151342,7 @@ async function portafRenderDocuments() {
   var cessions = _acqfoncMesCessions();
   var host = document.getElementById('portaf-doc-list');
   if (!host) return;
-  var docs = await dbGetAll('documents');
+  var docs = await docsListeLegere();
   var visibles = [];
   var uneSoldee = false;
   cessions.forEach(function(c){
@@ -151577,7 +151704,7 @@ async function portfinRenderDocuments() {
   var f = SESSION_FINANCIER;
   var host = document.getElementById('portfin-doc-list');
   if (!f || !host) return;
-  var docs = await dbGetAll('documents');
+  var docs = await docsListeLegere();
   var engage = parseFloat(f.montant_engagement) || 0;
   var verse = finMontantVerse(f.id);
   var soldeIntegral = engage > 0 && verse >= engage;
