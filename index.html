@@ -122753,6 +122753,30 @@ async function valRattraperEtapes(){
   }catch(err){ console.error('[Validations] rattrapage',err); }
   finally{ APP._valRattrapage=false; }
 }
+/* Rattrapage : attestation de solde « en attente DG » sans ligne centrale (échec d'écriture, synchro perdue, ancienne donnée).
+   Recrée la demande dans le module Validations, sans doublon (valPending). */
+async function valRattraperAttestations(){
+  if(APP._valRattrapageAtt) return; APP._valRattrapageAtt=true;
+  var n=0;
+  try{
+    var cl=DATA.clients||[];
+    for(var i=0;i<cl.length;i++){ var c=cl[i];
+      for(var k=0;k<2;k++){ var kind=k?'finale':'initial', champ=attChamp(kind), a=c[champ];
+        if(!a||a.statut!=='en_attente'||valPending(champ,c.id)) continue;
+        var nom=((c.nom||'')+' '+(c.prenoms||'')).trim();
+        var v={ id:uid(), type:champ, ref_id:c.id, libelle:attLibKind(kind)+' '+(a.numero||'')+' — '+nom+(c.dossier?(' ('+c.dossier+')'):''), montant:a.prix||0, meta:{client_id:c.id, rattrape:true}, statut:'en_attente', demandeur_id:null, demandeur:a.demandeur||'—', date_demande:a.date_demande||today(), valideur:null, date_decision:null, motif:'', created_at:today() };
+        DATA.validations.push(v); v._modifie=new Date().toISOString(); await dbPut('validations',v); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',v); n++;
+      } }
+    var ce=DATA.cessions_foncieres||[];
+    for(var j=0;j<ce.length;j++){ var s=ce[j], as=s.attestation_solde;
+      if(!as||as.statut!=='en_attente'||valPending(CES_ATT_TYPE,s.id)) continue;
+      var w={ id:uid(), type:CES_ATT_TYPE, ref_id:s.id, libelle:'Attestation de solde de cession '+(as.numero||'')+' — '+cesAcquereurLabel(s.acheteur)+(s.dossier?(' ('+s.dossier+')'):''), montant:as.prix||0, meta:{cession_id:s.id, rattrape:true}, statut:'en_attente', demandeur_id:null, demandeur:as.demandeur||'—', date_demande:as.date_demande||today(), valideur:null, date_decision:null, motif:'', created_at:today() };
+      DATA.validations.push(w); w._modifie=new Date().toISOString(); await dbPut('validations',w); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',w); n++;
+    }
+    if(n&&typeof renderValidations==='function') renderValidations();
+  }catch(err){ console.error('[Validations] rattrapage attestations',err); }
+  finally{ APP._valRattrapageAtt=false; }
+}
 async function submitBC(id){
   var b=(DATA.bons_commande||[]).find(function(x){return x.id===id;}); if(!b)return;
   var v=await valCreate('bon_commande', id, 'BC '+b.numero+' — '+bcFournisseurName(b.fournisseur_id), bcTotalHT(b), {chantier:b.chantier_id});
@@ -122954,6 +122978,7 @@ function renderValidations(){
   var cpt = document.getElementById('val-search-count');
   if(cpt) cpt.textContent = termes.length ? (list.length+' / '+totalListe+' résultat(s)') : '';
   if(typeof valRattraperEtapes==='function' && !APP._valRattrapageFait){ APP._valRattrapageFait=true; setTimeout(valRattraperEtapes,0); }
+  if(typeof valRattraperAttestations==='function') setTimeout(valRattraperAttestations,0);
   var tb=document.getElementById('tbody-validations'), bar=document.getElementById('val-toolbar'), pied=document.getElementById('val-pagination');
   if(tb){
     if(!list.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--blanc-dim);padding:20px;">'+(termes.length?'Aucun résultat pour cette recherche.':'Aucun élément.')+'</td></tr>'; if(bar) bar.innerHTML=''; if(pied) pied.innerHTML=''; }
@@ -123743,6 +123768,7 @@ async function attSoldeDemander(clientId, kind){
   attSoldeSauver(c);
   var v = await valCreate(champ, c.id, attLibKind(kind)+' '+c[champ].numero+' — '+nom+(c.dossier?(' ('+c.dossier+')'):''), S.prix, {client_id:c.id});
   attSoldeRafraichirUI(c.id);
+  if(!v && !valPending(champ, c.id)){ toast('⚠️ Demande non enregistrée dans Validations : rouvrez le module Validations pour la recréer.','error',8000); return; }
   toast('📤 Attestation transmise au DG / gérant pour validation (menu Validations).','success');
 }
 function attSoldeClientIntrouvable(){ toast('⛔ Souscripteur introuvable : son dossier a été supprimé alors que cette attestation est encore en attente. Rejetez la demande, ou restaurez le souscripteur avant de la traiter.','error'); }
