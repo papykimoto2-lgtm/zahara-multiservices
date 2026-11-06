@@ -2,12 +2,16 @@
    Chargé à la demande (onglet « Plan 3D »), après /vendor/three.r128.min.js.
    Confidentialité : le serveur (fc_vue_plan_lotissement) ne renvoie, pour les lots des autres, que le numéro, la surface,
    le contour et un statut réduit à « libre » ou « attribué ». Ce module n'affiche donc jamais de nom, de prix ni de paiement
-   d'un autre souscripteur ; seul le dossier du souscripteur connecté (ctx.paiement) est détaillé. */
+   d'un autre souscripteur ; seul le dossier du souscripteur connecté (ctx.paiement) est détaillé.
+   Mode public (ctx.mode === 'public', sans connexion) : les lots viennent des vues publiques déjà utilisées par la page Carte
+   (numéro, surface, prix, statut disponible / réservé / vendu, contour) ; aucun « mon lot », aucun paiement. */
 (function () {
   'use strict';
   var NF = new Intl.NumberFormat('fr-FR');
-  var LABEL = { mon_lot: 'Votre lot', libre: 'Disponible', attribue: 'Attribué' };
-  var HAUT = { libre: 1.2, attribue: 2.6, mon_lot: 7 };
+  var LABEL = { mon_lot: 'Votre lot', libre: 'Disponible', reserve: 'Réservé', attribue: 'Attribué', vendu: 'Vendu' };
+  var HAUT = { libre: 1.2, reserve: 2, attribue: 2.6, vendu: 2.6, mon_lot: 7 };
+  var HEX = { libre: '#2F7D5B', reserve: '#E0A100', attribue: '#8C887F', vendu: '#8C887F' };
+  var ORDRE = ['libre', 'reserve', 'attribue', 'vendu', 'mon_lot'];
   var REDUIT = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -56,7 +60,8 @@
     '.p3-am{display:grid;gap:5px;font-size:.84rem}.p3-am div{display:flex;justify-content:space-between;gap:8px}.p3-am span{color:#4b6a8b}',
     '.p3-note{font-size:.76rem;color:#4b6a8b;margin:0}',
     '.p3-list{display:flex;flex-wrap:wrap;gap:6px}',
-    '.p3-sel{display:flex;gap:6px;flex-wrap:wrap}',
+    '.p3-sel{display:flex;gap:6px;flex-wrap:wrap;align-items:center}',
+    '.p3-select{font:inherit;font-size:.82rem;border:1px solid #cfdfed;border-radius:8px;padding:7px 10px;background:#fff;color:#1e4663;max-width:100%}',
     '@media (max-width:640px){.p3-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.p3-hint{display:none}.p3-stage{height:62vh}}'
   ].join('\n');
   function injecterCss() {
@@ -76,7 +81,7 @@
 
   function preparer(plan) {
     var lots = (plan.lots || []).map(function (l) {
-      return { id: String(l.id), numero: l.numero || l.id, ilot: l.ilot || '', surface: +l.surface || 0, statut: LABEL[l.statut] && l.statut !== 'mon_lot' ? l.statut : (l.statut === 'mon_lot' ? 'mon_lot' : 'attribue'), poly: polyValide(l.poly) ? l.poly : null };
+      return { id: String(l.id), numero: l.numero || l.id, ilot: l.ilot || '', surface: +l.surface || 0, prix: +l.prix || 0, statut: LABEL[l.statut] ? l.statut : 'attribue', poly: polyValide(l.poly) ? l.poly : null };
     });
     var avecTrace = lots.filter(function (l) { return l.poly; });
     var modeGrille = avecTrace.length < Math.max(3, lots.length * 0.6);
@@ -113,7 +118,7 @@
   function monter(box, ctx) {
     injecterCss();
     var plans = (ctx.plans || []).filter(function (p) { return p && Array.isArray(p.lots) && p.lots.length; });
-    if (!plans.length) { box.innerHTML = '<div class="p3-card"><h5>Plan 3D</h5><p class="p3-note">Le plan de votre lotissement n\'est pas encore disponible. Il apparaîtra ici dès que les lots de votre programme seront tracés.</p></div>'; return null; }
+    if (!plans.length) { box.innerHTML = '<div class="p3-card"><h5>Plan 3D</h5><p class="p3-note">' + (ctx.mode === 'public' ? 'Aucun programme n\'a encore de lots tracés sur plan. Ils apparaîtront ici dès que leurs contours seront saisis.' : 'Le plan de votre lotissement n\'est pas encore disponible. Il apparaîtra ici dès que les lots de votre programme seront tracés.') + '</p></div>'; return null; }
     var cur = 0, ctrl = { destroy: function () {} };
     function rendre() { ctrl.destroy(); ctrl = monterPlan(box, ctx, plans, cur, function (i) { cur = i; rendre(); }); }
     rendre();
@@ -123,43 +128,53 @@
   function monterPlan(box, ctx, plans, idx, changerPlan) {
     var THREE = window.THREE, plan = plans[idx], prep = preparer(plan), lots = prep.lots, byId = {};
     lots.forEach(function (l) { byId[l.id] = l; });
+    var pub = ctx.mode === 'public';             /* plan public : sans connexion, aucun « mon lot », aucun paiement */
     var mes = lots.filter(function (l) { return l.statut === 'mon_lot'; });
-    var cnt = { libre: 0, attribue: 0, mon_lot: mes.length };
+    var cnt = { libre: 0, reserve: 0, attribue: 0, vendu: 0, mon_lot: mes.length };
     lots.forEach(function (l) { if (l.statut !== 'mon_lot') cnt[l.statut]++; });
     var pay = ctx.paiement || { total: 0, verse: 0, reste: 0, pct: 0 };
     var surfMes = mes.reduce(function (s, l) { return s + l.surface; }, 0);
 
     var titre = [plan.programme, plan.parcelle].filter(Boolean).join(' · ') || 'Mon lotissement';
-    var sel = plans.length > 1 ? '<div class="p3-sel">' + plans.map(function (p, i) {
-      return '<button type="button" class="p3-btn' + (i === idx ? ' on' : '') + '" data-plan="' + i + '">' + esc([p.programme, p.parcelle].filter(Boolean).join(' · ') || ('Plan ' + (i + 1))) + '</button>';
-    }).join('') + '</div>' : '';
+    function nomPlan(p, i) { return [p.programme, p.parcelle].filter(Boolean).join(' · ') || ('Plan ' + (i + 1)); }
+    var sel = plans.length > 6
+      ? '<div class="p3-sel"><label for="p3-prog" class="p3-note">Programme</label><select id="p3-prog" class="p3-select" data-planselect>' + plans.map(function (p, i) {
+          return '<option value="' + i + '"' + (i === idx ? ' selected' : '') + '>' + esc(nomPlan(p, i)) + ' (' + p.total + ' lots)</option>';
+        }).join('') + '</select></div>'
+      : plans.length > 1 ? '<div class="p3-sel">' + plans.map(function (p, i) {
+          return '<button type="button" class="p3-btn' + (i === idx ? ' on' : '') + '" data-plan="' + i + '">' + esc(nomPlan(p, i)) + '</button>';
+        }).join('') + '</div>' : '';
     box.innerHTML = '<div class="p3">' +
-      '<div class="p3-top"><div><h4>Plan 3D de mon lotissement</h4><p>' + esc(titre) + '</p></div><span class="p3-tag">Lots voisins : statut seulement</span></div>' + sel +
-      '<div class="p3-kpis"><div><span>' + (mes.length > 1 ? 'Mes lots' : 'Mon lot') + '</span><b>' + (mes.length ? esc(mes.map(function (l) { return l.numero; }).join(', ')) : '—') + '</b></div>' +
-      '<div><span>Surface</span><b>' + (surfMes ? fmt(surfMes) + ' m²' : '—') + '</b></div>' +
-      '<div><span>Lots disponibles</span><b>' + cnt.libre + ' / ' + lots.length + '</b></div>' +
-      '<div><span>Prix réglé</span><b>' + Math.round(pay.pct || 0) + ' %</b></div></div>' +
+      '<div class="p3-top"><div><h4>' + (pub ? 'Plan 3D du programme' : 'Plan 3D de mon lotissement') + '</h4><p>' + esc(titre) + '</p></div><span class="p3-tag">' + (pub ? 'Informations publiques' : 'Lots voisins : statut seulement') + '</span></div>' + sel +
+      (pub
+        ? '<div class="p3-kpis"><div><span>Lots</span><b>' + lots.length + '</b></div><div><span>Disponibles</span><b>' + cnt.libre + '</b></div><div><span>Réservés</span><b>' + cnt.reserve + '</b></div><div><span>Vendus</span><b>' + (cnt.vendu + cnt.attribue) + '</b></div></div>'
+        : '<div class="p3-kpis"><div><span>' + (mes.length > 1 ? 'Mes lots' : 'Mon lot') + '</span><b>' + (mes.length ? esc(mes.map(function (l) { return l.numero; }).join(', ')) : '—') + '</b></div>' +
+          '<div><span>Surface</span><b>' + (surfMes ? fmt(surfMes) + ' m²' : '—') + '</b></div>' +
+          '<div><span>Lots disponibles</span><b>' + cnt.libre + ' / ' + lots.length + '</b></div>' +
+          '<div><span>Prix réglé</span><b>' + Math.round(pay.pct || 0) + ' %</b></div></div>') +
       '<div class="p3-stage"><canvas aria-label="Plan 3D du lotissement. Glissez pour tourner, molette ou pincement pour zoomer, cliquez un lot pour voir sa fiche." tabindex="0"></canvas>' +
       '<div class="p3-chips" role="group" aria-label="Afficher les lots">' +
-      '<span class="p3-chip fixe" style="--c:var(--pp-primary,#A6431C)"><i></i>Mon lot</span>' +
-      '<button type="button" class="p3-chip" data-f="libre" aria-pressed="true" style="--c:#2F7D5B"><i></i>Disponibles ' + cnt.libre + '</button>' +
-      '<button type="button" class="p3-chip" data-f="attribue" aria-pressed="true" style="--c:#8C887F"><i></i>Attribués ' + cnt.attribue + '</button></div>' +
+      (pub ? '' : '<span class="p3-chip fixe" style="--c:var(--pp-primary,#A6431C)"><i></i>Mon lot</span>') +
+      ['libre', 'reserve', 'attribue', 'vendu'].filter(function (k) { return cnt[k] > 0; }).map(function (k) {
+        var nom = k === 'libre' ? 'Disponibles' : k === 'reserve' ? 'Réservés' : k === 'vendu' ? 'Vendus' : 'Attribués';
+        return '<button type="button" class="p3-chip" data-f="' + k + '" aria-pressed="true" style="--c:' + HEX[k] + '"><i></i>' + nom + ' ' + cnt[k] + '</button>';
+      }).join('') + '</div>' +
       '<svg class="p3-compass" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22" fill="rgba(255,255,255,.9)" stroke="#cfdfed"/><path d="M24 6l6 18H18z" fill="var(--pp-primary,#A6431C)"/><path d="M24 42l-6-18h12z" fill="#8a97a3" opacity=".5"/></svg>' +
       '<div class="p3-hint">Glisser pour tourner · molette pour zoomer · cliquer un lot</div>' +
-      '<div class="p3-bar"><button type="button" class="p3-btn pri" data-a="mon">Mon lot</button><button type="button" class="p3-btn" data-a="tout">Tout le lotissement</button>' +
+      '<div class="p3-bar">' + (pub ? '' : '<button type="button" class="p3-btn pri" data-a="mon">Mon lot</button>') + '<button type="button" class="p3-btn' + (pub ? ' pri' : '') + '" data-a="tout">' + (pub ? 'Vue d\'ensemble' : 'Tout le lotissement') + '</button>' +
       '<button type="button" class="p3-btn" data-a="plan" aria-pressed="false">Vue du plan</button><button type="button" class="p3-btn" data-a="rejouer">Rejouer l\'animation</button></div>' +
       '<div class="p3-tip" role="presentation"></div></div>' +
       '<div class="p3-card" aria-live="polite"></div>' +
       (prep.sansTrace ? '<p class="p3-note">' + prep.sansTrace + ' lot' + (prep.sansTrace > 1 ? 's' : '') + ' sans tracé ne figure' + (prep.sansTrace > 1 ? 'nt' : '') + ' pas sur ce plan.</p>' : '') +
       (prep.modeGrille ? '<p class="p3-note">Le tracé exact de cette parcelle n\'est pas encore saisi : les lots sont disposés en grille à titre indicatif, sans valeur de plan cadastral.</p>' : '') +
-      (plan.tronque ? '<p class="p3-note">Seuls les ' + lots.length + ' lots les plus proches du vôtre sont affichés, sur ' + plan.total + '.</p>' : '') +
+      (plan.tronque ? '<p class="p3-note">' + (pub ? 'Seuls ' + lots.length + ' lots sont affichés, sur ' + plan.total + '.' : 'Seuls les ' + lots.length + ' lots les plus proches du vôtre sont affichés, sur ' + plan.total + '.') + '</p>' : '') +
       '</div>';
 
     var stage = box.querySelector('.p3-stage'), cv = box.querySelector('canvas'), tip = box.querySelector('.p3-tip'), card = box.querySelector('.p3-card');
     var selected = null;
 
     /* fiche */
-    function pill(st) { var c = st === 'mon_lot' ? 'var(--pp-primary,#A6431C)' : st === 'libre' ? '#2F7D5B' : '#8C887F'; return '<span class="p3-pill" style="--c:' + c + '"><i></i>' + LABEL[st] + '</span>'; }
+    function pill(st) { var c = st === 'mon_lot' ? 'var(--pp-primary,#A6431C)' : (HEX[st] || '#8C887F'); return '<span class="p3-pill" style="--c:' + c + '"><i></i>' + LABEL[st] + '</span>'; }
     function bloc() {
       var circ = 2 * Math.PI * 38, p = clamp(pay.pct || 0, 0, 100);
       return '<div class="p3-pay"><div class="p3-ring"><svg viewBox="0 0 92 92"><circle cx="46" cy="46" r="38" fill="none" stroke="#e3eaf2" stroke-width="9"/><circle cx="46" cy="46" r="38" fill="none" stroke="var(--pp-primary,#A6431C)" stroke-width="9" stroke-dasharray="' + (circ * p / 100).toFixed(1) + ' ' + circ.toFixed(1) + '"/></svg><b>' + Math.round(p) + '%</b></div>' +
@@ -167,6 +182,11 @@
     }
     function fiche() {
       var l = selected;
+      if (!l && pub) {
+        card.innerHTML = '<div class="p3-row"><h5>' + esc(titre) + '</h5></div><div class="p3-facts"><div><span>Lots tracés</span><b>' + lots.length + '</b></div><div><span>Disponibles</span><b>' + cnt.libre + '</b></div><div><span>Réservés</span><b>' + cnt.reserve + '</b></div><div><span>Vendus</span><b>' + (cnt.vendu + cnt.attribue) + '</b></div></div>' +
+          '<p class="p3-note">Cliquez un lot sur le plan pour voir sa superficie, son prix et son statut. Informations publiques, sous réserve de mise à jour.</p>';
+        return;
+      }
       if (!l) {
         card.innerHTML = '<div class="p3-row"><h5>Mon dossier</h5>' + pill('mon_lot') + '</div>' + (pay.total ? bloc() : '') +
           '<div class="p3-list">' + mes.map(function (m) { return '<button type="button" class="p3-btn" data-lot="' + esc(m.id) + '">Lot ' + esc(m.numero) + (m.surface ? ' · ' + fmt(m.surface) + ' m²' : '') + '</button>'; }).join('') + '</div>' +
@@ -175,10 +195,12 @@
       }
       var mon = l.statut === 'mon_lot';
       card.innerHTML = '<div class="p3-row"><h5>Lot ' + esc(l.numero) + '</h5>' + pill(l.statut) + '</div>' +
-        '<div class="p3-facts">' + (l.surface ? '<div><span>Surface</span><b>' + fmt(l.surface) + ' m²</b></div>' : '') + (l.ilot ? '<div><span>Îlot</span><b>' + esc(l.ilot) + '</b></div>' : '') + '<div><span>Statut</span><b>' + LABEL[l.statut] + '</b></div></div>' +
+        '<div class="p3-facts">' + (l.surface ? '<div><span>Surface</span><b>' + fmt(l.surface) + ' m²</b></div>' : '') + (l.ilot ? '<div><span>Îlot</span><b>' + esc(l.ilot) + '</b></div>' : '') +
+          (pub && l.prix ? '<div><span>Prix</span><b>' + fmt(l.prix) + ' F</b></div>' : '') + (pub && l.prix && l.surface ? '<div><span>Prix au m²</span><b>' + fmt(l.prix / l.surface) + ' F</b></div>' : '') +
+          '<div><span>Statut</span><b>' + LABEL[l.statut] + '</b></div></div>' +
         (mon && pay.total ? '<h5 style="font-size:.9rem">Mon dossier</h5>' + bloc() : '') +
-        (!mon ? '<p class="p3-note">' + (l.statut === 'libre' ? 'Ce lot est disponible. Contactez votre conseiller pour en savoir plus.' : 'Ce lot est attribué. Les informations sur son souscripteur ne sont pas communiquées.') + '</p>' : '') +
-        '<div class="p3-list"><button type="button" class="p3-btn" data-a="fermer">Retour à mon dossier</button></div>';
+        (!mon ? '<p class="p3-note">' + (l.statut === 'libre' ? (pub ? 'Ce lot est disponible. Contactez-nous pour le réserver.' : 'Ce lot est disponible. Contactez votre conseiller pour en savoir plus.') : l.statut === 'reserve' ? 'Ce lot est réservé.' : 'Ce lot n\'est plus disponible. Les informations sur son souscripteur ne sont pas communiquées.') + '</p>' : '') +
+        '<div class="p3-list"><button type="button" class="p3-btn" data-a="fermer">' + (pub ? 'Fermer' : 'Retour à mon dossier') + '</button></div>';
     }
     fiche();
 
@@ -190,7 +212,7 @@
     renderer.outputEncoding = THREE.sRGBEncoding;
     var cs = getComputedStyle(document.documentElement);
     var colMon = (cs.getPropertyValue('--pp-primary') || '').trim() || '#A6431C';
-    var COL = { libre: 0x2F7D5B, attribue: 0x8C887F, mon_lot: new THREE.Color(colMon).getHex() };
+    var COL = { libre: 0x2F7D5B, reserve: 0xE0A100, attribue: 0x8C887F, vendu: 0x8C887F, mon_lot: new THREE.Color(colMon).getHex() };
 
     var scene = new THREE.Scene(); scene.background = new THREE.Color(0xe9eef1);
     var camera = new THREE.PerspectiveCamera(38, 1, 1, 6000);
@@ -198,7 +220,7 @@
     var sun = new THREE.DirectionalLight(0xffffff, 0.55); sun.position.set(-90, 160, 80); scene.add(sun);
 
     /* centre et rayon */
-    var ref = mes.length ? mes : lots, cx0 = 0, cz0 = 0;
+    var ref = !pub && mes.length ? mes : lots, cx0 = 0, cz0 = 0;
     ref.forEach(function (l) { cx0 += l.cx; cz0 += l.cz; }); cx0 /= ref.length; cz0 /= ref.length;
     var mx = 0, ax = 0, az = 0, R = 20;
     lots.forEach(function (l) { ax += l.cx; az += l.cz; R = Math.max(R, Math.hypot(l.cx - cx0, l.cz - cz0)); }); ax /= lots.length; az /= lots.length;
@@ -209,7 +231,7 @@
 
     /* groupes fusionnés par statut : un seul maillage par statut, quelle que soit la taille du plan */
     var groups = {}, meshes = [];
-    ['libre', 'attribue', 'mon_lot'].forEach(function (st) {
+    ORDRE.forEach(function (st) {
       var subset = lots.filter(function (l) { return l.statut === st; });
       var h = HAUT[st], chunksP = [], chunksN = [], ranges = [], face = 0, lines = [], total = 0;
       subset.forEach(function (l) {
@@ -270,8 +292,8 @@
     }
 
     /* caméra orbitale */
-    var cam = { th: -0.9, ph: 0.6, r: 400, tx: cx0, tz: cz0 };
-    var vueMon = { th: 0.6, ph: 0.95, r: clamp(RT * 0.8, 95, 190), tx: cx0, tz: cz0 };
+    var cam = { th: -0.9, ph: 0.6, r: 400, tx: pub ? ax : cx0, tz: pub ? az : cz0 };
+    var vueMon = pub ? { th: 0.6, ph: 0.95, r: clamp(RT * 2.4, 90, 700), tx: ax, tz: az } : { th: 0.6, ph: 0.95, r: clamp(RT * 0.8, 95, 190), tx: cx0, tz: cz0 };
     var want = {}; function viser(v) { want = { th: v.th, ph: v.ph, r: v.r, tx: v.tx, tz: v.tz }; }
     viser(vueMon); if (REDUIT) { cam.th = want.th; cam.ph = want.ph; cam.r = want.r; }
     var spin = !REDUIT, planVue = false, ptrs = {}, moved = 0, rMax = RT * 3.2 + 300;
@@ -329,6 +351,7 @@
     }
 
     /* commandes */
+    box.addEventListener('change', function (e) { var t = e.target; if (t && t.hasAttribute && t.hasAttribute('data-planselect')) changerPlan(+t.value); });
     box.addEventListener('click', function (e) {
       var b = e.target.closest('[data-f],[data-a],[data-lot],[data-plan]'); if (!b || !box.contains(b)) return;
       if (b.dataset.f) {
@@ -337,14 +360,14 @@
       } else if (b.dataset.lot) choisir(b.dataset.lot);
       else if (b.dataset.plan) changerPlan(+b.dataset.plan);
       else if (b.dataset.a === 'mon') { choisir(null, true); viser(vueMon); planVue = false; btn('plan').setAttribute('aria-pressed', 'false'); btn('plan').classList.remove('on'); }
-      else if (b.dataset.a === 'tout') { choisir(null, true); want.tx = ax; want.tz = az; want.r = clamp(RT * 2.6, 90, rMax); want.ph = 0.9; stopSpin(); }
+      else if (b.dataset.a === 'tout') { choisir(null, true); want.tx = ax; want.tz = az; want.r = clamp(RT * (pub ? 2.4 : 2.6), 90, pub ? 700 : rMax); want.ph = 0.9; stopSpin(); }
       else if (b.dataset.a === 'plan') { planVue = !planVue; b.classList.toggle('on', planVue); b.setAttribute('aria-pressed', planVue ? 'true' : 'false'); want.ph = planVue ? 0.08 : 0.95; if (planVue) want.th = 0; stopSpin(); }
       else if (b.dataset.a === 'rejouer') rejouer();
       else if (b.dataset.a === 'fermer') choisir(null);
     });
 
     /* animation d'entrée : les lots montent, puis le faisceau signale le vôtre */
-    var t0 = performance.now() / 1000, delais = { libre: 0.1, attribue: 0.35, mon_lot: 1.0 };
+    var t0 = performance.now() / 1000, delais = { libre: 0.1, reserve: 0.25, attribue: 0.35, vendu: 0.35, mon_lot: 1.0 };
     function rejouer() {
       if (REDUIT) return;
       t0 = performance.now() / 1000; Object.keys(groups).forEach(function (k) { groups[k].scale.y = 0.001; }); pins.forEach(function (p) { p.visible = false; });
@@ -377,7 +400,7 @@
     return {
       destroy: detruire,
       select: function (id) { choisir(id); return selected ? selected.id : null; },
-      info: function () { return { webgl: true, lots: lots.length, mes: mes.length, grille: prep.modeGrille, libres: cnt.libre, attribues: cnt.attribue, sansTrace: prep.sansTrace }; }
+      info: function () { return { webgl: true, public: pub, lots: lots.length, mes: mes.length, grille: prep.modeGrille, libres: cnt.libre, reserves: cnt.reserve, attribues: cnt.attribue, vendus: cnt.vendu, sansTrace: prep.sansTrace }; }
     };
   }
 

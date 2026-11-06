@@ -118,8 +118,12 @@ test('le portail branche l\'onglet « Plan 3D » et charge la 3D à la demande, 
 });
 
 test('le module n\'accède à aucune donnée nominative ou financière d\'un autre lot', () => {
-  const js = lire('portail-plan3d.js');
-  assert.ok(!/\.(prix|client_id|telephone|email|nom|montant)\b/.test(js.replace(/\/\*[\s\S]*?\*\//g, '')), 'champ sensible lu dans le module');
+  const js = lire('portail-plan3d.js').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(!/\.(client_id|telephone|email|nom|montant)\b/.test(js), 'champ sensible lu dans le module');
+  /* Le prix n'est lu que pour le plan public (mêmes informations que les fiches de la carte). Dans l'espace souscripteur,
+     la fonction serveur ne le renvoie pas (voir le test des champs serveur) et il n'est affiché qu'en mode public. */
+  const affichages = js.split('\n').filter((l) => /l\.prix/.test(l) && /<span>Prix/.test(l));
+  assert.ok(affichages.length > 0 && affichages.every((l) => /pub && l\.prix/.test(l)), 'prix affiché hors mode public');
 });
 
 test('fonction serveur : champs renvoyés limités, statut réduit à 3 valeurs, droits sans anon', () => {
