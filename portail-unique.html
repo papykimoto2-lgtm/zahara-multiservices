@@ -2444,6 +2444,7 @@
       +'<button onclick="sSub(this,\'ech\')">Échéancier</button>'
       +'<button onclick="sSub(this,\'ver\')">Versements</button>'
       +'<button onclick="sSub(this,\'tra\')">Travaux</button>'
+      +((c.lot_id||(c.lot_ids&&c.lot_ids.length))?'<button onclick="sSub(this,\'plan\');planOuvrir()">🗺️ Plan 3D</button>':'')
       +'<button onclick="sSub(this,\'rec\')">🔑 Réception</button>'
       +(S.suivi?'<button onclick="sSub(this,\'tit\')">📜 Suivi du titre</button>':'')
       +'<button onclick="sSub(this,\'doc\')">Documents</button>'
@@ -2456,6 +2457,7 @@
     html+='<div class="sub" id="s-ech"><div class="card"><strong>📅 Échéancier</strong><div style="overflow-x:auto;"><table><thead><tr><th>N°</th><th>Échéance</th><th>Montant</th><th>Statut</th></tr></thead><tbody>'+echeancier()+'</tbody></table></div><div style="font-size:.72rem; color:#4b6a8b; margin-top:8px;">Mensualité = (Prix − Apport) ÷ Durée. Frais exclus.</div></div></div>';
     html+='<div class="sub" id="s-ver"><div class="card"><strong>💳 Historique des versements</strong><div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Type</th><th>Concerne</th><th>Montant</th><th>Mode</th></tr></thead><tbody>'+tableVers(vs)+'</tbody></table></div></div></div>';
     html+='<div class="sub" id="s-tra">'+blocTravaux()+'</div>';
+    html+='<div class="sub" id="s-plan"></div>';
     html+='<div class="sub" id="s-rec">'+blocReception()+'</div>';
     if(S.suivi) html+='<div class="sub" id="s-tit">'+blocSuiviTitre()+blocPiecesTitre()+blocDeboursTitre()+'</div>';
     html+='<div class="sub" id="s-doc">'+sPrixModifs()+sAttSoldeSuivi()+'<div class="card"><strong>📁 Mes documents</strong><div style="display:flex; flex-direction:column; gap:12px; margin-top:12px; max-width:340px;"><button class="highlight-btn" style="background:#0077b6;" onclick="docEcheancier()">📅 Échéancier personnalisé</button><button class="highlight-btn" style="background:#0077b6;" onclick="docAttestation()">📑 Attestation de versements</button>'+sAttSoldeBtn()+'</div></div></div>';
@@ -2512,6 +2514,34 @@
   async function sousSubmitObs(){ if(!S.dossier)return; S.dossier.visite=S.dossier.visite||{}; S.dossier.visite.observations_souscripteur=document.getElementById('sous-obs').value; await sousSaveDossier(); alert('Vos observations ont été transmises au promoteur.'); rendreSouscripteur(); _reSelectRec(); }
   async function sousValiderReserve(i){ if(!S.dossier||!S.dossier.reserves||!S.dossier.reserves[i])return; var r=S.dossier.reserves[i]; r.statut='levee_validee'; r.sous_valide=true; r.sous_valide_date=new Date().toISOString().slice(0,10); await sousSaveDossier(); rendreSouscripteur(); _reSelectRec(); }
 
+  /* Plan 3D du lotissement : la bibliothèque 3D (hébergée avec le portail, aucun service tiers) et le module ne sont chargés
+     qu'à l'ouverture de l'onglet. Le serveur (fc_vue_plan_lotissement) ne renvoie des autres lots que leur forme et un statut
+     « libre / attribué » ; le détail financier affiché est celui du souscripteur connecté. */
+  function _planScript(src, global){
+    return new Promise(function(ok,ko){
+      if(window[global]) return ok();
+      var el=document.createElement('script'); el.src=src; el.onload=ok; el.onerror=function(){ ko(new Error('script')); }; document.head.appendChild(el);
+    });
+  }
+  async function planOuvrir(){
+    var box=document.getElementById('s-plan'); if(!box||box.getAttribute('data-ok')==='1'||!S.client) return;
+    box.setAttribute('data-ok','1');
+    box.innerHTML='<div class="loader"><span class="spinner dark"></span> Chargement du plan…</div>';
+    try{
+      var r=await fetch(SB_URL+'/rest/v1/rpc/fc_vue_plan_lotissement',{ method:'POST', headers:_authHdr(true), body:'{}' });
+      if(r.status===401||r.status===403) throw new Error('session');
+      if(!r.ok) throw new Error('http');
+      var v=await r.json();
+      await _planScript('/vendor/three.r128.min.js','THREE');
+      await _planScript('/portail-plan3d.js','PortailPlan3D');
+      var vs=sVers(), total=parseFloat(S.client.montant_total)||0;
+      var verse=vs.filter(surPrix).reduce(function(a,x){return a+(parseFloat(x.montant)||0);},0);
+      window.PortailPlan3D.monter(box,{ plans:(v&&Array.isArray(v.plans))?v.plans:[], paiement:{ total:total, verse:verse, reste:Math.max(0,total-verse), pct:total>0?Math.min(100,verse/total*100):0 } });
+    }catch(e){
+      box.setAttribute('data-ok','0');
+      box.innerHTML='<div class="card"><strong>🗺️ Plan 3D</strong><p style="font-size:.85rem;color:#4b6a8b;margin:8px 0;">'+(e&&e.message==='session'?'Session expirée : reconnectez-vous.':'Le plan n\'a pas pu être chargé pour le moment.')+'</p><button class="highlight-btn" onclick="planOuvrir()">Réessayer</button></div>';
+    }
+  }
   function kpiBox(l,v,st){ return '<div class="kpi"><div class="l">'+l+'</div><div class="v" style="'+(st||'')+'">'+v+'</div></div>'; }
   function sSub(btn,key){
     document.querySelectorAll('#sous-dash .subnav button').forEach(function(b){ b.classList.remove('on'); });
