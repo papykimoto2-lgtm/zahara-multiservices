@@ -123775,7 +123775,11 @@ function attSoldeClientIntrouvable(){ toast('⛔ Souscripteur introuvable : son 
 function attSoldeApercu(clientId, kind){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c){ attSoldeClientIntrouvable(); return; }
   var a = c[attChamp(kind)] || {};
-  var html = (a.statut==='valide' && a.html) ? attSoldeHtmlFinal(a, c) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind), date:today(), projet:true, kind:kind, sansVisa:!!a.sans_visa});
+  /* Validée = fiche validée/émise/délivrée, OU décision « validé » de la hiérarchie postérieure à la demande (fiche périmée sur ce poste) : plus de filigrane. */
+  var decidee = (DATA.validations||[]).some(function(v){ return v.type===attChamp(kind) && v.ref_id===clientId && v.statut==='valide' && String(v.date_decision||'')>=String(a.date_demande||''); });
+  var ok = ['valide','emise','delivre'].indexOf(a.statut)!==-1 || (decidee && ['en_attente','brouillon'].indexOf(a.statut)!==-1);
+  var html = ok ? (a.html ? attSoldeHtmlFinal(a, c) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind), date:a.date_emission||a.valide_le||today(), signataire:a.valide_par, kind:kind, sansVisa:!!a.sans_visa}))
+    : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind), date:today(), projet:true, kind:kind, sansVisa:!!a.sans_visa});
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
   w.document.write(html); w.document.close();
 }
@@ -125635,7 +125639,10 @@ async function cesAttDemander(id) {
 function cesAttApercu(id) {
   var c = (DATA.cessions_foncieres || []).find(function(x){ return x.id === id; }); if (!c) return;
   var a = c.attestation_solde || {};
-  var html = (a.statut === 'valide' && a.html) ? a.html : cesAttHtml(c, { numero: a.numero || cesAttNumero(), date: today(), projet: true });
+  var decidee = (DATA.validations || []).some(function(v){ return v.type === CES_ATT_TYPE && v.ref_id === id && v.statut === 'valide' && String(v.date_decision || '') >= String(a.date_demande || ''); });
+  var ok = ['valide', 'emise', 'delivre'].indexOf(a.statut) !== -1 || (decidee && ['en_attente', 'brouillon'].indexOf(a.statut) !== -1);
+  var html = ok ? (a.html || cesAttHtml(c, { numero: a.numero, date: a.date_emission || a.valide_le || today(), signataire: a.valide_par }))
+    : cesAttHtml(c, { numero: a.numero || cesAttNumero(), date: today(), projet: true });
   var w = window.open('', '_blank', 'width=860,height=900'); if (!w) { toast('Fenêtre bloquée par le navigateur.', 'error'); return; }
   w.document.write(html); w.document.close();
 }
