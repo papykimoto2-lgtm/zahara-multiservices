@@ -356,6 +356,9 @@
     }
     .carte-etiquette{ background:var(--pp-charbon); color:#fff; border:none; border-radius:6px; padding:3px 8px; font-size:.68rem; font-weight:600; box-shadow:0 2px 6px rgba(0,0,0,.2); }
     .carte-etiquette::before{ border-top-color:var(--pp-charbon); }
+    .carte-vues{ display:inline-flex; gap:0; margin-bottom:10px; border:1px solid #cfdfed; border-radius:999px; overflow:hidden; background:#fff; }
+    .carte-vues button{ border:0; background:#fff; padding:8px 16px; font-size:.82rem; font-weight:600; color:#1e4663; cursor:pointer; }
+    .carte-vues button.on{ background:var(--pp-primary); color:#fff; }
   </style>
   <style id="theme-vitrine">
     /* ═══ Thème vitrine « Moderne dynamique » ═══
@@ -910,6 +913,12 @@
       </aside>
 
       <div class="carte-main">
+        <div class="carte-vues" role="group" aria-label="Mode d'affichage">
+          <button type="button" class="on" id="carte-vue-carte" onclick="carteVue('carte')">🗺️ Carte</button>
+          <button type="button" id="carte-vue-3d" onclick="carteVue('3d')">🧊 Plan 3D</button>
+        </div>
+        <div id="carte-3d" hidden></div>
+        <div id="carte-bloc-carte">
         <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
           <label style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:#4b6a8b;cursor:pointer;">
             <input type="checkbox" id="carte-chk-etiquettes" onchange="toggleEtiquettesCarte(this.checked)">
@@ -935,6 +944,7 @@
         </div>
 
         <div id="carte-liste" style="margin-top:18px;"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -2139,6 +2149,20 @@
     var r=await fetch(SB_URL+'/rest/v1/'+path,{ headers:_authHdr() });
     if(!r.ok) throw new Error('HTTP '+r.status);
     return await r.json();
+  }
+
+  /* Lecture complète d'une vue, page par page. Le serveur plafonne le nombre de lignes par réponse (souvent 1 000) :
+     un simple « limit=2000 » renvoyait donc au plus ce plafond, et des lots manquaient sur la carte.
+     On avance du nombre de lignes réellement reçues jusqu'à une page vide, quel que soit ce plafond ;
+     « order » garantit un découpage stable d'une page à l'autre. Garde-fou : 50 pages. */
+  async function sbTout(path, ordre){
+    var tout=[], sep=path.indexOf('?')===-1?'?':'&', off=0;
+    for(var i=0;i<50;i++){
+      var page=await sb(path+sep+'order='+(ordre||'id')+'&limit=1000&offset='+off);
+      if(!Array.isArray(page)||!page.length) break;
+      tout=tout.concat(page); off+=page.length;
+    }
+    return tout;
   }
 
   async function sha256Hex(str){
@@ -4987,9 +5011,9 @@
     BIENS.charge=true;
     try{
       var r=await Promise.all([
-        sb('pi_lots_public?select=*&limit=2000').catch(function(){return [];}),
-        sb('pi_parcelles_public?select=*&limit=1000').catch(function(){return [];}),
-        sb('pi_biens_louer_public?select=*&limit=1000').catch(function(){return [];}),
+        sbTout('pi_lots_public?select=*').catch(function(){return [];}),
+        sbTout('pi_parcelles_public?select=*').catch(function(){return [];}),
+        sbTout('pi_biens_louer_public?select=*').catch(function(){return [];}),
         /* Programmes et opérations depuis les vues publiques. Les programmes
            venaient d'un champ texte ressaisi à la main dans le paramétrage :
            il ignorait la table programmes et se périmait dès la première
@@ -5483,6 +5507,49 @@
     CARTE.charge=true;
     majCarte();
   }
+
+  /* Plan 3D public (sans connexion) : mêmes lots que la carte (vues publiques), un plan par programme ayant des lots tracés.
+     Ne montre rien de plus que les fiches de la carte : numéro, superficie, prix, statut. La 3D et le module ne se chargent
+     qu'à la première ouverture. */
+  var CARTE3D = { monte:false, ctrl:null };
+  function carteVue(v){
+    var troisD=(v==='3d');
+    document.getElementById('carte-vue-carte').classList.toggle('on',!troisD);
+    document.getElementById('carte-vue-3d').classList.toggle('on',troisD);
+    document.getElementById('carte-3d').hidden=!troisD;
+    document.getElementById('carte-bloc-carte').hidden=troisD;
+    if(troisD) carte3dOuvrir();
+    else if(CARTE.map) setTimeout(function(){ CARTE.map.invalidateSize(); },60);
+  }
+  function _plansPublics(){
+    var noms={}; (BIENS.programmes||[]).forEach(function(g){ if(g&&g.id) noms[g.id]=g.nom||g.libelle||''; });
+    var parProg={};
+    (BIENS.lots||[]).forEach(function(l){
+      var poly=_mapContour(l.geo_polygon); if(!poly) return;
+      var st=_mapStatutLot(l.statut).cle, k=l.programme_id||'_';
+      (parProg[k]=parProg[k]||[]).push({ id:l.id, numero:l.numero||l.id, ilot:l.ilot||'', surface:_mapNum(l.superficie)||0, prix:_mapNum(l.prix)||0,
+        statut: st==='dispo'?'libre':(st==='reserve'?'reserve':'vendu'), poly:poly.map(function(q){ return [q[0],q[1]]; }) });
+    });
+    return Object.keys(parProg).filter(function(k){ return parProg[k].length>=3; }).map(function(k){
+      var lots=parProg[k], total=lots.length;
+      return { parcelle_id:'', parcelle:'', programme:noms[k]||(k==='_'?'Autres lots':'Programme'), total:total, tronque:total>1800, lots:lots.slice(0,1800) };
+    }).sort(function(a,b){ return b.total-a.total; });
+  }
+  async function carte3dOuvrir(){
+    var box=document.getElementById('carte-3d'); if(!box||CARTE3D.monte) return;
+    CARTE3D.monte=true;
+    box.innerHTML='<div class="loader"><span class="spinner dark"></span> Chargement du plan 3D…</div>';
+    try{
+      await chargerBiens();
+      await _planScript('/vendor/three.r128.min.js','THREE');
+      await _planScript('/portail-plan3d.js','PortailPlan3D');
+      CARTE3D.ctrl=window.PortailPlan3D.monter(box,{ mode:'public', plans:_plansPublics() });
+    }catch(e){
+      CARTE3D.monte=false;
+      box.innerHTML='<div class="card"><strong>🧊 Plan 3D</strong><p style="font-size:.85rem;color:#4b6a8b;margin:8px 0;">Le plan 3D n\'a pas pu être chargé pour le moment.</p><button class="highlight-btn" onclick="carte3dOuvrir()">Réessayer</button></div>';
+    }
+  }
+  window.carteVue=carteVue; window.carte3dOuvrir=carte3dOuvrir;
 
   /* Bascule du fond de carte (rues / satellite) depuis les boutons du panneau. */
   function changerFondCarte(btn, cle){
