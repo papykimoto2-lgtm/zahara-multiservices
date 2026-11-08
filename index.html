@@ -2346,6 +2346,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
   <script src="wa-relances-ui.js"></script>
   <script src="entonnoir.js"></script>
   <script src="entonnoir-ui.js"></script>
+  <script src="lead-score.js"></script>
+  <script src="lead-score-ui.js"></script>
 <!-- a11y-contrast:debut -->
 <style id="a11y-contrast">
 /* ═══ ACCESSIBILITÉ — contrastes WCAG 2.1 niveau AA (≥ 4,5:1 pour le texte courant) ═══
@@ -11624,6 +11626,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <option value="affichage">Affichage</option>
           </select>
           <button class="btn btn-secondary btn-sm" onclick="exportLeads()">⬇ Export</button>
+          <button class="btn btn-primary btn-sm" onclick="lsOuvrir()" title="Classement des prospects par score, avec l'action recommandée">🎯 À appeler</button>
           <button class="btn btn-secondary btn-sm" onclick="entOuvrir()" title="Où perd-on des ventes, et pourquoi ?">🔻 Entonnoir</button>
           <button class="btn btn-primary" onclick="openLead()">+ Nouveau prospect</button>
         </div>
@@ -98393,6 +98396,7 @@ function notifierLeadWeb(nom, detail){
 
 function renderPipeline() {
   populateAllERP();
+  if (window.lsPreparer) lsPreparer();
   var board = document.getElementById('pipeline-board');
   var funnel = document.getElementById('funnel-stats');
   if (!board) return;
@@ -98421,7 +98425,7 @@ function renderPipeline() {
 
   /* ── Kanban ── */
   board.innerHTML = PIPELINE_STADES.map(function(st, i){
-    var leads = byStade[st.id];
+    var leads = window.lsTrier ? lsTrier(byStade[st.id]) : byStade[st.id];
     var val = leads.reduce(function(s,l){ return s + (parseFloat(l.budget)||0); }, 0);
     var prevN = i>0 ? byStade[PIPELINE_STADES[i-1].id].length : null;
     var convTxt = (i>0 && prevN) ? ('↳ ' + Math.round(leads.length/prevN*100) + '% depuis ' + PIPELINE_STADES[i-1].label.toLowerCase()) : '&nbsp;';
@@ -98434,6 +98438,7 @@ function renderPipeline() {
       if (l.source === 'site_web') chips += '<span class="pl-chip" style="background:#dbeafe;color:#1e40af;">🌐 Réservation en ligne</span>';
       if (l.pays && String(l.pays).toLowerCase().indexOf('ivoire')===-1 && l.pays.trim()) chips += '<span class="pl-chip" style="background:#fef3c7;color:#92400e;">🌍 Diaspora · ' + escHtml(l.pays) + '</span>';
       if (l.type_logement) chips += '<span class="pl-chip">🏠 ' + escHtml(l.type_logement) + '</span>';
+      if (window.lsChip)   chips = lsChip(l) + chips;
       if (l.budget)        chips += '<span class="pl-chip budget">💰 ' + fmtF(l.budget) + ' F</span>';
       if (prog)            chips += '<span class="pl-chip">📍 ' + escHtml(prog.nom) + '</span>';
       if (due)             chips += '<span class="pl-chip warn">⏰ Relance due</span>';

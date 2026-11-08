@@ -169,6 +169,28 @@ Pour le recouvrement des retards : manuel Relances (PRO-REL).
 
 > Chaque changement de stade est daté et attribué. Les prospects antérieurs à cette fonction sont comptés d'après leur stade actuel (mention « estimé »).
 
+### CRM-10 — Scoring des prospects
+
+**Qui** : commerciaux et direction. **Où** : Pipeline Commercial › **🎯 À appeler** et pastille sur chaque carte.
+
+1. Le score (0 à 100) est **recalculé à chaque affichage** ; rien n'est saisi à la main.
+2. Niveaux : 🔥 chaud (65 et plus), 🟠 tiède (40 à 64), ❄️ froid (moins de 40).
+3. Survoler la pastille : détail des points par critère et action recommandée.
+4. **🎯 À appeler** : les 25 prospects ouverts à traiter en premier (score, puis budget), avec appel et WhatsApp en un clic.
+5. Dans chaque colonne du pipeline, les plus chauds sont en haut.
+
+| Critère | Points | Lecture |
+|---|---|---|
+| Avancement | 30 | Plus le stade est avancé, plus le score monte |
+| Fraîcheur | 20 | Dernier mouvement : 3 j ou moins = maximum, plus de 30 j = zéro |
+| Budget | 15 | Budget comparé au prix du programme (ou au ticket moyen) |
+| Source | 15 | Taux de conversion réel de la source (au moins 5 prospects, sinon neutre) |
+| Joignabilité | 10 | Téléphone, e-mail, programme ciblé, commercial affecté |
+| Suivi | 10 | Relance planifiée ; relance en retard = 2 points |
+
+> Les poids sont des repères métier, pas un modèle appris. Les revoir quand au moins 50 prospects sont clos (convertis ou perdus).
+> Un score bas sur un prospect « sans budget » signifie « à qualifier », pas « à abandonner ».
+
 ## 4. Contrôles et blocages
 
 | Contrôle | Effet |
