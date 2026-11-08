@@ -2342,6 +2342,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="wa-relances.js"></script>
+  <script src="wa-relances-ui.js"></script>
 <!-- a11y-contrast:debut -->
 <style id="a11y-contrast">
 /* ═══ ACCESSIBILITÉ — contrastes WCAG 2.1 niveau AA (≥ 4,5:1 pour le texte courant) ═══
@@ -5416,6 +5418,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
           <div class="spacer"></div>
           <input type="text" class="form-control" id="search-relances" placeholder="🔍 Rechercher un souscripteur (nom, tél, dossier)" style="max-width:280px;" oninput="detectRelances()">
+          <button class="btn btn-primary btn-sm" onclick="waRelOuvrir()" title="Relances WhatsApp J-3 / J0 / J+3 / J+10 avec lien de paiement">📲 Campagne WhatsApp</button>
           <button class="btn btn-secondary btn-sm" onclick="relancesActualiser()">🔄 Actualiser la liste</button>
           <button class="btn btn-secondary btn-sm" onclick="imprimerEtatRelances()" title="Imprimer l'état tel qu'affiché (onglet, recherche et tri en cours)">🖨️ Imprimer l'état</button>
         </div>
