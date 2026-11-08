@@ -57,6 +57,19 @@
 3. Examiner produits, coûts, compte de résultat, cash-flow, seuil de rentabilité, prévisionnel de trésorerie sur 12 mois, alertes, classement des programmes.
 4. **Imprimer** pour le comité.
 
+### PIL-04 bis — Santé des marges
+
+**Où** : Bilan de Promotion, bloc **🚦 Santé des marges** (tous les programmes). À consulter chaque mois.
+
+1. Régler la **marge cible** (15 % par défaut).
+2. Lire le statut : 🔴 marge négative · 🟠 sous la cible · 🟢 dans la cible. La marge est jugée **nette des commissions à venir** quand elles sont observables.
+3. Traiter d'abord les **⚠ données incomplètes** : foncier absent, aucun marché de travaux pour des logements, lots sans prix, encaissements sans commission. Une marge élevée sur des coûts manquants est trompeuse.
+4. Lire le **prix moyen plancher** : prix minimal moyen des lots restants pour tenir la marge cible sur toute l'opération, face au prix catalogue actuel et à la remise maximale possible. Si le plancher dépasse le catalogue, la cible n'est plus atteignable sans revoir les prix ou les coûts.
+5. Cliquer une ligne pour ouvrir le détail du programme.
+
+> **Frais commerciaux** : les commissions réelles (commercial et apporteur, hors annulées) sont comptées dans les coûts du programme. Elles ne l'étaient pas auparavant, ce qui surévaluait les marges.
+> **Commissions à venir** : taux réellement observé sur le programme × reste à encaisser. Jamais un taux supposé.
+
 ### PIL-05 — Plan de financement
 
 1. Ajouter une ligne de financement : **montant prévu obligatoire**.

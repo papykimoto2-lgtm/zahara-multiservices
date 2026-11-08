@@ -2352,6 +2352,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
   <script src="tresorerie-prev-ui.js"></script>
   <script src="apporteurs-rang.js"></script>
   <script src="apporteurs-rang-ui.js"></script>
+  <script src="marge-prog.js"></script>
+  <script src="marge-prog-ui.js"></script>
 <!-- a11y-contrast:debut -->
 <style id="a11y-contrast">
 /* ═══ ACCESSIBILITÉ — contrastes WCAG 2.1 niveau AA (≥ 4,5:1 pour le texte courant) ═══
@@ -10078,6 +10080,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
         </div>
 
+        <div id="bp-sante" style="margin-bottom:16px;"></div>
         <div id="bp-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px;"></div>
         <div class="card" style="margin-bottom:16px;border:1px solid var(--or);">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -73613,9 +73616,17 @@ function bpCompute(progId) {
   var coutHonoTech = coutConceptionReel>0 ? coutConceptionReel : Math.round(coutTravaux * pHonoTech/100);
   /* Frais commerciaux : commissions apporteurs d'affaires liées aux lots du programme. */
   var lotIds = lots.map(function(l){return l.id;});
-  var coutCommercial = (DATA.commissions_apporteurs || DATA.apporteurs_commissions || []).filter(function(cm){
-    return (cm.programme_id===progId) || (cm.lot_id && lotIds.indexOf(cm.lot_id)>=0);
-  }).reduce(function(s,cm){ return s + (parseFloat(cm.montant)||0); }, 0);
+  /* [CORRECTIF] Ce calcul lisait des stores inexistants (commissions_apporteurs / apporteurs_commissions) : les frais
+     commerciaux valaient toujours 0 et la marge était surévaluée. Les commissions réelles vivent dans DATA.commissions
+     (commercial + apporteur, champ montant_comm, hors annulées), rattachées au programme directement, par lot ou par souscripteur. */
+  var clientsProg = {}; (DATA.clients || []).forEach(function(c){ if (c.programme_id === progId) clientsProg[c.id] = true; });
+  var commsProg = (DATA.commissions || []).filter(function(cm){
+    if (cm.statut === 'annulee') return false;
+    if (cm.programme_id) return cm.programme_id === progId;
+    if (cm.client_id && clientsProg[cm.client_id]) return true;
+    return (cm.lot_ids || []).some(function(id){ return lotIds.indexOf(id) >= 0; });
+  });
+  var coutCommercial = commsProg.reduce(function(s,cm){ return s + (parseFloat(cm.montant_comm)||0); }, 0);
   /* Frais financiers : intérêts des financements du programme. */
   var coutFinancier = (DATA.financements_programme || []).filter(function(f){return f.programme_id===progId;})
     .reduce(function(s,f){ return s + (parseFloat(f.interets)||parseFloat(f.cout_financier)||0); }, 0);
@@ -73638,6 +73649,8 @@ function bpCompute(progId) {
   var tauxMarge = produits > 0 ? (marge / produits * 100) : 0;
   var tauxMargePot = produitsPotentiel > 0 ? (margePot / produitsPotentiel * 100) : 0;
   var resteEncaisser = produits - encaisse;
+  /* Commissions à générer sur ce qui reste à encaisser : taux OBSERVÉ sur ce programme (jamais un taux inventé). */
+  var commissionsAVenir = (encaisse > 0 && coutCommercial > 0) ? Math.round(Math.max(0, resteEncaisser) * coutCommercial / encaisse) : null;
   var resteDecaisser = coutTravaux - situationsPayees;
   var cashNet = encaisse - coutFoncier - situationsReglees;
 
@@ -73669,6 +73682,7 @@ function bpCompute(progId) {
     caVillaEngage:caVillaEngage, caImmeubleEngage:caImmeubleEngage,
     cessions:cessions, caCessions:caCessions, encaisse:encaisse, coutFoncier:coutFoncier, coutTravaux:coutTravaux,
     caLotsVendusReel:caLotsVendusReel, caLotsReserves:caLotsReserves, produitsRealises:produitsRealises, margeRealisee:margeRealisee, tauxMargeRealisee:tauxMargeRealisee,
+    commissionsAVenir:commissionsAVenir, nbCommissions:commsProg.length,
     coutHonoTech:coutHonoTech, coutCommercial:coutCommercial, coutFinancier:coutFinancier, coutAleas:coutAleas, coutsAnnexes:coutsAnnexes,
     situationsPayees:situationsPayees, situationsReglees:situationsReglees, produits:produits, produitsPotentiel:produitsPotentiel, couts:couts,
     marge:marge, margePot:margePot, tauxMarge:tauxMarge, tauxMargePot:tauxMargePot, resteEncaisser:resteEncaisser, resteDecaisser:resteDecaisser,
@@ -73678,6 +73692,7 @@ function bpCompute(progId) {
 }
 
 function bpRender() {
+  if (window.mpRendre) { try { mpRendre(); } catch (e) { console.error('[marge-prog]', e); } }
   var progId = (document.getElementById('bp-programme')||{}).value;
   var elK = document.getElementById('bp-kpis');
   if (!elK) return;
