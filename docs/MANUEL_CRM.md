@@ -191,6 +191,22 @@ Pour le recouvrement des retards : manuel Relances (PRO-REL).
 > Les poids sont des repères métier, pas un modèle appris. Les revoir quand au moins 50 prospects sont clos (convertis ou perdus).
 > Un score bas sur un prospect « sans budget » signifie « à qualifier », pas « à abandonner ».
 
+### CRM-11 — Classement des apporteurs
+
+**Qui** : direction commerciale. **Où** : Apporteurs d'affaire › **🏆 Classement**. À consulter chaque mois.
+
+1. Choisir la période (30 jours, 90 jours, 12 mois, depuis le début).
+2. Le classement suit l'**argent encaissé** sur la période (versements des clients apportés, hors frais de souscription), pas le nombre de promesses de vente.
+3. Lire pour chaque apporteur : part de l'encaissé, ventes et valeur vendue, résiliations, **coût de commission** (commissions ÷ encaissé), clients en retard, dernière vente.
+4. Signaux : 💤 sans vente depuis 90 jours · 🕳 aucune vente depuis la signature (60 jours et plus) · ⚠️ 40 % ou plus de clients en retard (au moins 3 clients) · 📄 contrat expiré ou expirant sous 60 jours · 🔒 non-contournement non signé.
+5. **Poids des 3 premiers** : au-delà de 80 % (avec plus de 3 apporteurs), le réseau dépend de trop peu de personnes.
+6. **À réveiller** : 💬 ouvre WhatsApp avec un message prêt, 📞 appelle, ✏️ ouvre la fiche.
+7. **⬇ CSV** : exporte le classement.
+
+**Paliers** (ventes sur 12 mois) : Bronze 1 · Argent 3 · Or 6 · Platine 12. Ce sont des niveaux de reconnaissance ; aucune prime n'est calculée ni versée. Les seuils se modifient dans `params.apporteurs_paliers`.
+
+> Les apporteurs suspendus ou résiliés ne sont jamais classés. Les commissions restent gérées par CRM-06.
+
 ## 4. Contrôles et blocages
 
 | Contrôle | Effet |

@@ -2350,6 +2350,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
   <script src="lead-score-ui.js"></script>
   <script src="tresorerie-prev.js"></script>
   <script src="tresorerie-prev-ui.js"></script>
+  <script src="apporteurs-rang.js"></script>
+  <script src="apporteurs-rang-ui.js"></script>
 <!-- a11y-contrast:debut -->
 <style id="a11y-contrast">
 /* ═══ ACCESSIBILITÉ — contrastes WCAG 2.1 niveau AA (≥ 4,5:1 pour le texte courant) ═══
@@ -12457,6 +12459,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
           <div class="spacer"></div>
           <button class="btn btn-secondary btn-sm" onclick="exportApporteursCSV()">⬇ Export</button>
+          <button class="btn btn-secondary btn-sm" onclick="aprOuvrir()" title="Qui apporte réellement de l'argent, qui dort, qui pose problème">🏆 Classement</button>
           <button class="btn btn-primary" onclick="openApporteurModal()">+ Nouvel apporteur</button>
         </div>
 
