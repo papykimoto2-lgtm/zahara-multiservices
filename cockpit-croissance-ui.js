@@ -56,6 +56,8 @@ function ccrSignaux() {
     S.locatif = { vacants: cnt('vacance'), perteMensuelle: rl.alertes.filter(function (a) { return a.k === 'vacance'; }).reduce(function (t, a) { return t + (rl.biens.find(function (l) { return l.bien.id === a.bien_id; }) || { loyer: 0 }).loyer; }, 0),
       recouvrement: cnt('recouvrement'), sousLoues: cnt('sous_loue'), finsProches: cnt('fin_proche') };
   } catch (e) { console.error('[cockpit-croissance] locatif', e); }
+
+  try { var px = pxdDonnees(); S.prix = { hausses: px.total.hausses, baisses: px.total.baisses }; } catch (e) { console.error('[cockpit-croissance] prix', e); }
   return S;
 }
 

@@ -91,6 +91,22 @@
 > **Frais commerciaux** : les commissions réelles (commercial et apporteur, hors annulées) sont comptées dans les coûts du programme. Elles ne l'étaient pas auparavant, ce qui surévaluait les marges.
 > **Commissions à venir** : taux réellement observé sur le programme × reste à encaisser. Jamais un taux supposé.
 
+### PIL-04 ter — Prix dynamique des lots
+
+**Qui** : direction commerciale (lecture), responsables (application), administrateur (réglages). **Où** : Lots › **💹 Prix dynamique**.
+
+1. Pour chaque programme, lire le **signal** : lots disponibles, ventes sur 90 jours (et les 90 jours d'avant), mois de stock au rythme actuel, prospects chauds.
+2. L'ERP propose :
+   - **📈 Hausse** (+5 % par défaut) : au moins 3 ventes sur 90 jours, 2 mois de stock ou moins, au moins un prospect chaud par lot disponible ;
+   - **📉 Baisse ciblée** (−5 %) : 12 mois de stock ou plus et peu de prospects chauds ; **seuls les lots anciens** (180 jours par défaut) sont concernés ;
+   - **⏸ Maintenir** dans les autres cas.
+3. **Plancher de marge** : une baisse ne descend jamais sous coût de revient du lot ÷ (1 − marge cible). Sans coût de lot, le plancher du programme (Santé des marges) s'applique, **s'il est fiable**. Sinon la baisse est **⛔ bloquée** : compléter les coûts, ou agir sur le financement ou le produit.
+4. Cocher les lots retenus puis **Appliquer la sélection** (responsable) : confirmation avec la variation cumulée.
+5. Chaque changement est tracé dans l'**historique du lot** (date, ancien et nouveau prix, motif, auteur). Un lot vendu ou réservé n'est jamais modifié ; si le prix a changé entre-temps, la ligne est refusée.
+6. **Mesurer** : relire le signal 30 jours plus tard. Une proposition est un **test**, pas une promesse de volume.
+
+> Les prix sont arrondis (50 000 F par défaut). Les prix déjà acceptés par des souscripteurs ne changent pas. Réglages (pas, seuils de stock, arrondi, ancienneté) dans le bloc « Réglages ».
+
 ### PIL-05 — Plan de financement
 
 1. Ajouter une ligne de financement : **montant prévu obligatoire**.

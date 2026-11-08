@@ -8,7 +8,7 @@
   function plur(n, s, p) { return n + ' ' + (n > 1 ? p : s); }
 
   /* s : { jour, tresorerie:{premierNegatif, besoin, soldeMin, semaineMin, seuil}, wa:{actif, nb, montant}, leads:{chauds, budgetChauds, dormantsNego, budgetNego, relancesRetard},
-           parrainage:{aValider, montant}, marges:{rouge, orange, incomplets, premier}, apporteurs:{dormants, contrats}, locatif:{vacants, perteMensuelle, recouvrement, sousLoues, finsProches} } ; f : formateur de montant */
+           parrainage:{aValider, montant}, marges:{rouge, orange, incomplets, premier}, apporteurs:{dormants, contrats}, locatif:{vacants, perteMensuelle, recouvrement, sousLoues, finsProches}, prix:{hausses, baisses} } ; f : formateur de montant */
   function construire(s, f) {
     f = f || function (n) { return String(Math.round(n)); };
     var A = [], j = s.jour || '';
@@ -64,6 +64,11 @@
     if (lo && (lo.sousLoues > 0 || lo.finsProches > 0))
       push({ aid: 'cr_loclev_' + j, prio: 46, urgent: false, icone: '📈', titre: 'Locatif : ' + (lo.sousLoues ? plur(lo.sousLoues, 'bien sous-loué', 'biens sous-loués') : '') + (lo.sousLoues && lo.finsProches ? ', ' : '') + (lo.finsProches ? plur(lo.finsProches, 'bail à renouveler', 'baux à renouveler') : ''),
         detail: 'Loyers sous la médiane du parc ou baux échus sous 90 jours.', boutons: [{ lib: '📉 Rentabilité', fn: "goTo('locatif');rloOuvrir()" }] });
+
+    var px = s.prix;
+    if (px && (px.hausses > 0 || px.baisses > 0))
+      push({ aid: 'cr_prix_' + j, prio: 54, urgent: false, icone: '💹', titre: 'Prix à ajuster : ' + (px.hausses ? plur(px.hausses, 'programme en forte demande', 'programmes en forte demande') : '') + (px.hausses && px.baisses ? ', ' : '') + (px.baisses ? plur(px.baisses, 'programme au stock dormant', 'programmes au stock dormant') : ''),
+        detail: 'Propositions chiffrées d\'après vos ventes, jamais sous le plancher de marge. À valider lot par lot.', boutons: [{ lib: '💹 Prix dynamique', fn: "goTo('lots');pxdOuvrir()" }] });
 
     var a = s.apporteurs;
     if (a && a.contrats > 0)

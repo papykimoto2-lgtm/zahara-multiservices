@@ -2358,6 +2358,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
   <script src="parrainage-ui.js"></script>
   <script src="rentabilite-locative.js"></script>
   <script src="rentabilite-locative-ui.js"></script>
+  <script src="prix-dynamique.js"></script>
+  <script src="prix-dynamique-ui.js"></script>
   <script src="cockpit-croissance.js"></script>
   <script src="cockpit-croissance-ui.js"></script>
 <!-- a11y-contrast:debut -->
@@ -4120,6 +4122,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div class="page-subtitle">Gestion des terrains, îlots et lots immobiliers</div>
           </div>
           <div class="spacer"></div>
+          <button class="btn btn-secondary btn-sm" onclick="pxdOuvrir()" title="Propositions de hausse ou de baisse ciblée selon vos ventes, sans jamais passer sous le plancher de marge">💹 Prix dynamique</button>
           <select class="filter-select" id="filter-programme-lots" onchange="filterLots()">
             <option value="">Tous les programmes</option>
           </select>

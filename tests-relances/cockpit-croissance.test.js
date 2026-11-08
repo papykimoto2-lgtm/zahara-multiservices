@@ -44,3 +44,9 @@ test('locatif : vacance, recouvrement, leviers (sous-loyer, baux à renouveler) 
   assert.equal(A.find(a => a.aid.startsWith('cr_locvac_')).montant, 700000); assert.match(A.find(a => a.aid.startsWith('cr_loclev_')).titre, /1 bien sous-loué, 2 baux à renouveler/);
   assert.deepEqual(C.construire({ jour: 'j', locatif: { vacants: 0, recouvrement: 0, sousLoues: 0, finsProches: 0 } }), []);
 });
+
+test('prix : une ligne unique, hausses et baisses comptées', () => {
+  const A = C.construire({ jour: 'j', prix: { hausses: 1, baisses: 2 } });
+  assert.equal(A.length, 1); assert.match(A[0].titre, /1 programme en forte demande, 2 programmes au stock dormant/); assert.equal(A[0].prio, 54);
+  assert.deepEqual(C.construire({ jour: 'j', prix: { hausses: 0, baisses: 0 } }), []);
+});
