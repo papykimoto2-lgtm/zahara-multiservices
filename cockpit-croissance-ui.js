@@ -50,6 +50,12 @@ function ccrSignaux() {
     var ap = aprDonnees(), tous = ap.classes.concat(ap.autres);
     S.apporteurs = { dormants: ap.nb_dormants, contrats: tous.filter(function (r) { return r.tags.some(function (t) { return t.k === 'contrat'; }); }).length };
   } catch (e) { console.error('[cockpit-croissance] apporteurs', e); }
+
+  try {
+    var rl = rloDonnees(), cnt = function (k) { return new Set(rl.alertes.filter(function (a) { return a.k === k; }).map(function (a) { return a.bien_id; })).size; };
+    S.locatif = { vacants: cnt('vacance'), perteMensuelle: rl.alertes.filter(function (a) { return a.k === 'vacance'; }).reduce(function (t, a) { return t + (rl.biens.find(function (l) { return l.bien.id === a.bien_id; }) || { loyer: 0 }).loyer; }, 0),
+      recouvrement: cnt('recouvrement'), sousLoues: cnt('sous_loue'), finsProches: cnt('fin_proche') };
+  } catch (e) { console.error('[cockpit-croissance] locatif', e); }
   return S;
 }
 

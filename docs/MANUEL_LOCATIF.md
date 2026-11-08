@@ -106,6 +106,28 @@
 2. **Candidatures** : prospects intéressés par un bien.
 3. **Démarcheurs** : agréés ou non.
 
+### LOC-11 — Rentabilité locative
+
+**Qui** : gestionnaire locatif (lecture), direction (décisions), administrateur (seuils). **Où** : Gestion locative › **📉 Rentabilité**. À consulter chaque mois ; les alertes remontent aussi dans le Cockpit.
+
+1. Lire les indicateurs : taux d'occupation, **perte mensuelle** due aux biens vacants, manque à gagner sur 12 mois, impayés, potentiel de sous-loyer.
+2. Traiter les **alertes** par ordre (rouge, puis montant décroissant) :
+
+| Alerte | Condition (réglable) | Action |
+|---|---|---|
+| 🕳 Vacance | Sans bail depuis 30 jours ou plus (rouge à 90) | Relouer, ajuster le loyer, lancer les travaux |
+| 💸 Recouvrement | Moins de 80 % encaissé sur 12 mois (au moins 3 quittances) | Recouvrement LOC-06, revoir le locataire |
+| 🔧 Entretien | Travaux terminés de plus de 15 % des loyers encaissés (rouge à 30 %) | Revoir l'état du bien ou le contrat d'entretien |
+| 📉 Sous-loué | Loyer au m² sous la médiane du parc de 15 % ou plus (3 comparables au moins, même commune et type) | Révision LOC-08 ou nouveau bail |
+| ⏳ Bail échu | Fin de bail sous 90 jours | Renouveler ou préparer la relocation |
+| 📈 Révision due | Plus de 12 mois sans révision | LOC-08 ; le gain se chiffre si le taux de révision est saisi |
+
+3. **Seuils d'alerte** (administrateur) : modifiables, avec le taux de révision annuel qui sert à chiffrer le gain.
+4. **⬇ CSV** : export par bien.
+
+> Vacance = jours sans bail actif ni en préavis sur les 12 derniers mois (un bien créé depuis moins d'un an est jugé sur sa durée réelle). Un bien en travaux n'est jamais signalé vacant.
+> Une alerte sans base chiffrée n'affiche pas de montant. Les travaux comptent pour la charge globale du bien ; la colonne « à notre charge » isole ceux imputés à l'exploitation.
+
 ## 4. Contrôles
 
 | Contrôle | Effet |

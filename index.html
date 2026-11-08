@@ -2356,6 +2356,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
   <script src="marge-prog-ui.js"></script>
   <script src="parrainage.js"></script>
   <script src="parrainage-ui.js"></script>
+  <script src="rentabilite-locative.js"></script>
+  <script src="rentabilite-locative-ui.js"></script>
   <script src="cockpit-croissance.js"></script>
   <script src="cockpit-croissance-ui.js"></script>
 <!-- a11y-contrast:debut -->
@@ -17218,6 +17220,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div class="page-sub">Baux · Quittancement · Charges · Recouvrement · Dépôts de garantie</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="rloOuvrir()" title="Biens vacants, impayés, sous-location, entretien : où le parc perd de l'argent">📉 Rentabilité</button>
             <button class="btn btn-secondary btn-sm" onclick="locQuittancerMois()">🧾 Quittancer le mois</button>
             <button class="btn btn-primary" onclick="locOpenBail()">+ Nouveau bail</button>
           </div>

@@ -37,3 +37,10 @@ test('marge : rouge prioritaire sur orange (une seule ligne marge) ; pluriels', 
   assert.equal(A.length, 1); assert.match(A[0].titre, /2 programmes à marge négative/);
   assert.match(C.construire({ jour: 'j', leads: { chauds: 1, budgetChauds: 1 } })[0].titre, /^1 prospect chaud à appeler$/);
 });
+
+test('locatif : vacance, recouvrement, leviers (sous-loyer, baux à renouveler) ; rien si rien à signaler', () => {
+  const A = C.construire({ jour: 'j', locatif: { vacants: 2, perteMensuelle: 700000, recouvrement: 1, sousLoues: 1, finsProches: 2 } });
+  assert.deepEqual(A.map(a => a.aid.split('_')[1]).sort(), ['loclev', 'locrec', 'locvac']);
+  assert.equal(A.find(a => a.aid.startsWith('cr_locvac_')).montant, 700000); assert.match(A.find(a => a.aid.startsWith('cr_loclev_')).titre, /1 bien sous-loué, 2 baux à renouveler/);
+  assert.deepEqual(C.construire({ jour: 'j', locatif: { vacants: 0, recouvrement: 0, sousLoues: 0, finsProches: 0 } }), []);
+});

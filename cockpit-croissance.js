@@ -8,7 +8,7 @@
   function plur(n, s, p) { return n + ' ' + (n > 1 ? p : s); }
 
   /* s : { jour, tresorerie:{premierNegatif, besoin, soldeMin, semaineMin, seuil}, wa:{actif, nb, montant}, leads:{chauds, budgetChauds, dormantsNego, budgetNego, relancesRetard},
-           parrainage:{aValider, montant}, marges:{rouge, orange, incomplets, premier}, apporteurs:{dormants, contrats} } ; f : formateur de montant */
+           parrainage:{aValider, montant}, marges:{rouge, orange, incomplets, premier}, apporteurs:{dormants, contrats}, locatif:{vacants, perteMensuelle, recouvrement, sousLoues, finsProches} } ; f : formateur de montant */
   function construire(s, f) {
     f = f || function (n) { return String(Math.round(n)); };
     var A = [], j = s.jour || '';
@@ -53,6 +53,17 @@
     if (p && p.aValider > 0)
       push({ aid: 'cr_parr_' + j, prio: 50, urgent: false, icone: '🤝', titre: plur(p.aValider, 'récompense de parrainage à valider', 'récompenses de parrainage à valider'),
         detail: 'Les filleuls ont versé le seuil. Montant : ' + f(p.montant) + ' F.', montant: p.montant, boutons: [{ lib: '🤝 Parrainage', fn: 'parOuvrir()' }] });
+
+    var lo = s.locatif;
+    if (lo && lo.vacants > 0)
+      push({ aid: 'cr_locvac_' + j, prio: 76, urgent: false, icone: '🕳', titre: plur(lo.vacants, 'bien locatif vacant depuis plus de 30 jours', 'biens locatifs vacants depuis plus de 30 jours'),
+        detail: 'Perte de ' + f(lo.perteMensuelle) + ' F de loyer chaque mois. Relouer, ajuster le loyer ou lancer les travaux.', montant: lo.perteMensuelle, boutons: [{ lib: '📉 Rentabilité', fn: "goTo('locatif');rloOuvrir()" }] });
+    if (lo && lo.recouvrement > 0)
+      push({ aid: 'cr_locrec_' + j, prio: 64, urgent: false, icone: '💸', titre: plur(lo.recouvrement, 'bien au recouvrement faible', 'biens au recouvrement faible'),
+        detail: 'Moins de 80 % des loyers encaissés sur 12 mois.', boutons: [{ lib: '📉 Rentabilité', fn: "goTo('locatif');rloOuvrir()" }] });
+    if (lo && (lo.sousLoues > 0 || lo.finsProches > 0))
+      push({ aid: 'cr_loclev_' + j, prio: 46, urgent: false, icone: '📈', titre: 'Locatif : ' + (lo.sousLoues ? plur(lo.sousLoues, 'bien sous-loué', 'biens sous-loués') : '') + (lo.sousLoues && lo.finsProches ? ', ' : '') + (lo.finsProches ? plur(lo.finsProches, 'bail à renouveler', 'baux à renouveler') : ''),
+        detail: 'Loyers sous la médiane du parc ou baux échus sous 90 jours.', boutons: [{ lib: '📉 Rentabilité', fn: "goTo('locatif');rloOuvrir()" }] });
 
     var a = s.apporteurs;
     if (a && a.contrats > 0)
