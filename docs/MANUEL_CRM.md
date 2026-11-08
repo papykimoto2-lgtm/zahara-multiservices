@@ -154,6 +154,21 @@ Pour le recouvrement des retards : manuel Relances (PRO-REL).
 
 **Où** : Rapports Commerciaux : performance, objectifs, commissions, analyses, impression. À lire chaque mois avec la direction.
 
+### CRM-09 — Entonnoir commercial
+
+**Qui** : direction commerciale. **Où** : Pipeline Commercial › **🔻 Entonnoir**.
+
+1. Choisir la période d'entrée des prospects, puis au besoin la source, le commercial ou le programme.
+2. Lire le **parcours** : prospects ayant atteint chaque étape, part qui passe à l'étape suivante, perdus à chaque étape, durée médiane. 🚧 marque le **goulot** (étape au plus faible passage, effectif d'au moins 5).
+3. Lire le **levier n°1** : ventes en plus si ce passage gagnait 10 points (indicatif, pas une prévision).
+4. Lire **Pourquoi on perd** : motifs classés, valeur perdue.
+5. Comparer sources, commerciaux et programmes. Une ligne atténuée (⚠) a moins de 5 prospects : non concluante.
+6. Relancer les **prospects dormants** (sans mouvement depuis 14 jours), classés par budget.
+
+**Perdre un prospect** : bouton **✕** sur la carte, **motif obligatoire**. Le prospect quitte le pipeline ; **↩ Rouvrir** le remet en jeu.
+
+> Chaque changement de stade est daté et attribué. Les prospects antérieurs à cette fonction sont comptés d'après leur stade actuel (mention « estimé »).
+
 ## 4. Contrôles et blocages
 
 | Contrôle | Effet |
