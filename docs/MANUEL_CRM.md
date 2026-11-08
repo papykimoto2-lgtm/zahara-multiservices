@@ -154,6 +154,80 @@ Pour le recouvrement des retards : manuel Relances (PRO-REL).
 
 **Où** : Rapports Commerciaux : performance, objectifs, commissions, analyses, impression. À lire chaque mois avec la direction.
 
+### CRM-09 — Entonnoir commercial
+
+**Qui** : direction commerciale. **Où** : Pipeline Commercial › **🔻 Entonnoir**.
+
+1. Choisir la période d'entrée des prospects, puis au besoin la source, le commercial ou le programme.
+2. Lire le **parcours** : prospects ayant atteint chaque étape, part qui passe à l'étape suivante, perdus à chaque étape, durée médiane. 🚧 marque le **goulot** (étape au plus faible passage, effectif d'au moins 5).
+3. Lire le **levier n°1** : ventes en plus si ce passage gagnait 10 points (indicatif, pas une prévision).
+4. Lire **Pourquoi on perd** : motifs classés, valeur perdue.
+5. Comparer sources, commerciaux et programmes. Une ligne atténuée (⚠) a moins de 5 prospects : non concluante.
+6. Relancer les **prospects dormants** (sans mouvement depuis 14 jours), classés par budget.
+
+**Perdre un prospect** : bouton **✕** sur la carte, **motif obligatoire**. Le prospect quitte le pipeline ; **↩ Rouvrir** le remet en jeu.
+
+> Chaque changement de stade est daté et attribué. Les prospects antérieurs à cette fonction sont comptés d'après leur stade actuel (mention « estimé »).
+
+### CRM-10 — Scoring des prospects
+
+**Qui** : commerciaux et direction. **Où** : Pipeline Commercial › **🎯 À appeler** et pastille sur chaque carte.
+
+1. Le score (0 à 100) est **recalculé à chaque affichage** ; rien n'est saisi à la main.
+2. Niveaux : 🔥 chaud (65 et plus), 🟠 tiède (40 à 64), ❄️ froid (moins de 40).
+3. Survoler la pastille : détail des points par critère et action recommandée.
+4. **🎯 À appeler** : les 25 prospects ouverts à traiter en premier (score, puis budget), avec appel et WhatsApp en un clic.
+5. Dans chaque colonne du pipeline, les plus chauds sont en haut.
+
+| Critère | Points | Lecture |
+|---|---|---|
+| Avancement | 30 | Plus le stade est avancé, plus le score monte |
+| Fraîcheur | 20 | Dernier mouvement : 3 j ou moins = maximum, plus de 30 j = zéro |
+| Budget | 15 | Budget comparé au prix du programme (ou au ticket moyen) |
+| Source | 15 | Taux de conversion réel de la source (au moins 5 prospects, sinon neutre) |
+| Joignabilité | 10 | Téléphone, e-mail, programme ciblé, commercial affecté |
+| Suivi | 10 | Relance planifiée ; relance en retard = 2 points |
+
+> Les poids sont des repères métier, pas un modèle appris. Les revoir quand au moins 50 prospects sont clos (convertis ou perdus).
+> Un score bas sur un prospect « sans budget » signifie « à qualifier », pas « à abandonner ».
+
+### CRM-11 — Classement des apporteurs
+
+**Qui** : direction commerciale. **Où** : Apporteurs d'affaire › **🏆 Classement**. À consulter chaque mois.
+
+1. Choisir la période (30 jours, 90 jours, 12 mois, depuis le début).
+2. Le classement suit l'**argent encaissé** sur la période (versements des clients apportés, hors frais de souscription), pas le nombre de promesses de vente.
+3. Lire pour chaque apporteur : part de l'encaissé, ventes et valeur vendue, résiliations, **coût de commission** (commissions ÷ encaissé), clients en retard, dernière vente.
+4. Signaux : 💤 sans vente depuis 90 jours · 🕳 aucune vente depuis la signature (60 jours et plus) · ⚠️ 40 % ou plus de clients en retard (au moins 3 clients) · 📄 contrat expiré ou expirant sous 60 jours · 🔒 non-contournement non signé.
+5. **Poids des 3 premiers** : au-delà de 80 % (avec plus de 3 apporteurs), le réseau dépend de trop peu de personnes.
+6. **À réveiller** : 💬 ouvre WhatsApp avec un message prêt, 📞 appelle, ✏️ ouvre la fiche.
+7. **⬇ CSV** : exporte le classement.
+
+**Paliers** (ventes sur 12 mois) : Bronze 1 · Argent 3 · Or 6 · Platine 12. Ce sont des niveaux de reconnaissance ; aucune prime n'est calculée ni versée. Les seuils se modifient dans `params.apporteurs_paliers`.
+
+> Les apporteurs suspendus ou résiliés ne sont jamais classés. Les commissions restent gérées par CRM-06.
+
+### CRM-12 — Parrainage souscripteur
+
+**Qui** : commerciaux (attribution), responsables (validation et versement), administrateur (règles). **Où** : Pipeline Commercial ou Suivi souscripteurs › **🤝 Parrainage**.
+
+1. **Règles** (administrateur) : activer le programme, montant de la récompense, % du prix que le filleul doit avoir **versé**, plafond par parrain, parrain à jour exigé. Programme désactivé : aucune offre n'est annoncée.
+2. **Solliciter** (onglet Ambassadeurs) : souscripteurs soldés ou à 50 % et plus, à jour. 💬 ouvre WhatsApp avec le message ; **Sollicité** date la demande (pas de relance avant 90 jours).
+3. **Enregistrer un parrainage** : choisir le parrain, puis le filleul (prospect ou souscripteur). Le prospect passe en source « Parrainage » ; devenu souscripteur, il est retrouvé par son téléphone.
+4. **Suivi** : un filleul est *éligible* quand l'argent versé atteint le seuil (frais de souscription exclus). Rien n'est créé automatiquement.
+5. **✓ Valider** (responsable) : la récompense passe « à verser ». **Valider toutes** pour le lot.
+6. **💰 Marquer versée** : mode et **référence obligatoires**, date. **✕** annule avec motif obligatoire.
+
+| État | Sens |
+|---|---|
+| Refusé : auto-parrainage | Même fiche ou même téléphone que le parrain |
+| Bloqué : parrain en retard | Règle « à jour exigé » |
+| Parrain inactif / filleul résilié | Aucune récompense |
+| Plafond atteint | Les plus anciens filleuls sont servis d'abord |
+
+> Le paiement se fait hors module (caisse ou virement). Aucune écriture comptable n'est générée : la passer en comptabilité avec la référence du journal.
+> Le journal vit dans la fiche du parrain (récompenses, demandes) et se synchronise avec elle.
+
 ## 4. Contrôles et blocages
 
 | Contrôle | Effet |

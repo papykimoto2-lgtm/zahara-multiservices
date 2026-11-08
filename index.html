@@ -2342,6 +2342,26 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="wa-relances.js"></script>
+  <script src="wa-relances-ui.js"></script>
+  <script src="entonnoir.js"></script>
+  <script src="entonnoir-ui.js"></script>
+  <script src="lead-score.js"></script>
+  <script src="lead-score-ui.js"></script>
+  <script src="tresorerie-prev.js"></script>
+  <script src="tresorerie-prev-ui.js"></script>
+  <script src="apporteurs-rang.js"></script>
+  <script src="apporteurs-rang-ui.js"></script>
+  <script src="marge-prog.js"></script>
+  <script src="marge-prog-ui.js"></script>
+  <script src="parrainage.js"></script>
+  <script src="parrainage-ui.js"></script>
+  <script src="rentabilite-locative.js"></script>
+  <script src="rentabilite-locative-ui.js"></script>
+  <script src="prix-dynamique.js"></script>
+  <script src="prix-dynamique-ui.js"></script>
+  <script src="cockpit-croissance.js"></script>
+  <script src="cockpit-croissance-ui.js"></script>
 <!-- a11y-contrast:debut -->
 <style id="a11y-contrast">
 /* ═══ ACCESSIBILITÉ — contrastes WCAG 2.1 niveau AA (≥ 4,5:1 pour le texte courant) ═══
@@ -4102,6 +4122,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div class="page-subtitle">Gestion des terrains, îlots et lots immobiliers</div>
           </div>
           <div class="spacer"></div>
+          <button class="btn btn-secondary btn-sm" onclick="pxdOuvrir()" title="Propositions de hausse ou de baisse ciblée selon vos ventes, sans jamais passer sous le plancher de marge">💹 Prix dynamique</button>
           <select class="filter-select" id="filter-programme-lots" onchange="filterLots()">
             <option value="">Tous les programmes</option>
           </select>
@@ -5416,6 +5437,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
           <div class="spacer"></div>
           <input type="text" class="form-control" id="search-relances" placeholder="🔍 Rechercher un souscripteur (nom, tél, dossier)" style="max-width:280px;" oninput="detectRelances()">
+          <button class="btn btn-primary btn-sm" onclick="waRelOuvrir()" title="Relances WhatsApp J-3 / J0 / J+3 / J+10 avec lien de paiement">📲 Campagne WhatsApp</button>
           <button class="btn btn-secondary btn-sm" onclick="relancesActualiser()">🔄 Actualiser la liste</button>
           <button class="btn btn-secondary btn-sm" onclick="imprimerEtatRelances()" title="Imprimer l'état tel qu'affiché (onglet, recherche et tri en cours)">🖨️ Imprimer l'état</button>
         </div>
@@ -10067,6 +10089,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
         </div>
 
+        <div id="bp-sante" style="margin-bottom:16px;"></div>
         <div id="bp-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px;"></div>
         <div class="card" style="margin-bottom:16px;border:1px solid var(--or);">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -11615,10 +11638,14 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <option value="reseaux_sociaux">Réseaux sociaux</option>
             <option value="commercial">Agent commercial</option>
             <option value="partenaire">Partenaire</option>
+            <option value="parrainage">Parrainage</option>
             <option value="salon">Salon</option>
             <option value="affichage">Affichage</option>
           </select>
           <button class="btn btn-secondary btn-sm" onclick="exportLeads()">⬇ Export</button>
+          <button class="btn btn-primary btn-sm" onclick="lsOuvrir()" title="Classement des prospects par score, avec l'action recommandée">🎯 À appeler</button>
+          <button class="btn btn-secondary btn-sm" onclick="parOuvrir()" title="Parrainage : filleuls, récompenses, ambassadeurs">🤝 Parrainage</button>
+          <button class="btn btn-secondary btn-sm" onclick="entOuvrir()" title="Où perd-on des ventes, et pourquoi ?">🔻 Entonnoir</button>
           <button class="btn btn-primary" onclick="openLead()">+ Nouveau prospect</button>
         </div>
         <!-- Funnel stats -->
@@ -12446,6 +12473,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           </div>
           <div class="spacer"></div>
           <button class="btn btn-secondary btn-sm" onclick="exportApporteursCSV()">⬇ Export</button>
+          <button class="btn btn-secondary btn-sm" onclick="aprOuvrir()" title="Qui apporte réellement de l'argent, qui dort, qui pose problème">🏆 Classement</button>
           <button class="btn btn-primary" onclick="openApporteurModal()">+ Nouvel apporteur</button>
         </div>
 
@@ -12492,6 +12520,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div class="page-subtitle">Actions commerciales selon le statut · Remise des accès au portail</div>
           </div>
           <div class="spacer"></div>
+          <button class="btn btn-sm btn-secondary" onclick="parOuvrir('ambassadeurs')" title="Souscripteurs satisfaits à solliciter pour un parrainage">🤝 Parrainage</button>
           <button class="btn btn-sm btn-secondary" onclick="csuiviRapportImprimer()" title="Rapport imprimable / PDF, généré à partir des données">📄 Rapport</button>
           <button class="btn btn-sm btn-secondary" onclick="csuiviRapportWhatsApp()" title="Envoyer la synthèse par WhatsApp">💬 Envoyer</button>
           <button class="btn btn-sm btn-secondary" onclick="csuiviRapportEmail()" title="Envoyer la synthèse par e-mail">✉️</button>
@@ -13062,6 +13091,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
           <div class="spacer"></div>
           <select class="filter-select" id="filter-annee-treso" onchange="buildTresorerieDetaille()"></select>
         </div>
+        <div id="treso-prev-box"></div>
         <div id="tresorerie-detaille-box"></div>
       </div>
 
@@ -17193,6 +17223,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div class="page-sub">Baux · Quittancement · Charges · Recouvrement · Dépôts de garantie</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="rloOuvrir()" title="Biens vacants, impayés, sous-location, entretien : où le parc perd de l'argent">📉 Rentabilité</button>
             <button class="btn btn-secondary btn-sm" onclick="locQuittancerMois()">🧾 Quittancer le mois</button>
             <button class="btn btn-primary" onclick="locOpenBail()">+ Nouveau bail</button>
           </div>
@@ -22656,6 +22687,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <option value="affichage">Affichage / Panneau</option>
             <option value="commercial">Agent commercial</option>
             <option value="partenaire">Partenaire / Prescripteur</option>
+            <option value="parrainage">🤝 Parrainage</option>
           </select>
         </div>
         <div class="form-group"><label>Stade Pipeline</label>
@@ -51057,6 +51089,8 @@ function ckActions() {
     }
   } catch(e){}
 
+  /* Actions de croissance : relances WhatsApp, prospects chauds, trésorerie prévisionnelle, marges, parrainage, apporteurs. */
+  try { if (window.ckActionsCroissance) ckActionsCroissance(push); } catch(e){ console.error('[cockpit-croissance]', e); }
   A.sort(function(a,b){ return b.prio - a.prio; });
   return A;
 }
@@ -73598,9 +73632,17 @@ function bpCompute(progId) {
   var coutHonoTech = coutConceptionReel>0 ? coutConceptionReel : Math.round(coutTravaux * pHonoTech/100);
   /* Frais commerciaux : commissions apporteurs d'affaires liées aux lots du programme. */
   var lotIds = lots.map(function(l){return l.id;});
-  var coutCommercial = (DATA.commissions_apporteurs || DATA.apporteurs_commissions || []).filter(function(cm){
-    return (cm.programme_id===progId) || (cm.lot_id && lotIds.indexOf(cm.lot_id)>=0);
-  }).reduce(function(s,cm){ return s + (parseFloat(cm.montant)||0); }, 0);
+  /* [CORRECTIF] Ce calcul lisait des stores inexistants (commissions_apporteurs / apporteurs_commissions) : les frais
+     commerciaux valaient toujours 0 et la marge était surévaluée. Les commissions réelles vivent dans DATA.commissions
+     (commercial + apporteur, champ montant_comm, hors annulées), rattachées au programme directement, par lot ou par souscripteur. */
+  var clientsProg = {}; (DATA.clients || []).forEach(function(c){ if (c.programme_id === progId) clientsProg[c.id] = true; });
+  var commsProg = (DATA.commissions || []).filter(function(cm){
+    if (cm.statut === 'annulee') return false;
+    if (cm.programme_id) return cm.programme_id === progId;
+    if (cm.client_id && clientsProg[cm.client_id]) return true;
+    return (cm.lot_ids || []).some(function(id){ return lotIds.indexOf(id) >= 0; });
+  });
+  var coutCommercial = commsProg.reduce(function(s,cm){ return s + (parseFloat(cm.montant_comm)||0); }, 0);
   /* Frais financiers : intérêts des financements du programme. */
   var coutFinancier = (DATA.financements_programme || []).filter(function(f){return f.programme_id===progId;})
     .reduce(function(s,f){ return s + (parseFloat(f.interets)||parseFloat(f.cout_financier)||0); }, 0);
@@ -73623,6 +73665,8 @@ function bpCompute(progId) {
   var tauxMarge = produits > 0 ? (marge / produits * 100) : 0;
   var tauxMargePot = produitsPotentiel > 0 ? (margePot / produitsPotentiel * 100) : 0;
   var resteEncaisser = produits - encaisse;
+  /* Commissions à générer sur ce qui reste à encaisser : taux OBSERVÉ sur ce programme (jamais un taux inventé). */
+  var commissionsAVenir = (encaisse > 0 && coutCommercial > 0) ? Math.round(Math.max(0, resteEncaisser) * coutCommercial / encaisse) : null;
   var resteDecaisser = coutTravaux - situationsPayees;
   var cashNet = encaisse - coutFoncier - situationsReglees;
 
@@ -73654,6 +73698,7 @@ function bpCompute(progId) {
     caVillaEngage:caVillaEngage, caImmeubleEngage:caImmeubleEngage,
     cessions:cessions, caCessions:caCessions, encaisse:encaisse, coutFoncier:coutFoncier, coutTravaux:coutTravaux,
     caLotsVendusReel:caLotsVendusReel, caLotsReserves:caLotsReserves, produitsRealises:produitsRealises, margeRealisee:margeRealisee, tauxMargeRealisee:tauxMargeRealisee,
+    commissionsAVenir:commissionsAVenir, nbCommissions:commsProg.length,
     coutHonoTech:coutHonoTech, coutCommercial:coutCommercial, coutFinancier:coutFinancier, coutAleas:coutAleas, coutsAnnexes:coutsAnnexes,
     situationsPayees:situationsPayees, situationsReglees:situationsReglees, produits:produits, produitsPotentiel:produitsPotentiel, couts:couts,
     marge:marge, margePot:margePot, tauxMarge:tauxMarge, tauxMargePot:tauxMargePot, resteEncaisser:resteEncaisser, resteDecaisser:resteDecaisser,
@@ -73663,6 +73708,7 @@ function bpCompute(progId) {
 }
 
 function bpRender() {
+  if (window.mpRendre) { try { mpRendre(); } catch (e) { console.error('[marge-prog]', e); } }
   var progId = (document.getElementById('bp-programme')||{}).value;
   var elK = document.getElementById('bp-kpis');
   if (!elK) return;
@@ -98387,6 +98433,7 @@ function notifierLeadWeb(nom, detail){
 
 function renderPipeline() {
   populateAllERP();
+  if (window.lsPreparer) lsPreparer();
   var board = document.getElementById('pipeline-board');
   var funnel = document.getElementById('funnel-stats');
   if (!board) return;
@@ -98394,7 +98441,7 @@ function renderPipeline() {
   var byStade = {};
   var _pipeSrc = (document.getElementById('pipeline-filter-source')||{}).value || '';
   PIPELINE_STADES.forEach(function(st){
-    byStade[st.id] = DATA.leads.filter(function(l){ return l.stade === st.id && (!_pipeSrc || l.source === _pipeSrc); });
+    byStade[st.id] = DATA.leads.filter(function(l){ return l.stade === st.id && l.statut !== 'perdu' && (!_pipeSrc || l.source === _pipeSrc); });
   });
   var base = byStade[PIPELINE_STADES[0].id].length || DATA.leads.length || 1;
 
@@ -98415,7 +98462,7 @@ function renderPipeline() {
 
   /* ── Kanban ── */
   board.innerHTML = PIPELINE_STADES.map(function(st, i){
-    var leads = byStade[st.id];
+    var leads = window.lsTrier ? lsTrier(byStade[st.id]) : byStade[st.id];
     var val = leads.reduce(function(s,l){ return s + (parseFloat(l.budget)||0); }, 0);
     var prevN = i>0 ? byStade[PIPELINE_STADES[i-1].id].length : null;
     var convTxt = (i>0 && prevN) ? ('↳ ' + Math.round(leads.length/prevN*100) + '% depuis ' + PIPELINE_STADES[i-1].label.toLowerCase()) : '&nbsp;';
@@ -98428,6 +98475,8 @@ function renderPipeline() {
       if (l.source === 'site_web') chips += '<span class="pl-chip" style="background:#dbeafe;color:#1e40af;">🌐 Réservation en ligne</span>';
       if (l.pays && String(l.pays).toLowerCase().indexOf('ivoire')===-1 && l.pays.trim()) chips += '<span class="pl-chip" style="background:#fef3c7;color:#92400e;">🌍 Diaspora · ' + escHtml(l.pays) + '</span>';
       if (l.type_logement) chips += '<span class="pl-chip">🏠 ' + escHtml(l.type_logement) + '</span>';
+      if (window.lsChip)   chips = lsChip(l) + chips;
+      if (window.parChip && l.parrain_id) chips += parChip(l);
       if (l.budget)        chips += '<span class="pl-chip budget">💰 ' + fmtF(l.budget) + ' F</span>';
       if (prog)            chips += '<span class="pl-chip">📍 ' + escHtml(prog.nom) + '</span>';
       if (due)             chips += '<span class="pl-chip warn">⏰ Relance due</span>';
@@ -98441,6 +98490,7 @@ function renderPipeline() {
         + (chips ? '<div class="pl-chips">' + chips + '</div>' : '')
         + '<div class="acts">'
         + '<button onclick="event.stopPropagation();openLead(\'' + l.id + '\')">✏️ Éditer</button>'
+        + (i < PIPELINE_STADES.length-1 ? '<button class="adv" style="background:#fee2e2;color:#b91c1c;" onclick="event.stopPropagation();entPerduOuvrir(\'' + l.id + '\')" title="Marquer perdu (motif obligatoire)">✕</button>' : '')
         + nextBtn
         + '</div></div>';
     }).join('') : '<div class="pl-empty">Aucun prospect ici.<br>Glissez une carte pour la déplacer.</div>';
@@ -98478,7 +98528,7 @@ function pipelineDrop(ev, stade, col) {
 function setLeadStade(id, stade) {
   var l = DATA.leads.find(function(x){ return x.id===id; });
   if (!l || l.stade === stade) { renderPipeline(); return; }
-  l.stade = stade;
+  if (window.Entonnoir) Entonnoir.transition(l, stade, Date.now(), (APP.currentUser && APP.currentUser.nom) || ''); else l.stade = stade;
   dbPut('leads', l);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_leads', l);
   renderPipeline();
@@ -98551,8 +98601,18 @@ async function saveLead() {
     geoloc_at: (document.getElementById('ld-lat').value ? ((DATA.leads.find(function(x){return x.id===APP.editingId;})||{}).geoloc_at || new Date().toISOString()) : null),
     created_at: APP.editingId ? undefined : today()
   };
-  if (APP.editingId){var idx=DATA.leads.findIndex(function(x){return x.id===APP.editingId;});if(idx>=0)DATA.leads[idx]=Object.assign({}, DATA.leads[idx], l);}
-  else DATA.leads.push(l);
+  if (l.created_at === undefined) delete l.created_at;   /* ne pas écraser la date d'entrée à l'édition (cohortes de l'entonnoir) */
+  var _par = (APP.currentUser && APP.currentUser.nom) || '';
+  if (APP.editingId){
+    var idx=DATA.leads.findIndex(function(x){return x.id===APP.editingId;});
+    if(idx>=0){
+      var ancien = DATA.leads[idx], nouveauStade = l.stade;
+      l.stade = ancien.stade;                                   /* le changement de stade passe par la trace d'historique */
+      DATA.leads[idx]=Object.assign({}, ancien, l);
+      if (window.Entonnoir) Entonnoir.transition(DATA.leads[idx], nouveauStade, Date.now(), _par); else DATA.leads[idx].stade = nouveauStade;
+      l = DATA.leads[idx];                                      /* on enregistre la fiche COMPLÈTE (historique, statut, perte), pas le formulaire seul */
+    }
+  } else { if (window.Entonnoir) Entonnoir.initialiser(l, Date.now(), _par); DATA.leads.push(l); }
   await dbPut('leads', l);
   if (typeof syncToSupabase === 'function') syncToSupabase('pi_leads', l);
   closeModal('modal-lead'); renderPipeline();
@@ -98594,7 +98654,7 @@ function avancerLead(id) {
   if (!l) return;
   var stades = PIPELINE_STADES.map(function(s){return s.id;});
   var idx = stades.indexOf(l.stade);
-  if (idx < stades.length - 1) { l.stade = stades[idx+1]; dbPut('leads', l); if (typeof syncToSupabase === 'function') syncToSupabase('pi_leads', l); renderPipeline(); toast('Lead avancé : ' + l.stade.replace(/_/g,' '), 'success'); }
+  if (idx < stades.length - 1) { if (window.Entonnoir) Entonnoir.transition(l, stades[idx+1], Date.now(), (APP.currentUser && APP.currentUser.nom) || ''); else l.stade = stades[idx+1]; dbPut('leads', l); if (typeof syncToSupabase === 'function') syncToSupabase('pi_leads', l); renderPipeline(); toast('Lead avancé : ' + l.stade.replace(/_/g,' '), 'success'); }
   else { toast('Lead au stade maximum. Convertissez-le en souscripteur.', 'info'); }
 }
 
@@ -98630,7 +98690,8 @@ async function convertirEnSouscripteur() {
   if (_lid) {
     var _ld = (DATA.leads||[]).find(function(x){ return x.id === _lid; });
     if (_ld) {
-      _ld.stade = 'reservation'; _ld.statut = 'converti'; _ld.date_conversion = today();
+      if (window.Entonnoir) Entonnoir.transition(_ld, 'reservation', Date.now(), (APP.currentUser && APP.currentUser.nom) || ''); else _ld.stade = 'reservation';
+      _ld.statut = 'converti'; _ld.date_conversion = today();
       await dbPut('leads', _ld);
       if (typeof syncToSupabase === 'function') syncToSupabase('pi_leads', _ld);
     }
@@ -98660,6 +98721,7 @@ async function convertirEnSouscripteur() {
    TRÉSORERIE DÉTAILLÉE
 ══════════════════════════════════════════════════════ */
 function buildTresorerieDetaille() {
+  if (window.tpRendre) { try { tpRendre(); } catch (e) { console.error('[tresorerie-prev]', e); } }
   var box = document.getElementById('tresorerie-detaille-box');
   if (!box) return;
   var selAnnee = document.getElementById('filter-annee-treso');
