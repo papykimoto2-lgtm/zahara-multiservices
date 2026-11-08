@@ -1,6 +1,6 @@
 /* Entonnoir commercial — interface (page Pipeline Commercial). Dépend de entonnoir.js et des globales de l'ERP. */
 var ENT = { periode: '90', source: '', commercial: '', programme: '', perduId: null };
-var ENT_SOURCES = { bouche_oreille: 'Bouche-à-oreille', reseaux_sociaux: 'Réseaux sociaux', site_web: 'Site web', salon: 'Salon', affichage: 'Affichage', commercial: 'Agent commercial', partenaire: 'Partenaire' };
+var ENT_SOURCES = { bouche_oreille: 'Bouche-à-oreille', reseaux_sociaux: 'Réseaux sociaux', site_web: 'Site web', salon: 'Salon', affichage: 'Affichage', commercial: 'Agent commercial', partenaire: 'Partenaire', parrainage: 'Parrainage' };
 
 function entH(x) { return typeof escHtml === 'function' ? escHtml(x) : String(x == null ? '' : x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function entF(n) { return (typeof fmtF === 'function' ? fmtF(Math.round(n || 0)) : String(Math.round(n || 0))) + ' F'; }

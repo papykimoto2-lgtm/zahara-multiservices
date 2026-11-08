@@ -2354,6 +2354,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
   <script src="apporteurs-rang-ui.js"></script>
   <script src="marge-prog.js"></script>
   <script src="marge-prog-ui.js"></script>
+  <script src="parrainage.js"></script>
+  <script src="parrainage-ui.js"></script>
 <!-- a11y-contrast:debut -->
 <style id="a11y-contrast">
 /* ═══ ACCESSIBILITÉ — contrastes WCAG 2.1 niveau AA (≥ 4,5:1 pour le texte courant) ═══
@@ -11629,11 +11631,13 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <option value="reseaux_sociaux">Réseaux sociaux</option>
             <option value="commercial">Agent commercial</option>
             <option value="partenaire">Partenaire</option>
+            <option value="parrainage">Parrainage</option>
             <option value="salon">Salon</option>
             <option value="affichage">Affichage</option>
           </select>
           <button class="btn btn-secondary btn-sm" onclick="exportLeads()">⬇ Export</button>
           <button class="btn btn-primary btn-sm" onclick="lsOuvrir()" title="Classement des prospects par score, avec l'action recommandée">🎯 À appeler</button>
+          <button class="btn btn-secondary btn-sm" onclick="parOuvrir()" title="Parrainage : filleuls, récompenses, ambassadeurs">🤝 Parrainage</button>
           <button class="btn btn-secondary btn-sm" onclick="entOuvrir()" title="Où perd-on des ventes, et pourquoi ?">🔻 Entonnoir</button>
           <button class="btn btn-primary" onclick="openLead()">+ Nouveau prospect</button>
         </div>
@@ -12509,6 +12513,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <div class="page-subtitle">Actions commerciales selon le statut · Remise des accès au portail</div>
           </div>
           <div class="spacer"></div>
+          <button class="btn btn-sm btn-secondary" onclick="parOuvrir('ambassadeurs')" title="Souscripteurs satisfaits à solliciter pour un parrainage">🤝 Parrainage</button>
           <button class="btn btn-sm btn-secondary" onclick="csuiviRapportImprimer()" title="Rapport imprimable / PDF, généré à partir des données">📄 Rapport</button>
           <button class="btn btn-sm btn-secondary" onclick="csuiviRapportWhatsApp()" title="Envoyer la synthèse par WhatsApp">💬 Envoyer</button>
           <button class="btn btn-sm btn-secondary" onclick="csuiviRapportEmail()" title="Envoyer la synthèse par e-mail">✉️</button>
@@ -22674,6 +22679,7 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
             <option value="affichage">Affichage / Panneau</option>
             <option value="commercial">Agent commercial</option>
             <option value="partenaire">Partenaire / Prescripteur</option>
+            <option value="parrainage">🤝 Parrainage</option>
           </select>
         </div>
         <div class="form-group"><label>Stade Pipeline</label>
@@ -98460,6 +98466,7 @@ function renderPipeline() {
       if (l.pays && String(l.pays).toLowerCase().indexOf('ivoire')===-1 && l.pays.trim()) chips += '<span class="pl-chip" style="background:#fef3c7;color:#92400e;">🌍 Diaspora · ' + escHtml(l.pays) + '</span>';
       if (l.type_logement) chips += '<span class="pl-chip">🏠 ' + escHtml(l.type_logement) + '</span>';
       if (window.lsChip)   chips = lsChip(l) + chips;
+      if (window.parChip && l.parrain_id) chips += parChip(l);
       if (l.budget)        chips += '<span class="pl-chip budget">💰 ' + fmtF(l.budget) + ' F</span>';
       if (prog)            chips += '<span class="pl-chip">📍 ' + escHtml(prog.nom) + '</span>';
       if (due)             chips += '<span class="pl-chip warn">⏰ Relance due</span>';

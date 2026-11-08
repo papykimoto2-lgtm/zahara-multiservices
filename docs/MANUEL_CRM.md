@@ -207,6 +207,27 @@ Pour le recouvrement des retards : manuel Relances (PRO-REL).
 
 > Les apporteurs suspendus ou résiliés ne sont jamais classés. Les commissions restent gérées par CRM-06.
 
+### CRM-12 — Parrainage souscripteur
+
+**Qui** : commerciaux (attribution), responsables (validation et versement), administrateur (règles). **Où** : Pipeline Commercial ou Suivi souscripteurs › **🤝 Parrainage**.
+
+1. **Règles** (administrateur) : activer le programme, montant de la récompense, % du prix que le filleul doit avoir **versé**, plafond par parrain, parrain à jour exigé. Programme désactivé : aucune offre n'est annoncée.
+2. **Solliciter** (onglet Ambassadeurs) : souscripteurs soldés ou à 50 % et plus, à jour. 💬 ouvre WhatsApp avec le message ; **Sollicité** date la demande (pas de relance avant 90 jours).
+3. **Enregistrer un parrainage** : choisir le parrain, puis le filleul (prospect ou souscripteur). Le prospect passe en source « Parrainage » ; devenu souscripteur, il est retrouvé par son téléphone.
+4. **Suivi** : un filleul est *éligible* quand l'argent versé atteint le seuil (frais de souscription exclus). Rien n'est créé automatiquement.
+5. **✓ Valider** (responsable) : la récompense passe « à verser ». **Valider toutes** pour le lot.
+6. **💰 Marquer versée** : mode et **référence obligatoires**, date. **✕** annule avec motif obligatoire.
+
+| État | Sens |
+|---|---|
+| Refusé : auto-parrainage | Même fiche ou même téléphone que le parrain |
+| Bloqué : parrain en retard | Règle « à jour exigé » |
+| Parrain inactif / filleul résilié | Aucune récompense |
+| Plafond atteint | Les plus anciens filleuls sont servis d'abord |
+
+> Le paiement se fait hors module (caisse ou virement). Aucune écriture comptable n'est générée : la passer en comptabilité avec la référence du journal.
+> Le journal vit dans la fiche du parrain (récompenses, demandes) et se synchronise avec elle.
+
 ## 4. Contrôles et blocages
 
 | Contrôle | Effet |
