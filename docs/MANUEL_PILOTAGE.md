@@ -32,6 +32,27 @@
 2. Parcourir les onglets : Cockpit, Vue générale, Finance, Compta & Trésorerie, Commercial, Travaux, RH, Stock & Achats, Foncier, Juridique, Direction, Alertes.
 3. Commencer par le **Cockpit** (briefing et file d'actions), finir par **Alertes**.
 
+### PIL-01 bis — Actions de croissance du Cockpit
+
+**Où** : Tableau de bord › **Cockpit**, dans la file d'actions (triée avec les autres règles). À traiter chaque matin.
+
+| Action | Condition | Priorité |
+|---|---|---|
+| 🔮 Trésorerie négative prévue | Projection de base 13 semaines : solde négatif (urgent si dans 4 semaines ou moins) | 110 / 80 |
+| 🔴 Programme à marge négative | Santé des marges | 88 |
+| 📲 Relances WhatsApp prêtes | Campagne active, clients à relancer aujourd'hui | 84 |
+| 💤 Négociations sans mouvement | Stade négociation, 7 jours sans mouvement | 82 |
+| 🔥 Prospects chauds à appeler | Score de 65 et plus | 78 |
+| ⏰ Relances prospects en retard | Date de relance dépassée | 72 |
+| 🤝 Récompenses de parrainage à valider | Programme actif, seuil versé | 50 |
+| 📄 Contrats d'apporteurs | Expirés ou sous 60 jours | 48 |
+| 💤 Apporteurs dormants | 90 jours sans vente | 42 |
+
+1. Chaque ligne ouvre directement l'écran qui permet d'agir.
+2. **Reporter** ou **ignorer** une action ne la masque que pour la journée : elle revient demain si le problème persiste.
+3. Les montants affichés sont l'**enjeu** (à recouvrer, budget en jeu, besoin de trésorerie), pas un chiffre d'affaires garanti.
+4. Si une source de données échoue, les autres actions s'affichent quand même.
+
 ### PIL-02 — Cockpit RH
 
 **Où** : Cockpit RH.

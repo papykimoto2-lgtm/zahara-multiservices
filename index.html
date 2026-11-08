@@ -2356,6 +2356,8 @@ body.no-delete [onclick*="Supprimer"]{display:none !important;}
   <script src="marge-prog-ui.js"></script>
   <script src="parrainage.js"></script>
   <script src="parrainage-ui.js"></script>
+  <script src="cockpit-croissance.js"></script>
+  <script src="cockpit-croissance-ui.js"></script>
 <!-- a11y-contrast:debut -->
 <style id="a11y-contrast">
 /* ═══ ACCESSIBILITÉ — contrastes WCAG 2.1 niveau AA (≥ 4,5:1 pour le texte courant) ═══
@@ -51081,6 +51083,8 @@ function ckActions() {
     }
   } catch(e){}
 
+  /* Actions de croissance : relances WhatsApp, prospects chauds, trésorerie prévisionnelle, marges, parrainage, apporteurs. */
+  try { if (window.ckActionsCroissance) ckActionsCroissance(push); } catch(e){ console.error('[cockpit-croissance]', e); }
   A.sort(function(a,b){ return b.prio - a.prio; });
   return A;
 }
