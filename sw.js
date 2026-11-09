@@ -70,9 +70,9 @@ self.addEventListener('fetch', function (event) {
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).then(function (res) {
-        if (estCoquille && res && res.ok) {
+        if (estCoquille && res && res.status === 200) {
           var copie = res.clone();
-          caches.open(CACHE_NAME).then(function (c) { c.put(req, copie); }).catch(function () {});
+          caches.open(CACHE_NAME).then(function (c) { return c.put(req, copie); }).catch(function () {});
         }
         return res;
       }).catch(function () {
@@ -89,9 +89,9 @@ self.addEventListener('fetch', function (event) {
 
   event.respondWith(
     fetch(req).then(function (res) {
-      if (res && res.ok) {
+      if (res && res.status === 200) {
         var copie = res.clone();
-        caches.open(CACHE_NAME).then(function (c) { c.put(req, copie); }).catch(function () {});
+        caches.open(CACHE_NAME).then(function (c) { return c.put(req, copie); }).catch(function () {});
       }
       return res;
     }).catch(function () {
