@@ -45,6 +45,9 @@
     '.p3-btn:focus-visible,.p3-chip:focus-visible{outline:2px solid #1e4663;outline-offset:2px}',
     '.p3-tip{position:absolute;pointer-events:none;background:#14202b;color:#fff;padding:5px 9px;border-radius:6px;font-size:.75rem;line-height:1.35;white-space:nowrap;opacity:0;transition:opacity .12s;z-index:3}',
     '.p3-tip.on{opacity:1}',
+    '.p3-btn[disabled]{opacity:.6;cursor:default}',
+    '.p3-attr{position:absolute;right:10px;bottom:52px;font-size:.66rem;color:#14202b;background:rgba(255,255,255,.8);padding:2px 7px;border-radius:5px;pointer-events:none}',
+    '.p3-attr[hidden]{display:none}',
     '.p3-hint{position:absolute;left:12px;bottom:52px;font-size:.72rem;color:#4b6a8b;background:rgba(255,255,255,.8);padding:3px 8px;border-radius:5px;pointer-events:none}',
     '.p3-card{background:#fff;border:1px solid #e3eaf2;border-radius:16px;padding:16px;display:grid;gap:12px}',
     '.p3-card h5{margin:0;font-size:1rem;font-weight:800}',
@@ -80,6 +83,7 @@
   function ordreNaturel(a, b) { return String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true }); }
 
   function preparer(plan) {
+    var geo = null;
     var lots = (plan.lots || []).map(function (l) {
       return { id: String(l.id), numero: l.numero || l.id, ilot: l.ilot || '', surface: +l.surface || 0, prix: +l.prix || 0, statut: LABEL[l.statut] ? l.statut : 'attribue', poly: polyValide(l.poly) ? l.poly : null };
     });
@@ -91,6 +95,7 @@
       var s0 = 0, s1 = 0, n = 0;
       ref.forEach(function (l) { l.poly.forEach(function (p) { s0 += +p[0]; s1 += +p[1]; n++; }); });
       var lat0 = s0 / n, lng0 = s1 / n, kx = 111320 * Math.cos(lat0 * Math.PI / 180), kz = 110540;
+      geo = { lat0: lat0, lng0: lng0, kx: kx, kz: kz };
       lots = lots.filter(function (l) { if (!l.poly) { sansTrace++; return false; } return true; });
       lots.forEach(function (l) {
         var pts = l.poly.map(function (p) { return [(+p[1] - lng0) * kx, -(+p[0] - lat0) * kz]; });
@@ -111,7 +116,52 @@
     lots.forEach(function (l) {
       var sx = 0, sz = 0; l.pts.forEach(function (p) { sx += p[0]; sz += p[1]; }); l.cx = sx / l.pts.length; l.cz = sz / l.pts.length;
     });
-    return { lots: lots, modeGrille: modeGrille, sansTrace: sansTrace };
+    return { lots: lots, modeGrille: modeGrille, sansTrace: sansTrace, geo: geo };
+  }
+
+  /* ---------- Fond satellite ----------
+     Même imagerie que la page Carte (Esri World Imagery). Les lots étant projetés depuis leurs coordonnées réelles, il
+     suffit de poser sous eux la mosaïque de tuiles qui couvre le lotissement. Chargée uniquement à la demande (bouton
+     « Satellite ») : sans ce clic, aucune requête ne part vers le fournisseur d'imagerie. */
+  var SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  var SAT_ZMAX = 19, SAT_COTE_MAX = 5;          /* au plus 5 × 5 tuiles de 256 px */
+  function tuileX(lng, z) { return (lng + 180) / 360 * Math.pow(2, z); }
+  function tuileY(lat, z) { var r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z); }
+  function lngDeTuile(x, z) { return x / Math.pow(2, z) * 360 - 180; }
+  function latDeTuile(y, z) { return Math.atan(Math.sinh(Math.PI * (1 - 2 * y / Math.pow(2, z)))) * 180 / Math.PI; }
+  /* Emprise en tuiles autour d'un centre (lat, lng) et d'un demi-côté en mètres ; renvoie aussi la position du fond dans le
+     repère local du plan (mètres, nord = −z). Le zoom retenu est le plus fin qui tient dans SAT_COTE_MAX tuiles de côté. */
+  function emprise(geo, cx, cz, demi, zmax) {
+    var lat = geo.lat0 - cz / geo.kz, lng = geo.lng0 + cx / geo.kx, dLat = demi / geo.kz, dLng = demi / geo.kx;
+    for (var z = Math.min(zmax || SAT_ZMAX, SAT_ZMAX); z >= 3; z--) {
+      var x0 = Math.floor(tuileX(lng - dLng, z)), x1 = Math.floor(tuileX(lng + dLng, z)), y0 = Math.floor(tuileY(lat + dLat, z)), y1 = Math.floor(tuileY(lat - dLat, z));
+      if (x1 - x0 + 1 > SAT_COTE_MAX || y1 - y0 + 1 > SAT_COTE_MAX) continue;
+      var lngO = lngDeTuile(x0, z), lngE = lngDeTuile(x1 + 1, z), latN = latDeTuile(y0, z), latS = latDeTuile(y1 + 1, z);
+      var xO = (lngO - geo.lng0) * geo.kx, xE = (lngE - geo.lng0) * geo.kx, zN = -(latN - geo.lat0) * geo.kz, zS = -(latS - geo.lat0) * geo.kz;
+      return { z: z, x0: x0, y0: y0, nx: x1 - x0 + 1, ny: y1 - y0 + 1, largeur: xE - xO, profondeur: zS - zN, cx: (xO + xE) / 2, cz: (zN + zS) / 2 };
+    }
+    return null;
+  }
+  /* Assemble les tuiles sur un canevas. Échec si plus d'un quart manque, ou si le canevas n'est pas lisible par WebGL. */
+  function chargerMosaique(e, url) {
+    return new Promise(function (ok, ko) {
+      var c = document.createElement('canvas'); c.width = e.nx * 256; c.height = e.ny * 256;
+      var g = c.getContext('2d'), reste = e.nx * e.ny, rates = 0, fini = false;
+      var garde = setTimeout(function () { if (!fini) { fini = true; ko(new Error('délai dépassé')); } }, 20000);
+      function un() {
+        if (--reste > 0 || fini) return;
+        fini = true; clearTimeout(garde);
+        if (rates > e.nx * e.ny / 4) return ko(new Error('imagerie indisponible'));
+        try { g.getImageData(0, 0, 1, 1); } catch (err) { return ko(err); }
+        ok(c);
+      }
+      for (var j = 0; j < e.ny; j++) for (var i = 0; i < e.nx; i++) (function (i, j) {
+        var im = new Image(); im.crossOrigin = 'anonymous';
+        im.onload = function () { try { g.drawImage(im, i * 256, j * 256, 256, 256); } catch (err) { rates++; } un(); };
+        im.onerror = function () { rates++; un(); };
+        im.src = url.replace('{z}', e.z).replace('{x}', e.x0 + i).replace('{y}', e.y0 + j);
+      })(i, j);
+    });
   }
 
   /* ---------- Montage ---------- */
@@ -162,7 +212,9 @@
       '<svg class="p3-compass" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22" fill="rgba(255,255,255,.9)" stroke="#cfdfed"/><path d="M24 6l6 18H18z" fill="var(--pp-primary,#A6431C)"/><path d="M24 42l-6-18h12z" fill="#8a97a3" opacity=".5"/></svg>' +
       '<div class="p3-hint">Glisser pour tourner · molette pour zoomer · cliquer un lot</div>' +
       '<div class="p3-bar">' + (pub ? '' : '<button type="button" class="p3-btn pri" data-a="mon">Mon lot</button>') + '<button type="button" class="p3-btn' + (pub ? ' pri' : '') + '" data-a="tout">' + (pub ? 'Vue d\'ensemble' : 'Tout le lotissement') + '</button>' +
-      '<button type="button" class="p3-btn" data-a="plan" aria-pressed="false">Vue du plan</button><button type="button" class="p3-btn" data-a="rejouer">Rejouer l\'animation</button></div>' +
+      '<button type="button" class="p3-btn" data-a="plan" aria-pressed="false">Vue du plan</button><button type="button" class="p3-btn" data-a="rejouer">Rejouer l\'animation</button>' +
+      (prep.geo ? '<button type="button" class="p3-btn" data-a="sat" aria-pressed="false">Satellite</button>' : '') + '</div>' +
+      '<div class="p3-attr" hidden>Imagerie © Esri</div>' +
       '<div class="p3-tip" role="presentation"></div></div>' +
       '<div class="p3-card" aria-live="polite"></div>' +
       (prep.sansTrace ? '<p class="p3-note">' + prep.sansTrace + ' lot' + (prep.sansTrace > 1 ? 's' : '') + ' sans tracé ne figure' + (prep.sansTrace > 1 ? 'nt' : '') + ' pas sur ce plan.</p>' : '') +
@@ -228,6 +280,32 @@
     var ground = new THREE.Mesh(new THREE.PlaneGeometry(RT * 14 + 400, RT * 14 + 400), new THREE.MeshStandardMaterial({ color: 0xd9dfd3, roughness: 1 }));
     ground.rotation.x = -Math.PI / 2; ground.position.set(ax, -0.05, az); scene.add(ground);
     scene.fog = new THREE.Fog(0xe9eef1, RT * 5 + 300, RT * 11 + 900);
+
+    /* fond satellite, à la demande : mosaïque posée juste au-dessus du sol, lots rendus translucides pour laisser voir le terrain */
+    var sat = { on: false, mesh: null, etat: 'non_charge' };
+    function satAppliquer() {
+      if (sat.mesh) sat.mesh.visible = sat.on;
+      meshes.forEach(function (m) { m.material.transparent = sat.on; m.material.opacity = sat.on ? 0.72 : 1; m.material.needsUpdate = true; });
+      var b = btn('sat'), at = box.querySelector('.p3-attr');
+      if (b) { b.classList.toggle('on', sat.on); b.setAttribute('aria-pressed', sat.on ? 'true' : 'false'); }
+      if (at) at.hidden = !sat.on;
+    }
+    function satBasculer() {
+      var b = btn('sat'); if (!b || !prep.geo || sat.etat === 'charge_en_cours' || sat.etat === 'echec') return;
+      if (sat.etat === 'pret') { sat.on = !sat.on; satAppliquer(); return; }
+      var e = emprise(prep.geo, ax, az, RT * 1.8 + 150, ctx.satZoomMax);
+      if (!e) return;
+      sat.etat = 'charge_en_cours'; b.disabled = true; b.textContent = 'Chargement…';
+      chargerMosaique(e, ctx.satUrl || SAT_URL).then(function (canevas) {
+        if (!vivant) return;
+        var t = new THREE.CanvasTexture(canevas); t.encoding = THREE.sRGBEncoding; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+        sat.mesh = new THREE.Mesh(new THREE.PlaneGeometry(e.largeur, e.profondeur), new THREE.MeshBasicMaterial({ map: t }));
+        sat.mesh.rotation.x = -Math.PI / 2; sat.mesh.position.set(e.cx, -0.02, e.cz); scene.add(sat.mesh);
+        sat.etat = 'pret'; sat.zoom = e.z; sat.tuiles = e.nx * e.ny; sat.on = true; b.disabled = false; b.textContent = 'Satellite'; satAppliquer();
+      }).catch(function () {
+        sat.etat = 'echec'; sat.on = false; b.textContent = 'Satellite indisponible'; b.title = 'L\'imagerie satellite n\'a pas pu être chargée (connexion ou zone non couverte).'; satAppliquer();
+      });
+    }
 
     /* groupes fusionnés par statut : un seul maillage par statut, quelle que soit la taille du plan */
     var groups = {}, meshes = [];
@@ -363,6 +441,7 @@
       else if (b.dataset.a === 'tout') { choisir(null, true); want.tx = ax; want.tz = az; want.r = clamp(RT * (pub ? 2.4 : 2.6), 90, pub ? 700 : rMax); want.ph = 0.9; stopSpin(); }
       else if (b.dataset.a === 'plan') { planVue = !planVue; b.classList.toggle('on', planVue); b.setAttribute('aria-pressed', planVue ? 'true' : 'false'); want.ph = planVue ? 0.08 : 0.95; if (planVue) want.th = 0; stopSpin(); }
       else if (b.dataset.a === 'rejouer') rejouer();
+      else if (b.dataset.a === 'sat') satBasculer();
       else if (b.dataset.a === 'fermer') choisir(null);
     });
 
@@ -400,9 +479,9 @@
     return {
       destroy: detruire,
       select: function (id) { choisir(id); return selected ? selected.id : null; },
-      info: function () { return { webgl: true, public: pub, lots: lots.length, mes: mes.length, grille: prep.modeGrille, libres: cnt.libre, reserves: cnt.reserve, attribues: cnt.attribue, vendus: cnt.vendu, sansTrace: prep.sansTrace }; }
+      info: function () { return { webgl: true, public: pub, lots: lots.length, mes: mes.length, grille: prep.modeGrille, satellite: sat.etat, satelliteActif: sat.on, satZoom: sat.zoom || null, satTuiles: sat.tuiles || 0, libres: cnt.libre, reserves: cnt.reserve, attribues: cnt.attribue, vendus: cnt.vendu, sansTrace: prep.sansTrace }; }
     };
   }
 
-  window.PortailPlan3D = { monter: monter, _preparer: preparer };
+  window.PortailPlan3D = { monter: monter, _preparer: preparer, _emprise: emprise };
 })();

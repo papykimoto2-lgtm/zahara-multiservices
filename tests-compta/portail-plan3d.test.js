@@ -107,6 +107,77 @@ test('plan de 700 lots (maximum renvoyé par le serveur) : monté en moins de 5 
   await page.close();
 });
 
+/* ---------- Fond satellite ---------- */
+const TUILE = '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#3d6b3a"/><path d="M0 0L256 256" stroke="#fff"/></svg>';
+async function tuilesFactices(page, ok) {
+  const vues = [];
+  await page.route('**/tuiles/**', (route) => {
+    vues.push(route.request().url());
+    return ok ? route.fulfill({ contentType: 'image/svg+xml', headers: { 'access-control-allow-origin': '*' }, body: TUILE }) : route.abort();
+  });
+  return vues;
+}
+const SAT_URL_TEST = 'https://imagerie.test/tuiles/{z}/{y}/{x}';
+
+test('satellite : aucune requête d\'imagerie sans clic, puis mosaïque chargée et bascule aller-retour', async () => {
+  const { page, erreurs } = await ouvrirPage();
+  const vues = await tuilesFactices(page, true);
+  await page.evaluate((a) => { window.__c = window.PortailPlan3D.monter(document.getElementById('s-plan'), { plans: [a.plan], paiement: a.pay, satUrl: a.url }); }, { plan: planAvecTraces(60, 7), pay: PAIEMENT, url: SAT_URL_TEST });
+  await page.waitForTimeout(300);
+  assert.strictEqual(vues.length, 0, 'imagerie demandée avant tout clic');
+  assert.strictEqual((await page.evaluate(() => window.__c.info())).satellite, 'non_charge');
+  await page.click('[data-a="sat"]');
+  await page.waitForFunction(() => window.__c.info().satellite === 'pret');
+  let info = await page.evaluate(() => window.__c.info());
+  assert.strictEqual(info.satelliteActif, true);
+  assert.ok(info.satTuiles >= 1 && info.satTuiles <= 25, 'nombre de tuiles hors limite : ' + info.satTuiles);
+  assert.strictEqual(vues.length, info.satTuiles);
+  assert.strictEqual(await page.locator('[data-a="sat"]').getAttribute('aria-pressed'), 'true');
+  assert.strictEqual(await page.locator('.p3-attr').isVisible(), true, 'mention de la source de l\'imagerie absente');
+  await page.click('[data-a="sat"]');
+  info = await page.evaluate(() => window.__c.info());
+  assert.strictEqual(info.satelliteActif, false);
+  assert.strictEqual(await page.locator('.p3-attr').isVisible(), false);
+  assert.strictEqual(vues.length, info.satTuiles, 'la mosaïque ne doit être téléchargée qu\'une fois');
+  assert.deepStrictEqual(erreurs, []);
+});
+
+test('satellite : imagerie injoignable → bouton « indisponible », le plan reste utilisable', async () => {
+  const { page, erreurs } = await ouvrirPage();
+  await tuilesFactices(page, false);
+  await page.evaluate((a) => { window.__c = window.PortailPlan3D.monter(document.getElementById('s-plan'), { plans: [a.plan], paiement: a.pay, satUrl: a.url }); }, { plan: planAvecTraces(60, 7), pay: PAIEMENT, url: SAT_URL_TEST });
+  await page.click('[data-a="sat"]');
+  await page.waitForFunction(() => window.__c.info().satellite === 'echec');
+  assert.match(await page.locator('[data-a="sat"]').innerText(), /indisponible/);
+  assert.strictEqual((await page.evaluate(() => window.__c.info())).satelliteActif, false);
+  assert.strictEqual(await page.evaluate(() => window.__c.select('L3')), 'L3');
+  assert.deepStrictEqual(erreurs, []);
+});
+
+test('satellite : pas de bouton quand les lots sont en grille indicative (aucune position réelle)', async () => {
+  const { page } = await ouvrirPage();
+  const plan = planAvecTraces(12, 2); plan.lots.forEach((l) => { delete l.poly; });
+  await page.evaluate((a) => { window.__c = window.PortailPlan3D.monter(document.getElementById('s-plan'), { plans: [a.plan], paiement: a.pay }); }, { plan, pay: PAIEMENT });
+  assert.strictEqual((await page.evaluate(() => window.__c.info())).grille, true);
+  assert.strictEqual(await page.locator('[data-a="sat"]').count(), 0);
+});
+
+test('satellite : la mosaïque est calée sur les lots (écart inférieur à 1 m aux bords de l\'emprise)', async () => {
+  const { page } = await ouvrirPage();
+  const r = await page.evaluate(() => {
+    var lat0 = 5.3153, lng0 = -4.4317, geo = { lat0: lat0, lng0: lng0, kx: 111320 * Math.cos(lat0 * Math.PI / 180), kz: 110540 };
+    var e = window.PortailPlan3D._emprise(geo, 40, -25, 400, 19), n = Math.pow(2, e.z);
+    /* coin nord-ouest et sud-est de la mosaïque, recalculés indépendamment depuis les indices de tuiles */
+    var lngO = e.x0 / n * 360 - 180, lngE = (e.x0 + e.nx) / n * 360 - 180;
+    var lat = function (y) { return Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI; };
+    var attendu = { xO: (lngO - lng0) * geo.kx, xE: (lngE - lng0) * geo.kx, zN: -(lat(e.y0) - lat0) * geo.kz, zS: -(lat(e.y0 + e.ny) - lat0) * geo.kz };
+    return { e: e, ecart: Math.max(Math.abs(e.cx - e.largeur / 2 - attendu.xO), Math.abs(e.cx + e.largeur / 2 - attendu.xE), Math.abs(e.cz - e.profondeur / 2 - attendu.zN), Math.abs(e.cz + e.profondeur / 2 - attendu.zS)) };
+  });
+  assert.ok(r.ecart < 1, 'écart de calage : ' + r.ecart);
+  assert.ok(r.e.nx <= 5 && r.e.ny <= 5 && r.e.largeur >= 800 && r.e.profondeur >= 800, 'emprise insuffisante ou trop de tuiles');
+  assert.ok(r.e.cx - r.e.largeur / 2 <= 40 - 400 && r.e.cx + r.e.largeur / 2 >= 40 + 400, 'la mosaïque ne couvre pas toute la zone demandée');
+});
+
 test('le portail branche l\'onglet « Plan 3D » et charge la 3D à la demande, depuis ses propres fichiers', () => {
   const p = lire('portail-unique.html');
   assert.ok(p.indexOf("sSub(this,\\'plan\\');planOuvrir()") !== -1, 'bouton Plan 3D absent');
