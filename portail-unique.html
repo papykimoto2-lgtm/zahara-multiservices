@@ -2621,7 +2621,12 @@
         else photosGenerales.push(p);
       });
     });
-    (MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='chantier'; }).forEach(function(m){ photosGenerales.push({ data:m.data, legende:m.titre }); });
+    (MEDIAS||[]).filter(function(m){ return m.type==='photo' && m.categorie==='chantier'; }).forEach(function(m){ photosGenerales.push({ data:m.data, url:m.url, legende:m.titre }); });
+    /* Les photos publiées depuis l'ERP sont désormais au Storage (url seule, plus de
+       base64) : sans url ici, la vignette s'affichait cassée. Une photo sans source
+       exploitable est écartée plutôt qu'affichée vide. */
+    var aSource=function(p){ return !!(p && (p.data||p.url)); };
+    photosMaison=photosMaison.filter(aSource); photosGenerales=photosGenerales.filter(aSource);
     var vignette=function(p){ var src=p.data||p.url||''; return '<div class="photo-item"><img src="'+esc(src)+'" loading="lazy" alt="Photo">'+(p.legende?'<div class="photo-cap">'+esc(p.legende)+'</div>':'')+'</div>'; };
     var blocMaison = photosMaison.length
       ? '<div class="card"><strong>🏠 Photos de votre maison</strong><div class="photo-grid">'+photosMaison.map(vignette).join('')+'</div></div>'
