@@ -130,13 +130,15 @@ test('satellite : aucune requête d\'imagerie sans clic, puis mosaïque chargée
   await page.waitForFunction(() => window.__c.info().satellite === 'pret');
   let info = await page.evaluate(() => window.__c.info());
   assert.strictEqual(info.satelliteActif, true);
-  assert.ok(info.satTuiles >= 1 && info.satTuiles <= 25, 'nombre de tuiles hors limite : ' + info.satTuiles);
+  assert.ok(info.satTuiles >= 1 && info.satTuiles <= 64, 'nombre de tuiles hors limite : ' + info.satTuiles);
+  assert.strictEqual(info.sol, false, 'le sol uni doit être masqué sous la photo (sinon l\'image tremble)');
   assert.strictEqual(vues.length, info.satTuiles);
   assert.strictEqual(await page.locator('[data-a="sat"]').getAttribute('aria-pressed'), 'true');
   assert.strictEqual(await page.locator('.p3-attr').isVisible(), true, 'mention de la source de l\'imagerie absente');
   await page.click('[data-a="sat"]');
   info = await page.evaluate(() => window.__c.info());
   assert.strictEqual(info.satelliteActif, false);
+  assert.strictEqual(info.sol, true, 'le sol uni doit revenir quand la photo est retirée');
   assert.strictEqual(await page.locator('.p3-attr').isVisible(), false);
   assert.strictEqual(vues.length, info.satTuiles, 'la mosaïque ne doit être téléchargée qu\'une fois');
   assert.deepStrictEqual(erreurs, []);
@@ -174,7 +176,7 @@ test('satellite : la mosaïque est calée sur les lots (écart inférieur à 1 m
     return { e: e, ecart: Math.max(Math.abs(e.cx - e.largeur / 2 - attendu.xO), Math.abs(e.cx + e.largeur / 2 - attendu.xE), Math.abs(e.cz - e.profondeur / 2 - attendu.zN), Math.abs(e.cz + e.profondeur / 2 - attendu.zS)) };
   });
   assert.ok(r.ecart < 1, 'écart de calage : ' + r.ecart);
-  assert.ok(r.e.nx <= 5 && r.e.ny <= 5 && r.e.largeur >= 800 && r.e.profondeur >= 800, 'emprise insuffisante ou trop de tuiles');
+  assert.ok(r.e.nx <= 8 && r.e.ny <= 8 && r.e.largeur >= 800 && r.e.profondeur >= 800, 'emprise insuffisante ou trop de tuiles');
   assert.ok(r.e.cx - r.e.largeur / 2 <= 40 - 400 && r.e.cx + r.e.largeur / 2 >= 40 + 400, 'la mosaïque ne couvre pas toute la zone demandée');
 });
 

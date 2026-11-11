@@ -46,7 +46,7 @@
     '.p3-tip{position:absolute;pointer-events:none;background:#14202b;color:#fff;padding:5px 9px;border-radius:6px;font-size:.75rem;line-height:1.35;white-space:nowrap;opacity:0;transition:opacity .12s;z-index:3}',
     '.p3-tip.on{opacity:1}',
     '.p3-btn[disabled]{opacity:.6;cursor:default}',
-    '.p3-attr{position:absolute;right:10px;bottom:52px;font-size:.66rem;color:#14202b;background:rgba(255,255,255,.8);padding:2px 7px;border-radius:5px;pointer-events:none}',
+    '.p3-attr{position:absolute;right:10px;top:64px;font-size:.66rem;color:#14202b;background:rgba(255,255,255,.8);padding:2px 7px;border-radius:5px;pointer-events:none}',
     '.p3-attr[hidden]{display:none}',
     '.p3-hint{position:absolute;left:12px;bottom:52px;font-size:.72rem;color:#4b6a8b;background:rgba(255,255,255,.8);padding:3px 8px;border-radius:5px;pointer-events:none}',
     '.p3-card{background:#fff;border:1px solid #e3eaf2;border-radius:16px;padding:16px;display:grid;gap:12px}',
@@ -124,7 +124,7 @@
      suffit de poser sous eux la mosaïque de tuiles qui couvre le lotissement. Chargée uniquement à la demande (bouton
      « Satellite ») : sans ce clic, aucune requête ne part vers le fournisseur d'imagerie. */
   var SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-  var SAT_ZMAX = 19, SAT_COTE_MAX = 5;          /* au plus 5 × 5 tuiles de 256 px */
+  var SAT_ZMAX = 18, SAT_COTE_MAX = 8;          /* zoom 18 : au-delà, l'imagerie manque souvent hors des grandes villes ; au plus 8 × 8 tuiles de 256 px (mosaïque de 2 048 px) */
   function tuileX(lng, z) { return (lng + 180) / 360 * Math.pow(2, z); }
   function tuileY(lat, z) { var r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z); }
   function lngDeTuile(x, z) { return x / Math.pow(2, z) * 360 - 180; }
@@ -145,7 +145,11 @@
   /* Assemble les tuiles sur un canevas. Échec si plus d'un quart manque, ou si le canevas n'est pas lisible par WebGL. */
   function chargerMosaique(e, url) {
     return new Promise(function (ok, ko) {
-      var c = document.createElement('canvas'); c.width = e.nx * 256; c.height = e.ny * 256;
+      /* Canevas en puissance de deux : sans cela, certains téléphones (WebGL 1) ne peuvent pas générer les niveaux de
+         réduction de la texture, et l'image scintille dès que la caméra bouge. */
+      var pot = function (n) { var v = 256; while (v < n && v < 2048) v *= 2; return v; };
+      var c = document.createElement('canvas'); c.width = pot(e.nx * 256); c.height = pot(e.ny * 256);
+      var lw = c.width / e.nx, lh = c.height / e.ny;
       var g = c.getContext('2d'), reste = e.nx * e.ny, rates = 0, fini = false;
       var garde = setTimeout(function () { if (!fini) { fini = true; ko(new Error('délai dépassé')); } }, 20000);
       function un() {
@@ -157,7 +161,7 @@
       }
       for (var j = 0; j < e.ny; j++) for (var i = 0; i < e.nx; i++) (function (i, j) {
         var im = new Image(); im.crossOrigin = 'anonymous';
-        im.onload = function () { try { g.drawImage(im, i * 256, j * 256, 256, 256); } catch (err) { rates++; } un(); };
+        im.onload = function () { try { g.drawImage(im, Math.floor(i * lw), Math.floor(j * lh), Math.ceil(lw), Math.ceil(lh)); } catch (err) { rates++; } un(); };
         im.onerror = function () { rates++; un(); };
         im.src = url.replace('{z}', e.z).replace('{x}', e.x0 + i).replace('{y}', e.y0 + j);
       })(i, j);
@@ -285,6 +289,9 @@
     var sat = { on: false, mesh: null, etat: 'non_charge' };
     function satAppliquer() {
       if (sat.mesh) sat.mesh.visible = sat.on;
+      /* Le sol uni est masqué sous la photo : deux surfaces presque à la même hauteur se disputent l'affichage et
+         l'image tremble (surtout sur téléphone, où la précision de profondeur est plus faible). */
+      ground.visible = !(sat.on && sat.mesh);
       meshes.forEach(function (m) { m.material.transparent = sat.on; m.material.opacity = sat.on ? 0.72 : 1; m.material.needsUpdate = true; });
       var b = btn('sat'), at = box.querySelector('.p3-attr');
       if (b) { b.classList.toggle('on', sat.on); b.setAttribute('aria-pressed', sat.on ? 'true' : 'false'); }
@@ -293,7 +300,7 @@
     function satBasculer() {
       var b = btn('sat'); if (!b || !prep.geo || sat.etat === 'charge_en_cours' || sat.etat === 'echec') return;
       if (sat.etat === 'pret') { sat.on = !sat.on; satAppliquer(); return; }
-      var e = emprise(prep.geo, ax, az, RT * 1.8 + 150, ctx.satZoomMax);
+      var e = emprise(prep.geo, ax, az, RT * 1.3 + 100, ctx.satZoomMax);
       if (!e) return;
       sat.etat = 'charge_en_cours'; b.disabled = true; b.textContent = 'Chargement…';
       chargerMosaique(e, ctx.satUrl || SAT_URL).then(function (canevas) {
@@ -479,7 +486,7 @@
     return {
       destroy: detruire,
       select: function (id) { choisir(id); return selected ? selected.id : null; },
-      info: function () { return { webgl: true, public: pub, lots: lots.length, mes: mes.length, grille: prep.modeGrille, satellite: sat.etat, satelliteActif: sat.on, satZoom: sat.zoom || null, satTuiles: sat.tuiles || 0, libres: cnt.libre, reserves: cnt.reserve, attribues: cnt.attribue, vendus: cnt.vendu, sansTrace: prep.sansTrace }; }
+      info: function () { return { webgl: true, public: pub, lots: lots.length, mes: mes.length, grille: prep.modeGrille, satellite: sat.etat, satelliteActif: sat.on, sol: ground.visible, satZoom: sat.zoom || null, satTuiles: sat.tuiles || 0, libres: cnt.libre, reserves: cnt.reserve, attribues: cnt.attribue, vendus: cnt.vendu, sansTrace: prep.sansTrace }; }
     };
   }
 
