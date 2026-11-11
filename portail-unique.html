@@ -1620,7 +1620,24 @@
      identifié lors de la même revue. */
   var SB_TOKEN = null;
   try { SB_TOKEN = sessionStorage.getItem('pp_token') || null; } catch(e){}
+  /* [FIX — portail vide après 2 h] Le jeton d'un espace connecté dure 2 heures et signe TOUS les appels, y compris les
+     lectures publiques (programmes, lots, identité de l'entreprise). Une fois expiré, le serveur refusait donc tout :
+     le portail s'affichait vide, avec le nom par défaut, et le rechargement n'y changeait rien puisque le jeton restait
+     dans l'onglet. Un jeton expiré est désormais écarté avant chaque appel : les lectures publiques repartent avec la
+     clé publique, et l'espace connecté redemande simplement le code. */
+  function _jetonExpire(t){
+    try {
+      var b = String(t).split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+      var exp = JSON.parse(atob(b + '==='.slice((b.length + 3) % 4))).exp;
+      return !exp || (exp * 1000) < (Date.now() + 30000);
+    } catch(e){ return true; }
+  }
+  function _ecarterJetonExpire(){
+    if (SB_TOKEN && _jetonExpire(SB_TOKEN)) { SB_TOKEN = null; _effacerSessionPortail(); }
+  }
+  _ecarterJetonExpire();
   function _authHdr(json){
+    _ecarterJetonExpire();
     var h = { apikey: SB_KEY, Authorization: 'Bearer ' + (SB_TOKEN || SB_KEY) };
     if (json) h['Content-Type'] = 'application/json';
     return h;
@@ -1780,7 +1797,7 @@
         await chargerCopropriete();
       }
     } catch(e) {
-      _effacerSessionPortail();
+      SB_TOKEN = null; _effacerSessionPortail();
     }
   }
   document.addEventListener('DOMContentLoaded', function(){ _restaurerSessionPortail(); });
@@ -2147,6 +2164,8 @@
 
   async function sb(path){
     var r=await fetch(SB_URL+'/rest/v1/'+path,{ headers:_authHdr() });
+    /* Jeton refusé par le serveur (expiré, révoqué) : on l'écarte et on rejoue une fois avec la clé publique. */
+    if(r.status===401 && SB_TOKEN){ SB_TOKEN=null; _effacerSessionPortail(); r=await fetch(SB_URL+'/rest/v1/'+path,{ headers:_authHdr() }); }
     if(!r.ok) throw new Error('HTTP '+r.status);
     return await r.json();
   }
