@@ -7749,6 +7749,12 @@ body [style*="background: rgb(239, 68, 68)"] { background:#B91C1C !important; }
                 <div class="form-group span-2"><label>🔗 Lien de l'application (envoyé dans les invitations)</label>
                   <input type="text" id="param-app-url" class="form-control" placeholder="https://votre-domaine.ci">
                 </div>
+                <div class="form-group span-2"><label>🌐 Lien du portail souscripteur (envoyé avec le code d'accès)</label>
+                  <input type="text" id="param-portail-url" class="form-control" placeholder="Laisser vide : adresse du site + /portail-unique.html">
+                </div>
+                <div class="form-group span-2"><label>✍️ Mot du promoteur (ouvre le message d'accueil du souscripteur)</label>
+                  <textarea id="param-mot-promoteur" class="form-control" rows="3" placeholder="Ex. : Merci pour votre confiance. Nous avons créé cet espace pour que vous suiviez votre projet en toute transparence."></textarea>
+                </div>
               </div>
               <div style="display:flex;gap:8px;margin-top:10px;">
                 <button class="btn btn-secondary btn-sm" onclick="testerEmailJS()">🔌 Tester EmailJS</button>
@@ -35694,16 +35700,54 @@ async function csuiviPreparerCourant() {
   }
   csuiviRender();
 }
-function csuiviMessageAcces(c, code) {
-  var soc = csuiviSociete(), url = getAppUrl();
-  return 'Bonjour ' + ((c.prenoms || c.nom || '').trim()) + ',\n\n'
-    + 'Vous avez maintenant accès à ' + soc + ' (votre Espace Souscripteur) pour suivre vos paiements, documents et échéances.\n\n'
-    + (url ? '🔗 Lien : ' + url + '\n' : '')
-    + '👤 Identifiant : ' + (c.dossier || c.tel || c.id) + '\n'
-    + '🔑 Code d’accès : ' + code + '\n\n'
-    + 'Ouvrez le lien, cliquez sur « Espace souscripteur », puis saisissez votre identifiant et ce code.\n\n'
+/* Lien direct vers l'onglet « Espace Souscripteur » du portail public
+   (portail-unique.html#souscripteur ouvre directement le formulaire de connexion). */
+function portailUrlBase() {
+  var u = ((DATA.params || {}).portail_url || '').trim();
+  if (u) return u;
+  try { if (/^https?:$/.test(location.protocol)) return location.origin + '/portail-unique.html'; } catch (e) {}
+  return '';
+}
+function portailUrlSouscripteur() {
+  var u = portailUrlBase();
+  return (u && u.indexOf('#') < 0) ? u + '#souscripteur' : u;
+}
+/* Message d'accueil remis au souscripteur avec ses accès — UNE seule rédaction
+   pour la fenêtre « Code d'accès généré », l'envoi en file, l'e-mail et la copie.
+   opts.wa = true : mise en gras WhatsApp (*…*). */
+function messageAccesSouscripteur(c, code, opts) {
+  opts = opts || {};
+  var p = DATA.params || {}, soc = csuiviSociete();
+  var g = function (t) { return opts.wa ? '*' + t + '*' : t; };
+  var nom = (((c.prenoms || '') + ' ' + (c.nom || '')).trim()) || 'cher souscripteur';
+  var lien = portailUrlSouscripteur(), accueil = portailUrlBase().split('#')[0];
+  var mot = (p.mot_promoteur || '').trim()
+    || ('Merci pour la confiance que vous accordez à ' + soc + '. Pour que vous suiviez votre projet en toute transparence, nous vous ouvrons votre Espace Souscripteur personnel.');
+  var conseiller = (typeof csuiviCommercialNom === 'function') ? csuiviCommercialNom(c) : '';
+  var contact = 'Une question ? '
+    + (conseiller ? 'Votre conseiller ' + conseiller + ' reste à votre écoute' : 'Notre équipe reste à votre écoute')
+    + (p.tel ? ' au ' + p.tel : '') + ', ou directement par la messagerie de votre espace.';
+  return 'Bonjour ' + nom + ',\n\n'
+    + mot + '\n\n'
+    + '🏠 ' + g('Votre Espace Souscripteur — ' + soc) + '\n'
+    + 'Depuis votre téléphone, à tout moment, vous y retrouvez :\n'
+    + '• 💰 votre situation : montant versé et reste à payer\n'
+    + '• 📅 votre échéancier et vos prochaines échéances\n'
+    + '• 🧾 vos versements, et la déclaration d’un nouveau paiement\n'
+    + '• 🏗️ l’avancement des travaux et le suivi de votre titre\n'
+    + '• 📑 vos documents (attestation de versements, échéancier…)\n'
+    + '• 💬 une messagerie directe avec notre équipe\n\n'
+    + g('Vos accès personnels') + '\n'
+    + (lien ? '🔗 Lien : ' + lien + '\n' : '')
+    + '👤 Identifiant : ' + g(String(c.dossier || c.tel || c.id)) + '\n'
+    + '🔑 Code d’accès : ' + g(String(code)) + '\n\n'
+    + g('Pour vous connecter') + ' : ouvrez le lien, puis saisissez votre identifiant et ce code dans « Connexion souscripteur ».\n'
+    + '🔒 Ce code est personnel : ne le communiquez à personne.\n\n'
+    + contact + '\n\n'
+    + (accueil ? '🤝 Un proche a lui aussi un projet immobilier ? Faites-lui découvrir nos programmes : ' + accueil + '\n\n' : '')
     + 'Cordialement,\n' + soc;
 }
+function csuiviMessageAcces(c, code) { return messageAccesSouscripteur(c, code); }
 function csuiviHtmlFile() {
   var c = csuiviCourant(), n = CSUIVI.file.length;
   if (!c) {
@@ -93442,6 +93486,8 @@ async function saveCommsParams() {
     emailjs_template: gv('param-emailjs-template'),
     emailjs_key:      gv('param-emailjs-key'),
     app_url:          gv('param-app-url'),
+    portail_url:      gv('param-portail-url'),
+    mot_promoteur:    gv('param-mot-promoteur'),
     wa_societe:       gv('param-wa-societe'),
     wa_message:       gv('param-wa-message'),
     twilio_sid:       gv('param-twilio-sid'),
@@ -93481,6 +93527,8 @@ loadParamFields = function() {
   sv('param-emailjs-template', p.emailjs_template);
   sv('param-emailjs-key',      p.emailjs_key);
   sv('param-app-url',          p.app_url);
+  sv('param-portail-url',      p.portail_url);
+  sv('param-mot-promoteur',    p.mot_promoteur);
   sv('param-wa-societe',       p.wa_societe);
   sv('param-wa-message',       p.wa_message||'Bonjour {nom}, votre promoteur ImmoSuite ERP vous contacte.');
   sv('param-twilio-sid',       p.twilio_sid);
@@ -112256,7 +112304,7 @@ function _showCodeModal(client, code) {
   el.id = '_modal-code-acces';
   el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
   el.innerHTML = ''
-    + '<div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);">'
+    + '<div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:420px;width:100%;max-height:92vh;overflow-y:auto;box-sizing:border-box;box-shadow:0 20px 60px rgba(0,0,0,.25);">'
     + '<div style="font-size:32px;text-align:center;margin-bottom:8px;">🔑</div>'
     + '<h3 style="margin:0 0 4px;font-size:17px;color:#1C1C2E;text-align:center;">Code d\'accès généré</h3>'
     + '<p style="margin:0 0 18px;font-size:13px;color:#64748B;text-align:center;">' + escHtml(nom) + '</p>'
@@ -112275,27 +112323,28 @@ function _showCodeModal(client, code) {
     + '⚠️ Ce code n\'est jamais affiché à nouveau. Communiquez-le <strong>immédiatement</strong> par WhatsApp ou SMS.'
     + '</div>'
 
-    + '<button id="_btn-copy-code" style="width:100%;padding:12px;background:#2563EB;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;">📋 Copier le code</button>'
-    + '<button id="_btn-wa-code" style="width:100%;padding:12px;background:#25D366;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:12px;">💬 Envoyer par WhatsApp</button>'
+    + '<div style="font-size:11px;color:#475569;margin-bottom:6px;font-weight:600;">MESSAGE D\'ACCUEIL ENVOYÉ AU SOUSCRIPTEUR</div>'
+    + '<textarea id="_msg-code-apercu" readonly rows="7" style="font-family:inherit;width:100%;box-sizing:border-box;border:1px solid #CBD5E1;border-radius:8px;padding:10px;font-size:12px;line-height:1.45;color:#1C1C2E;background:#F8FAFC;resize:vertical;margin-bottom:12px;"></textarea>'
+
+    + '<button id="_btn-wa-code" style="width:100%;padding:12px;background:#25D366;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;">💬 Envoyer par WhatsApp</button>'
+    + '<button id="_btn-copy-msg" style="width:100%;padding:12px;background:#2563EB;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;">📋 Copier le message complet</button>'
+    + '<button id="_btn-copy-code" style="width:100%;padding:10px;background:#EFF6FF;color:#1D4ED8;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px;">Copier le code seul</button>'
     + '<button id="_btn-close-code" style="width:100%;padding:10px;background:#F1F5F9;color:#475569;border:none;border-radius:8px;font-size:13px;cursor:pointer;">Fermer (le code disparaîtra)</button>'
     + '</div>';
 
   document.body.appendChild(el);
 
-  document.getElementById('_btn-copy-code').onclick = function() {
-    navigator.clipboard ? navigator.clipboard.writeText(code).then(function(){ toast('Code copié !', 'success'); })
-                        : (function(){ var ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('Code copié !','success'); })();
+  var _copier = function(texte, ok) {
+    if (navigator.clipboard) navigator.clipboard.writeText(texte).then(function(){ toast(ok, 'success'); });
+    else { var ta=document.createElement('textarea');ta.value=texte;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast(ok,'success'); }
   };
+  document.getElementById('_msg-code-apercu').value = messageAccesSouscripteur(client, code);
+  document.getElementById('_btn-copy-code').onclick = function() { _copier(code, 'Code copié !'); };
+  document.getElementById('_btn-copy-msg').onclick = function() { _copier(messageAccesSouscripteur(client, code), 'Message complet copié !'); };
   document.getElementById('_btn-wa-code').onclick = function() {
-    var msg = encodeURIComponent(
-      '🏠 *ImmoSuite — Accès votre espace souscripteur*\n\n'
-      + 'Bonjour ' + nom + ',\n\n'
-      + '🔑 Identifiant : *' + login + '*\n'
-      + '🔒 Code d\'accès : *' + code + '*\n\n'
-      + '➡️ Connectez-vous sur l\'application pour suivre votre dossier.'
-    );
-    var tel = (client.tel || '').replace(/\D/g,'');
-    window.open('https://wa.me/' + (tel || '') + '?text=' + msg, '_blank');
+    var msg = encodeURIComponent(messageAccesSouscripteur(client, code, { wa: true }));
+    var tel = client.tel ? telWhatsApp(String(client.tel).split('/')[0]) : '';
+    window.open('https://wa.me/' + tel + '?text=' + msg, '_blank');
   };
   var closeBtn = document.getElementById('_btn-close-code');
   closeBtn.onclick = function() { el.remove(); };
