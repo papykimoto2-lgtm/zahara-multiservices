@@ -35373,7 +35373,8 @@ function getRetardataires() {
    Le journal et l'état d'envoi vivent dans la fiche client : ils se
    synchronisent avec elle, sans nouvelle table.
    ═══════════════════════════════════════════════════════════════════════ */
-var CSUIVI = { tab: 'actions', statut: '', commercial: '', recherche: '', file: [], pos: 0, code: '', codeId: '' };
+var CSUIVI = { tab: 'actions', statut: '', commercial: '', recherche: '', file: [], fileCible: 'souscripteur', pos: 0, code: '', codeId: '', exp: '',
+  cible: 'souscripteur', facces: 'aucun', fprog: '', fcomm: '', fstat: '', ftype: '', frech: '', exclus: {} };
 
 var CSUIVI_STATUTS = {
   retard_grave: { ico: '🔴', lib: 'Retard ≥ 3 mois', ordre: 1, action: 'Relance ferme + rendez-vous', canal: 'appel' },
@@ -35648,55 +35649,153 @@ function csuiviAccesEtat(c) {
 function csuiviCandidats() {
   return (DATA.clients || []).filter(function (c) { return (c.statut || 'actif') === 'actif' && csuiviAccesEtat(c) === 'aucun'; });
 }
-function csuiviHtmlPortail() {
-  var actifs = (DATA.clients || []).filter(function (c) { return (c.statut || 'actif') === 'actif'; });
-  var cand = csuiviCandidats(), joignables = cand.filter(function (c) { return c.tel || c.email; });
-  var envoye = actifs.filter(function (c) { return csuiviAccesEtat(c) === 'envoye'; }).length;
-  var code = actifs.filter(function (c) { return csuiviAccesEtat(c) === 'code'; }).length;
-  var connectes = actifs.filter(function (c) { return c.derniere_connexion_portail; }).length;
-  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;">'
-    + '<div class="card" style="padding:10px;"><div style="font-size:11px;color:var(--blanc-dim);">Souscripteurs actifs</div><div style="font-size:22px;font-weight:800;">' + actifs.length + '</div></div>'
-    + '<div class="card" style="padding:10px;"><div style="font-size:11px;color:var(--blanc-dim);">⏳ Accès à remettre</div><div style="font-size:22px;font-weight:800;color:var(--or);">' + cand.length + '</div></div>'
-    + '<div class="card" style="padding:10px;"><div style="font-size:11px;color:var(--blanc-dim);">✅ Accès envoyés (via cet écran)</div><div style="font-size:22px;font-weight:800;color:var(--vert);">' + envoye + '</div></div>'
-    + '<div class="card" style="padding:10px;"><div style="font-size:11px;color:var(--blanc-dim);">🔑 Code déjà existant</div><div style="font-size:22px;font-weight:800;">' + code + '</div></div>'
-    + '<div class="card" style="padding:10px;"><div style="font-size:11px;color:var(--blanc-dim);">🌐 Déjà connectés</div><div style="font-size:22px;font-weight:800;">' + connectes + '</div></div></div>';
-
-  if (CSUIVI.file.length) return h + csuiviHtmlFile();
-
-  h += '<div class="alert alert-info" style="font-size:12px;">Pour chaque souscripteur actif qui n’a pas encore d’accès, l’application crée un code personnel (6 chiffres, conservé chiffré) et prépare le message dans WhatsApp — ou par e-mail s’il n’a pas de téléphone. Vous cliquez sur « Envoyer » dans WhatsApp, puis sur « Suivant ». Ceux qui ont déjà un code ne sont pas touchés : leur code reste valable.</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
-    + '<button class="btn btn-primary" ' + (joignables.length ? '' : 'disabled ') + 'onclick="csuiviDemarrerEnvoi()">📨 Démarrer l’envoi (' + joignables.length + ')</button>'
+/* ── Envoi groupé d'accès au portail unique : souscripteurs ET intervenants, selon un filtre ──
+   Sélection = filtre + cases décochées ; un accès existant n'est remplacé qu'après confirmation
+   (l'ancien code cesse de fonctionner). Droits : souscripteurs = admin/manager/commercial ;
+   intervenants = admin/manager (identifiant externe). */
+function csuiviPeut(cible) {
+  try { return cible === 'intervenant' ? fcPeutGererAccesIntervenant() : (hasRole('admin') || hasRole('manager') || hasRole('commercial')); } catch (e) { return false; }
+}
+function csuiviEtatAcces(cible, o) {
+  if (cible === 'intervenant') { var e = fcEtatAccesIntervenant(o).etat; return e === 'inactif' ? '' : e; }
+  return (o.statut || 'actif') === 'actif' ? csuiviAccesEtat(o) : '';
+}
+function csuiviLigne(cible, o) {
+  var interv = cible === 'intervenant';
+  return { id: o.id, obj: o,
+    nom: interv ? (String(o.nom_organisation || '') + (o.contact_nom ? ' — ' + o.contact_nom : '')) : (((o.prenoms || '') + ' ' + (o.nom || '')).trim() || '—'),
+    ref: interv ? (FC_TYPES_INTERVENANT[o.type] || o.type || '') : (o.dossier || ''),
+    tel: (interv ? o.telephone : o.tel) || '', email: o.email || '', etat: csuiviEtatAcces(cible, o) };
+}
+/* Lignes correspondant au filtre courant (avant exclusions manuelles). */
+function csuiviSelection() {
+  var cible = CSUIVI.cible, q = (CSUIVI.frech || '').toLowerCase(), calc = {};
+  if (cible !== 'intervenant' && CSUIVI.fstat) csuiviCalculer().forEach(function (x) { calc[x.c.id] = x; });
+  var src = cible === 'intervenant' ? (DATA.intervenants_fonciers || []) : (DATA.clients || []);
+  return src.map(function (o) { return csuiviLigne(cible, o); }).filter(function (r) {
+    if (!r.etat) return false;
+    if (CSUIVI.facces !== 'tous' && r.etat !== CSUIVI.facces) return false;
+    if (cible === 'intervenant') { if (CSUIVI.ftype && r.obj.type !== CSUIVI.ftype) return false; }
+    else {
+      if (CSUIVI.fprog && r.obj.programme_id !== CSUIVI.fprog) return false;
+      if (CSUIVI.fstat && !(calc[r.id] && calc[r.id].code === CSUIVI.fstat)) return false;
+      var cm = csuiviCommercialNom(r.obj);
+      if (CSUIVI.fcomm === '__none__' ? !!cm : (CSUIVI.fcomm && cm !== CSUIVI.fcomm)) return false;
+    }
+    return !q || (r.nom + ' ' + r.ref + ' ' + r.tel + ' ' + r.email).toLowerCase().indexOf(q) >= 0;
+  });
+}
+/* Destinataires retenus : joignables (téléphone ou e-mail) et non décochés. */
+function csuiviCibles() {
+  return csuiviSelection().filter(function (r) { return (r.tel || r.email) && !CSUIVI.exclus[r.id]; });
+}
+function csuiviF(k, v) { CSUIVI[k] = v; CSUIVI.exclus = {}; csuiviRender(); }
+function csuiviChoisirCible(c) { CSUIVI.cible = c; CSUIVI.facces = 'aucun'; CSUIVI.fprog = CSUIVI.fcomm = CSUIVI.fstat = CSUIVI.ftype = CSUIVI.frech = ''; CSUIVI.exclus = {}; csuiviRender(); }
+function csuiviBasculer(id) { if (CSUIVI.exclus[id]) delete CSUIVI.exclus[id]; else CSUIVI.exclus[id] = 1; csuiviRenderSel(); }
+function csuiviRenderSel() { var b = document.getElementById('csuivi-sel'); if (b) b.innerHTML = csuiviHtmlSel(); }
+function csuiviEmailjsPret() { var p = DATA.params || {}; return !!(p.emailjs_service && p.emailjs_template && p.emailjs_key && typeof emailjs !== 'undefined'); }
+function csuiviHtmlSel() {
+  var rows = csuiviSelection(), cibles = csuiviCibles(), sansContact = rows.filter(function (r) { return !r.tel && !r.email; }).length;
+  var remp = cibles.filter(function (r) { return r.etat !== 'aucun'; }).length, mail = cibles.filter(function (r) { return r.email; }).length;
+  var h = '<div style="font-size:13px;margin:10px 0;"><b>' + cibles.length + '</b> destinataire(s) retenu(s) sur ' + rows.length + ' correspondant au filtre'
+    + (sansContact ? ' · <span style="color:var(--or);">' + sansContact + ' sans téléphone ni e-mail (ignoré' + (sansContact > 1 ? 's' : '') + ')</span>' : '') + '</div>';
+  if (remp) h += '<div class="alert alert-warning" style="font-size:12px;">⚠️ ' + remp + ' destinataire(s) ont déjà un accès : un nouveau code sera créé et l’ancien cessera de fonctionner (confirmation demandée).</div>';
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
+    + '<button class="btn btn-primary" ' + (cibles.length ? '' : 'disabled ') + 'onclick="csuiviDemarrerEnvoi()">📨 Envoi assisté (WhatsApp / e-mail) — ' + cibles.length + '</button>'
+    + (csuiviEmailjsPret() ? '<button class="btn btn-secondary" ' + (mail ? '' : 'disabled ') + 'onclick="csuiviEnvoiGroupeEmail()">✉️ Envoyer tous par e-mail automatiquement — ' + mail + '</button>' : '')
     + '</div>';
-  if (cand.length > joignables.length) {
-    h += '<div class="alert alert-warning" style="font-size:12px;">' + (cand.length - joignables.length) + ' souscripteur(s) sans téléphone ni e-mail : complétez leur fiche pour pouvoir leur envoyer l’accès.</div>';
+  if (rows.length) {
+    h += '<div style="max-height:360px;overflow:auto;"><table class="table"><thead><tr><th></th><th>Nom</th><th>Réf.</th><th>Contact</th><th>Accès</th></tr></thead><tbody>'
+      + rows.slice(0, 200).map(function (r) {
+        var joignable = r.tel || r.email;
+        return '<tr' + (joignable ? '' : ' style="opacity:.5;"') + '><td><input type="checkbox" ' + (joignable ? '' : 'disabled ') + (joignable && !CSUIVI.exclus[r.id] ? 'checked ' : '') + 'onchange="csuiviBasculer(\'' + escHtml(r.id) + '\')"></td>'
+          + '<td>' + escHtml(r.nom) + '</td><td>' + escHtml(r.ref) + '</td><td>' + escHtml(r.tel || r.email || '—') + '</td>'
+          + '<td>' + ({ aucun: '⏳ à remettre', envoye: '✅ envoyé', code: '🔑 code existant', actif: '🔑 actif', expire: '⌛ expiré' }[r.etat] || '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+      + (rows.length > 200 ? '<div style="font-size:11px;color:var(--blanc-dim);">200 premières lignes affichées sur ' + rows.length + ' (tous les destinataires cochés sont traités).</div>' : '');
+  } else h += '<div class="alert alert-success">Aucun destinataire pour ce filtre.</div>';
+  return h;
+}
+function csuiviHtmlPortail() {
+  if (CSUIVI.file.length) return csuiviHtmlFile();
+  var interv = CSUIVI.cible === 'intervenant', cible = CSUIVI.cible;
+  var base = (interv ? (DATA.intervenants_fonciers || []) : (DATA.clients || [])).map(function (o) { return csuiviLigne(cible, o); }).filter(function (r) { return r.etat; });
+  var n = function (e) { return base.filter(function (r) { return r.etat === e; }).length; };
+  var cartes = interv
+    ? [['aucun', '⏳ Accès à remettre', 'var(--or)'], ['actif', '🔑 Accès actifs', 'var(--vert)'], ['expire', '⌛ Accès expirés', 'var(--rouge)']]
+    : [['aucun', '⏳ Accès à remettre', 'var(--or)'], ['envoye', '✅ Envoyés (via cet écran)', 'var(--vert)'], ['code', '🔑 Code déjà existant', '']];
+  var h = '<div style="display:flex;gap:8px;margin-bottom:12px;">'
+    + '<button class="btn btn-sm ' + (!interv ? 'btn-primary' : 'btn-secondary') + '" onclick="csuiviChoisirCible(\'souscripteur\')">🏠 Souscripteurs</button>'
+    + '<button class="btn btn-sm ' + (interv ? 'btn-primary' : 'btn-secondary') + '" onclick="csuiviChoisirCible(\'intervenant\')">🤝 Intervenants (partenaires)</button></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;">'
+    + '<div class="card" style="padding:10px;"><div style="font-size:11px;color:var(--blanc-dim);">' + (interv ? 'Intervenants actifs' : 'Souscripteurs actifs') + '</div><div style="font-size:22px;font-weight:800;">' + base.length + '</div></div>'
+    + cartes.map(function (c) {
+      return '<div class="card" style="padding:10px;cursor:pointer;' + (CSUIVI.facces === c[0] ? 'outline:2px solid var(--or);' : '') + '" title="Cliquer pour filtrer" onclick="csuiviF(\'facces\',\'' + c[0] + '\')">'
+        + '<div style="font-size:11px;color:var(--blanc-dim);">' + c[1] + '</div><div style="font-size:22px;font-weight:800;' + (c[2] ? 'color:' + c[2] + ';' : '') + '">' + n(c[0]) + '</div></div>';
+    }).join('') + '</div>';
+  var opt = function (v, l, cur) { return '<option value="' + escHtml(v) + '"' + (cur === v ? ' selected' : '') + '>' + escHtml(l) + '</option>'; };
+  var etats = interv ? [['aucun', 'Accès à remettre'], ['expire', 'Accès expirés'], ['actif', 'Accès actifs (régénérer)'], ['tous', 'Tous']]
+                     : [['aucun', 'Accès à remettre'], ['envoye', 'Déjà envoyés (renvoyer)'], ['code', 'Code existant (régénérer)'], ['tous', 'Tous']];
+  h += '<div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;">'
+    + '<input class="search-input" placeholder="Rechercher…" value="' + escHtml(CSUIVI.frech) + '" oninput="CSUIVI.frech=this.value;CSUIVI.exclus={};csuiviRenderSel()">'
+    + '<select class="filter-select" onchange="csuiviF(\'facces\',this.value)">' + etats.map(function (e) { return opt(e[0], e[1], CSUIVI.facces); }).join('') + '</select>';
+  if (interv) {
+    h += '<select class="filter-select" onchange="csuiviF(\'ftype\',this.value)"><option value="">Tous les types</option>'
+      + Object.keys(FC_TYPES_INTERVENANT).map(function (k) { return opt(k, FC_TYPES_INTERVENANT[k], CSUIVI.ftype); }).join('') + '</select>';
+  } else {
+    var comms = {};
+    (DATA.clients || []).forEach(function (c) { var m = csuiviCommercialNom(c); if (m) comms[m] = 1; });
+    h += '<select class="filter-select" onchange="csuiviF(\'fprog\',this.value)"><option value="">Tous les programmes</option>'
+      + (DATA.programmes || []).map(function (p) { return opt(p.id, p.nom || p.id, CSUIVI.fprog); }).join('') + '</select>'
+      + '<select class="filter-select" onchange="csuiviF(\'fstat\',this.value)"><option value="">Tous les statuts</option>'
+      + Object.keys(CSUIVI_STATUTS).map(function (k) { return opt(k, CSUIVI_STATUTS[k].ico + ' ' + CSUIVI_STATUTS[k].lib, CSUIVI.fstat); }).join('') + '</select>'
+      + '<select class="filter-select" onchange="csuiviF(\'fcomm\',this.value)"><option value="">Tous les commerciaux</option>' + opt('__none__', '— Non assigné —', CSUIVI.fcomm)
+      + Object.keys(comms).sort().map(function (m) { return opt(m, m, CSUIVI.fcomm); }).join('') + '</select>';
   }
-  if (!cand.length) h += '<div class="alert alert-success">Tous les souscripteurs actifs ont déjà reçu ou possèdent un accès.</div>';
+  h += '</div><div id="csuivi-sel">' + csuiviHtmlSel() + '</div>';
   return h;
 }
 
 function csuiviDemarrerEnvoi() {
-  if (!hasRole('admin') && !hasRole('manager') && !hasRole('commercial')) { toast('⛔ Accès refusé.', 'error'); return; }
-  CSUIVI.file = csuiviCandidats().filter(function (c) { return c.tel || c.email; }).map(function (c) { return c.id; });
+  if (!csuiviPeut(CSUIVI.cible)) { toast('⛔ Accès refusé.', 'error'); return; }
+  var rows = csuiviCibles(); if (!rows.length) return;
+  var remp = rows.filter(function (r) { return r.etat !== 'aucun'; }).length;
+  if (remp && !confirm(remp + ' destinataire(s) ont déjà un accès. Un nouveau code va remplacer l’ancien (qui cessera de fonctionner). Continuer ?')) return;
+  CSUIVI.file = rows.map(function (r) { return r.id; }); CSUIVI.fileCible = CSUIVI.cible;
   CSUIVI.pos = 0; CSUIVI.code = ''; CSUIVI.codeId = '';
   csuiviRender(); csuiviPreparerCourant();
 }
-function csuiviCourant() { return (DATA.clients || []).find(function (c) { return c.id === CSUIVI.file[CSUIVI.pos]; }) || null; }
-
-/* Génère le code du souscripteur affiché (une seule fois, stocké haché). */
+function csuiviCourant() {
+  var src = CSUIVI.fileCible === 'intervenant' ? (DATA.intervenants_fonciers || []) : (DATA.clients || []);
+  return src.find(function (c) { return c.id === CSUIVI.file[CSUIVI.pos]; }) || null;
+}
+/* Crée l'accès (code affiché une seule fois, stocké haché). Renvoie { code, exp } ou null. */
+async function csuiviCreerAcces(cible, c) {
+  if (cible === 'intervenant') {
+    var r = await fcGenererAccesIntervenant(c.id);
+    return r.ok ? { code: r.code, exp: r.expiration } : { erreur: r.erreur };
+  }
+  var code = Math.floor(100000 + Math.random() * 900000).toString(), salt = generateSalt();
+  c.code_acces_hash = await hashPassword(code, salt);
+  c.code_acces_salt = salt;
+  c.code_acces_date = new Date().toISOString();
+  delete c.code_acces; delete c.mot_de_passe;
+  c._baseModifie = c._modifie || c._baseModifie || null;   /* référence = dernière version connue : évite un faux conflit de synchro */
+  await dbPut('clients', c);
+  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+  return { code: code, exp: '' };
+}
+function csuiviMessageCourant(cible, c, code, exp) {
+  return cible === 'intervenant' ? fcMessageAccesIntervenant(c, code, exp) : messageAccesSouscripteur(c, code);
+}
+/* Génère le code du destinataire affiché. */
 async function csuiviPreparerCourant() {
   var c = csuiviCourant();
   if (!c) { csuiviRender(); return; }
   if (CSUIVI.codeId !== c.id) {
-    var code = Math.floor(100000 + Math.random() * 900000).toString();
-    var salt = generateSalt();
-    c.code_acces_hash = await hashPassword(code, salt);
-    c.code_acces_salt = salt;
-    c.code_acces_date = new Date().toISOString();
-    delete c.code_acces; delete c.mot_de_passe;
-    c._baseModifie = c._modifie || c._baseModifie || null;   /* référence = dernière version connue : évite un faux conflit de synchro */
-    await dbPut('clients', c);
-    if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
-    CSUIVI.code = code; CSUIVI.codeId = c.id;
+    var r = await csuiviCreerAcces(CSUIVI.fileCible, c);
+    if (r.erreur) { toast('❌ ' + r.erreur, 'error'); csuiviSuivant(); return; }
+    CSUIVI.code = r.code; CSUIVI.exp = r.exp; CSUIVI.codeId = c.id;
   }
   csuiviRender();
 }
@@ -35749,55 +35848,99 @@ function messageAccesSouscripteur(c, code, opts) {
 }
 function csuiviMessageAcces(c, code) { return messageAccesSouscripteur(c, code); }
 function csuiviHtmlFile() {
-  var c = csuiviCourant(), n = CSUIVI.file.length;
+  var c = csuiviCourant(), n = CSUIVI.file.length, cible = CSUIVI.fileCible;
   if (!c) {
-    return '<div class="alert alert-success">✅ Envoi terminé : tous les souscripteurs de la liste ont été traités.</div>'
+    return '<div class="alert alert-success">✅ Envoi terminé : tous les destinataires de la liste ont été traités.</div>'
       + '<button class="btn btn-secondary" onclick="csuiviSetTab(\'portail\')">Retour au récapitulatif</button>';
   }
   if (CSUIVI.codeId !== c.id) return '<div class="alert alert-info">Création du code…</div>';
-  var msg = csuiviMessageAcces(c, CSUIVI.code), id = escHtml(c.id);
-  var tel = c.tel ? telWhatsApp(String(c.tel).split('/')[0]) : '';
+  var l = csuiviLigne(cible, c), msg = csuiviMessageCourant(cible, c, CSUIVI.code, CSUIVI.exp), id = escHtml(c.id);
+  var tel = l.tel ? telWhatsApp(String(l.tel).split('/')[0]) : '';
   return '<div class="card" style="padding:16px;max-width:640px;">'
-    + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">Souscripteur ' + (CSUIVI.pos + 1) + ' / ' + n + '</div>'
-    + '<div style="font-size:18px;font-weight:800;">' + escHtml(((c.prenoms || '') + ' ' + (c.nom || '')).trim()) + '</div>'
-    + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">Dossier ' + escHtml(c.dossier || '—') + ' · ' + escHtml(c.tel || 'pas de téléphone') + ' · ' + escHtml(c.email || 'pas d’e-mail') + '</div>'
+    + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">' + (cible === 'intervenant' ? 'Intervenant ' : 'Souscripteur ') + (CSUIVI.pos + 1) + ' / ' + n + '</div>'
+    + '<div style="font-size:18px;font-weight:800;">' + escHtml(l.nom) + '</div>'
+    + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">' + (cible === 'intervenant' ? '' : 'Dossier ') + escHtml(l.ref || '—') + ' · ' + escHtml(l.tel || 'pas de téléphone') + ' · ' + escHtml(l.email || 'pas d’e-mail') + '</div>'
     + '<textarea class="form-control" rows="9" readonly style="font-size:12px;">' + escHtml(msg) + '</textarea>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
     + (tel ? '<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/' + tel + '?text=' + encodeURIComponent(msg) + '" onclick="csuiviAccesEnvoye(\'' + id + '\',\'whatsapp\')">💬 Envoyer par WhatsApp</a>' : '')
-    + (c.email ? '<button class="btn btn-secondary" onclick="csuiviAccesEmail(\'' + id + '\')">✉️ Envoyer par e-mail</button>' : '')
+    + (l.email ? '<button class="btn btn-secondary" onclick="csuiviAccesEmail(\'' + id + '\')">✉️ Envoyer par e-mail</button>' : '')
     + '<button class="btn btn-secondary" onclick="csuiviCopier()">📋 Copier</button>'
     + '<button class="btn btn-secondary" onclick="csuiviSuivant()">Suivant ▶</button>'
     + '<button class="btn btn-secondary" onclick="csuiviSetTab(\'portail\')">Arrêter</button></div>'
     + '<div id="csuivi-etat" style="font-size:12px;margin-top:10px;color:var(--vert);"></div></div>';
 }
-async function csuiviAccesEnvoye(clientId, canal) {
-  var c = (DATA.clients || []).find(function (x) { return x.id === clientId; }); if (!c) return;
+/* Marque l'accès comme remis (date + canal). Aucun secret n'est enregistré. */
+async function csuiviMarquerEnvoye(cible, id, canal) {
+  var interv = cible === 'intervenant';
+  var c = interv ? fcIntervenant(id) : (DATA.clients || []).find(function (x) { return x.id === id; });
+  if (!c) return false;
   c.portail_acces_envoye = { date: today(), canal: canal };
-  c._baseModifie = c._modifie || c._baseModifie || null;
-  await dbPut('clients', c);
-  if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+  if (interv) {
+    (c.acces_historique = c.acces_historique || []).push({ date: new Date().toISOString(), action: 'envoye', par: fcActeur().nom, canal: canal });
+    c._modifie = new Date().toISOString();
+    await fcDb('intervenants_fonciers', c);
+  } else {
+    c._baseModifie = c._modifie || c._baseModifie || null;
+    await dbPut('clients', c);
+    if (typeof syncToSupabase === 'function') syncToSupabase('pi_clients', c);
+  }
+  return true;
+}
+async function csuiviAccesEnvoye(clientId, canal) {
+  if (!await csuiviMarquerEnvoye(CSUIVI.fileCible, clientId, canal)) return;
   var e = document.getElementById('csuivi-etat');
   if (e) e.textContent = '✔ Accès marqué comme envoyé par ' + canal + '. Cliquez sur « Envoyer » dans la fenêtre ouverte, puis « Suivant ».';
 }
+function csuiviEmailjsEnvoyer(cible, c, code, exp) {
+  var p = DATA.params || {}, soc = csuiviSociete(), l = csuiviLigne(cible, c);
+  emailjs.init(p.emailjs_key);
+  return emailjs.send(p.emailjs_service, p.emailjs_template, {
+    to_email: l.email, to_name: cible === 'intervenant' ? (c.contact_nom || c.nom_organisation || '') : (c.nom || ''),
+    subject: cible === 'intervenant' ? 'Votre accès à l’espace Intervenants — ' + soc : 'Vos accès à ' + soc,
+    message: csuiviMessageCourant(cible, c, code, exp), from_name: soc, reply_to: p.email || '' });
+}
 async function csuiviAccesEmail(clientId) {
-  var c = (DATA.clients || []).find(function (x) { return x.id === clientId; }); if (!c || !c.email) return;
-  var msg = csuiviMessageAcces(c, CSUIVI.code), soc = csuiviSociete(), sujet = 'Vos accès à ' + soc, p = DATA.params || {};
-  if (p.emailjs_service && p.emailjs_template && p.emailjs_key && typeof emailjs !== 'undefined') {
+  var cible = CSUIVI.fileCible, c = csuiviCourant(); if (!c || c.id !== clientId) return;
+  var l = csuiviLigne(cible, c); if (!l.email) return;
+  if (csuiviEmailjsPret()) {
     try {
-      emailjs.init(p.emailjs_key);
-      await emailjs.send(p.emailjs_service, p.emailjs_template, { to_email: c.email, to_name: c.nom || '', subject: sujet, message: msg, from_name: soc, reply_to: p.email || '' });
+      await csuiviEmailjsEnvoyer(cible, c, CSUIVI.code, CSUIVI.exp);
       await csuiviAccesEnvoye(clientId, 'email');
-      toast('✅ E-mail envoyé à ' + c.email, 'success');
+      toast('✅ E-mail envoyé à ' + l.email, 'success');
       csuiviSuivant();
     } catch (err) { toast('❌ Erreur EmailJS : ' + ((err && err.text) || err), 'error'); }
   } else {
     await csuiviAccesEnvoye(clientId, 'email');
-    window.location.href = 'mailto:' + c.email + '?subject=' + encodeURIComponent(sujet) + '&body=' + encodeURIComponent(msg);
+    var sujet = cible === 'intervenant' ? 'Votre accès à l’espace Intervenants — ' + csuiviSociete() : 'Vos accès à ' + csuiviSociete();
+    window.location.href = 'mailto:' + l.email + '?subject=' + encodeURIComponent(sujet) + '&body=' + encodeURIComponent(csuiviMessageCourant(cible, c, CSUIVI.code, CSUIVI.exp));
   }
+}
+/* Envoi groupé 100 % automatique par e-mail (EmailJS) : un code par destinataire, cadence ≤ 1 message/seconde. */
+async function csuiviEnvoiGroupeEmail() {
+  var cible = CSUIVI.cible;
+  if (!csuiviPeut(cible)) { toast('⛔ Accès refusé.', 'error'); return; }
+  if (!csuiviEmailjsPret()) { toast('EmailJS non configuré (Paramètres).', 'error'); return; }
+  var rows = csuiviCibles().filter(function (r) { return r.email; }); if (!rows.length) return;
+  var remp = rows.filter(function (r) { return r.etat !== 'aucun'; }).length;
+  if (!confirm('Envoyer ' + rows.length + ' e-mail(s) d’accès maintenant ?' + (remp ? '\n' + remp + ' ancien(s) code(s) seront remplacé(s) et cesseront de fonctionner.' : ''))) return;
+  var ok = 0, ko = [], box = document.getElementById('csuivi-sel');
+  for (var k = 0; k < rows.length; k++) {
+    var c = rows[k].obj;
+    if (box) box.innerHTML = '<div class="alert alert-info">Envoi en cours… ' + (k + 1) + ' / ' + rows.length + ' — ne fermez pas cet écran.</div>';
+    var r = await csuiviCreerAcces(cible, c);
+    if (r.erreur) { ko.push(rows[k].nom + ' (' + r.erreur + ')'); continue; }
+    try { await csuiviEmailjsEnvoyer(cible, c, r.code, r.exp); await csuiviMarquerEnvoye(cible, c.id, 'email'); ok++; }
+    catch (err) { ko.push(rows[k].nom + ' (' + ((err && err.text) || err) + ')'); }
+    await new Promise(function (res) { setTimeout(res, 1100); });
+  }
+  csuiviRender();
+  var b = document.getElementById('csuivi-sel');
+  if (b) b.insertAdjacentHTML('afterbegin', '<div class="alert ' + (ko.length ? 'alert-warning' : 'alert-success') + '" style="font-size:12px;">✅ ' + ok + ' e-mail(s) envoyé(s)'
+    + (ko.length ? ' · ❌ ' + ko.length + ' échec(s) : ' + escHtml(ko.join(' ; ')) + '. Pour ceux-ci un nouveau code a été créé : relancez en « Envoi assisté » (filtre « Code existant »).' : '') + '</div>');
 }
 function csuiviCopier() {
   var c = csuiviCourant(); if (!c) return;
-  var t = csuiviMessageAcces(c, CSUIVI.code);
+  var t = csuiviMessageCourant(CSUIVI.fileCible, c, CSUIVI.code, CSUIVI.exp);
   if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { toast('Message copié.', 'success'); });
 }
 function csuiviSuivant() {
