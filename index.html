@@ -30681,14 +30681,22 @@ async function renderPortailStats() {
   var ends = rows.filter(function(r){ return r.event_type === 'session_end'; });
   var tabs = rows.filter(function(r){ return r.event_type === 'tab_view'; });
 
+  /* Une visite = une session (identifiant aléatoire par ouverture du portail) : le même visiteur revenu compte plusieurs fois. */
   var visiteurs = new Set(starts.map(function(r){ return r.session_id; })).size;
-  var dureeMoy = ends.length ? Math.round(ends.reduce(function(s,r){ return s+(r.duree_ms||0); },0) / ends.length / 1000) : 0;
-  var tauxRebond = starts.length ? Math.round(tabs.length ? (1 - (new Set(tabs.map(function(r){return r.session_id;})).size / visiteurs)) * 100 : 100) : 0;
+  var avecNav = new Set(tabs.map(function(r){ return r.session_id; })).size;
+  /* Durée : UNE valeur par session (la plus grande : la fin est renvoyée à chaque passage en arrière-plan, et les anciennes
+     versions l'envoyaient deux fois), plafonnée à 2 h (onglet oublié ouvert), puis MÉDIANE : la moyenne était écrasée
+     par quelques sessions interminables. */
+  var parSession = {};
+  ends.forEach(function(r){ var d = Math.min(r.duree_ms || 0, 7200000); if (d > (parSession[r.session_id] || 0)) parSession[r.session_id] = d; });
+  var durees = Object.keys(parSession).map(function(k){ return parSession[k]; }).sort(function(a,b){ return a - b; });
+  var dureeMoy = durees.length ? Math.round((durees.length % 2 ? durees[(durees.length - 1) / 2] : (durees[durees.length / 2 - 1] + durees[durees.length / 2]) / 2) / 1000) : 0;
+  var tauxRebond = starts.length ? Math.round(tabs.length ? (1 - (avecNav / visiteurs)) * 100 : 100) : 0;
 
   document.getElementById('pstats-kpis').innerHTML =
-    '<div class="kpi-card"><div class="kpi-label">Visiteurs uniques</div><div class="kpi-value">' + visiteurs + '</div></div>'
-    + '<div class="kpi-card"><div class="kpi-label">Sessions totales</div><div class="kpi-value">' + starts.length + '</div></div>'
-    + '<div class="kpi-card"><div class="kpi-label">Durée moyenne</div><div class="kpi-value">' + (dureeMoy>=60 ? Math.floor(dureeMoy/60)+' min '+(dureeMoy%60)+'s' : dureeMoy+'s') + '</div></div>'
+    '<div class="kpi-card"><div class="kpi-label">Visites</div><div class="kpi-value">' + visiteurs + '</div></div>'
+    + '<div class="kpi-card"><div class="kpi-label">Visites avec navigation</div><div class="kpi-value">' + avecNav + '</div></div>'
+    + '<div class="kpi-card"><div class="kpi-label">Durée médiane</div><div class="kpi-value">' + (dureeMoy>=60 ? Math.floor(dureeMoy/60)+' min '+(dureeMoy%60)+'s' : dureeMoy+'s') + '</div></div>'
     + '<div class="kpi-card"><div class="kpi-label">Taux de rebond*</div><div class="kpi-value">' + Math.max(0,tauxRebond) + '%</div></div>';
 
   function _barres(counts, total, formatLabel) {
@@ -30725,7 +30733,7 @@ async function renderPortailStats() {
     : '<div style="color:var(--blanc-dim);font-size:12px;">Aucune visite sur la période.</div>';
 
   document.getElementById('pstats-kpis').insertAdjacentHTML('afterend',
-    '<div style="font-size:11px;color:var(--blanc-dim);margin:4px 0 0;">* Taux de rebond : visiteurs n\'ayant consulté aucun onglet au-delà de l\'accueil. Aucune donnée personnelle collectée — région = fuseau horaire déclaré par le navigateur, pas de géolocalisation IP.</div>');
+    '<div style="font-size:11px;color:var(--blanc-dim);margin:4px 0 0;">* Taux de rebond : visites sans aucun onglet consulté au-delà de l\'accueil. Visite = une ouverture du portail (un même visiteur qui revient compte plusieurs fois). Durée = temps actif, médiane des visites terminées, plafonnée à 2 h. Robots, aperçus de lien et visites de test (?nostats=1) ne sont plus comptés depuis la mise à jour du portail ; l\'historique antérieur peut en contenir. Aucune donnée personnelle collectée — région = fuseau horaire déclaré par le navigateur, pas de géolocalisation IP.</div>');
 }
 /* Classement commerciaux + apporteurs — CA porté (montant_total) et encaissé,
    à partir des souscripteurs qu'ils ont respectivement en portefeuille.

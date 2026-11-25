@@ -6974,7 +6974,19 @@
      (proxy géographique courant, RGPD-friendly). session_id aléatoire,
      jamais lié à un compte même après connexion souscripteur/apporteur.
   ══════════════════════════════════════════════════════════════════ */
-  var ANALYTICS = { sessionId: null, debut: null, ongletsVus: {} };
+  var ANALYTICS = { sessionId: null, debut: null, ongletsVus: {}, actif: 0, depuis: null, dernierEnvoi: -1 };
+
+  /* Exclusions : robots et aperçus de lien (WhatsApp, Facebook, moteurs…), automates (webdriver) et visites de test de l'équipe.
+     Test : ouvrir le portail avec ?nostats=1 (mémorisé dans ce navigateur) ; ?nostats=0 réactive la mesure. */
+  function _anaExclu(){
+    try{
+      if(/[?&]nostats=1(&|$)/.test(location.search)) localStorage.setItem('pp_no_stats','1');
+      if(/[?&]nostats=0(&|$)/.test(location.search)) localStorage.removeItem('pp_no_stats');
+      if(localStorage.getItem('pp_no_stats')==='1') return true;
+    }catch(e){}
+    if(navigator.webdriver) return true;
+    return /bot|crawl|spider|slurp|facebookexternalhit|facebot|whatsapp|telegram|preview|headless|lighthouse|pingdom|uptime|monitor|curl|python-requests/i.test(navigator.userAgent||'');
+  }
 
   function _anaUid(){ return 'sess_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10); }
   function _anaAppareil(){
@@ -7005,8 +7017,10 @@
     } catch(e){ /* jamais bloquant pour le visiteur */ }
   }
   function _anaDemarrer(){
+    if(_anaExclu()) return;
     ANALYTICS.sessionId = _anaUid();
     ANALYTICS.debut = Date.now();
+    ANALYTICS.depuis = (document.visibilityState === 'hidden') ? null : ANALYTICS.debut;
     var sid = ANALYTICS.sessionId;
     _anaEnvoyer({
       session_id: sid, event_type:'session_start',
@@ -7031,9 +7045,18 @@
     ANALYTICS.ongletsVus[nom] = true;
     _anaEnvoyer({ session_id: ANALYTICS.sessionId, event_type:'tab_view', onglet: nom });
   }
+  /* Durée = temps ACTIF (page visible), pas le temps écoulé depuis l'ouverture : un onglet resté ouvert en arrière-plan ne
+     gonfle plus la mesure. Plafonnée à 4 h. La fin est (ré)envoyée quand la page passe en arrière-plan ou se ferme, mais
+     jamais deux fois avec la même valeur ; l'écran de statistiques retient la plus grande valeur par session. */
+  function _anaActif(){
+    var t = ANALYTICS.actif + (ANALYTICS.depuis ? Date.now() - ANALYTICS.depuis : 0);
+    return Math.max(0, Math.min(t, 4 * 3600 * 1000));
+  }
   function _anaTerminer(){
     if (!ANALYTICS.sessionId) return;
-    var duree = Date.now() - ANALYTICS.debut;
+    var duree = _anaActif();
+    if (Math.round(duree / 1000) === ANALYTICS.dernierEnvoi) return;   /* pagehide + beforeunload : une seule fois */
+    ANALYTICS.dernierEnvoi = Math.round(duree / 1000);
     /* fetch keepalive : contrairement à sendBeacon, permet les headers complets
        (apikey + Authorization requis par PostgREST) tout en survivant à la
        fermeture de l'onglet — supporté par tous les navigateurs modernes. */
@@ -7045,7 +7068,15 @@
       });
     } catch(e){}
   }
+  function _anaVisibilite(){
+    if (!ANALYTICS.sessionId) return;
+    if (document.visibilityState === 'hidden') {
+      if (ANALYTICS.depuis) { ANALYTICS.actif += Date.now() - ANALYTICS.depuis; ANALYTICS.depuis = null; }
+      _anaTerminer();
+    } else if (!ANALYTICS.depuis) { ANALYTICS.depuis = Date.now(); }
+  }
   document.addEventListener('DOMContentLoaded', _anaDemarrer);
+  document.addEventListener('visibilitychange', _anaVisibilite);
   window.addEventListener('pagehide', _anaTerminer);
   window.addEventListener('beforeunload', _anaTerminer);
   /* Onglet vu : se raccroche au sélecteur d'onglets déjà en place plus haut */
