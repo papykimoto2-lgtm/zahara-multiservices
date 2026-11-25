@@ -44,7 +44,7 @@ test('souscripteur : contrôles avant envoi ; envoi multipart avec jeton, sans C
   const { page, erreurs } = await ouvrir(); await preparerReseau(page);
   const r = await page.evaluate(async (D) => {
     var h = document.createElement('div'); h.id = 's-tit'; document.body.appendChild(h);
-    S.suivi = { dossiers: [{}] }; S.client = { id: 'c1' }; S.pieces = D; SB_TOKEN = 'JETON'; rafraichirPiecesTitre();
+    S.suivi = { dossiers: [{}] }; S.client = { id: 'c1' }; S.pieces = D; SB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjQxMDI0NDQ4MDB9.sig'; rafraichirPiecesTitre();
     var o = {};
     await ptEnvoyer(0); o.sansFichier = S.ptMsg.m;
     __fichier('pt-f-0', 'gros.pdf', 'application/pdf', 5 * 1024 * 1024 + 1); await ptEnvoyer(0); o.gros = S.ptMsg.m;
@@ -58,7 +58,7 @@ test('souscripteur : contrôles avant envoi ; envoi multipart avec jeton, sans C
     return o;
   }, DEMANDES);
   assert.equal(r.sansFichier, 'Choisissez un fichier.'); assert.match(r.gros, /5 Mo/); assert.match(r.type, /Format non accepté/); assert.equal(r.appelsAvant, 0, 'aucun envoi si le fichier est refusé côté navigateur');
-  assert.match(r.appel.u, /\/functions\/v1\/fc-portail-fichier$/); assert.equal(r.appel.h.Authorization, 'Bearer JETON'); assert.equal(r.appel.h['Content-Type'], undefined, 'le navigateur fixe la limite multipart');
+  assert.match(r.appel.u, /\/functions\/v1\/fc-portail-fichier$/); assert.equal(r.appel.h.Authorization, 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjQxMDI0NDQ4MDB9.sig'); assert.equal(r.appel.h['Content-Type'], undefined, 'le navigateur fixe la limite multipart');
   assert.deepEqual(JSON.parse(r.appel.corps.cible), { kind: 'souscripteur', dossier_id: 'd1', etape_code: 'depot' }); assert.equal(r.appel.corps.note, 'recto-verso'); assert.deepEqual(r.appel.corps.fichier, { nom: 'cni.pdf', type: 'application/pdf', taille: 1500 });
   assert.equal(r.ok.t, 'ok'); assert.equal(r.apres, 1); assert.equal(r.occupe, false); assert.equal(r.refus.t, 'err'); assert.match(r.refus.m, /Aucune pièce n'est demandée/);
   assert.deepEqual(erreurs, []);
@@ -67,7 +67,7 @@ test('souscripteur : contrôles avant envoi ; envoi multipart avec jeton, sans C
 test('souscripteur : ouverture d\'un fichier par URL signée ; refus et session expirée', async () => {
   const { page, erreurs } = await ouvrir(); await preparerReseau(page);
   const r = await page.evaluate(async (D) => {
-    var h = document.createElement('div'); h.id = 's-tit'; document.body.appendChild(h); S.suivi = { dossiers: [{}] }; S.pieces = D; SB_TOKEN = 'JETON';
+    var h = document.createElement('div'); h.id = 's-tit'; document.body.appendChild(h); S.suivi = { dossiers: [{}] }; S.pieces = D; SB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjQxMDI0NDQ4MDB9.sig';
     var ouverts = []; window.open = function () { var w = { closed: false, location: '', close: function () { this.closed = true; } }; ouverts.push(w); return w; };
     var o = {}; __rep.body = { ok: true, url: 'https://x.supabase.co/storage/v1/object/sign/pieces-foncieres/a?token=t' };
     await ptOuvrir(0); o.loc = ouverts[0].location; o.corps = __appels[0].corps;
@@ -82,7 +82,7 @@ test('souscripteur : ouverture d\'un fichier par URL signée ; refus et session 
 test('intervenant : dépôt du fichier d\'un livrable (cible mission/livrable, note) ; contrôles ; rechargement ; formulaire proposé', async () => {
   const { page, erreurs } = await ouvrir(); await preparerReseau(page);
   const r = await page.evaluate(async () => {
-    SB_TOKEN = 'JETON'; INT.id = 'g1'; INT.nom = 'Cabinet';
+    SB_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjQxMDI0NDQ4MDB9.sig'; INT.id = 'g1'; INT.nom = 'Cabinet';
     INT.missions = [{ id: 'm1', reference: 'MF-1', titre: 'Bornage', statut: 'en_cours', echeance: '2099-12-31', dossier: { reference: 'DF-1' }, etapes: [], livrables: [{ id: 'l1', libelle: 'Plan', versions: [] }], messages: [] }];
     INT.ouverte = 'm1'; document.body.insertAdjacentHTML('beforeend', '<div id="int-dash"></div>'); rendreIntervenant();
     var o = {}; o.formulaire = /Déposer le fichier/.test(document.getElementById('int-dash').innerHTML);
@@ -95,7 +95,7 @@ test('intervenant : dépôt du fichier d\'un livrable (cible mission/livrable, n
     return o;
   });
   assert.equal(r.formulaire, true); assert.equal(r.sans, 'Choisissez un fichier.'); assert.match(r.type, /Format non accepté/);
-  assert.deepEqual(JSON.parse(r.appel.corps.cible), { kind: 'livrable', mission_id: 'm1', livrable_id: 'l1' }); assert.equal(r.appel.corps.note, 'v1 corrigée'); assert.equal(r.appel.h.Authorization, 'Bearer JETON');
+  assert.deepEqual(JSON.parse(r.appel.corps.cible), { kind: 'livrable', mission_id: 'm1', livrable_id: 'l1' }); assert.equal(r.appel.corps.note, 'v1 corrigée'); assert.equal(r.appel.h.Authorization, 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjQxMDI0NDQ4MDB9.sig');
   assert.equal(r.ok.t, 'ok'); assert.match(r.ok.m, /soumettre la mission/); assert.equal(r.occupe, null); assert.equal(r.recharge, true); assert.equal(r.refus.t, 'err'); assert.match(r.refus.m, /déjà en attente/);
   assert.deepEqual(erreurs, []);
 });
