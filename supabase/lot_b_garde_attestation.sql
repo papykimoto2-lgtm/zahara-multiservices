@@ -139,7 +139,7 @@ end $$;
 create or replace function attestation_garde.trg_donnees() returns trigger
 language plpgsql as $$
 declare
-  cle text; o jsonb; n jsonb; v text[]; m text; x text; num text;
+  cle text; o jsonb; n jsonb; v text[]; m text; x text; num text; refus boolean := false;
 begin
   begin
     if tg_op = 'INSERT' and attestation_garde.ligne_existe(tg_table_name, new.id) then return new; end if;   -- upsert : contrôlé par le trigger UPDATE
@@ -160,12 +160,12 @@ begin
         perform attestation_garde.consigner(tg_table_name, new.id, m, x, jsonb_build_object('objet', cle, 'avant', o ->> 'statut', 'apres', n ->> 'statut'));
       end loop;
       if m = 'bloque' and coalesce(array_length(v, 1), 0) > 0 then
+        refus := true;
         raise exception 'Attestation de solde : % (écriture refusée par la garde serveur)', v[1] using errcode = '42501';
       end if;
     end loop;
-  exception when insufficient_privilege then
-    raise;
-  when others then
+  exception when others then
+    if refus then raise; end if;   -- refus délibéré du mode « bloque » ; tout autre incident (y compris un droit manquant) est consigné et l'écriture passe
     -- incident interne de la garde : consigné, l'écriture passe (la garde ne doit jamais bloquer l'ERP par erreur)
     begin
       perform attestation_garde.consigner(tg_table_name, new.id, 'erreur', 'incident interne de la garde', jsonb_build_object('sqlstate', sqlstate, 'message', sqlerrm));
@@ -178,7 +178,7 @@ end $$;
 create or replace function attestation_garde.trg_cessions() returns trigger
 language plpgsql as $$
 declare
-  o jsonb; n jsonb; v text[]; m text; x text; num text;
+  o jsonb; n jsonb; v text[]; m text; x text; num text; refus boolean := false;
 begin
   begin
     if tg_op = 'INSERT' and attestation_garde.ligne_existe(tg_table_name, new.id) then return new; end if;   -- upsert : contrôlé par le trigger UPDATE
@@ -197,11 +197,11 @@ begin
       perform attestation_garde.consigner(tg_table_name, new.id, m, x, jsonb_build_object('avant', o ->> 'statut', 'apres', n ->> 'statut'));
     end loop;
     if m = 'bloque' and coalesce(array_length(v, 1), 0) > 0 then
+      refus := true;
       raise exception 'Attestation de solde : % (écriture refusée par la garde serveur)', v[1] using errcode = '42501';
     end if;
-  exception when insufficient_privilege then
-    raise;
-  when others then
+  exception when others then
+    if refus then raise; end if;   -- refus délibéré du mode « bloque » ; tout autre incident (y compris un droit manquant) est consigné et l'écriture passe
     begin
       perform attestation_garde.consigner(tg_table_name, new.id, 'erreur', 'incident interne de la garde', jsonb_build_object('sqlstate', sqlstate, 'message', sqlerrm));
     exception when others then null;
@@ -213,7 +213,7 @@ end $$;
 create or replace function attestation_garde.trg_validations() returns trigger
 language plpgsql as $$
 declare
-  o text; n text; t text; m text; v text[] := '{}'; x text;
+  o text; n text; t text; m text; v text[] := '{}'; x text; refus boolean := false;
 begin
   begin
     if tg_op = 'INSERT' and attestation_garde.ligne_existe(tg_table_name, new.id) then return new; end if;   -- upsert : contrôlé par le trigger UPDATE
@@ -231,11 +231,11 @@ begin
       perform attestation_garde.consigner(tg_table_name, new.id, m, x, jsonb_build_object('type', t, 'avant', o, 'apres', n));
     end loop;
     if m = 'bloque' and coalesce(array_length(v, 1), 0) > 0 then
+      refus := true;
       raise exception 'Validation d''attestation : % (écriture refusée par la garde serveur)', v[1] using errcode = '42501';
     end if;
-  exception when insufficient_privilege then
-    raise;
-  when others then
+  exception when others then
+    if refus then raise; end if;   -- refus délibéré du mode « bloque » ; tout autre incident (y compris un droit manquant) est consigné et l'écriture passe
     begin
       perform attestation_garde.consigner(tg_table_name, new.id, 'erreur', 'incident interne de la garde', jsonb_build_object('sqlstate', sqlstate, 'message', sqlerrm));
     exception when others then null;
