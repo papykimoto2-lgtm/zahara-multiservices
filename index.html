@@ -34614,6 +34614,7 @@ async function saveClient() {
     await dbPut('clients', client);
     /* Statut du lot : réservé jusqu'au seuil d'immobilisation, vendu au-delà */
     await majStatutLotClient(id);
+    try { if (typeof attSoldeAuto === 'function') attSoldeAuto(id); } catch (e) {}   /* prix du contrat modifié : l'attestation suit */
     syncToSupabase('pi_clients', client);
     await logAudit('clients', client.id, _clientAvant ? 'update' : 'create', _clientAvant, client);
     try { await commProposerReaffectation(_clientAvant, client); } catch (eRc) { console.warn('Réaffectation des commissions', eRc); }
@@ -38864,6 +38865,7 @@ async function savePaiement() {
       if (_mvtLie || _creerBon) _vrsRafraichirCaisse();
       if (typeof majStatutLotClient === 'function') await majStatutLotClient(vEdit.client_id);
       attSoldeAuto(vEdit.client_id);
+      if (_vAvant.client_id && _vAvant.client_id !== vEdit.client_id) attSoldeAuto(_vAvant.client_id);   /* ancien souscripteur : plus soldé ? */
       APP._editVersementId = null;
       closeModal('modal-paiement');
       toast('Versement modifié — commissions et écriture comptable réimpactées.', 'success');
@@ -39334,6 +39336,7 @@ async function deleteVersement(id, skipConfirm) {
   if (typeof buildBalance === 'function') buildBalance();
   if (typeof buildGrandLivre === 'function') buildGrandLivre();
   if (clientId && typeof majStatutLotClient === 'function') await majStatutLotClient(clientId);
+  if (clientId && typeof attSoldeAuto === 'function') { try { attSoldeAuto(clientId); } catch (e) {} }   /* brouillon périmé retiré, attestation validée marquée obsolète */
   renderVersements();
   if (typeof payOnlineRender === 'function') payOnlineRender();
   refreshDashboard();
@@ -97196,16 +97199,16 @@ async function attLierJuridique(c, note, kind) {
     return d;
   } catch (e) { console.warn('[Juridique] liaison attestation impossible :', e); return null; }
 }
-var ATT_STATUT_LIB = { a_etablir:['À établir','badge-neutre'], brouillon:['Brouillon','badge-bleu'], en_attente:['En attente DG/gérant','badge-or'], valide:['Validée','badge-vert'], rejete:['Rejetée','badge-rouge'], emise:['Émise','badge-vert'], delivre:['Délivrée','badge-vert'] };
+var ATT_STATUT_LIB = { obsolete:['⚠️ Obsolète (non soldé)','badge-rouge'], a_etablir:['À établir','badge-neutre'], brouillon:['Brouillon','badge-bleu'], en_attente:['En attente DG/gérant','badge-or'], valide:['Validée','badge-vert'], rejete:['Rejetée','badge-rouge'], emise:['Émise','badge-vert'], delivre:['Délivrée','badge-vert'] };
 function attRegistreLignes() {
   var L = [];
   (DATA.clients || []).forEach(function(c){
     var a = c.attestation_solde, nom = ((c.nom || '') + ' ' + (c.prenoms || '')).trim();
-    if (a) L.push({ type:'solde', typeLib:'Attestation de solde', ref:a.numero, nom:nom, dossier:c.dossier || '', statut:a.statut, date:a.valide_le || a.date_demande || a.date_brouillon || '', clientId:c.id, djId:c.dossier_juridique_id || a.dossier_juridique_id || '', variantes:(a.variantes || []).length });
+    if (a) L.push({ type:'solde', typeLib:'Attestation de solde', ref:a.numero, nom:nom, dossier:c.dossier || '', statut:(a.obsolete && a.statut==='valide' ? 'obsolete' : a.statut), date:a.valide_le || a.date_demande || a.date_brouillon || '', clientId:c.id, djId:c.dossier_juridique_id || a.dossier_juridique_id || '', variantes:(a.variantes || []).length });
     else if (c.statut !== 'resilie' && typeof attSoldeSolde === 'function' && attSoldeSolde(c).solde)
       L.push({ type:'solde', typeLib:'Attestation de solde', ref:'—', nom:nom, dossier:c.dossier || '', statut:'a_etablir', date:'', clientId:c.id, djId:c.dossier_juridique_id || '', variantes:0 });
     var af = c.attestation_solde_finale;
-    if (af) L.push({ type:'solde_finale', typeLib:'Attestation de solde (valeur finale)', ref:af.numero, nom:nom, dossier:c.dossier || '', statut:af.statut, date:af.valide_le || af.date_demande || af.date_brouillon || '', clientId:c.id, djId:c.dossier_juridique_id || af.dossier_juridique_id || '', variantes:0 });
+    if (af) L.push({ type:'solde_finale', typeLib:'Attestation de solde (valeur finale)', ref:af.numero, nom:nom, dossier:c.dossier || '', statut:(af.obsolete && af.statut==='valide' ? 'obsolete' : af.statut), date:af.valide_le || af.date_demande || af.date_brouillon || '', clientId:c.id, djId:c.dossier_juridique_id || af.dossier_juridique_id || '', variantes:0 });
     else if (c.statut !== 'resilie' && typeof attSoldeApplicable === 'function' && attSoldeApplicable(c, 'finale') && attSoldeSolde(c, 'finale').solde)
       L.push({ type:'solde_finale', typeLib:'Attestation de solde (valeur finale)', ref:'—', nom:nom, dossier:c.dossier || '', statut:'a_etablir', date:'', clientId:c.id, djId:c.dossier_juridique_id || '', variantes:0 });
   });
@@ -123116,7 +123119,13 @@ async function valDecideCoeur(v,id,decision,motif){
      && !confirm('Vous n\'avez pas consulté les pièces justificatives de cette attestation (bouton « 🔎 Pièces »).\n\nValider quand même ?')) return;
   v.statut=decision; v.valideur=(APP.currentUser&&APP.currentUser.nom)||'—'; v.date_decision=today(); v.motif=motif||'';
   await dbPut('validations',v); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',v);
-  await valApply(v.type,v.ref_id,decision);
+  var rApply = await valApply(v.type,v.ref_id,decision);
+  if(rApply && rApply.refuse){   /* l'effet n'a pas pu être appliqué : la ligne de validation ne doit pas rester « validée » */
+    v.statut='rejete'; v.motif=rApply.motif||'Effet non appliqué'; v._modifie=new Date().toISOString();
+    await dbPut('validations',v); if(typeof syncToSupabase==='function')syncToSupabase('pi_validations',v);
+    renderValidations(); etudesLiveRefresh('validations');
+    toast('⛔ Rejeté : '+v.motif,'error',7000); return;
+  }
   renderValidations(); if(typeof renderAchats==='function')renderAchats();
   etudesLiveRefresh('validations');
   if (v.type==='bon_commande') etudesLiveRefresh('bons_commande');
@@ -123140,10 +123149,22 @@ async function valApply(type,refId,decision){
   if(type==='attestation_solde' || type==='attestation_solde_finale'){
     var kd = attKindDeType(type), champ = attChamp(kd);
     var ac=(DATA.clients||[]).find(function(x){return x.id===refId;});
+    if(!ac || !ac[champ]){ if(decision==='valide') return { refuse:true, motif:'Dossier du souscripteur introuvable (supprimé ?)' }; }
     if(ac && ac[champ]){
       var at=ac[champ], nomV=(APP.currentUser&&APP.currentUser.nom)||'—';
-      if(decision==='valide' && !attSoldeSolde(ac, kd).solde){ at.statut='rejete'; at.motif=(kd==='finale'?'Valeur finale non soldée':'Souscripteur non soldé')+' à la date de validation'; toast('⚠️ Ce souscripteur n\'est plus soldé : attestation refusée.','error'); }
+      /* Idempotence : seule une attestation EN ATTENTE peut être validée. Une décision rejouée (autre poste, rattrapage) ne
+         re-signe jamais un document déjà validé (date, signataire, texte figés). */
+      if(decision==='valide' && at.statut!=='en_attente'){
+        if(['valide','emise','delivre'].indexOf(at.statut)===-1) return { refuse:true, motif:'Attestation non en attente (statut « '+at.statut+' ») : validation sans effet' };
+        return;
+      }
+      if(decision==='valide' && !attSoldeSolde(ac, kd).solde){ at.statut='rejete'; at.motif=(kd==='finale'?'Valeur finale non soldée':'Souscripteur non soldé')+' à la date de validation'; toast('⚠️ Ce souscripteur n\'est plus soldé : attestation refusée.','error'); attSoldeSauver(ac); attSoldeRafraichirUI(ac.id); return { refuse:true, motif:at.motif }; }
       else if(decision==='valide'){
+        /* Unicité du numéro : deux postes ont pu attribuer le même avant synchronisation. Le doublon est renuméroté AVANT signature. */
+        if((DATA.clients||[]).some(function(o){ return o.id!==ac.id && o[champ] && o[champ].numero===at.numero && ['valide','emise','delivre'].indexOf(o[champ].statut)!==-1; })){
+          var ancienNum=at.numero; at.numero=attSoldeNumero(kd);
+          toast('ℹ️ Numéro '+ancienNum+' déjà attribué à un autre dossier : l\'attestation est renumérotée '+at.numero+'.','info',8000);
+        }
         at.statut='valide'; at.valide_par=nomV; at.valide_le=today(); at.date_emission=today();
         at.html=attSoldeHtml(ac,{numero:at.numero,date:today(),signataire:nomV,kind:kd,sansVisa:!!at.sans_visa});
         await attLierJuridique(ac,attLibKind(kd)+' N° '+at.numero+' validée par '+nomV+' (version officielle, sans modification).',kd);
@@ -123161,6 +123182,10 @@ async function valApply(type,refId,decision){
       var ata=cc.attestation_solde, nomC=(APP.currentUser&&APP.currentUser.nom)||'—';
       if(decision==='valide' && !cesAttSolde(cc).solde){ ata.statut='rejete'; ata.motif='Cession non soldée à la date de validation'; toast('⚠️ Cette cession n\'est plus soldée : attestation refusée.','error'); }
       else if(decision==='valide'){
+        if((DATA.cessions_foncieres||[]).some(function(o){ return o.id!==cc.id && o.attestation_solde && o.attestation_solde.numero===ata.numero && ['valide','emise','delivre'].indexOf(o.attestation_solde.statut)!==-1; })){
+          var ancienNumC=ata.numero; ata.numero=cesAttNumero();
+          toast('ℹ️ Numéro '+ancienNumC+' déjà attribué : l\'attestation de cession est renumérotée '+ata.numero+'.','info',8000);
+        }
         ata.statut='valide'; ata.valide_par=nomC; ata.valide_le=today(); ata.date_emission=today();
         ata.html=cesAttHtml(cc,{numero:ata.numero,date:today(),signataire:nomC});
       } else {
@@ -123700,13 +123725,29 @@ function attSoldeSolde(c, kind){
   return { vs:vs, verse:verse, prix:prix, dateSolde:dateSolde, frais:frais, solde: prix > 0 && totalVerse >= prix - 0.5,
            prixInitial:P.initial, totalContrat:P.total, modifs:P.modifs, sommeModifs:P.sommeModifs };
 }
-function attSoldeNumero(kind){
+/* Numéro d'attestation JAMAIS réutilisé : le plus haut numéro attribué est mémorisé dans params.seq_ecr (clé « ATS-2026 »,
+   fusionnée entre postes par le plus haut), même si l'attestation ou le souscripteur est supprimé ensuite.
+   apercu = true : calcule sans réserver (aperçu d'un brouillon sans numéro). */
+function attNumeroSuivant(pre, an, max, apercu){
+  DATA.params = DATA.params || {};
+  var seq = DATA.params.seq_ecr || (DATA.params.seq_ecr = {}), cle = pre + '-' + an;
+  if((seq[cle]||0) > max) max = seq[cle];
+  if(!apercu){
+    seq[cle] = max + 1;
+    clearTimeout(window._seqEcrTimer);
+    window._seqEcrTimer = setTimeout(function(){
+      try { _paramsToucher(); Promise.resolve(dbPut('params', DATA.params)).then(function(){ if (typeof syncToSupabase === 'function') syncToSupabase('pi_params', DATA.params); }).catch(function(){}); } catch (e) {}
+    }, 1500);
+  }
+  return pre + '-' + an + '-' + ('0000' + (max+1)).slice(-4);
+}
+function attSoldeNumero(kind, apercu){
   var an = new Date().getFullYear(), max = 0, pre = kind==='finale' ? 'ATF' : 'ATS', champ = attChamp(kind), re = new RegExp('^'+pre+'-(\\d{4})-(\\d+)$');
   (DATA.clients||[]).forEach(function(c){
     var m = c[champ] && re.exec(c[champ].numero||'');
     if(m && parseInt(m[1],10)===an) max = Math.max(max, parseInt(m[2],10));
   });
-  return pre + '-' + an + '-' + ('0000' + (max+1)).slice(-4);
+  return attNumeroSuivant(pre, an, max, apercu);
 }
 /* Corps du document. opts : {numero, date, signataire, fonction, projet}. Pas d'image embarquée (reste léger dans la fiche). */
 /* Pied de page d'entreprise des documents officiels, construit depuis Paramètres › Entreprise :
@@ -123783,12 +123824,13 @@ function attMoteurPagination(){
   function absorber() {
     Array.prototype.slice.call(document.body.children).forEach(function (el) {
       var cl = el.classList;
-      if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || cl.contains('projet') || cl.contains('pgx')) return;
+      if (cl.contains('projet')) { src.projet = el.cloneNode(true); el.parentNode.removeChild(el); return; }   /* filigrane : repris sur CHAQUE page */
+      if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || cl.contains('pgx')) return;
       if (cl.contains('pg')) {
         src.cls = el.className.replace(/\bpg\b/, '').trim();
         var f = el.querySelector('tfoot td'); if (f && f.innerHTML.trim()) src.footer = f.innerHTML;
         var td = el.querySelector('tbody > tr > td');
-        if (td) Array.prototype.slice.call(td.children).forEach(function (c) { if (c.classList.contains('pied')) src.footer = c.outerHTML; else src.units.push(c.cloneNode(true)); });
+        if (td) Array.prototype.slice.call(td.children).forEach(function (c) { if (c.classList.contains('pied')) src.footer = c.outerHTML; else if (c.classList.contains('projet')) src.projet = c.cloneNode(true); else src.units.push(c.cloneNode(true)); });
       } else if (cl.contains('pied')) { src.footer = el.outerHTML; }
       else { src.units.push(el.cloneNode(true)); }
       el.parentNode.removeChild(el);
@@ -123813,6 +123855,7 @@ function attMoteurPagination(){
       var p = document.createElement('div'); p.className = 'pgx ' + src.cls;
       var c = document.createElement('div'); c.className = 'pgx-c'; p.appendChild(c);
       var f = document.createElement('div'); f.className = 'pgx-f'; f.innerHTML = src.footer; p.appendChild(f);
+      if (src.projet) { var wm = src.projet.cloneNode(true); wm.style.position = 'absolute'; p.appendChild(wm); }
       document.body.appendChild(p);
       avail = (H - PT - GAP) * MM - f.offsetHeight;
       page = { p: p, c: c, avail: avail, force: false }; pages.push(page); return page;
@@ -123822,8 +123865,21 @@ function attMoteurPagination(){
     function ajouter(nodes) { return nodes.map(function (n) { var k = n.cloneNode(true); page.c.appendChild(k); return k; }); }
     function retirer(ks) { ks.forEach(function (k) { if (k.parentNode) k.parentNode.removeChild(k); }); }
 
+    /* Bloc non tableau trop haut pour une page (ex. « Portée et réserves » + observations longues) : réparti par éléments
+       sur plusieurs pages. Jamais supprimé en silence. */
+    function couperBloc(ks) {
+      var N = ks[ks.length - 1]; if (!N || N.tagName === 'TABLE') return;
+      ks.slice(0, -1).forEach(function (n) { if (!n.parentNode) page.c.appendChild(n); });
+      if (!N.parentNode) page.c.appendChild(N);
+      var kids = Array.prototype.slice.call(N.children); if (!kids.length) return;
+      N.parentNode.removeChild(N);
+      kids.forEach(function (k) {
+        page.c.appendChild(k);
+        if (!tient() && page.c.childNodes.length > 1) { page.c.removeChild(k); nouvelle(); page.c.appendChild(k); }
+      });
+    }
     function couperTableau(ks) {
-      var T = ks[ks.length - 1]; if (!T || T.tagName !== 'TABLE') return;
+      var T = ks[ks.length - 1]; if (!T || T.tagName !== 'TABLE') return false;
       var tb = T.tBodies[0] || T, rows = Array.prototype.slice.call(tb.rows), head = T.tHead ? T.tHead.cloneNode(true) : null;
       var parent = T.parentNode; parent.removeChild(T);
       function coque() { var t = T.cloneNode(false); if (head) t.appendChild(head.cloneNode(true)); var b = document.createElement('tbody'); t.appendChild(b); page.c.appendChild(t); return b; }
@@ -123832,6 +123888,7 @@ function attMoteurPagination(){
         b.appendChild(r);
         if (!tient() && b.rows.length > 1) { b.removeChild(r); nouvelle(); b = coque(); b.appendChild(r); }
       });
+      return true;
     }
 
     groupes().forEach(function (g) {
@@ -123849,7 +123906,7 @@ function attMoteurPagination(){
         if (ok) { ks = ajouter(g.nodes); couperTableau(ks); return; }
       }
       if (!vide()) { nouvelle(); ks = ajouter(g.nodes); if (tient()) return; }
-      couperTableau(ks);
+      if (!couperTableau(ks)) couperBloc(ks);
     });
     /* Anti-page orpheline : une page presque vide (quelques lignes reportées) suivie d'un saut forcé est fusionnée
        avec la page suivante quand l'ensemble tient sur une feuille. */
@@ -123905,7 +123962,7 @@ function attSoldeHtmlFinal(a, c){
   if (!h) return h;
   if (h.indexOf('class="pied"') === -1) {
     var pied = docPiedDePageEntreprise(c ? attSoldeEntreprise(c) : null);
-    if (pied) h = h.replace('</head>', '<style>'+ATT_PIED_CSS+'</style></head>').replace('</body>', pied+'</body>');
+    if (pied) h = h.replace('</head>', function(){ return '<style>'+ATT_PIED_CSS+'</style></head>'; }).replace('</body>', function(){ return pied+'</body>'; });
   }
   return attSoldeMiseEnPage(h);
 }
@@ -124005,7 +124062,7 @@ function attSoldeHtml(c, opts){
     + '<div class="art">5. La présente attestation est délivrée à l\'intéressé(e) pour servir et valoir ce que de droit, notamment auprès '+(ov.destinataire?E(ov.destinataire):'du notaire et de la Conservation foncière')+'.</div>'
     + (ov.observations ? '<div class="art">6. '+E(ov.observations)+'</div>' : '')
     + '<div class="sig">'+(opts.sansVisa ? '<div></div>' : ATT_VISA_BLOC)
-    + '<div>Fait à '+E(p.ville||'____________')+', le '+E(dateShort(opts.date||today()))+'<br><strong>'+E(opts.fonction||'Le Directeur Général / Le Gérant')+'</strong><br>'+E(opts.signataire||'')+'<br><br><br>Signature et cachet</div></div>'
+    + '<div>Fait à '+E(p.ville||'Abidjan')+', le '+E(dateShort(opts.date||today()))+'<br><strong>'+E(opts.fonction||'Le Directeur Général / Le Gérant')+'</strong><br>'+E(opts.signataire||'')+'<br><br><br>Signature et cachet</div></div>'
     + (typeof printQrFooter === 'function' ? printQrFooter('Attestation de solde ' + (opts.numero||'')) : '') + '</div></td></tr></tbody><tfoot><tr><td>' + docPiedDePageEntreprise(p) + '</td></tr></tfoot></table>'
     + attMoteurScript() + '</body></html>';
   return h;
@@ -124013,11 +124070,36 @@ function attSoldeHtml(c, opts){
 /* Constat de solde de tout compte : appelé après chaque versement. Prépare un BROUILLON d'attestation
    (rien n'est transmis au souscripteur tant que la direction n'a pas validé) ; retire le brouillon si le
    souscripteur n'est plus soldé (versement modifié ou annulé). */
+/* ── Attestation VALIDÉE devenue obsolète : le dossier n'est plus soldé (versement supprimé ou modifié, prix relevé…).
+   Elle reste « validée » dans le registre (trace), mais est marquée a.obsolete, RETIRÉE du portail et de l'espace du notaire,
+   et ne peut plus être imprimée, publiée, transmise ni envoyée tant qu'elle n'est pas annulée puis refaite. */
+function attSoldeRefuseObsolete(a){
+  if(!a || !a.obsolete) return false;
+  toast('⛔ Attestation obsolète : le dossier n\'est plus soldé ('+(a.obsolete.motif||'')+'). Annulez la validation (↩), puis refaites l\'attestation.','error',8000);
+  return true;
+}
+/* Diffusion (portail, notaire, WhatsApp, variante) : mêmes droits que la validation (hiérarchie). */
+function attPeutDiffuser(){ return (typeof hasRole!=='function') || hasRole('admin') || hasRole('manager'); }
+function attRefuseDiffuser(){
+  if(attPeutDiffuser()) return false;
+  toast('⛔ Réservé à la hiérarchie (administrateur ou manager).','error'); return true;
+}
 function attSoldeAuto(clientId){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
   if(c.statut==='resilie') return;
   ['initial','finale'].forEach(function(kind){
     var champ = attChamp(kind), a = c[champ], S = attSoldeSolde(c, kind), ok = S.solde && attSoldeApplicable(c, kind);
+    if(a && a.statut==='valide'){   /* figée telle que signée ; seule l'obsolescence est signalée */
+      if(!ok && !a.obsolete){
+        a.obsolete = { date:today(), motif:'versé '+fmtF(Math.round(S.verse))+' F pour un prix de '+fmtF(Math.round(S.prix))+' F' };
+        var retiree = !!(a.publie_portail || a.transmis_notaire);
+        a.publie_portail = false; a.transmis_notaire = false; delete a.transmis_notaire_le; delete a.html_notaire;
+        try{ attLierJuridique(c, attLibKind(kind)+' N° '+a.numero+' devenue OBSOLÈTE : le dossier n\'est plus soldé ('+a.obsolete.motif+')'+(retiree?'. Retirée du portail et de l\'espace du notaire.':'.'), kind); }catch(e){}
+        attSoldeSauver(c);
+        toast('⚠️ '+attLibKind(kind)+' N° '+a.numero+' : le dossier n\'est plus soldé. L\'attestation validée est marquée OBSOLÈTE'+(retiree?' et retirée du portail / du notaire':'')+'. Annulez la validation puis refaites-la.','error',10000);
+      } else if(ok && a.obsolete){ delete a.obsolete; attSoldeSauver(c); toast('Dossier de nouveau soldé : l\'attestation N° '+a.numero+' n\'est plus obsolète (republiez-la si besoin).','info',6000); }
+      return;
+    }
     if(ok && !a){
       c[champ] = { numero:attSoldeNumero(kind), statut:'brouillon', date_brouillon:today(), prix:S.prix, verse:S.verse, date_solde:S.dateSolde, publie_portail:false };
       attSoldeSauver(c);
@@ -124057,6 +124139,8 @@ function attNotairesActifs(){ return (DATA.intervenants_fonciers||[]).filter(fun
 function attNotaireDe(c){ return c && c.notaire_intervenant_id ? (DATA.intervenants_fonciers||[]).find(function(i){ return i.id===c.notaire_intervenant_id; }) || null : null; }
 function attNotaireChoisir(clientId, id){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}); if(!c) return;
+  /* Désignation : hiérarchie OU responsable du dossier foncier (même règle que la transmission des sections au notaire). */
+  if(!attPeutDiffuser() && !(typeof dnPeutTransmettre==='function' && dnPeutTransmettre(c))){ toast('⛔ Réservé à la hiérarchie ou au responsable du dossier.','error'); return; }
   var avant = attNotaireDe(c), apres = id ? (attNotairesActifs().find(function(i){return i.id===id;})||null) : null;
   if(id && !apres){ toast('Notaire introuvable ou inactif.','error'); return; }
   c.notaire_intervenant_id = apres ? apres.id : '';
@@ -124067,13 +124151,25 @@ function attNotaireChoisir(clientId, id){
   attSoldeSauver(c); attSoldeRafraichirUI(clientId);
   toast(apres ? 'Notaire désigné : '+apres.nom_organisation+'. Transmettez ensuite chaque attestation (⚖️).' : 'Notaire retiré : plus aucun accès.','info');
 }
+/* Texte transmis au notaire : l'attestation validée SANS la ligne « Contact » (téléphone, e-mail, adresse du souscripteur) et,
+   sauf case « identité » cochée dans la transmission, sans date de naissance ni pièce d'identité (minimisation). */
+function attSoldeHtmlNotaire(a, c){
+  var h = attSoldeHtmlFinal(a, c); if(!h) return h;
+  h = h.replace(/<tr><th>Contact<\/th><td>[\s\S]*?<\/td><\/tr>/, '');
+  if(!(typeof dnTransmission==='function' && dnTransmission(c).identite)){
+    h = h.replace(/<tr><th>Né\(e\) le<\/th><td>[\s\S]*?<\/td><\/tr>/, '').replace(/<tr><th>Pièce d'identité<\/th><td>[\s\S]*?<\/td><\/tr>/, '');
+  }
+  return h;
+}
 function attSoldeNotaire(clientId, on, kind){
+  if(attRefuseDiffuser()) return;
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c[attChamp(kind)];
   if(!a || a.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
+  if(on && attSoldeRefuseObsolete(a)) return;
   var n = attNotaireDe(c);
   if(on && (!n || n.statut_relation!=='actif')){ toast('Désignez d\'abord un notaire actif pour ce souscripteur.','error'); return; }
   a.transmis_notaire = !!on;
-  if(on){ a.transmis_notaire_le = today(); a.html_notaire = attSoldeHtmlFinal(a, c); } else { delete a.transmis_notaire_le; delete a.html_notaire; }
+  if(on){ a.transmis_notaire_le = today(); a.html_notaire = attSoldeHtmlNotaire(a, c); } else { delete a.transmis_notaire_le; delete a.html_notaire; }
   attLierJuridique(c, attLibKind(kind)+' N° '+a.numero+(on ? ' transmise au notaire '+n.nom_organisation+' (espace Intervenant).' : ' retirée de l\'espace du notaire.'), kind);
   attSoldeSauver(c); attSoldeRafraichirUI(c.id);
   toast(on ? '⚖️ Attestation disponible dans l\'espace du notaire (il doit avoir un accès portail actif).' : 'Transmission au notaire retirée.', 'info', 6000);
@@ -124193,7 +124289,7 @@ function attSoldeEnsureModalVar(){
     + '<div class="form-group"><label>Pièce d\'identité</label><input class="form-control" id="att-var-piece"></div>'
     + '<div class="form-group span-2"><label>Désignation du bien</label><textarea class="form-control" id="att-var-bien" rows="2"></textarea></div>'
     + '<div class="form-group span-2"><label>Destinataire (à qui l\'attestation est remise)</label><input class="form-control" id="att-var-destinataire" placeholder="ex : Banque X, Ambassade de France, employeur… (laisser vide : notaire et Conservation foncière)"></div>'
-    + '<div class="form-group span-2"><label>Observations complémentaires</label><textarea class="form-control" id="att-var-observations" rows="2"></textarea></div>'
+    + '<div class="form-group span-2"><label>Observations complémentaires <span style="font-weight:normal;font-size:11px;">(1 200 caractères max.)</span></label><textarea class="form-control" id="att-var-observations" rows="2" maxlength="1200"></textarea></div>'
     + '<div class="form-group span-2"><label>Motif de la modification * <span style="font-weight:normal;color:var(--dim);">(demande du souscripteur)</span></label><input class="form-control" id="att-var-motif" placeholder="ex : orthographe du nom corrigée à la demande de M. KONE du 08/10/2026"></div>'
     + '</div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal(\'modal-att-var\')">Annuler</button>'
     + '<button class="btn btn-secondary" onclick="attSoldeVarianteImprimer(false)">👁 Aperçu</button>'
@@ -124212,7 +124308,9 @@ function attSoldeVarianteOuvrir(clientId){
   document.getElementById('modal-att-var').classList.add('open');
 }
 async function attSoldeVarianteImprimer(imprimer){
+  if(attRefuseDiffuser()) return;
   var c = (DATA.clients||[]).find(function(x){return x.id===ATT_VAR_CLIENT;}); if(!c || !c.attestation_solde) return;
+  if(attSoldeRefuseObsolete(c.attestation_solde)) return;
   var a = c.attestation_solde, def = attSoldeChampsDefaut(c), champs = {}, modifs = [];
   Object.keys(ATT_VAR_LIBELLES).forEach(function(k){
     var v = (document.getElementById('att-var-'+k).value || '').trim(); champs[k] = v;
@@ -124276,7 +124374,9 @@ async function attSoldeDemander(clientId, kind){
   if(c.statut==='resilie' || !S.solde || !attSoldeApplicable(c, kind)){ toast(kind==='finale' ? 'La valeur finale n\'est pas soldée : attestation impossible.' : 'Ce souscripteur n\'est pas soldé : attestation impossible.','error'); return; }
   var a = c[champ];
   if(a && a.statut==='en_attente'){ toast('Une demande de validation est déjà en cours.','info'); return; }
-  if(a && a.statut==='valide' && !confirm('Une attestation a déjà été validée ('+a.numero+'). En demander une nouvelle ?')) return;
+  if(a && a.statut==='valide'){   /* jamais d'écrasement silencieux d'un document signé : passer par l'annulation (motif, rôle, trace) */
+    toast('⛔ Une attestation est déjà validée ('+a.numero+'). Annulez d\'abord sa validation (↩, motif obligatoire), puis refaites-la.','error',8000); return;
+  }
   var nom = ((c.nom||'')+' '+(c.prenoms||'')).trim();
   c[champ] = { numero:(a && a.statut!=='valide') ? a.numero : attSoldeNumero(kind), statut:'en_attente', date_demande:today(),
     demandeur:(APP.currentUser&&APP.currentUser.nom)||'—', prix:S.prix, verse:S.verse, date_solde:S.dateSolde, publie_portail:false, annulations:(a && a.annulations) || undefined };
@@ -124293,8 +124393,8 @@ function attSoldeApercu(clientId, kind){
   /* Validée = fiche validée/émise/délivrée, OU décision « validé » de la hiérarchie postérieure à la demande (fiche périmée sur ce poste) : plus de filigrane. */
   var decidee = (DATA.validations||[]).some(function(v){ return v.type===attChamp(kind) && v.ref_id===clientId && v.statut==='valide' && String(v.date_decision||'')>=String(a.date_demande||''); });
   var ok = ['valide','emise','delivre'].indexOf(a.statut)!==-1 || (decidee && ['en_attente','brouillon'].indexOf(a.statut)!==-1);
-  var html = ok ? (a.html ? attSoldeHtmlFinal(a, c) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind), date:a.date_emission||a.valide_le||today(), signataire:a.valide_par, kind:kind, sansVisa:!!a.sans_visa}))
-    : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind), date:today(), projet:true, kind:kind, sansVisa:!!a.sans_visa});
+  var html = ok ? (a.html ? attSoldeHtmlFinal(a, c) : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind, true), date:a.date_emission||a.valide_le||today(), signataire:a.valide_par, kind:kind, sansVisa:!!a.sans_visa}))
+    : attSoldeHtml(c, {numero:a.numero||attSoldeNumero(kind, true), date:today(), projet:true, kind:kind, sansVisa:!!a.sans_visa});
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
   w.document.write(html); w.document.close();
 }
@@ -124363,18 +124463,23 @@ function attSoldePieces(clientId, kind){
 }
 function attSoldeImprimer(clientId, kind){
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c[attChamp(kind)]; if(!a || a.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
+  if(attSoldeRefuseObsolete(a)) return;
   var w = window.open('','_blank','width=860,height=900'); if(!w){ toast('Fenêtre bloquée par le navigateur.','error'); return; }
   w.document.write(attSoldeHtmlFinal(a, c)); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400);
 }
 function attSoldePublier(clientId, on, kind){
+  if(attRefuseDiffuser()) return;
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c[attChamp(kind)]; if(!a || a.statut!=='valide') return;
+  if(on && attSoldeRefuseObsolete(a)) return;
   a.publie_portail = !!on; if(on) a.publie_le = today();
   attLierJuridique(c, attLibKind(kind)+' N° '+a.numero+(on?' publiée au portail du souscripteur.':' retirée du portail.'), kind);
   attSoldeSauver(c); attSoldeRafraichirUI(c.id);
   toast(on?'🌐 Attestation disponible dans l\'espace portail du souscripteur.':'Attestation retirée du portail.','info');
 }
 function attSoldeWhatsApp(clientId, kind){
+  if(attRefuseDiffuser()) return;
   var c = (DATA.clients||[]).find(function(x){return x.id===clientId;}), a = c && c[attChamp(kind)]; if(!a || a.statut!=='valide'){ toast('Attestation non validée.','error'); return; }
+  if(attSoldeRefuseObsolete(a)) return;
   if(!c.tel){ toast('Aucun numéro de téléphone pour ce souscripteur.','error'); return; }
   var p = DATA.params||{};
   var lien = (p.portail_url || (location.origin + '/portail-unique.html'));
@@ -124428,6 +124533,8 @@ function attSoldeCellule(clientId, kind){
       + '<button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeDemander('+q+k+')">'+(a && a.statut==='brouillon' ? '📤 Soumettre au DG' : '📜 Faire valider')+'</button>';
   }
   if(a.statut==='en_attente') return '<span class="badge badge-or" style="font-size:10px;">⏳ En attente DG/gérant</span> <button class="btn btn-secondary btn-sm" '+b+' onclick="attSoldeApercu('+q+k+')">👁</button> '+attSoldeBtnVisa(q,k,a,b);
+  if(a.obsolete) return '<span class="badge badge-rouge" style="font-size:10px;" title="'+escHtml(a.obsolete.motif||'')+'">⚠️ Obsolète — dossier non soldé</span> '
+    + '<button class="btn btn-secondary btn-sm" '+b+' title="Annuler la validation puis refaire l\'attestation" onclick="attSoldeAnnulerValidation('+q+k+')">↩ Annuler la validation</button>';
   return '<span class="badge badge-vert" style="font-size:10px;">✅ Validée</span> '
     + '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer l\'attestation SANS modification : version officielle, à remettre au notaire" onclick="attSoldeImprimer('+q+k+')">🖨 Sans modif.</button> '
     + (kind==='finale' ? '' : '<button class="btn btn-secondary btn-sm" '+b+' title="Imprimer avec les modifications demandées par le souscripteur : version à titre indicatif" onclick="attSoldeVarianteOuvrir('+q+')">✏️ Avec modif.</button> ')
@@ -126069,13 +126176,13 @@ function cesAttSolde(c) {
   var prix = parseFloat(c.prix_cession) || 0, verse = crecVerse(c), ps = cesAttPaiements(c);
   return { prix: prix, verse: verse, ps: ps, dateSolde: ps.length ? ps[ps.length - 1].date : (c.date || ''), solde: c.statut !== 'resiliee' && prix > 0 && verse >= prix - 0.5 };
 }
-function cesAttNumero() {
+function cesAttNumero(apercu) {
   var an = new Date().getFullYear(), max = 0, re = /^ACS-(\d{4})-(\d+)$/;
   (DATA.cessions_foncieres || []).forEach(function(c){
     var m = c.attestation_solde && re.exec(c.attestation_solde.numero || '');
     if (m && parseInt(m[1], 10) === an) max = Math.max(max, parseInt(m[2], 10));
   });
-  return 'ACS-' + an + '-' + ('0000' + (max + 1)).slice(-4);
+  return attNumeroSuivant('ACS', an, max, apercu);
 }
 function cesAttSauver(c) {
   c._modifie = new Date().toISOString();
@@ -126157,7 +126264,7 @@ function cesAttApercu(id) {
   var decidee = (DATA.validations || []).some(function(v){ return v.type === CES_ATT_TYPE && v.ref_id === id && v.statut === 'valide' && String(v.date_decision || '') >= String(a.date_demande || ''); });
   var ok = ['valide', 'emise', 'delivre'].indexOf(a.statut) !== -1 || (decidee && ['en_attente', 'brouillon'].indexOf(a.statut) !== -1);
   var html = ok ? (a.html || cesAttHtml(c, { numero: a.numero, date: a.date_emission || a.valide_le || today(), signataire: a.valide_par }))
-    : cesAttHtml(c, { numero: a.numero || cesAttNumero(), date: today(), projet: true });
+    : cesAttHtml(c, { numero: a.numero || cesAttNumero(true), date: today(), projet: true });
   var w = window.open('', '_blank', 'width=860,height=900'); if (!w) { toast('Fenêtre bloquée par le navigateur.', 'error'); return; }
   w.document.write(html); w.document.close();
 }
@@ -140886,12 +140993,13 @@ function printQrFooter(ref){
   var stamp=(((window.DATA&&DATA.params&&(DATA.params.societe||DATA.params.nom_societe))||'DOC').toUpperCase().replace(/[^A-Z0-9]+/g,'-').slice(0,16))+'|'+ref+'|'+new Date().toISOString().slice(0,10);
   var code=_cyrb53(stamp+'|'+soc).slice(0,10).toUpperCase();
   var svg=qrSvgTag(stamp+'|'+code);
+  soc = escHtml(soc);   /* champ libre (Paramètres › Société) : jamais injecté brut dans le document imprimé */
   return '<div class="doc-qr" style="margin-top:20px;border-top:1px solid #ddd;padding-top:8px;display:flex;align-items:center;gap:12px;page-break-inside:avoid;">'
     +'<div style="flex:0 0 auto;background:#fff;padding:4px;border:1px solid #eee;">'+svg+'</div>'
     +'<div style="font-size:8pt;color:#555;line-height:1.45;font-family:Arial,sans-serif;">'
     +'<strong>Document authentifiable — '+soc+'</strong><br>'
     +'Réf. : '+ref+' &nbsp;|&nbsp; Code de contrôle : <strong>'+code+'</strong><br>'
-    +'Scannez le QR pour vérifier l\'origine et l\'intégrité du document.'
+    +'Code de contrôle interne : à rapprocher du registre des attestations de l\'entreprise.'
     +'</div></div>';
 }
 function docRefFromHtml(html){ var m=html&&html.match(/R[ée]f\.?\s*:?\s*([A-Za-z0-9\-\/_]+)/); if(m)return m[1]; var t=html&&html.match(/<title>([^<]{1,40})<\/title>/); return t?t[1].trim():'DOC'; }
@@ -145295,7 +145403,7 @@ function _montantEnLettres(n) {
   if (mi) parts.push(cent(mi) + ' million' + (mi > 1 ? 's' : ''));
   if (k) parts.push(k === 1 ? 'mille' : cent(k).replace(/(cent|vingt)s$/, '$1') + ' mille');
   if (r) parts.push(cent(r));
-  return parts.join(' ');
+  return parts.join(' ') + ((!k && !r && (mi || ms)) ? ' de' : '');   /* « un million DE francs » */
 }
 
 function _cvQrDataUrl(texte) {
