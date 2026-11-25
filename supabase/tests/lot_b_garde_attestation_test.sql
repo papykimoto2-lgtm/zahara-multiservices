@@ -59,6 +59,14 @@ do $$ begin
 end $$;
 update public.pi_clients set data = jsonb_set(data, '{attestation_solde,statut}', '"en_attente"') where id = 'c1';   -- remise en état (postgres)
 
+-- robustesse : un droit manquant sur le journal ne doit JAMAIS bloquer une écriture de l'ERP (mode journal)
+revoke execute on function attestation_garde.consigner(text, text, text, text, jsonb) from public, authenticated, agent_app;
+select pg_temp.essai('journal : droit manquant sur la garde = écriture conservée (incident consigné ailleurs)',
+  $q$update public.pi_clients set data = jsonb_set(data, '{attestation_solde,statut}', '"valide"') where id = 'c3'$q$,
+  '{"role":"anon"}', false);
+grant execute on function attestation_garde.consigner(text, text, text, text, jsonb) to public;
+update public.pi_clients set data = jsonb_set(data, '{attestation_solde,statut}', '"en_attente"') where id = 'c3';   -- remise en état
+
 update attestation_garde.config set mode = 'bloque';
 
 -- ═══ MODE BLOQUE ═══

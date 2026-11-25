@@ -26536,11 +26536,13 @@ async function staffLogin(login, motdepasse){
   if(!d.token) throw new Error('Réponse invalide');
   STAFF={ token:d.token, expire:Date.now()+((d.expires_in||43200)*1000)-60000, user:d.user||null };
   localStorage.setItem('sb_staff', JSON.stringify(STAFF));
+  _staffSessionPrete();
   return d.user;
 }
 function staffLogout(){
   STAFF={token:null,expire:0,user:null};
   localStorage.removeItem('sb_staff');
+  _rtAppliquerJeton();
   /* [Revue] staffLogout() ne coupait pas l'intervalle d'auto-guérison créé
      au login (voir doLogin) — il continuait de tourner jusqu'à 30 min après
      la déconnexion, retentant staffLogin() avec les identifiants PÉRIMÉS de
@@ -26553,6 +26555,77 @@ function staffLogout(){
   if (b) b.style.display = 'none';
 }
 function staffActif(){ return !!(STAFF.token && STAFF.expire>Date.now()); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   [RLS phase A] Les circuits de synchronisation portent le jeton du personnel
+   Trois circuits partaient sous la clé anonyme publique : le temps réel
+   (client créé avec la clé anon), le chargement initial et la file d'envoi
+   (lancés avant la fin de staff-login), et le pull incrémental (clé anon
+   écrite en dur). Tant que les règles ouvertes existent, rien ne casse ;
+   mais retirer l'accès anonyme (phase D du plan de fermeture) casserait ces
+   trois circuits. Ils attendent donc la session du personnel.
+   IMMO_SYNC_ANON_FALLBACK = true : période de transition, comportement
+   inchangé si aucune session n'a pu s'ouvrir (repli sur la clé anon).
+   À passer à false le jour où l'accès anonyme est retiré : les envois sont
+   alors différés (données conservées en file locale), jamais tentés en anon.
+══════════════════════════════════════════════════════════════════════ */
+window.IMMO_SYNC_ANON_FALLBACK = true;
+var _staffAttentes = [];
+window._staffLoginEnCours = false;
+/* Attend l'ouverture de session si une connexion est en cours. Renvoie true si une session est active. */
+function attendreSessionStaff(maxMs){
+  if (staffActif()) return Promise.resolve(true);
+  /* Indicateur périmé (connexion interrompue) : ne jamais bloquer la synchronisation plus d'une minute. */
+  if (!window._staffLoginEnCours || (Date.now() - (window._staffLoginDepuis || 0)) > 60000) return Promise.resolve(false);
+  return new Promise(function(resolve){
+    var fini = false;
+    function cb(ok){ if (fini) return; fini = true; clearTimeout(t); resolve(!!ok); }
+    var t = setTimeout(function(){ if (fini) return; fini = true;
+      var i = _staffAttentes.indexOf(cb); if (i >= 0) _staffAttentes.splice(i, 1);
+      resolve(staffActif()); }, (maxMs == null ? 30000 : maxMs));
+    _staffAttentes.push(cb);
+  });
+}
+function _staffLoginTermine(){
+  var w = _staffAttentes.splice(0);
+  w.forEach(function(f){ try { f(staffActif()); } catch(e){} });
+}
+/* Un envoi ou un pull peut-il partir ? (true = oui ; false = différé, les données restent en file locale) */
+async function syncAutorise(contexte){
+  if (staffActif()) return true;
+  var ok = await attendreSessionStaff(30000);
+  if (ok) return true;
+  if (window.IMMO_SYNC_ANON_FALLBACK !== false) return true;
+  console.warn('[SYNC] ' + contexte + ' différé : aucune session du personnel ouverte (staff-login). Les données restent en file locale.');
+  try { _majBadgeStaffSession(); } catch(e){}
+  return false;
+}
+/* Le temps réel doit présenter le même jeton que PostgREST. */
+function _rtAppliquerJeton(){
+  try {
+    if (typeof _RT !== 'undefined' && _RT.client && _RT.client.realtime && typeof _RT.client.realtime.setAuth === 'function') _RT.client.realtime.setAuth(sbAuth());
+  } catch(e){}
+}
+function _staffSessionPrete(){
+  _rtAppliquerJeton();
+  _staffLoginTermine();
+  try { if (typeof _RT !== 'undefined' && !_RT.active && !_RT.starting && typeof startRealtime === 'function') startRealtime(); } catch(e){}
+  setTimeout(function(){ try { if (typeof flushSyncOutbox === 'function') flushSyncOutbox(); } catch(e){} }, 500);
+}
+/* Le jeton dure 8 h et ne se renouvelle pas sans mot de passe : prévenir avant l'expiration plutôt que retomber en silence sur la clé anon. */
+var _staffExpAverti = false;
+setInterval(function(){
+  try {
+    if (!STAFF.token) { _staffExpAverti = false; return; }
+    var reste = STAFF.expire - Date.now();
+    if (reste <= 0) { _majBadgeStaffSession(); return; }
+    if (reste < 10 * 60000 && !_staffExpAverti) {
+      _staffExpAverti = true;
+      if (typeof toast === 'function') toast('Votre session de synchronisation expire dans moins de 10 minutes : déconnectez-vous puis reconnectez-vous pour la renouveler.', 'warning');
+    }
+    if (reste >= 10 * 60000) _staffExpAverti = false;
+  } catch(e){}
+}, 60000);
 
 /* [Fix instabilité accès] Badge visible pour signaler une session dégradée
    (staff-login indisponible → repli sur clé anon → RLS bloque les tables
@@ -28775,6 +28848,7 @@ async function syncFromSupabase() {
   if (!SB.url || !SB.key) { toast('Configurez d\'abord l\'URL et la clé Supabase.', 'error'); return; }
   if (!navigator.onLine) { toast('Connexion internet requise pour récupérer depuis le Cloud.', 'error'); return; }
   if (!confirm('Récupérer les données depuis le Cloud ? Les enregistrements distants seront fusionnés dans ce poste.')) return;
+  if (!(await syncAutorise('récupération manuelle'))) { toast('Session de synchronisation non ouverte : reconnectez-vous puis réessayez.', 'error'); return; }   /* [RLS phase A] */
   var out = document.getElementById('sync-result');
   var total = 0, tablesVides = 0;
   /* ── _pulling=true : empêche dbPut() de marquer ces enregistrements
@@ -29192,7 +29266,7 @@ async function _pullBatchViaRPC() {
   var url = SB.url.replace(/\/+$/,'') + '/rest/v1/rpc/pull_incremental';
   var resp = await fetch(url, {
     method: 'POST',
-    headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + SB.key, 'Content-Type': 'application/json' },
+    headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + sbAuth(), 'Content-Type': 'application/json' },
     body: body
   });
   if (!resp.ok) throw new Error('RPC pull_incremental indisponible (' + resp.status + ')');
@@ -29308,6 +29382,7 @@ async function pullFromCloudSilent() {
   if (!navigator.onLine) return;
   getSBConfig();
   if (!SB.url || !SB.key) return;
+  if (!(await syncAutorise('pull'))) return;   /* [RLS phase A] */
 
   _pulling = true;   // empêche dbPut de marquer ces enregistrements "dirty"
   var total = 0;
@@ -29509,6 +29584,8 @@ async function flushSyncOutbox() {
   if (_syncFlushing) return;
   if (!SB.url || !SB.key) return;
   if (!navigator.onLine) return;
+  if (!(await syncAutorise('envoi'))) return;   /* [RLS phase A] données conservées en file locale */
+  if (_syncFlushing) return;
   _syncFlushing = true;
   try {
     var q = _outboxRead();
@@ -30454,6 +30531,7 @@ async function doLogin() {
     return;
   }
 
+  window._staffLoginEnCours = !!(SB.url && SB.key); window._staffLoginDepuis = Date.now();   /* [RLS phase A] les circuits de synchronisation attendent staff-login */
   await startSession(user);
 
   /* [Perf connexion] L'application s'ouvre dès la session locale établie ; l'Edge Function staff-login (réseau, démarrage à froid, jusqu'à 3 essais)
@@ -30499,6 +30577,7 @@ async function doLogin() {
   } catch (e) {
     console.warn('[AUTH] Session Supabase (staff-login) indisponible après 3 tentatives — poursuite en session locale uniquement.', e);
   }
+  window._staffLoginEnCours = false; _staffLoginTermine();   /* [RLS phase A] libère les circuits en attente */
   _majBadgeStaffSession();
   /* Auto-guérison : si staffLogin a échoué au login (Edge Function temporairement
      indisponible), on retente en silence toutes les 2 minutes tant que la
@@ -90867,7 +90946,7 @@ async function pmDelete(id) {
 }
 async function _pmAnonCount(chemin) {
   try {
-    var r = await fetch(SB.url + '/rest/v1/' + chemin, { headers: { 'apikey': SB.key, 'Authorization': 'Bearer ' + SB.key, 'Prefer': 'count=exact' } });
+    var r = await fetch(SB.url + '/rest/v1/' + chemin, { headers: { 'apikey': SB.key, 'Prefer': 'count=exact' } });   /* comptage ANONYME volontaire : la clé anonyme en en-tête apikey suffit */
     if (!r.ok) return -1;
     var n = parseInt(String(r.headers.get('content-range') || '').split('/')[1]); return isNaN(n) ? -1 : n;
   } catch (e) { return -1; }
@@ -95823,6 +95902,7 @@ async function startRealtime(){
       heartbeatIntervalMs: 30000
     }
   });
+  _rtAppliquerJeton();   /* [RLS phase A] même jeton que PostgREST */
   _RT._badge('','⬤ RT…');
 
   /* Écouter tout le schéma public : le filtre serveur « table=like.pi_% »
