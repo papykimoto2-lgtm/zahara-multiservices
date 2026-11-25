@@ -35,10 +35,12 @@ test('portail : chargement par RPC sans paramètre ; réponse invalide ou refus 
     o.l = (await chargerDeboursTitre()).length; o.url = window.__u[0][0].split('/rpc/')[1]; o.body = window.__u[0][1];
     window.fetch = async function () { return new Response('{}', { status: 403 }); }; o.refus = await chargerDeboursTitre();
     window.fetch = async function () { return new Response('{"x":1}', { status: 200 }); }; o.invalide = await chargerDeboursTitre();
-    var ecrit = ''; window.open = function () { return { document: { write: function (h) { ecrit = h; }, close: function () {} }, print: function () {} }; };
+    var ecrit = '', ifr = null;   /* fenêtre simulée : le document stocké est confié à une iframe sandbox (srcdoc), jamais écrit dans la page du portail */
+    window.open = function () { var el = function () { return { setAttribute: function (k, v) { this[k] = v; }, addEventListener: function () {}, set srcdoc(v) { ecrit = v; ifr = this; } }; };
+      return { document: { open: function () {}, write: function () {}, close: function () {}, createElement: el, body: { appendChild: function () {} }, getElementById: function () { return { addEventListener: function () {} }; } } }; };
     S.debours = N; dbOuvrir(0); o.ecrit = ecrit; ecrit = ''; dbOuvrir(99); o.hors = ecrit;
     return o;
   }, NOTES);
-  assert.equal(r.l, 2); assert.equal(r.url, 'fc_vue_souscripteur_debours'); assert.equal(r.body, '{}'); assert.equal(r.refus, null); assert.equal(r.invalide, null); assert.equal(r.ecrit, '<p>NOTE <b>1</b></p>'); assert.equal(r.hors, '');
+  assert.equal(r.l, 2); assert.equal(r.url, 'fc_vue_souscripteur_debours'); assert.equal(r.body, '{}'); assert.equal(r.refus, null); assert.equal(r.invalide, null); assert.ok(r.ecrit.indexOf('<p>NOTE <b>1</b></p>') === 0 && r.ecrit.indexOf('__print__') > 0, 'le document figé est rendu tel quel, dans la sandbox'); assert.equal(r.hors, '');
   assert.deepEqual(erreurs, []);
 });

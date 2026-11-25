@@ -1625,6 +1625,28 @@
      le portail s'affichait vide, avec le nom par défaut, et le rechargement n'y changeait rien puisque le jeton restait
      dans l'onglet. Un jeton expiré est désormais écarté avant chaque appel : les lectures publiques repartent avec la
      clé publique, et l'espace connecté redemande simplement le code. */
+  /* [SÉCURITÉ] Un document HTML venu de la base (attestation, note de débours) n'est JAMAIS écrit dans l'origine du portail :
+     un script injecté y lirait sessionStorage['pp_token'] (jeton de 2 h) et le dossier de la victime. Il est rendu dans une
+     iframe sandbox SANS allow-same-origin (origine opaque : ni jeton, ni stockage, ni cookies, ni navigation du parent, ni
+     fenêtre fille). allow-scripts reste nécessaire au moteur de pagination du document ; allow-modals à l'impression.
+     L'impression se déclenche depuis l'intérieur (message) : le parent ne peut pas appeler print() sur une iframe d'origine opaque. */
+  function ouvrirDocSandbox(html, imprimer){
+    var w=window.open('','_blank','width=860,height=900'); if(!w) return false;
+    var d=w.document; d.open();
+    d.write('<!doctype html><html><head><meta charset="utf-8"><title>Document</title><style>html,body{margin:0;height:100%;background:#d1d5db;font-family:Arial,sans-serif}'
+      +'.bar{height:40px;box-sizing:border-box;padding:6px 10px;background:#0a2b3e;text-align:right}.bar button{padding:6px 14px;border:0;border-radius:6px;background:#fff;cursor:pointer;font-weight:600}'
+      +'iframe{display:block;border:0;width:100%;height:calc(100% - 40px);background:#fff}</style></head><body><div class="bar"><button type="button" id="pp-imp">🖨 Imprimer</button></div></body></html>');
+    d.close();
+    var f=d.createElement('iframe'); f.setAttribute('sandbox','allow-scripts allow-modals');
+    var ecoute='<script>window.addEventListener("message",function(e){if(e.data==="__print__"){try{window.print();}catch(x){}}});<\/script>';
+    var h=String(html||''), i=h.lastIndexOf('</body>');
+    f.srcdoc = i<0 ? h+ecoute : h.slice(0,i)+ecoute+h.slice(i);
+    d.body.appendChild(f);
+    var imp=function(){ try{ f.contentWindow.postMessage('__print__','*'); }catch(e){} };
+    d.getElementById('pp-imp').addEventListener('click', imp);
+    if(imprimer) f.addEventListener('load', function(){ setTimeout(imp, 700); });
+    return true;
+  }
   function _jetonExpire(t){
     try {
       var b = String(t).split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
@@ -1904,8 +1926,7 @@
   }
   function intOuvrirAttestation(ci,i){
     var d=(INT.dossiers||[])[parseInt(ci,10)], a=d&&(d.attestations||[])[parseInt(i,10)]; if(!a||!a.html) return;
-    var w=window.open('','_blank','width=860,height=900'); if(!w) return;
-    w.document.write(a.html); w.document.close();
+    if(!ouvrirDocSandbox(a.html,false)) return;
     try{ logConnexion('[NOTAIRE] '+(INT.nom||INT.id), true, 'Consultation attestation '+(a.numero||'')+' — '+(d.souscripteur||'')); }catch(e){}
     setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
   }
@@ -2397,8 +2418,7 @@
   }
   function dbOuvrir(i){
     var n=S.debours&&S.debours[parseInt(i,10)]; if(!n||!n.html) return;
-    var w=window.open('','_blank','width=860,height=900'); if(!w) return;
-    w.document.write(n.html); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
+    ouvrirDocSandbox(n.html,true);
   }
   /* Frise des démarches : étapes publiées au souscripteur, groupées par phase. Lecture seule. */
   var FRISE_ST={ termine:['Terminé','ok'], en_cours:['En cours','cours'], attente_intervenant:['En attente','att'], attente_document:['En attente','att'], attente_administration:['Chez l\'administration','att'], attente_decision:['En attente de décision','att'], bloque:['À débloquer','att'], rejete:['Rejeté','ko'], a_venir:['À venir',''], a_preparer:['À venir','']};
@@ -2722,8 +2742,7 @@
   function docAttSolde(kind){
     var a=_attPubliee(kind==='finale'?'attestation_solde_finale':'attestation_solde');
     if(!a) return;
-    var w=window.open('','_blank','width=860,height=900'); if(!w) return;
-    w.document.write(a.html); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
+    ouvrirDocSandbox(a.html,true);
   }
   function docAttestation(){
     var c=S.client, vs=sVers();
@@ -2917,8 +2936,7 @@
   }
   function fonOuvrirAttestation(){
     var a=F.cession&&F.cession.attestation_solde; if(!a||a.statut!=='valide'||!a.publie_portail||!a.html) return;
-    var w=window.open('','_blank','width=860,height=900'); if(!w) return;
-    w.document.write(a.html); w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
+    ouvrirDocSandbox(a.html,true);
   }
   /* Documents remis : seules les lignes marquées « visible portail » sont affichées (état et date) ; jamais de fichier ni de note interne. */
   var FON_DOCS_LIB={ contrat:'Contrat de cession / promesse / acte de vente', recus:'Reçus de versement', plan_lot:'Plan de situation / plan du lot', pv_remise:'PV de remise du terrain (bornage)', titre_mere:'Copie du titre mère (ACD / titre foncier)', arrete_lotissement:'Arrêté d\'approbation du lotissement', non_gage:'Certificat de non-gage / état foncier', acte_notarie:'Acte de vente notarié', titre_individuel:'Titre foncier individuel' };
