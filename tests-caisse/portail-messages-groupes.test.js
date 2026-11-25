@@ -57,7 +57,7 @@ test('interface, file un par un et trace dans le journal du souscripteur', async
     document.body.insertAdjacentHTML('beforeend', '<div id="csuivi-contenu"></div><button id="csuivi-tab-messages"></button>');
     csuiviSetTab('messages');
     var html = document.getElementById('csuivi-contenu').innerHTML;
-    csmsgDemarrer();
+    csmsgDemarrer(); await new Promise(function (res) { setTimeout(res, 600); });
     var fileHtml = document.getElementById('csuivi-contenu').innerHTML;
     var c0 = csmsgCourant().c.id;
     await csmsgTrace(c0, 'whatsapp');
@@ -69,5 +69,57 @@ test('interface, file un par un et trace dans le journal du souscripteur', async
   });
   assert.equal(r.sel, true); assert.equal(r.file, true); assert.equal(r.fin, true);
   assert.deepEqual(r.log, ['whatsapp']); assert.equal(r.faits, 1); assert.equal(r.passes, 1);
+  assert.deepEqual(app.etat.erreursPage, []);
+});
+
+test('accès au portail joints à tous les messages, y compris aux souscripteurs en retard', async () => {
+  const app = await ouvrirApp(); await preparer(app.page);
+  const r = await app.page.evaluate(async function () {
+    document.body.insertAdjacentHTML('beforeend', '<div id="csuivi-contenu"></div>');
+    var att = function () { return new Promise(function (res) { setTimeout(res, 600); }); };
+    /* a : à jour sans accès ; c : soldé avec accès existant */
+    var c = DATA.clients.find(function (x) { return x.id === 'c'; }); c.code_acces_hash = 'h'; c.code_acces_salt = 's';
+    DATA.versements = DATA.versements.filter(function (v) { return v.client_id !== 'a'; });
+    DATA.clients.push({ id: 'r', nom: 'Retard', prenoms: 'Rita', dossier: 'DR', tel: '07 00 00 00 09', montant_total: 1000000, statut: 'actif', date_souscription: '2020-01-01' });
+    var calc = csuiviCalculer(); var xr = calc.find(function (x) { return x.c.id === 'r'; }), xc = calc.find(function (x) { return x.c.id === 'c'; });
+    xr.code = 'retard'; xr.retard = { moisRetard: 4, montantDu: 250000 };   /* souscripteur en retard */
+    var apercu = csmsgTexte(xr);
+    var o = { codeRetard: xr.code, apercuAcces: /Votre Espace Souscripteur/.test(apercu), apercuPlaceholder: /créé automatiquement/.test(apercu),
+      existant: /déjà été remis/.test(csmsgTexte(xc)), avantSignature: apercu.indexOf('Espace Souscripteur') < apercu.indexOf('Cordialement') };
+    Object.assign(CSMSG, { statut: '', niveau: '', rech: 'Retard', exclus: {}, modele: 'auto', file: [], pos: 0, acces: true, regen: false, code: '', codeId: '' });
+    csmsgDemarrer(); await att();
+    var cur = csmsgCourant(), reel = csmsgTexte(cur), code = CSMSG.code;
+    o.codeCree = /^\d{6}$/.test(code); o.dansMessage = reel.indexOf('Code d’accès : ' + code) >= 0; o.hache = !!cur.c.code_acces_hash && JSON.stringify(DATA.clients).indexOf(code) < 0;
+    await csmsgTrace(cur.c.id, 'email'); o.envoye = csuiviAccesEtat(cur.c);
+    CSMSG.acces = false; o.sans = /Espace Souscripteur/.test(csmsgTexte(cur));
+    CSMSG.acces = true; CSMSG.modele = 'libre'; CSMSG.texte = 'Bonjour {prenom}\n{acces}\nMerci'; o.libreVar = /Identifiant : DR/.test(csmsgTexte(cur, '123456'));
+    return o;
+  });
+  assert.equal(r.codeRetard, 'retard'); assert.equal(r.apercuAcces, true); assert.equal(r.apercuPlaceholder, true);
+  assert.equal(r.existant, true); assert.equal(r.avantSignature, true);
+  assert.equal(r.codeCree, true); assert.equal(r.dansMessage, true); assert.equal(r.hache, true); assert.equal(r.envoye, 'envoye');
+  assert.equal(r.sans, false); assert.equal(r.libreVar, true);
+  assert.deepEqual(app.etat.erreursPage, []);
+});
+
+test('actions commerciales : le message d\'un souscripteur en retard contient ses accès au portail', async () => {
+  const app = await ouvrirApp(); await preparer(app.page);
+  const r = await app.page.evaluate(async function () {
+    document.body.insertAdjacentHTML('beforeend', '<div id="csuivi-contenu"></div>');
+    var cible = null;
+    window.open = function () { return { location: { set href(v) { cible = v; } } }; };
+    DATA.clients.find(function (c) { return c.id === 'a'; }).email = 'a@x.ci';
+    var x = csuiviCalculer().find(function (y) { return y.c.id === 'a'; });
+    var h = csuiviHtmlTable([x]);
+    /* mailto : on intercepte la construction du lien via csuiviInsererBloc + portailBlocAcces */
+    x.code = 'retard'; x.retard = { moisRetard: 4, montantDu: 250000 };
+    var code = '';
+    var r = await csuiviCreerAcces('souscripteur', x.c); code = r.code;
+    var msg = csuiviInsererBloc(csuiviMessage(x), portailBlocAcces(x.c, '🔑 Code d’accès : ' + code));
+    return { boutons: /csuiviEnvoiLigne\('a','email'\)/.test(h) && /csuiviEnvoiLigne\('a','whatsapp'\)/.test(h), ancien: /mailto:/.test(h),
+      retard: /retard/i.test(csuiviMessage(x)), acces: msg.indexOf('Code d’accès : ' + code) >= 0 && /Identifiant : Da/.test(msg), avantSignature: msg.indexOf('Espace Souscripteur') < msg.indexOf('Cordialement') };
+  });
+  assert.equal(r.boutons, true); assert.equal(r.ancien, false, 'plus de lien mailto figé sans accès');
+  assert.equal(r.retard, true); assert.equal(r.acces, true); assert.equal(r.avantSignature, true);
   assert.deepEqual(app.etat.erreursPage, []);
 });
