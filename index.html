@@ -35904,12 +35904,12 @@ function csuiviHtmlFile() {
     + (!l.wa.ok && l.tel ? '<div class="alert alert-warning" style="font-size:12px;">WhatsApp impossible : ' + escHtml(l.wa.raison) + (l.email ? ' — utilisez l’e-mail.' : '') + '</div>' : '')
     + '<textarea class="form-control" rows="9" readonly style="font-size:12px;">' + escHtml(msg) + '</textarea>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
-    + (tel ? '<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/' + tel + '?text=' + encodeURIComponent(msg) + '" onclick="csuiviAccesEnvoye(\'' + id + '\',\'whatsapp\')">💬 Envoyer par WhatsApp</a>' : '')
+    + (tel ? '<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/' + tel + '?text=' + encodeURIComponent(msg) + '" onclick="csuiviAccesEnvoye(\'' + id + '\',\'whatsapp\');csuiviAvancer(\'' + id + '\')">💬 Envoyer par WhatsApp</a>' : '')
     + (l.email ? '<button class="btn btn-secondary" onclick="csuiviAccesEmail(\'' + id + '\')">✉️ Envoyer par e-mail</button>' : '')
     + '<button class="btn btn-secondary" onclick="csuiviCopier()">📋 Copier</button>'
     + '<button class="btn btn-secondary" onclick="csuiviSuivant()">⏭ Passer / Suivant</button>'
     + '<button class="btn btn-secondary" onclick="csuiviSetTab(\'portail\')">Arrêter</button></div>'
-    + '<div style="font-size:11px;color:var(--blanc-dim);margin-top:8px;">Envoi manuel : WhatsApp s’ouvre avec le message prêt, appuyez sur « Envoyer » dans WhatsApp, puis revenez ici et cliquez « Suivant ».</div>'
+    + '<div style="font-size:11px;color:var(--blanc-dim);margin-top:8px;">Envoi manuel : WhatsApp s’ouvre avec le message prêt ; appuyez sur « Envoyer » dans WhatsApp. Le destinataire suivant s’affiche tout seul à votre retour.</div>'
     + '<div id="csuivi-etat" style="font-size:12px;margin-top:10px;color:var(--vert);"></div></div>';
 }
 /* Marque l'accès comme remis (date + canal). Aucun secret n'est enregistré. */
@@ -35932,7 +35932,7 @@ async function csuiviMarquerEnvoye(cible, id, canal) {
 async function csuiviAccesEnvoye(clientId, canal) {
   if (!await csuiviMarquerEnvoye(CSUIVI.fileCible, clientId, canal)) return;
   var e = document.getElementById('csuivi-etat');
-  if (e) e.textContent = '✔ Accès marqué comme envoyé par ' + canal + '. Cliquez sur « Envoyer » dans la fenêtre ouverte, puis « Suivant ».';
+  if (e) e.textContent = '✔ Accès marqué comme envoyé par ' + canal + '. Passage au suivant…';
 }
 function csuiviEmailjsEnvoyer(cible, c, code, exp) {
   var p = DATA.params || {}, soc = csuiviSociete(), l = csuiviLigne(cible, c);
@@ -35954,6 +35954,7 @@ async function csuiviAccesEmail(clientId) {
     } catch (err) { toast('❌ Erreur EmailJS : ' + ((err && err.text) || err), 'error'); }
   } else {
     await csuiviAccesEnvoye(clientId, 'email');
+    csuiviAvancer(clientId);
     var sujet = cible === 'intervenant' ? 'Votre accès à l’espace Intervenants — ' + csuiviSociete() : 'Vos accès à ' + csuiviSociete();
     window.location.href = 'mailto:' + l.email + '?subject=' + encodeURIComponent(sujet) + '&body=' + encodeURIComponent(csuiviMessageCourant(cible, c, CSUIVI.code, CSUIVI.exp));
   }
@@ -35980,6 +35981,11 @@ async function csuiviEnvoiGroupeEmail() {
   var b = document.getElementById('csuivi-sel');
   if (b) b.insertAdjacentHTML('afterbegin', '<div class="alert ' + (ko.length ? 'alert-warning' : 'alert-success') + '" style="font-size:12px;">✅ ' + ok + ' e-mail(s) envoyé(s)'
     + (ko.length ? ' · ❌ ' + ko.length + ' échec(s) : ' + escHtml(ko.join(' ; ')) + '. Pour ceux-ci un nouveau code a été créé : relancez en « Envoi assisté » (filtre « Code existant »).' : '') + '</div>');
+}
+/* Envoi manuel (WhatsApp / mailto) : passe automatiquement au destinataire suivant une fois l'application ouverte.
+   Délai court pour laisser le lien s'ouvrir ; le contrôle d'identifiant évite un double saut (double clic). */
+function csuiviAvancer(id) {
+  setTimeout(function () { var c = csuiviCourant(); if (c && c.id === id) csuiviSuivant(); }, 700);
 }
 function csuiviCopier() {
   var c = csuiviCourant(); if (!c) return;
@@ -36119,19 +36125,19 @@ function csmsgHtmlFile() {
     + (!x.wa.ok && x.c.tel ? '<div class="alert alert-warning" style="font-size:12px;">WhatsApp impossible : ' + escHtml(x.wa.raison) + (x.c.email ? ' — utilisez l’e-mail.' : '') + '</div>' : '')
     + '<textarea class="form-control" rows="8" readonly style="font-size:12px;">' + escHtml(msg) + '</textarea>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
-    + (x.wa.ok ? '<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/' + x.wa.num + '?text=' + encodeURIComponent(msg) + '" onclick="csmsgTrace(\'' + id + '\',\'whatsapp\')">💬 Ouvrir WhatsApp</a>' : '')
+    + (x.wa.ok ? '<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/' + x.wa.num + '?text=' + encodeURIComponent(msg) + '" onclick="csmsgTrace(\'' + id + '\',\'whatsapp\');csmsgAvancer(\'' + id + '\')">💬 Ouvrir WhatsApp</a>' : '')
     + (x.c.email ? '<button class="btn btn-secondary" onclick="csmsgEmail(\'' + id + '\')">✉️ E-mail</button>' : '')
     + '<button class="btn btn-secondary" onclick="csmsgCopier()">📋 Copier</button>'
     + '<button class="btn btn-secondary" onclick="csmsgPasser()">⏭ Passer / Suivant</button>'
     + '<button class="btn btn-secondary" onclick="csmsgArreter()">⏹ Arrêter</button></div>'
-    + '<div style="font-size:11px;color:var(--blanc-dim);margin-top:8px;">WhatsApp s’ouvre avec le message prêt : appuyez sur « Envoyer », puis revenez ici et cliquez « Suivant ».</div>'
+    + '<div style="font-size:11px;color:var(--blanc-dim);margin-top:8px;">WhatsApp s’ouvre avec le message prêt : appuyez sur « Envoyer ». Le destinataire suivant s’affiche tout seul à votre retour.</div>'
     + '<div id="csmsg-etat" style="font-size:12px;margin-top:10px;color:var(--vert);"></div></div>';
 }
 async function csmsgTrace(id, canal) {
   var x = csuiviCalculer().filter(function (y) { return y.c.id === id; })[0]; if (!x) return;
   await csuiviLoguer(id, x.code, canal, 'Message groupé' + (CSMSG.modele === 'libre' ? ' (personnalisé)' : ''));
   CSMSG.faits++;
-  var e = document.getElementById('csmsg-etat'); if (e) e.textContent = '✔ Envoi tracé (' + canal + '). Envoyez dans la fenêtre ouverte, puis « Suivant ».';
+  var e = document.getElementById('csmsg-etat'); if (e) e.textContent = '✔ Envoi tracé (' + canal + '). Passage au suivant…';
 }
 function csmsgEmailjs(x) {
   var p = DATA.params || {}, soc = csuiviSociete();
@@ -36145,6 +36151,7 @@ async function csmsgEmail(id) {
     catch (err) { toast('❌ Erreur EmailJS : ' + ((err && err.text) || err), 'error'); }
   } else {
     await csmsgTrace(id, 'email');
+    csmsgAvancer(id);
     window.location.href = 'mailto:' + x.c.email + '?subject=' + encodeURIComponent(csmsgObjet(x)) + '&body=' + encodeURIComponent(csmsgTexte(x));
   }
 }
@@ -36163,6 +36170,9 @@ async function csmsgEnvoiGroupeEmail() {
   csuiviRender();
   var b = document.getElementById('csmsg-sel');
   if (b) b.insertAdjacentHTML('afterbegin', '<div class="alert ' + (ko.length ? 'alert-warning' : 'alert-success') + '" style="font-size:12px;">✅ ' + ok + ' e-mail(s) envoyé(s)' + (ko.length ? ' · ❌ ' + ko.length + ' échec(s) : ' + escHtml(ko.join(' ; ')) : '') + '</div>');
+}
+function csmsgAvancer(id) {
+  setTimeout(function () { var x = csmsgCourant(); if (x && x.c.id === id) csmsgPasser(true); }, 700);
 }
 function csmsgCopier() {
   var x = csmsgCourant(); if (!x) return;

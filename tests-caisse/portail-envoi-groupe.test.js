@@ -123,3 +123,21 @@ test('identification des numéros WhatsApp (règle CRM-SANIX) et filtre canal', 
   assert.equal(r.cibles, 'c1,c2', 'un fixe sans e-mail est injoignable');
   assert.deepEqual(app.etat.erreursPage, []);
 });
+
+test('envoi manuel : passage automatique au destinataire suivant (accès et messages)', async () => {
+  const app = await ouvrirApp(); await preparer(app.page);
+  const r = await app.page.evaluate(async function () {
+    var att = function () { return new Promise(function (res) { setTimeout(res, 1200); }); };
+    document.body.insertAdjacentHTML('beforeend', '<div id="csuivi-contenu"></div>');
+    csuiviDemarrerEnvoi(); await att();
+    var a0 = csuiviCourant().id; csuiviAvancer(a0); csuiviAvancer(a0); await att();   /* double clic : un seul saut */
+    var a1 = csuiviCourant().id;
+    Object.assign(CSMSG, { statut: '', niveau: '', prog: '', comm: '', canal: '', rech: '', exclus: {}, modele: 'auto', file: [], pos: 0, faits: 0, passes: 0 });
+    csmsgDemarrer();
+    var m0 = csmsgCourant().c.id; csmsgAvancer(m0); await att();
+    return { a0: a0, a1: a1, m0: m0, m1: csmsgCourant() && csmsgCourant().c.id, pos: CSMSG.pos };
+  });
+  assert.equal(r.a0, 'c1'); assert.equal(r.a1, 'c2', 'un seul saut malgré le double déclenchement');
+  assert.notEqual(r.m1, r.m0); assert.equal(r.pos, 1);
+  assert.deepEqual(app.etat.erreursPage, []);
+});
