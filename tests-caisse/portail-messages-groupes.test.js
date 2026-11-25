@@ -101,3 +101,25 @@ test('accès au portail joints à tous les messages, y compris aux souscripteurs
   assert.equal(r.sans, false); assert.equal(r.libreVar, true);
   assert.deepEqual(app.etat.erreursPage, []);
 });
+
+test('actions commerciales : le message d\'un souscripteur en retard contient ses accès au portail', async () => {
+  const app = await ouvrirApp(); await preparer(app.page);
+  const r = await app.page.evaluate(async function () {
+    document.body.insertAdjacentHTML('beforeend', '<div id="csuivi-contenu"></div>');
+    var cible = null;
+    window.open = function () { return { location: { set href(v) { cible = v; } } }; };
+    DATA.clients.find(function (c) { return c.id === 'a'; }).email = 'a@x.ci';
+    var x = csuiviCalculer().find(function (y) { return y.c.id === 'a'; });
+    var h = csuiviHtmlTable([x]);
+    /* mailto : on intercepte la construction du lien via csuiviInsererBloc + portailBlocAcces */
+    x.code = 'retard'; x.retard = { moisRetard: 4, montantDu: 250000 };
+    var code = '';
+    var r = await csuiviCreerAcces('souscripteur', x.c); code = r.code;
+    var msg = csuiviInsererBloc(csuiviMessage(x), portailBlocAcces(x.c, '🔑 Code d’accès : ' + code));
+    return { boutons: /csuiviEnvoiLigne\('a','email'\)/.test(h) && /csuiviEnvoiLigne\('a','whatsapp'\)/.test(h), ancien: /mailto:/.test(h),
+      retard: /retard/i.test(csuiviMessage(x)), acces: msg.indexOf('Code d’accès : ' + code) >= 0 && /Identifiant : Da/.test(msg), avantSignature: msg.indexOf('Espace Souscripteur') < msg.indexOf('Cordialement') };
+  });
+  assert.equal(r.boutons, true); assert.equal(r.ancien, false, 'plus de lien mailto figé sans accès');
+  assert.equal(r.retard, true); assert.equal(r.acces, true); assert.equal(r.avantSignature, true);
+  assert.deepEqual(app.etat.erreursPage, []);
+});
