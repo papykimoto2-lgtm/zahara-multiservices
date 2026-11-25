@@ -102,3 +102,24 @@ test('rôle sans droit : intervenants refusés', async () => {
   });
   assert.equal(r.s, true); assert.equal(r.i, false);
 });
+
+test('identification des numéros WhatsApp (règle CRM-SANIX) et filtre canal', async () => {
+  const app = await ouvrirApp(); await preparer(app.page);
+  const r = await app.page.evaluate(function () {
+    var a = function (x) { var w = waNumero(x); return w.kind + ':' + w.num; };
+    var o = { mob: a('07 07 90 49 19'), plus: a('+225 05 12 34 56 78'), fixe: a('27 21 00 00 00'), vide: a(''), mal: a('12345'),
+      multi: a('27 21 00 00 00 / 07 08 09 10 11'), ancien: a('07 90 49 19'), etr: a('+221 77 123 45 67') };
+    DATA.clients.push({ id: 'c6', nom: 'Fixe', prenoms: 'Seul', dossier: 'D6', tel: '27 21 00 00 00', statut: 'actif' });
+    CSUIVI.fcanal = 'wa'; o.wa = csuiviSelection().map(function (x) { return x.id; }).sort().join(',');
+    CSUIVI.fcanal = 'sanswa'; o.sans = csuiviSelection().map(function (x) { return x.id; }).sort().join(',');
+    CSUIVI.fcanal = ''; o.cibles = csuiviCibles().map(function (x) { return x.id; }).sort().join(',');
+    return o;
+  });
+  assert.equal(r.mob, 'mobile:2250707904919'); assert.equal(r.plus, 'mobile:2250512345678');
+  assert.equal(r.fixe, 'fixe:'); assert.equal(r.vide, 'vide:'); assert.equal(r.mal, 'invalide:');
+  assert.equal(r.multi, 'mobile:2250708091011', 'premier mobile retenu'); assert.equal(r.ancien, 'mobile:2250707904919');
+  assert.equal(r.etr, 'international:221771234567');
+  assert.equal(r.wa, 'c1'); assert.equal(r.sans, 'c2,c3,c6');
+  assert.equal(r.cibles, 'c1,c2', 'un fixe sans e-mail est injoignable');
+  assert.deepEqual(app.etat.erreursPage, []);
+});

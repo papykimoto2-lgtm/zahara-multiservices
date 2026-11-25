@@ -35374,7 +35374,7 @@ function getRetardataires() {
    synchronisent avec elle, sans nouvelle table.
    ═══════════════════════════════════════════════════════════════════════ */
 var CSUIVI = { tab: 'actions', statut: '', commercial: '', recherche: '', file: [], fileCible: 'souscripteur', pos: 0, code: '', codeId: '', exp: '',
-  cible: 'souscripteur', facces: 'aucun', fprog: '', fcomm: '', fstat: '', ftype: '', frech: '', exclus: {} };
+  cible: 'souscripteur', facces: 'aucun', fprog: '', fcomm: '', fstat: '', ftype: '', frech: '', fcanal: '', exclus: {} };
 
 var CSUIVI_STATUTS = {
   retard_grave: { ico: '🔴', lib: 'Retard ≥ 3 mois', ordre: 1, action: 'Relance ferme + rendez-vous', canal: 'appel' },
@@ -35641,6 +35641,37 @@ async function csuiviMarquerFait(clientId, code) {
 }
 
 /* ── Onglet 2 : accès au portail souscripteur ─────────────────────────── */
+/* Identification des numéros WhatsApp (même règle que CRM-SANIX : waAnalyse).
+   Mobile ivoirien 01/05/07 (10 chiffres) = WhatsApp ; fixe 21-27 = pas de WhatsApp ;
+   ancien format 8 chiffres converti ; champ à plusieurs numéros (« / », « , », « ou ») = 1er mobile ;
+   numéro étranger avec + ou 00 accepté. Renvoie { ok, num (pour wa.me), affiche, kind, raison }. */
+var _CI_ANCIEN_8 = (function () { var m = {};
+  [['01', '01 02 03 40 41 42 43 50 51 52 53 70 71 72 73'], ['05', '04 05 06 44 45 46 54 55 56 64 65 66 74 75 76 84 85 86 94 95 96'],
+   ['07', '07 08 09 47 48 49 57 58 59 67 68 69 77 78 79 87 88 89 97 98']].forEach(function (e) { e[1].split(' ').forEach(function (x) { m[x] = e[0]; }); });
+  return m; })();
+function waNumero(raw) {
+  var t = String(raw == null ? '' : raw).trim();
+  if (!t) return { ok: false, kind: 'vide', num: '', affiche: '', raison: 'Numéro manquant' };
+  var mi = /^(?:\+|00)\s*(\d[\d\s.\-()]{7,})$/.exec(t);
+  if (mi && !/[\/;,|]| ou | et /i.test(t)) {
+    var di = mi[1].replace(/\D/g, '');
+    if (di.indexOf('225') !== 0 && di.length >= 9 && di.length <= 15) return { ok: true, kind: 'international', num: di, affiche: '+' + di, raison: '' };
+  }
+  var all = [];
+  t.replace(/[()]/g, '/').split(/[\/;,|\n]| ou | et /i).forEach(function (pt) {
+    var d = pt.replace(/\D/g, ''); if (!d) return;
+    if (d.indexOf('00225') === 0) d = d.slice(5); else if (d.indexOf('225') === 0 && (d.length === 13 || d.length === 11)) d = d.slice(3);
+    var kind = 'invalide', n = d;
+    if (d.length === 10) kind = /^(01|05|07)/.test(d) ? 'mobile' : /^(21|22|23|24|25|27)/.test(d) ? 'fixe' : 'invalide';
+    else if (d.length === 8 && _CI_ANCIEN_8[d.slice(0, 2)]) { n = _CI_ANCIEN_8[d.slice(0, 2)] + d; kind = 'mobile'; }
+    else if (d.length === 8 && /^[23]/.test(d)) kind = 'fixe';
+    all.push({ n: n, kind: kind });
+  });
+  var m = all.filter(function (x) { return x.kind === 'mobile'; })[0];
+  if (m) return { ok: true, kind: 'mobile', num: '225' + m.n, affiche: '+225 ' + m.n.replace(/(\d{2})(?=\d)/g, '$1 ').trim(), raison: '' };
+  if (all.some(function (x) { return x.kind === 'fixe'; })) return { ok: false, kind: 'fixe', num: '', affiche: '', raison: 'Numéro fixe : pas de WhatsApp (il faut un mobile 01 / 05 / 07)' };
+  return { ok: false, kind: 'invalide', num: '', affiche: '', raison: 'Numéro invalide « ' + t.slice(0, 30) + ' » (10 chiffres attendus : 07 XX XX XX XX)' };
+}
 function csuiviAccesEtat(c) {
   if (c.portail_acces_envoye) return 'envoye';
   if (c.code_acces_hash || c.derniere_connexion_portail) return 'code';
@@ -35665,7 +35696,8 @@ function csuiviLigne(cible, o) {
   return { id: o.id, obj: o,
     nom: interv ? (String(o.nom_organisation || '') + (o.contact_nom ? ' — ' + o.contact_nom : '')) : (((o.prenoms || '') + ' ' + (o.nom || '')).trim() || '—'),
     ref: interv ? (FC_TYPES_INTERVENANT[o.type] || o.type || '') : (o.dossier || ''),
-    tel: (interv ? o.telephone : o.tel) || '', email: o.email || '', etat: csuiviEtatAcces(cible, o) };
+    tel: (interv ? o.telephone : o.tel) || '', email: o.email || '', etat: csuiviEtatAcces(cible, o),
+    wa: waNumero(interv ? o.telephone : o.tel) };
 }
 /* Lignes correspondant au filtre courant (avant exclusions manuelles). */
 function csuiviSelection() {
@@ -35682,34 +35714,41 @@ function csuiviSelection() {
       var cm = csuiviCommercialNom(r.obj);
       if (CSUIVI.fcomm === '__none__' ? !!cm : (CSUIVI.fcomm && cm !== CSUIVI.fcomm)) return false;
     }
+    if (CSUIVI.fcanal === 'wa' && !r.wa.ok) return false;
+    if (CSUIVI.fcanal === 'email' && !r.email) return false;
+    if (CSUIVI.fcanal === 'sanswa' && r.wa.ok) return false;
     return !q || (r.nom + ' ' + r.ref + ' ' + r.tel + ' ' + r.email).toLowerCase().indexOf(q) >= 0;
   });
 }
 /* Destinataires retenus : joignables (téléphone ou e-mail) et non décochés. */
 function csuiviCibles() {
-  return csuiviSelection().filter(function (r) { return (r.tel || r.email) && !CSUIVI.exclus[r.id]; });
+  return csuiviSelection().filter(function (r) { return (r.wa.ok || r.email) && !CSUIVI.exclus[r.id]; });
 }
 function csuiviF(k, v) { CSUIVI[k] = v; CSUIVI.exclus = {}; csuiviRender(); }
-function csuiviChoisirCible(c) { CSUIVI.cible = c; CSUIVI.facces = 'aucun'; CSUIVI.fprog = CSUIVI.fcomm = CSUIVI.fstat = CSUIVI.ftype = CSUIVI.frech = ''; CSUIVI.exclus = {}; csuiviRender(); }
+function csuiviChoisirCible(c) { CSUIVI.cible = c; CSUIVI.facces = 'aucun'; CSUIVI.fprog = CSUIVI.fcomm = CSUIVI.fstat = CSUIVI.ftype = CSUIVI.frech = CSUIVI.fcanal = ''; CSUIVI.exclus = {}; csuiviRender(); }
 function csuiviBasculer(id) { if (CSUIVI.exclus[id]) delete CSUIVI.exclus[id]; else CSUIVI.exclus[id] = 1; csuiviRenderSel(); }
 function csuiviRenderSel() { var b = document.getElementById('csuivi-sel'); if (b) b.innerHTML = csuiviHtmlSel(); }
 function csuiviEmailjsPret() { var p = DATA.params || {}; return !!(p.emailjs_service && p.emailjs_template && p.emailjs_key && typeof emailjs !== 'undefined'); }
 function csuiviHtmlSel() {
-  var rows = csuiviSelection(), cibles = csuiviCibles(), sansContact = rows.filter(function (r) { return !r.tel && !r.email; }).length;
+  var rows = csuiviSelection(), cibles = csuiviCibles(), sansContact = rows.filter(function (r) { return !r.wa.ok && !r.email; }).length;
   var remp = cibles.filter(function (r) { return r.etat !== 'aucun'; }).length, mail = cibles.filter(function (r) { return r.email; }).length;
   var h = '<div style="font-size:13px;margin:10px 0;"><b>' + cibles.length + '</b> destinataire(s) retenu(s) sur ' + rows.length + ' correspondant au filtre'
-    + (sansContact ? ' · <span style="color:var(--or);">' + sansContact + ' sans téléphone ni e-mail (ignoré' + (sansContact > 1 ? 's' : '') + ')</span>' : '') + '</div>';
+    + (sansContact ? ' · <span style="color:var(--or);">' + sansContact + ' injoignable' + (sansContact > 1 ? 's' : '') + ' (ni WhatsApp valide ni e-mail : ignoré' + (sansContact > 1 ? 's' : '') + ')</span>' : '') + '</div>'
+    + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:8px;">📱 ' + rows.filter(function (r) { return r.wa.ok; }).length + ' numéro(s) WhatsApp identifié(s) · '
+    + rows.filter(function (r) { return !r.wa.ok && r.tel; }).length + ' téléphone(s) sans WhatsApp (fixe / invalide) · ✉️ ' + rows.filter(function (r) { return r.email; }).length + ' e-mail(s)</div>';
   if (remp) h += '<div class="alert alert-warning" style="font-size:12px;">⚠️ ' + remp + ' destinataire(s) ont déjà un accès : un nouveau code sera créé et l’ancien cessera de fonctionner (confirmation demandée).</div>';
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
-    + '<button class="btn btn-primary" ' + (cibles.length ? '' : 'disabled ') + 'onclick="csuiviDemarrerEnvoi()">📨 Envoi assisté (WhatsApp / e-mail) — ' + cibles.length + '</button>'
-    + (csuiviEmailjsPret() ? '<button class="btn btn-secondary" ' + (mail ? '' : 'disabled ') + 'onclick="csuiviEnvoiGroupeEmail()">✉️ Envoyer tous par e-mail automatiquement — ' + mail + '</button>' : '')
+    + '<button class="btn btn-primary" ' + (cibles.length ? '' : 'disabled ') + 'onclick="csuiviDemarrerEnvoi()">👆 Un par un (manuel) : WhatsApp / e-mail — ' + cibles.length + '</button>'
+    + (csuiviEmailjsPret() ? '<button class="btn btn-secondary" ' + (mail ? '' : 'disabled ') + 'onclick="csuiviEnvoiGroupeEmail()">⚡ Envoi direct e-mail (EmailJS) — ' + mail + '</button>' : '')
     + '</div>';
   if (rows.length) {
     h += '<div style="max-height:360px;overflow:auto;"><table class="table"><thead><tr><th></th><th>Nom</th><th>Réf.</th><th>Contact</th><th>Accès</th></tr></thead><tbody>'
       + rows.slice(0, 200).map(function (r) {
-        var joignable = r.tel || r.email;
+        var joignable = r.wa.ok || r.email;
         return '<tr' + (joignable ? '' : ' style="opacity:.5;"') + '><td><input type="checkbox" ' + (joignable ? '' : 'disabled ') + (joignable && !CSUIVI.exclus[r.id] ? 'checked ' : '') + 'onchange="csuiviBasculer(\'' + escHtml(r.id) + '\')"></td>'
-          + '<td>' + escHtml(r.nom) + '</td><td>' + escHtml(r.ref) + '</td><td>' + escHtml(r.tel || r.email || '—') + '</td>'
+          + '<td>' + escHtml(r.nom) + '</td><td>' + escHtml(r.ref) + '</td><td>'
+          + (r.wa.ok ? '<span title="Numéro WhatsApp utilisé">📱 ' + escHtml(r.wa.affiche) + '</span>' : (r.tel ? '<span style="color:var(--rouge);" title="' + escHtml(r.wa.raison) + '">❌ ' + escHtml(r.tel) + ' (' + (r.wa.kind === 'fixe' ? 'fixe' : 'invalide') + ')</span>' : '<span style="color:var(--blanc-dim);">pas de téléphone</span>'))
+          + (r.email ? '<br><span style="font-size:11px;">✉️ ' + escHtml(r.email) + '</span>' : '') + '</td>'
           + '<td>' + ({ aucun: '⏳ à remettre', envoye: '✅ envoyé', code: '🔑 code existant', actif: '🔑 actif', expire: '⌛ expiré' }[r.etat] || '') + '</td></tr>';
       }).join('') + '</tbody></table></div>'
       + (rows.length > 200 ? '<div style="font-size:11px;color:var(--blanc-dim);">200 premières lignes affichées sur ' + rows.length + ' (tous les destinataires cochés sont traités).</div>' : '');
@@ -35738,7 +35777,8 @@ function csuiviHtmlPortail() {
                      : [['aucun', 'Accès à remettre'], ['envoye', 'Déjà envoyés (renvoyer)'], ['code', 'Code existant (régénérer)'], ['tous', 'Tous']];
   h += '<div class="filters-bar" style="display:flex;gap:8px;flex-wrap:wrap;">'
     + '<input class="search-input" placeholder="Rechercher…" value="' + escHtml(CSUIVI.frech) + '" oninput="CSUIVI.frech=this.value;CSUIVI.exclus={};csuiviRenderSel()">'
-    + '<select class="filter-select" onchange="csuiviF(\'facces\',this.value)">' + etats.map(function (e) { return opt(e[0], e[1], CSUIVI.facces); }).join('') + '</select>';
+    + '<select class="filter-select" onchange="csuiviF(\'facces\',this.value)">' + etats.map(function (e) { return opt(e[0], e[1], CSUIVI.facces); }).join('') + '</select>'
+    + '<select class="filter-select" onchange="csuiviF(\'fcanal\',this.value)">' + [['', 'Tous canaux'], ['wa', '📱 WhatsApp possible'], ['email', '✉️ E-mail disponible'], ['sanswa', '🚫 Sans WhatsApp valide']].map(function (e) { return opt(e[0], e[1], CSUIVI.fcanal); }).join('') + '</select>';
   if (interv) {
     h += '<select class="filter-select" onchange="csuiviF(\'ftype\',this.value)"><option value="">Tous les types</option>'
       + Object.keys(FC_TYPES_INTERVENANT).map(function (k) { return opt(k, FC_TYPES_INTERVENANT[k], CSUIVI.ftype); }).join('') + '</select>';
@@ -35855,18 +35895,20 @@ function csuiviHtmlFile() {
   }
   if (CSUIVI.codeId !== c.id) return '<div class="alert alert-info">Création du code…</div>';
   var l = csuiviLigne(cible, c), msg = csuiviMessageCourant(cible, c, CSUIVI.code, CSUIVI.exp), id = escHtml(c.id);
-  var tel = l.tel ? telWhatsApp(String(l.tel).split('/')[0]) : '';
+  var tel = l.wa.ok ? l.wa.num : '';
   return '<div class="card" style="padding:16px;max-width:640px;">'
     + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">' + (cible === 'intervenant' ? 'Intervenant ' : 'Souscripteur ') + (CSUIVI.pos + 1) + ' / ' + n + '</div>'
     + '<div style="font-size:18px;font-weight:800;">' + escHtml(l.nom) + '</div>'
-    + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">' + (cible === 'intervenant' ? '' : 'Dossier ') + escHtml(l.ref || '—') + ' · ' + escHtml(l.tel || 'pas de téléphone') + ' · ' + escHtml(l.email || 'pas d’e-mail') + '</div>'
+    + '<div style="font-size:12px;color:var(--blanc-dim);margin-bottom:10px;">' + (cible === 'intervenant' ? '' : 'Dossier ') + escHtml(l.ref || '—') + ' · ' + escHtml(l.wa.ok ? '📱 ' + l.wa.affiche : (l.tel ? '❌ ' + l.tel : 'pas de téléphone')) + ' · ' + escHtml(l.email || 'pas d’e-mail') + '</div>'
+    + (!l.wa.ok && l.tel ? '<div class="alert alert-warning" style="font-size:12px;">WhatsApp impossible : ' + escHtml(l.wa.raison) + (l.email ? ' — utilisez l’e-mail.' : '') + '</div>' : '')
     + '<textarea class="form-control" rows="9" readonly style="font-size:12px;">' + escHtml(msg) + '</textarea>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
     + (tel ? '<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/' + tel + '?text=' + encodeURIComponent(msg) + '" onclick="csuiviAccesEnvoye(\'' + id + '\',\'whatsapp\')">💬 Envoyer par WhatsApp</a>' : '')
     + (l.email ? '<button class="btn btn-secondary" onclick="csuiviAccesEmail(\'' + id + '\')">✉️ Envoyer par e-mail</button>' : '')
     + '<button class="btn btn-secondary" onclick="csuiviCopier()">📋 Copier</button>'
-    + '<button class="btn btn-secondary" onclick="csuiviSuivant()">Suivant ▶</button>'
+    + '<button class="btn btn-secondary" onclick="csuiviSuivant()">⏭ Passer / Suivant</button>'
     + '<button class="btn btn-secondary" onclick="csuiviSetTab(\'portail\')">Arrêter</button></div>'
+    + '<div style="font-size:11px;color:var(--blanc-dim);margin-top:8px;">Envoi manuel : WhatsApp s’ouvre avec le message prêt, appuyez sur « Envoyer » dans WhatsApp, puis revenez ici et cliquez « Suivant ».</div>'
     + '<div id="csuivi-etat" style="font-size:12px;margin-top:10px;color:var(--vert);"></div></div>';
 }
 /* Marque l'accès comme remis (date + canal). Aucun secret n'est enregistré. */
