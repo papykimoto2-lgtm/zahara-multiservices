@@ -45,6 +45,11 @@ Chaque phase a un critère d'arrêt et un retour arrière. On fait **Zahara d'ab
 - Arrêt immédiat + `rls_fermeture.restaurer('X')` si : échec ERP (création / sync), souscripteur qui voit autrui, 401/403 persistants, formulaire public en échec.
 
 ### Phase 4 — Garde serveur des transitions d'attestation (SQL)
+> **Script prêt et testé, non appliqué** : `supabase/lot_b_garde_attestation.sql` ; tests : `supabase/tests/lot_b_garde_attestation_test.sql`
+> (PostgreSQL 16 de test simulant `auth.jwt()` et les rôles Supabase : 35 vérifications, dont upsert, service_role, jetons portail).
+> Deux modes : **`journal`** (défaut : n'empêche rien, consigne dans `attestation_garde.journal`) puis **`bloque`**. Une erreur interne de la garde
+> est consignée et l'écriture passe. Déploiement : appliquer en `journal`, laisser tourner plusieurs jours, lire le journal, corriger les
+> faux positifs (ex. un poste périmé qui repousse l'ancien statut d'une attestation), puis `update attestation_garde.config set mode = 'bloque'`.
 Triggers `BEFORE UPDATE` sur `pi_clients` (et `pi_cessions_foncieres`) pour les objets `attestation_solde`, `attestation_solde_finale` :
 - Passage à `statut = 'valide'`, ou `publie_portail`, `transmis_notaire` à vrai : exige `auth.jwt()->>'app_role'` ∈ {admin, manager}.
 - Une attestation `valide` est **immuable** (`html`, `numero`, `valide_par`, `valide_le`, `prix`, `verse`) sauf deux chemins : annulation (retour `brouillon` avec une entrée de plus dans `annulations`) et visa (une entrée de plus dans `visa_historique`).
