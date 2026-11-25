@@ -36003,25 +36003,48 @@ function csuiviSuivant() {
    niveau = tranche du prix déjà versée. Message automatique par statut (csuiviMessage) ou libre
    avec variables. Rien ne part sans clic : WhatsApp / e-mail un par un, ou e-mail direct (EmailJS).
    Chaque envoi est tracé dans le journal du souscripteur. */
-var CSMSG = { statut: '', niveau: '', prog: '', comm: '', canal: '', rech: '', exclus: {}, modele: 'auto', texte: '', objet: '', file: [], pos: 0, faits: 0, passes: 0 };
+var CSMSG = { statut: '', niveau: '', prog: '', comm: '', canal: '', rech: '', exclus: {}, modele: 'auto', texte: '', objet: '', file: [], pos: 0, faits: 0, passes: 0,
+  acces: true, regen: false, code: '', codeId: '' };
 var CSMSG_NIVEAUX = { '0-25': 'Moins de 25 % versé', '25-50': '25 à 50 % versé', '50-80': '50 à 80 % versé', '80-99': '80 % et plus, non soldé', '100': 'Soldé (100 %)' };
-var CSMSG_VARIABLES = '{prenom} {nom} {dossier} {lot} {total} {verse} {reste} {pourcent} {retard} {montant_du} {commercial} {societe} {lien}';
+var CSMSG_VARIABLES = '{prenom} {nom} {dossier} {lot} {total} {verse} {reste} {pourcent} {retard} {montant_du} {commercial} {societe} {lien} {acces}';
 function csmsgPeut() { return csuiviPeut('souscripteur'); }
 function csmsgNiveau(x) {
   if (!(x.total > 0)) return '';
   var p = x.verse / x.total * 100;
   return p >= 100 ? '100' : p >= 80 ? '80-99' : p >= 50 ? '50-80' : p >= 25 ? '25-50' : '0-25';
 }
-function csmsgFill(t, x) {
+function csmsgFill(t, x, bloc) {
   var c = x.c, v = {
     prenom: (c.prenoms || c.nom || '').trim(), nom: c.nom || '', dossier: c.dossier || '', lot: x.lot || '',
     total: fmtF(x.total) + ' F', verse: fmtF(x.verse) + ' F', reste: fmtF(x.reste) + ' F',
     pourcent: x.total > 0 ? Math.round(x.verse / x.total * 100) + ' %' : '',
     retard: x.retard ? csuiviDureeRetard(x.retard) : '', montant_du: x.retard ? fmtF(x.retard.montantDu) + ' F' : '',
-    commercial: x.commercial || '', societe: csuiviSociete(), lien: (typeof portailUrlSouscripteur === 'function' ? portailUrlSouscripteur() : '') };
+    commercial: x.commercial || '', societe: csuiviSociete(), lien: (typeof portailUrlSouscripteur === 'function' ? portailUrlSouscripteur() : ''), acces: bloc || '' };
   return String(t || '').replace(/\{(\w+)\}/g, function (m, k) { return Object.prototype.hasOwnProperty.call(v, k) ? v[k] : m; });
 }
-function csmsgTexte(x) { return CSMSG.modele === 'libre' ? csmsgFill(CSMSG.texte, x) : csuiviMessage(x); }
+/* Accès au portail joints à TOUT message, y compris aux souscripteurs en retard : le portail est un outil de
+   transparence et de confiance (situation, versements, échéancier, documents), pas une récompense.
+   Code : jamais relisible (stocké haché) → créé à l'envoi pour ceux qui n'en ont pas ; ceux qui en ont déjà un
+   reçoivent le lien et l'identifiant (code déjà remis, nouveau code sur simple demande). */
+function csmsgBesoinCode(c) { return !!CSMSG.acces && (CSMSG.regen || csuiviAccesEtat(c) === 'aucun'); }
+function csmsgCodeCourant(x) { return CSMSG.codeId === x.c.id ? CSMSG.code : ''; }
+function csmsgBlocAcces(c, code) {
+  var lien = portailUrlSouscripteur(), id = String(c.dossier || c.tel || c.id);
+  var ligneCode = code ? '🔑 Code d’accès : ' + code
+    : (csmsgBesoinCode(c) ? '🔑 Code d’accès : (créé automatiquement à l’envoi)'
+      : '🔑 Code d’accès : celui qui vous a déjà été remis (code oublié ? répondez à ce message, nous vous en créons un nouveau)');
+  return '🏠 Votre Espace Souscripteur — ' + csuiviSociete() + '\n'
+    + 'En toute transparence, retrouvez à tout moment votre situation, vos versements, votre échéancier et vos documents :\n'
+    + (lien ? '🔗 Lien : ' + lien + '\n' : '') + '👤 Identifiant : ' + id + '\n' + ligneCode + '\n'
+    + '🔒 Ce code est personnel : ne le communiquez à personne.';
+}
+function csmsgTexte(x, code) {
+  var libre = CSMSG.modele === 'libre', bloc = CSMSG.acces ? csmsgBlocAcces(x.c, code || csmsgCodeCourant(x)) : '';
+  var t = libre ? csmsgFill(CSMSG.texte, x, bloc) : csuiviMessage(x);
+  if (!bloc || (libre && /\{acces\}/.test(CSMSG.texte))) return t;
+  var i = t.lastIndexOf('\n\nCordialement');
+  return i < 0 ? t + '\n\n' + bloc : t.slice(0, i) + '\n\n' + bloc + t.slice(i);
+}
 function csmsgObjet(x) { return CSMSG.modele === 'libre' && CSMSG.objet.trim() ? csmsgFill(CSMSG.objet, x) : 'Votre dossier — ' + csuiviSociete(); }
 /* Lignes correspondant au filtre. */
 function csmsgSelection() {
@@ -36102,12 +36125,25 @@ function csuiviHtmlMessages() {
       + '<textarea class="form-control" rows="6" placeholder="Bonjour {prenom}, …" oninput="csmsgSaisie(\'texte\',this.value)">' + escHtml(CSMSG.texte) + '</textarea>'
       + '<div style="font-size:11px;color:var(--blanc-dim);margin-top:4px;">Variables : ' + CSMSG_VARIABLES + '</div>';
   } else h += '<div style="font-size:12px;color:var(--blanc-dim);">Chaque souscripteur reçoit le texte adapté à son statut (relance amiable, bienvenue, suivi bancaire, solde, remerciement…).</div>';
+  h += '<label style="display:block;font-size:13px;margin-top:10px;"><input type="checkbox" ' + (CSMSG.acces ? 'checked ' : '') + 'onchange="csmsgF(\'acces\',this.checked)"> 🔑 Joindre les accès au portail unique (lien, identifiant, code) — <b>pour tous, y compris les souscripteurs en retard</b></label>'
+    + (CSMSG.acces ? '<label style="display:block;font-size:12px;margin-top:4px;color:var(--blanc-dim);"><input type="checkbox" ' + (CSMSG.regen ? 'checked ' : '') + 'onchange="csmsgF(\'regen\',this.checked)"> Créer aussi un nouveau code pour ceux qui en ont déjà un (l’ancien cessera de fonctionner). Sinon : lien et identifiant, code déjà remis.</label>' : '');
   return h + '</div><div id="csmsg-sel">' + csmsgHtmlSel() + '</div>';
 }
 function csmsgDemarrer() {
   if (!csmsgPeut()) { toast('⛔ Accès refusé.', 'error'); return; }
   var rows = csmsgCibles(); if (!rows.length) return;
-  CSMSG.file = rows.map(function (x) { return x.c.id; }); CSMSG.pos = 0; CSMSG.faits = 0; CSMSG.passes = 0;
+  var remp = CSMSG.acces && CSMSG.regen ? rows.filter(function (x) { return csuiviAccesEtat(x.c) !== 'aucun'; }).length : 0;
+  if (remp && !confirm(remp + ' souscripteur(s) ont déjà un accès : un nouveau code va remplacer l’ancien (qui cessera de fonctionner). Continuer ?')) return;
+  CSMSG.file = rows.map(function (x) { return x.c.id; }); CSMSG.pos = 0; CSMSG.faits = 0; CSMSG.passes = 0; CSMSG.code = ''; CSMSG.codeId = '';
+  csuiviRender(); csmsgPreparer();
+}
+/* Crée, si besoin, le code d'accès du destinataire affiché (affiché une seule fois, stocké haché). */
+async function csmsgPreparer() {
+  var x = csmsgCourant();
+  if (x && csmsgBesoinCode(x.c) && CSMSG.codeId !== x.c.id) {
+    var r = await csuiviCreerAcces('souscripteur', x.c);
+    CSMSG.code = r.code || ''; CSMSG.codeId = x.c.id;
+  }
   csuiviRender();
 }
 function csmsgCourant() {
@@ -36118,6 +36154,7 @@ function csmsgHtmlFile() {
   var x = csmsgCourant(), n = CSMSG.file.length;
   if (!x) return '<div class="alert alert-success">✅ Terminé : ' + CSMSG.faits + ' message(s) traité(s), ' + CSMSG.passes + ' passé(s). Chaque envoi est tracé dans le journal du souscripteur.</div>'
     + '<button class="btn btn-secondary" onclick="csmsgArreter()">Retour</button>';
+  if (csmsgBesoinCode(x.c) && CSMSG.codeId !== x.c.id) return '<div class="alert alert-info">Création du code d’accès…</div>';
   var msg = csmsgTexte(x), id = escHtml(x.c.id), s = CSUIVI_STATUTS[x.code];
   return '<div class="card" style="padding:16px;max-width:640px;"><div style="font-size:12px;color:var(--blanc-dim);margin-bottom:6px;">Message ' + (CSMSG.pos + 1) + ' / ' + n + '</div>'
     + '<div style="font-size:18px;font-weight:800;">' + escHtml(((x.c.prenoms || '') + ' ' + (x.c.nom || '')).trim()) + '</div>'
@@ -36137,12 +36174,13 @@ async function csmsgTrace(id, canal) {
   var x = csuiviCalculer().filter(function (y) { return y.c.id === id; })[0]; if (!x) return;
   await csuiviLoguer(id, x.code, canal, 'Message groupé' + (CSMSG.modele === 'libre' ? ' (personnalisé)' : ''));
   CSMSG.faits++;
+  if (CSMSG.acces) await csuiviMarquerEnvoye('souscripteur', id, canal);   /* accès remis : visible dans « Accès portail » */
   var e = document.getElementById('csmsg-etat'); if (e) e.textContent = '✔ Envoi tracé (' + canal + '). Passage au suivant…';
 }
-function csmsgEmailjs(x) {
+function csmsgEmailjs(x, code) {
   var p = DATA.params || {}, soc = csuiviSociete();
   emailjs.init(p.emailjs_key);
-  return emailjs.send(p.emailjs_service, p.emailjs_template, { to_email: x.c.email, to_name: x.c.nom || '', subject: csmsgObjet(x), message: csmsgTexte(x), from_name: soc, reply_to: p.email || '' });
+  return emailjs.send(p.emailjs_service, p.emailjs_template, { to_email: x.c.email, to_name: x.c.nom || '', subject: csmsgObjet(x), message: csmsgTexte(x, code), from_name: soc, reply_to: p.email || '' });
 }
 async function csmsgEmail(id) {
   var x = csmsgCourant(); if (!x || x.c.id !== id || !x.c.email) return;
@@ -36159,11 +36197,19 @@ async function csmsgEnvoiGroupeEmail() {
   if (!csmsgPeut()) { toast('⛔ Accès refusé.', 'error'); return; }
   if (!csuiviEmailjsPret()) { toast('EmailJS non configuré (Paramètres).', 'error'); return; }
   var rows = csmsgCibles().filter(function (x) { return x.c.email; }); if (!rows.length) return;
-  if (!confirm('Envoyer ' + rows.length + ' e-mail(s) maintenant ? Cette action ne peut pas être annulée.')) return;
+  var remp = CSMSG.acces && CSMSG.regen ? rows.filter(function (x) { return csuiviAccesEtat(x.c) !== 'aucun'; }).length : 0;
+  if (!confirm('Envoyer ' + rows.length + ' e-mail(s) maintenant ?' + (CSMSG.acces ? '\nLes accès au portail seront joints (nouveau code créé pour ceux qui n’en ont pas).' : '') + (remp ? '\n' + remp + ' ancien(s) code(s) seront remplacé(s) et cesseront de fonctionner.' : '') + '\nCette action ne peut pas être annulée.')) return;
   var ok = 0, ko = [], box = document.getElementById('csmsg-sel');
   for (var k = 0; k < rows.length; k++) {
     if (box) box.innerHTML = '<div class="alert alert-info">Envoi en cours… ' + (k + 1) + ' / ' + rows.length + ' — ne fermez pas cet écran.</div>';
-    try { await csmsgEmailjs(rows[k]); await csuiviLoguer(rows[k].c.id, rows[k].code, 'email', 'Message groupé' + (CSMSG.modele === 'libre' ? ' (personnalisé)' : '')); ok++; }
+    try {
+      var code = '';
+      if (csmsgBesoinCode(rows[k].c)) { var r = await csuiviCreerAcces('souscripteur', rows[k].c); code = r.code || ''; }
+      await csmsgEmailjs(rows[k], code);
+      await csuiviLoguer(rows[k].c.id, rows[k].code, 'email', 'Message groupé' + (CSMSG.modele === 'libre' ? ' (personnalisé)' : ''));
+      if (CSMSG.acces) await csuiviMarquerEnvoye('souscripteur', rows[k].c.id, 'email');
+      ok++;
+    }
     catch (err) { ko.push(((rows[k].c.nom || '') + ' (' + ((err && err.text) || err) + ')')); }
     await new Promise(function (res) { setTimeout(res, 1100); });
   }
@@ -36178,7 +36224,7 @@ function csmsgCopier() {
   var x = csmsgCourant(); if (!x) return;
   if (navigator.clipboard) navigator.clipboard.writeText(csmsgTexte(x)).then(function () { toast('Message copié.', 'success'); });
 }
-function csmsgPasser(fait) { if (!fait) CSMSG.passes++; CSMSG.pos++; csuiviRender(); }
+function csmsgPasser(fait) { if (!fait) CSMSG.passes++; CSMSG.pos++; csuiviRender(); csmsgPreparer(); }
 function csmsgArreter() { CSMSG.file = []; CSMSG.pos = 0; csuiviRender(); }
 
 /* ═══════════════════════════════════════════════════════════════════════
