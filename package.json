@@ -4,6 +4,7 @@
   "scripts": {
     "test:caisse": "node --test tests-caisse/*.test.js",
     "test:compta": "node --test tests-compta/*.test.js",
-    "test": "npm run test:caisse && npm run test:compta"
+    "test": "npm run test:caisse && npm run test:compta",
+    "test:arc": "node arc-en-ciel/tests/conventions.js && node arc-en-ciel/tests/interface.js && node arc-en-ciel/tests/base-sql.js"
   }
 }

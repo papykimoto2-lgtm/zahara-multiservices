@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://*.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0b3d91">
+<link rel="icon" type="image/png" href="icons/arc-192.png">
+<link rel="stylesheet" href="modules.css">
+<title>Vérifier un document — Arc-en-Ciel Connect</title>
+</head>
+<body>
+<main class="ct etroit">
+<div class="card">
+<h1 class="hi">Vérifier un document</h1>
+<p class="sub">Scannez le QR imprimé sur le document (ou collez son lien) : l'origine, l'intégrité et la validité de la clé de signature sont contrôlées sans connexion.</p>
+<form id="f"><label>Lien du QR, texte « ARCV1|… » ou référence<input id="q" required autocomplete="off" maxlength="600"></label><button class="p" type="submit">Vérifier</button></form>
+</div>
+<div id="res" class="card" aria-live="polite"><p class="mu">Aucune vérification en cours.</p></div>
+<p class="ft">Arc-en-Ciel Connect · Logiciel développé par Sanix Africa Division Technologies · WhatsApp +225 0779181075 / 0140017751</p>
+</main>
+<script src="config.js"></script><script src="verifier-engine.js"></script>
+</body>
+</html>
