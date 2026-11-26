@@ -97,3 +97,28 @@ Dépôt `portail-medias` (écriture restreinte au personnel), secrets dans `pi_p
 - Un souscripteur ne reçoit que sa fiche filtrée ; les attestations non publiées ou annulées sont absentes de sa réponse.
 - Une attestation validée dont le texte est modifié en base n'est plus affichée (empreinte).
 - Un `<script>` dans `a.html` n'exfiltre aucun jeton.
+
+## 6. Revue indépendante du 26/11/2026 — suites (lot B2)
+
+Corrigé dans `lot_b_garde_attestation.sql` (v2, 55 vérifications locales PG16, **non appliqué en production**) :
+C2 visa soumis au rôle, annulations / visa jamais raccourcis · C3 valeurs « vraies » JS · C4 type / ref_id des validations immuables ·
+C6 `session_user` (une RPC SECURITY DEFINER n'échappe plus) · C7 partage notaire figé · E1 incident interne : refus par prudence sur une attestation
+sensible en mode `bloque` · E2 triggers `zz_…` · E3 DELETE gardé (fiche avec attestation validée, décision prise) · E4 registre des numéros
+(clé primaire, numéro obligatoire, jamais réutilisé, partagé initiale / finale / cessions) · E5 journal tronqué + login / sub / kind ·
+E6 `valide_par_serveur` / `valide_le_serveur` · E7 `search_path` fixé · F1 table `roles_autorises` · F2 valide → rejete permis au rôle autorisé ·
+F3 erreur HTTP 400 « GARDE_ATTESTATION » : l'ERP met en quarantaine sans geler la file · F4 comparaison numérique.
+C1 : trigger sur `pi_users` (rôle, statut, mots de passe : administrateur seulement ; mot de passe personnel permis).
+C5 : `pull_incremental_complet.sql` + `rls_04_pull_restreint.sql` (drapeau `pull_restreint`, à activer avec la vague A).
+
+**Reste à faire avant la vague A (go / no-go)** :
+- R1 inventaire des 7 vues publiques (Menko : +2) et de leurs tables de base, traitées AVANT la vague A ;
+- R2 régénérer `tables_portail()` depuis les appels `/rest/v1/` de `portail-unique.html`, du hub et de `menko-agro` ;
+- R3 `fermer()` : vérifier le contenu de `personnel_tout` (ALL, authenticated, qual, with_check) ;
+- R4 corriger `tools/rls_sonde_anon.js` (PATCH sur id inexistant = 204, tables vides, RPC) et ajouter `pull_incremental` ;
+- R5 renouvellement du jeton (8 h non renouvelable ; repli client 12 h incohérent) ;
+- R6 politique INSERT dédiée pour les formulaires publics ; `pi_logs_connexion` ouverte annule l'anti-brute-force ;
+- R7 jeton du personnel dans `localStorage` : iframe sandbox pour l'ERP aussi ;
+- supprimer le mot de passe en clair de `staff-login` (après migration des comptes) ;
+- répétition complète sur une branche Supabase, `restaurer()` chronométré < 5 min ;
+- rôles personnalisés (`responsable_*`, `comptable`…) : décider lesquels valident, les inscrire dans `attestation_garde.roles_autorises`.
+Passage en `bloque` : seulement après fermeture de `pi_users` et 7 jours de journal sans faux positif.

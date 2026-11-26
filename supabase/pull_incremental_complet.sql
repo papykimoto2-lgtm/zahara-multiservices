@@ -35,7 +35,13 @@ declare
   t text;
   cur text;
   rows jsonb;
+  ok boolean := true;
 begin
+  /* Revue lot B (C5) : une fois la restriction activée (rls_04_pull_restreint.sql), la clé publique ne lit plus rien par cette fonction. */
+  if to_regprocedure('attestation_garde.pull_autorise()') is not null then
+    execute 'select attestation_garde.pull_autorise()' into ok;
+    if not coalesce(ok, false) then raise exception 'pull_incremental réservé au personnel connecté' using errcode = '42501'; end if;
+  end if;
   result := public.pull_incremental_v1(cursors);
   for t in select jsonb_object_keys(coalesce(cursors, '{}'::jsonb)) loop
     continue when result ? t;
